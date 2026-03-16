@@ -185,6 +185,7 @@
       "kasserpro.domain": {
         "type": "Project"
       }
-    }
+    },
+    "net8.0/win-x86": {}
   }
 }

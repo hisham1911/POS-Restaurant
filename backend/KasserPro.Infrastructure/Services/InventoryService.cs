@@ -402,6 +402,35 @@ public class InventoryService : IInventoryService
         return inventory.Quantity;
     }
 
+    public async Task<int> GetRestorableQuantityAsync(int productId, int orderId)
+    {
+        var tenantId = _currentUserService.TenantId;
+        var branchId = _currentUserService.BranchId;
+
+        // Actual decremented quantity from sale movements for this order/product.
+        var actualDecremented = await _context.StockMovements
+            .Where(m => m.TenantId == tenantId &&
+                        m.BranchId == branchId &&
+                        m.ProductId == productId &&
+                        m.ReferenceType == "Order" &&
+                        m.ReferenceId == orderId &&
+                        m.Quantity < 0)
+            .SumAsync(m => (int?)(-m.Quantity)) ?? 0;
+
+        // Already restored quantity from refund movements for this order/product.
+        var alreadyRestored = await _context.StockMovements
+            .Where(m => m.TenantId == tenantId &&
+                        m.BranchId == branchId &&
+                        m.ProductId == productId &&
+                        m.ReferenceType == "OrderRefund" &&
+                        m.ReferenceId == orderId &&
+                        m.Quantity > 0)
+            .SumAsync(m => (int?)m.Quantity) ?? 0;
+
+        var restorable = actualDecremented - alreadyRestored;
+        return restorable > 0 ? restorable : 0;
+    }
+
     public async Task<ApiResponse<InventoryTransferDto>> CreateTransferAsync(CreateTransferRequest request)
     {
         await using var transaction = await _context.Database.BeginTransactionAsync();

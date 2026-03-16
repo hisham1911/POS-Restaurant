@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useGetLowStockItemsQuery } from "../../api/inventoryApi";
 import { useAppSelector } from "../../store/hooks";
 import { selectCurrentBranch, selectBranches } from "../../store/slices/branchSlice";
-import { AlertTriangle, Package, Filter } from "lucide-react";
+import { AlertTriangle, Package, Filter, ChevronDown } from "lucide-react";
 
 export default function LowStockAlerts() {
   const currentBranch = useAppSelector(selectCurrentBranch);
@@ -62,22 +62,25 @@ export default function LowStockAlerts() {
         {/* Branch Filter */}
         <div className="flex items-center gap-2">
           <Filter className="w-5 h-5 text-gray-400" />
-          <select
-            value={selectedBranchId || "all"}
-            onChange={(e) =>
-              setSelectedBranchId(
-                e.target.value === "all" ? undefined : Number(e.target.value)
-              )
-            }
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="all">جميع الفروع</option>
-            {branches.map((branch) => (
-              <option key={branch.id} value={branch.id}>
-                {branch.name}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              value={selectedBranchId || "all"}
+              onChange={(e) =>
+                setSelectedBranchId(
+                  e.target.value === "all" ? undefined : Number(e.target.value)
+                )
+              }
+              className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm min-w-[180px]"
+            >
+              <option value="all">جميع الفروع</option>
+              {branches.map((branch) => (
+                <option key={branch.id} value={branch.id}>
+                  {branch.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+          </div>
         </div>
       </div>
 

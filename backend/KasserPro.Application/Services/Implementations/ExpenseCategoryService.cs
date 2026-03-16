@@ -75,7 +75,7 @@ public class ExpenseCategoryService : IExpenseCategoryService
 
     public async Task<ApiResponse<ExpenseCategoryDto>> CreateAsync(CreateExpenseCategoryRequest request)
     {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             // Check for duplicate name
@@ -101,13 +101,13 @@ public class ExpenseCategoryService : IExpenseCategoryService
 
             await _unitOfWork.ExpenseCategories.AddAsync(category);
             await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             return ApiResponse<ExpenseCategoryDto>.Ok(MapToDto(category));
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackTransactionAsync();
             _logger.LogError(ex, "Error creating expense category");
             return ApiResponse<ExpenseCategoryDto>.Fail(ErrorCodes.INTERNAL_ERROR);
         }
@@ -115,7 +115,7 @@ public class ExpenseCategoryService : IExpenseCategoryService
 
     public async Task<ApiResponse<ExpenseCategoryDto>> UpdateAsync(int id, UpdateExpenseCategoryRequest request)
     {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             var category = await _unitOfWork.ExpenseCategories.Query()
@@ -148,13 +148,13 @@ public class ExpenseCategoryService : IExpenseCategoryService
 
             _unitOfWork.ExpenseCategories.Update(category);
             await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             return ApiResponse<ExpenseCategoryDto>.Ok(MapToDto(category));
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackTransactionAsync();
             _logger.LogError(ex, "Error updating expense category {Id}", id);
             return ApiResponse<ExpenseCategoryDto>.Fail(ErrorCodes.INTERNAL_ERROR);
         }
@@ -162,7 +162,7 @@ public class ExpenseCategoryService : IExpenseCategoryService
 
     public async Task<ApiResponse<bool>> DeleteAsync(int id)
     {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             var category = await _unitOfWork.ExpenseCategories.Query()
@@ -184,13 +184,13 @@ public class ExpenseCategoryService : IExpenseCategoryService
 
             _unitOfWork.ExpenseCategories.Delete(category);
             await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             return ApiResponse<bool>.Ok(true);
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackTransactionAsync();
             _logger.LogError(ex, "Error deleting expense category {Id}", id);
             return ApiResponse<bool>.Fail(ErrorCodes.INTERNAL_ERROR);
         }
@@ -213,16 +213,16 @@ public class ExpenseCategoryService : IExpenseCategoryService
 
                 var defaultCategories = new List<ExpenseCategory>
                 {
-                    new() { TenantId = tenant.Id, Name = "رواتب", NameEn = "Salaries", Icon = "💰", Color = "#3B82F6", IsActive = true, IsSystem = true, SortOrder = 1 },
-                    new() { TenantId = tenant.Id, Name = "إيجار", NameEn = "Rent", Icon = "🏢", Color = "#8B5CF6", IsActive = true, IsSystem = true, SortOrder = 2 },
-                    new() { TenantId = tenant.Id, Name = "كهرباء", NameEn = "Electricity", Icon = "⚡", Color = "#F59E0B", IsActive = true, IsSystem = true, SortOrder = 3 },
-                    new() { TenantId = tenant.Id, Name = "مياه", NameEn = "Water", Icon = "💧", Color = "#06B6D4", IsActive = true, IsSystem = true, SortOrder = 4 },
-                    new() { TenantId = tenant.Id, Name = "صيانة", NameEn = "Maintenance", Icon = "🔧", Color = "#10B981", IsActive = true, IsSystem = true, SortOrder = 5 },
-                    new() { TenantId = tenant.Id, Name = "تسويق", NameEn = "Marketing", Icon = "📢", Color = "#EC4899", IsActive = true, IsSystem = true, SortOrder = 6 },
-                    new() { TenantId = tenant.Id, Name = "مواصلات", NameEn = "Transportation", Icon = "🚗", Color = "#6366F1", IsActive = true, IsSystem = true, SortOrder = 7 },
-                    new() { TenantId = tenant.Id, Name = "اتصالات", NameEn = "Communications", Icon = "📞", Color = "#14B8A6", IsActive = true, IsSystem = true, SortOrder = 8 },
-                    new() { TenantId = tenant.Id, Name = "مستلزمات مكتبية", NameEn = "Office Supplies", Icon = "📝", Color = "#F97316", IsActive = true, IsSystem = true, SortOrder = 9 },
-                    new() { TenantId = tenant.Id, Name = "أخرى", NameEn = "Other", Icon = "📦", Color = "#64748B", IsActive = true, IsSystem = true, SortOrder = 10 }
+                    new() { TenantId = tenant.Id, Name = "Ø±ÙˆØ§ØªØ¨", NameEn = "Salaries", Icon = "ðŸ’°", Color = "#3B82F6", IsActive = true, IsSystem = true, SortOrder = 1 },
+                    new() { TenantId = tenant.Id, Name = "Ø¥ÙŠØ¬Ø§Ø±", NameEn = "Rent", Icon = "ðŸ¢", Color = "#8B5CF6", IsActive = true, IsSystem = true, SortOrder = 2 },
+                    new() { TenantId = tenant.Id, Name = "ÙƒÙ‡Ø±Ø¨Ø§Ø¡", NameEn = "Electricity", Icon = "âš¡", Color = "#F59E0B", IsActive = true, IsSystem = true, SortOrder = 3 },
+                    new() { TenantId = tenant.Id, Name = "Ù…ÙŠØ§Ù‡", NameEn = "Water", Icon = "ðŸ’§", Color = "#06B6D4", IsActive = true, IsSystem = true, SortOrder = 4 },
+                    new() { TenantId = tenant.Id, Name = "ØµÙŠØ§Ù†Ø©", NameEn = "Maintenance", Icon = "ðŸ”§", Color = "#10B981", IsActive = true, IsSystem = true, SortOrder = 5 },
+                    new() { TenantId = tenant.Id, Name = "ØªØ³ÙˆÙŠÙ‚", NameEn = "Marketing", Icon = "ðŸ“¢", Color = "#EC4899", IsActive = true, IsSystem = true, SortOrder = 6 },
+                    new() { TenantId = tenant.Id, Name = "Ù…ÙˆØ§ØµÙ„Ø§Øª", NameEn = "Transportation", Icon = "ðŸš—", Color = "#6366F1", IsActive = true, IsSystem = true, SortOrder = 7 },
+                    new() { TenantId = tenant.Id, Name = "Ø§ØªØµØ§Ù„Ø§Øª", NameEn = "Communications", Icon = "ðŸ“ž", Color = "#14B8A6", IsActive = true, IsSystem = true, SortOrder = 8 },
+                    new() { TenantId = tenant.Id, Name = "Ù…Ø³ØªÙ„Ø²Ù…Ø§Øª Ù…ÙƒØªØ¨ÙŠØ©", NameEn = "Office Supplies", Icon = "ðŸ“", Color = "#F97316", IsActive = true, IsSystem = true, SortOrder = 9 },
+                    new() { TenantId = tenant.Id, Name = "Ø£Ø®Ø±Ù‰", NameEn = "Other", Icon = "ðŸ“¦", Color = "#64748B", IsActive = true, IsSystem = true, SortOrder = 10 }
                 };
 
                 foreach (var category in defaultCategories)

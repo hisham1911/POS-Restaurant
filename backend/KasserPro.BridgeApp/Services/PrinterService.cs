@@ -96,12 +96,12 @@ public class PrinterService : IPrinterService
         {
             var printDoc = new PrintDocument();
             printDoc.PrinterSettings.PrinterName = printerName;
-            
+
             // Set default document name (used when printing to PDF)
             printDoc.DocumentName = receipt.ReceiptNumber;
-            
+
             // Also set PrintFileName for better compatibility with Print to PDF
-            if (printerName.Contains("PDF", StringComparison.OrdinalIgnoreCase) || 
+            if (printerName.Contains("PDF", StringComparison.OrdinalIgnoreCase) ||
                 printerName.Contains("XPS", StringComparison.OrdinalIgnoreCase))
             {
                 var documentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
@@ -202,14 +202,24 @@ public class PrinterService : IPrinterService
                 }
 
                 // ========== 2. HEADER ==========
+                bool isDailyReport = receipt.ReceiptNumber.Contains("تقرير يومي");
+
                 if (rs.ShowBranchName)
                 {
                     DrawCenter(receipt.BranchName, fontHeader);
                     y += 2;
                 }
 
-                DrawRow("فاتورة رقم", receipt.ReceiptNumber, font);
-                DrawCenter(receipt.Date.ToString("dd/MM/yyyy  hh:mm tt"), font);
+                if (isDailyReport)
+                {
+                    DrawCenter(receipt.ReceiptNumber, fontBold);
+                    // No time line for daily reports
+                }
+                else
+                {
+                    DrawRow("فاتورة رقم", receipt.ReceiptNumber, font);
+                    DrawCenter(receipt.Date.ToString("dd/MM/yyyy  hh:mm tt"), font);
+                }
 
                 // ========== REFUND INDICATOR ==========
                 if (receipt.IsRefund)
@@ -222,14 +232,17 @@ public class PrinterService : IPrinterService
                 DrawDash();
 
                 // ========== 3. CASHIER, CUSTOMER & PAYMENT ==========
-                var paymentAr = TranslatePaymentMethod(receipt.PaymentMethod);
-                if (rs.ShowCashier)
+                if (!string.IsNullOrEmpty(receipt.PaymentMethod) || !string.IsNullOrEmpty(receipt.CashierName))
                 {
-                    DrawRow($"الكاشير: {receipt.CashierName}", $"الدفع: {paymentAr}", font);
-                }
-                else
-                {
-                    DrawRow($"الدفع: {paymentAr}", "", font);
+                    var paymentAr = TranslatePaymentMethod(receipt.PaymentMethod);
+                    if (rs.ShowCashier)
+                    {
+                        DrawRow($"الكاشير: {receipt.CashierName}", $"الدفع: {paymentAr}", font);
+                    }
+                    else
+                    {
+                        DrawRow($"الدفع: {paymentAr}", "", font);
+                    }
                 }
                 if (rs.ShowCustomerName && !string.IsNullOrEmpty(receipt.CustomerName))
                 {
@@ -241,42 +254,100 @@ public class PrinterService : IPrinterService
                 // ========== 4. ITEMS ==========
                 foreach (var item in receipt.Items)
                 {
-                    // For refunds, show absolute values (positive numbers)
-                    var displayQuantity = receipt.IsRefund ? Math.Abs(item.Quantity) : item.Quantity;
-                    var displayPrice = receipt.IsRefund ? Math.Abs(item.TotalPrice) : item.TotalPrice;
-                    DrawRow($"{item.Name} × {displayQuantity:F0}", $"{displayPrice:F0} ج.م", font);
+                    if (isDailyReport)
+                    {
+                        // Smart rendering for daily report items
+                        if (item.Quantity == -1)
+                        {
+                            // Section header
+                            DrawDash();
+                            DrawCenter(item.Name, fontBold);
+                        }
+                        else if (item.Quantity == 0 && item.TotalPrice == 0)
+                        {
+                            // Empty divider – skip
+                        }
+                        else if (item.Quantity == 0 && item.TotalPrice != 0)
+                        {
+                            if (item.TotalPrice < 0)
+                            {
+                                // Deduction row: show with "-" prefix
+                                DrawRow(item.Name, $"- {Math.Abs(item.TotalPrice):F2} ج.م", font);
+                            }
+                            else
+                            {
+                                // Value row: Name ......... Price
+                                DrawRow(item.Name, $"{item.TotalPrice:F2} ج.م", font);
+                            }
+                        }
+                        else if (item.Quantity > 0 && item.TotalPrice == 0)
+                        {
+                            // Count row: Name ......... N
+                            DrawRow(item.Name, $"{item.Quantity}", font);
+                        }
+                        else
+                        {
+                            // Normal product: Name × Qty | Price
+                            DrawRow($"{item.Name} × {item.Quantity:F0}", $"{item.TotalPrice:F2} ج.م", font);
+                        }
+                    }
+                    else
+                    {
+                        // Regular receipt: standard format
+                        var displayQuantity = receipt.IsRefund ? Math.Abs(item.Quantity) : item.Quantity;
+                        var displayPrice = receipt.IsRefund ? Math.Abs(item.TotalPrice) : item.TotalPrice;
+                        DrawRow($"{item.Name} × {displayQuantity:F0}", $"{displayPrice:F0} ج.م", font);
+                    }
                 }
 
                 DrawDash();
 
                 // ========== 5. TOTALS ==========
-                // For refunds, show absolute values (positive numbers)
-                var displayNetTotal = receipt.IsRefund ? Math.Abs(receipt.NetTotal) : receipt.NetTotal;
-                var displayTaxAmount = receipt.IsRefund ? Math.Abs(receipt.TaxAmount) : receipt.TaxAmount;
-                var displayTotalAmount = receipt.IsRefund ? Math.Abs(receipt.TotalAmount) : receipt.TotalAmount;
+                // Check if this is a debt payment receipt
+                bool isDebtPayment = receipt.ReceiptNumber.StartsWith("PAY-");
 
-                DrawRow("المجموع", $"{displayNetTotal:F2} ج.م", font);
-
-                if (Math.Abs(receipt.TaxAmount) > 0 && rs.IsTaxEnabled)
+                if (isDebtPayment)
                 {
-                    DrawRow($"الضريبة ({rs.TaxRate:F0}%)", $"{displayTaxAmount:F2} ج.م", font);
+                    // Debt payment: Show only 3 fields
+                    DrawRow("المبلغ الكلي", $"{receipt.NetTotal:F2} ج.م", fontBold);
+                    DrawRow("المدفوع", $"{receipt.AmountPaid:F2} ج.م", fontBold);
+                    DrawRow("المتبقي", $"{receipt.AmountDue:F2} ج.م", fontBold);
                 }
-
-                var discount = receipt.NetTotal - receipt.TotalAmount + receipt.TaxAmount;
-                if (Math.Abs(discount) > 0)
+                else if (isDailyReport)
                 {
-                    var displayDiscount = Math.Abs(discount);
-                    DrawRow("الخصم", $"-{displayDiscount:F2} ج.م", font);
+                    // Show just the grand total for daily reports
+                    DrawRow("الإجمالي", $"{receipt.TotalAmount:F2} ج.م", fontTotal);
                 }
+                else
+                {
+                    // For refunds, show absolute values (positive numbers)
+                    var displayNetTotal = receipt.IsRefund ? Math.Abs(receipt.NetTotal) : receipt.NetTotal;
+                    var displayTaxAmount = receipt.IsRefund ? Math.Abs(receipt.TaxAmount) : receipt.TaxAmount;
+                    var displayTotalAmount = receipt.IsRefund ? Math.Abs(receipt.TotalAmount) : receipt.TotalAmount;
 
-                DrawDash();
+                    DrawRow("المجموع", $"{displayNetTotal:F2} ج.م", font);
 
-                // Total - bold and bigger
-                DrawRow("الإجمالي", $"{displayTotalAmount:F2} ج.م", fontTotal);
+                    if (Math.Abs(receipt.TaxAmount) > 0 && rs.IsTaxEnabled)
+                    {
+                        DrawRow($"الضريبة ({rs.TaxRate:F0}%)", $"{displayTaxAmount:F2} ج.م", font);
+                    }
+
+                    var discount = receipt.NetTotal - receipt.TotalAmount + receipt.TaxAmount;
+                    if (Math.Abs(discount) > 0)
+                    {
+                        var displayDiscount = Math.Abs(discount);
+                        DrawRow("الخصم", $"-{displayDiscount:F2} ج.م", font);
+                    }
+
+                    DrawDash();
+
+                    // Total - bold and bigger
+                    DrawRow("الإجمالي", $"{displayTotalAmount:F2} ج.م", fontTotal);
+                }
 
                 // ========== 6. PAYMENT AMOUNTS ==========
-                // Amount paid and change/due
-                if (receipt.AmountPaid > 0)
+                // Amount paid and change/due (skip for debt payments - already shown above)
+                if (!isDebtPayment && receipt.AmountPaid > 0)
                 {
                     DrawDash();
                     DrawRow("المبلغ المدفوع", $"{receipt.AmountPaid:F2} ج.م", font);
@@ -323,8 +394,76 @@ public class PrinterService : IPrinterService
     /// <summary>
     /// Generates ESC/POS byte sequence for a receipt
     /// </summary>
+    private byte[] GenerateDebtPaymentReceiptEscPos(ReceiptDto receipt)
+    {
+        var commands = new List<byte[]>();
+        var arabicEncoding = Encoding.GetEncoding(1256);
+
+        // Initialize printer
+        commands.Add(new byte[] { 0x1B, 0x40 }); // ESC @ - Initialize
+
+        // Center align
+        commands.Add(new byte[] { 0x1B, 0x61, 0x01 }); // ESC a 1
+
+        // Header
+        commands.Add(new byte[] { 0x1B, 0x21, 0x38 }); // Double size + bold
+        commands.Add(arabicEncoding.GetBytes("مجزر الأمانة\n"));
+        commands.Add(new byte[] { 0x1B, 0x21, 0x00 }); // Reset
+        commands.Add(arabicEncoding.GetBytes("\n"));
+        commands.Add(arabicEncoding.GetBytes("================================\n"));
+        commands.Add(arabicEncoding.GetBytes("\n"));
+
+        // Receipt info - left align
+        commands.Add(new byte[] { 0x1B, 0x61, 0x00 }); // Left align
+
+        commands.Add(new byte[] { 0x1B, 0x21, 0x08 }); // Bold
+        commands.Add(arabicEncoding.GetBytes($"فاتورة رقم: {receipt.ReceiptNumber}\n"));
+        commands.Add(new byte[] { 0x1B, 0x21, 0x00 }); // Reset
+
+        commands.Add(arabicEncoding.GetBytes($"التاريخ: {receipt.Date:dd/MM/yyyy HH:mm}\n"));
+        commands.Add(arabicEncoding.GetBytes($"الكاشير: {receipt.CashierName}\n"));
+        commands.Add(arabicEncoding.GetBytes($"العميل: {receipt.CustomerName}\n"));
+        commands.Add(arabicEncoding.GetBytes($"الدفع: {TranslatePaymentMethod(receipt.PaymentMethod)}\n"));
+        commands.Add(arabicEncoding.GetBytes("\n"));
+        commands.Add(arabicEncoding.GetBytes("================================\n"));
+        commands.Add(arabicEncoding.GetBytes("\n"));
+
+        // 3 Fields only: المبلغ الكلي - المدفوع - المتبقي
+        commands.Add(new byte[] { 0x1B, 0x21, 0x08 }); // Bold
+        commands.Add(arabicEncoding.GetBytes(FormatLineArabic("المبلغ الكلي", $"{receipt.NetTotal:F2} ج.م", 32) + "\n"));
+        commands.Add(arabicEncoding.GetBytes(FormatLineArabic("المدفوع", $"{receipt.AmountPaid:F2} ج.م", 32) + "\n"));
+        commands.Add(arabicEncoding.GetBytes(FormatLineArabic("المتبقي", $"{receipt.AmountDue:F2} ج.م", 32) + "\n"));
+        commands.Add(new byte[] { 0x1B, 0x21, 0x00 }); // Reset
+
+        commands.Add(arabicEncoding.GetBytes("\n"));
+        commands.Add(arabicEncoding.GetBytes("================================\n"));
+        commands.Add(arabicEncoding.GetBytes("\n"));
+
+        // Footer
+        commands.Add(new byte[] { 0x1B, 0x61, 0x01 }); // Center align
+        commands.Add(new byte[] { 0x1B, 0x21, 0x08 }); // Bold
+        commands.Add(arabicEncoding.GetBytes("شكراً لزيارتكم\n"));
+        commands.Add(new byte[] { 0x1B, 0x21, 0x00 }); // Reset
+        commands.Add(arabicEncoding.GetBytes("\n"));
+
+        // Feed and cut
+        commands.Add(new byte[] { 0x1B, 0x64, 0x03 }); // ESC d 3 - Feed 3 lines
+        commands.Add(new byte[] { 0x1D, 0x56, 0x00 }); // GS V 0 - Full cut
+
+        return commands.SelectMany(x => x).ToArray();
+    }
+
+    /// <summary>
+    /// Generates ESC/POS byte sequence for a receipt
+    /// </summary>
     private byte[] GenerateReceiptEscPos(ReceiptDto receipt)
     {
+        // Check if this is a debt payment receipt (PAY-X format)
+        if (receipt.ReceiptNumber.StartsWith("PAY-"))
+        {
+            return GenerateDebtPaymentReceiptEscPos(receipt);
+        }
+
         var commands = new List<byte[]>();
 
         // Use Windows-1256 encoding for Arabic support

@@ -13,6 +13,7 @@ import {
   AlertCircle,
   RefreshCw,
   Power,
+  ChevronDown,
 } from "lucide-react";
 import { formatDateOnly } from "../../utils/formatters";
 
@@ -385,17 +386,20 @@ export default function TenantCreationPage() {
               placeholder="بحث بالاسم أو slug"
               className="md:col-span-2 px-3 py-2 border border-gray-300 rounded-lg text-sm"
             />
-            <select
-              value={statusFilter}
-              onChange={(e) =>
-                setStatusFilter(e.target.value as "all" | "active" | "inactive")
-              }
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
-            >
-              <option value="all">كل الحالات</option>
-              <option value="active">المفعلة فقط</option>
-              <option value="inactive">المعطلة فقط</option>
-            </select>
+            <div className="relative">
+              <select
+                value={statusFilter}
+                onChange={(e) =>
+                  setStatusFilter(e.target.value as "all" | "active" | "inactive")
+                }
+                className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+              >
+                <option value="all">كل الحالات</option>
+                <option value="active">المفعلة فقط</option>
+                <option value="inactive">المعطلة فقط</option>
+              </select>
+              <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            </div>
           </div>
 
           {isLoadingTenants ? (

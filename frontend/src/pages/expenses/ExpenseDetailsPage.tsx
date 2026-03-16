@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, Check, X, DollarSign, FileText, Download, Trash2 } from 'lucide-react';
+import { ArrowRight, Check, X, DollarSign, FileText, Download, Trash2, ChevronDown } from 'lucide-react';
 import {
   useGetExpenseByIdQuery,
   useApproveExpenseMutation,
@@ -377,15 +377,18 @@ export function ExpenseDetailsPage() {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               طريقة الدفع <span className="text-red-500">*</span>
             </label>
-            <select
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="Cash">نقدي</option>
-              <option value="Card">بطاقة</option>
-              <option value="BankTransfer">تحويل بنكي</option>
-            </select>
+            <div className="relative">
+              <select
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+              >
+                <option value="Cash">نقدي</option>
+                <option value="Card">بطاقة</option>
+                <option value="BankTransfer">تحويل بنكي</option>
+              </select>
+              <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">ملاحظات (اختياري)</label>

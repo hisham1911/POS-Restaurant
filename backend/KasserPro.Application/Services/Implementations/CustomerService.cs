@@ -26,7 +26,7 @@ public class CustomerService : ICustomerService
     public async Task<PagedResult<CustomerDto>> GetAllAsync(int page = 1, int pageSize = 20, string? search = null)
     {
         var tenantId = _currentUser.TenantId;
-        
+
         var query = _unitOfWork.Customers.Query()
             .Where(c => c.TenantId == tenantId && c.IsActive);
 
@@ -34,14 +34,14 @@ public class CustomerService : ICustomerService
         if (!string.IsNullOrWhiteSpace(search))
         {
             var searchLower = search.ToLower();
-            query = query.Where(c => 
-                c.Phone.Contains(search) || 
+            query = query.Where(c =>
+                c.Phone.Contains(search) ||
                 (c.Name != null && c.Name.ToLower().Contains(searchLower)) ||
                 (c.Email != null && c.Email.ToLower().Contains(searchLower)));
         }
 
         var totalCount = await query.CountAsync();
-        
+
         var customers = await query
             .OrderByDescending(c => c.LastOrderAt ?? c.CreatedAt)
             .Skip((page - 1) * pageSize)
@@ -55,7 +55,7 @@ public class CustomerService : ICustomerService
     public async Task<CustomerDto?> GetByIdAsync(int id)
     {
         var tenantId = _currentUser.TenantId;
-        
+
         var customer = await _unitOfWork.Customers.Query()
             .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId);
 
@@ -69,7 +69,7 @@ public class CustomerService : ICustomerService
 
         var tenantId = _currentUser.TenantId;
         var normalizedPhone = NormalizePhone(phone);
-        
+
         var customer = await _unitOfWork.Customers.Query()
             .FirstOrDefaultAsync(c => c.Phone == normalizedPhone && c.TenantId == tenantId);
 
@@ -114,7 +114,7 @@ public class CustomerService : ICustomerService
     public async Task<CustomerDto?> UpdateAsync(int id, UpdateCustomerRequest request)
     {
         var tenantId = _currentUser.TenantId;
-        
+
         var customer = await _unitOfWork.Customers.Query()
             .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId);
 
@@ -159,10 +159,15 @@ public class CustomerService : ICustomerService
         return (newCustomer, true);
     }
 
+    /// <summary>
+    /// Update customer order statistics.
+    /// CRITICAL: NO transaction management - participates in parent transaction.
+    /// Parent service (OrderService) is responsible for SaveChanges and Commit.
+    /// </summary>
     public async Task UpdateOrderStatsAsync(int customerId, decimal orderTotal, int loyaltyPoints = 0)
     {
         var tenantId = _currentUser.TenantId;
-        
+
         var customer = await _unitOfWork.Customers.Query()
             .FirstOrDefaultAsync(c => c.Id == customerId && c.TenantId == tenantId);
 
@@ -173,7 +178,7 @@ public class CustomerService : ICustomerService
         customer.TotalOrders++;
         customer.TotalSpent += orderTotal;
         customer.LastOrderAt = DateTime.UtcNow;
-        
+
         // Update loyalty points (can be positive or negative)
         if (loyaltyPoints != 0)
         {
@@ -183,13 +188,19 @@ public class CustomerService : ICustomerService
                 customer.LoyaltyPoints = 0;
         }
 
-        await _unitOfWork.SaveChangesAsync();
+        // NO SaveChangesAsync - parent will save
+        // NO Commit - parent will commit
     }
 
-    public async Task DeductRefundStatsAsync(int customerId, decimal refundAmount, int pointsToDeduct)
+    /// <summary>
+    /// Deduct customer stats on refund.
+    /// CRITICAL: NO transaction management - participates in parent transaction (OrderService.RefundAsync).
+    /// Parent service is responsible for SaveChanges and Commit.
+    /// </summary>
+    public async Task DeductRefundStatsAsync(int customerId, decimal refundAmount, int pointsToDeduct, bool isFullRefund = false)
     {
         var tenantId = _currentUser.TenantId;
-        
+
         var customer = await _unitOfWork.Customers.Query()
             .FirstOrDefaultAsync(c => c.Id == customerId && c.TenantId == tenantId);
 
@@ -200,19 +211,29 @@ public class CustomerService : ICustomerService
         customer.TotalSpent -= refundAmount;
         if (customer.TotalSpent < 0)
             customer.TotalSpent = 0;
-        
+
         // Deduct loyalty points (don't go below zero)
         customer.LoyaltyPoints -= pointsToDeduct;
         if (customer.LoyaltyPoints < 0)
             customer.LoyaltyPoints = 0;
 
-        await _unitOfWork.SaveChangesAsync();
+        // FIX M-3: Decrement TotalOrders on full refund
+        if (isFullRefund && customer.TotalOrders > 0)
+            customer.TotalOrders--;
+
+        // NO SaveChangesAsync - parent will save
+        // NO Commit - parent will commit
     }
 
+    /// <summary>
+    /// Update customer credit balance (add to TotalDue).
+    /// CRITICAL: NO transaction management - participates in parent transaction.
+    /// Parent service (OrderService) is responsible for SaveChanges and Commit.
+    /// </summary>
     public async Task UpdateCreditBalanceAsync(int customerId, decimal amountDue)
     {
         var tenantId = _currentUser.TenantId;
-        
+
         var customer = await _unitOfWork.Customers.Query()
             .FirstOrDefaultAsync(c => c.Id == customerId && c.TenantId == tenantId);
 
@@ -222,13 +243,14 @@ public class CustomerService : ICustomerService
         // Add to TotalDue (customer owes more money)
         customer.TotalDue += amountDue;
 
-        await _unitOfWork.SaveChangesAsync();
+        // NO SaveChangesAsync - parent will save
+        // NO Commit - parent will commit
     }
 
     public async Task<bool> ValidateCreditLimitAsync(int customerId, decimal additionalAmount)
     {
         var tenantId = _currentUser.TenantId;
-        
+
         var customer = await _unitOfWork.Customers.Query()
             .FirstOrDefaultAsync(c => c.Id == customerId && c.TenantId == tenantId);
 
@@ -249,15 +271,28 @@ public class CustomerService : ICustomerService
         if (points <= 0) return;
 
         var tenantId = _currentUser.TenantId;
-        
-        var customer = await _unitOfWork.Customers.Query()
-            .FirstOrDefaultAsync(c => c.Id == customerId && c.TenantId == tenantId);
 
-        if (customer == null)
-            return;
+        await _unitOfWork.BeginTransactionAsync();
+        try
+        {
+            var customer = await _unitOfWork.Customers.Query()
+                .FirstOrDefaultAsync(c => c.Id == customerId && c.TenantId == tenantId);
 
-        customer.LoyaltyPoints += points;
-        await _unitOfWork.SaveChangesAsync();
+            if (customer == null)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                return;
+            }
+
+            customer.LoyaltyPoints += points;
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+        }
+        catch
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            throw;
+        }
     }
 
     public async Task<bool> RedeemLoyaltyPointsAsync(int customerId, int points)
@@ -265,67 +300,80 @@ public class CustomerService : ICustomerService
         if (points <= 0) return false;
 
         var tenantId = _currentUser.TenantId;
-        
-        var customer = await _unitOfWork.Customers.Query()
-            .FirstOrDefaultAsync(c => c.Id == customerId && c.TenantId == tenantId);
 
-        if (customer == null || customer.LoyaltyPoints < points)
-            return false;
+        await _unitOfWork.BeginTransactionAsync();
+        try
+        {
+            var customer = await _unitOfWork.Customers.Query()
+                .FirstOrDefaultAsync(c => c.Id == customerId && c.TenantId == tenantId);
 
-        customer.LoyaltyPoints -= points;
-        await _unitOfWork.SaveChangesAsync();
-        return true;
+            if (customer == null || customer.LoyaltyPoints < points)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                return false;
+            }
+
+            customer.LoyaltyPoints -= points;
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+            return true;
+        }
+        catch
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            throw;
+        }
     }
 
     public async Task<ApiResponse<PayDebtResponse>> PayDebtAsync(int customerId, PayDebtRequest request, int recordedByUserId)
     {
         var tenantId = _currentUser.TenantId;
         var branchId = _currentUser.BranchId;
-        
+
         // Validate amount
         if (request.Amount <= 0)
             return ApiResponse<PayDebtResponse>.Fail("INVALID_AMOUNT", "المبلغ يجب أن يكون أكبر من صفر");
-        
+
         // Get user for snapshot (filter by TenantId for multi-tenancy)
         var user = await _unitOfWork.Users.Query()
             .FirstOrDefaultAsync(u => u.Id == recordedByUserId && u.TenantId == tenantId);
         if (user == null)
             return ApiResponse<PayDebtResponse>.Fail("USER_NOT_FOUND", "المستخدم غير موجود");
-        
+
         // Get current shift (optional)
         var currentShift = await _unitOfWork.Shifts.Query()
-            .FirstOrDefaultAsync(s => s.TenantId == tenantId 
-                                   && s.BranchId == branchId 
+            .FirstOrDefaultAsync(s => s.TenantId == tenantId
+                                   && s.BranchId == branchId
                                    && s.UserId == recordedByUserId
                                    && !s.IsClosed);
-        
-        // ✅ BEGIN TRANSACTION - SQLite will acquire EXCLUSIVE lock on first write
-        await using var transaction = await _unitOfWork.BeginTransactionAsync();
-        
+
+        // BEGIN TRANSACTION - SQLite will acquire EXCLUSIVE lock on first write
+        await _unitOfWork.BeginTransactionAsync();
+
         try
         {
-            // ✅ FIX: Read customer INSIDE transaction with fresh data protected by lock
+            // FIX: Read customer INSIDE transaction with fresh data protected by lock
             var customer = await _unitOfWork.Customers.Query()
                 .FirstOrDefaultAsync(c => c.Id == customerId && c.TenantId == tenantId);
-            
+
             if (customer == null)
             {
-                await transaction.RollbackAsync();
+                await _unitOfWork.RollbackTransactionAsync();
                 return ApiResponse<PayDebtResponse>.Fail("CUSTOMER_NOT_FOUND", "العميل غير موجود");
             }
-            
-            // ✅ FIX: Validate with fresh data inside transaction
+
+            // FIX: Validate with fresh data inside transaction
             if (request.Amount > customer.TotalDue)
             {
-                await transaction.RollbackAsync();
-                return ApiResponse<PayDebtResponse>.Fail("AMOUNT_EXCEEDS_DEBT", 
+                await _unitOfWork.RollbackTransactionAsync();
+                return ApiResponse<PayDebtResponse>.Fail("AMOUNT_EXCEEDS_DEBT",
                     $"المبلغ ({request.Amount:F2}) أكبر من الدين المستحق ({customer.TotalDue:F2})");
             }
-            
-            // ✅ Calculate balance with fresh data
+
+            // Calculate balance with fresh data
             var balanceBefore = customer.TotalDue;
             var balanceAfter = balanceBefore - request.Amount;
-            
+
             // Create debt payment record
             var debtPayment = new DebtPayment
             {
@@ -342,15 +390,15 @@ public class CustomerService : ICustomerService
                 BalanceBefore = balanceBefore,
                 BalanceAfter = balanceAfter
             };
-            
+
             await _unitOfWork.DebtPayments.AddAsync(debtPayment);
-            
+
             // Reduce customer's TotalDue
             customer.TotalDue = balanceAfter;
-            
+
             await _unitOfWork.SaveChangesAsync();
-            
-            // ✅ INTEGRATION: Record in cash register if payment method is Cash
+
+            // INTEGRATION: Record in cash register if payment method is Cash
             if (request.PaymentMethod == Domain.Enums.PaymentMethod.Cash)
             {
                 await _cashRegisterService.RecordTransactionAsync(
@@ -362,9 +410,9 @@ public class CustomerService : ICustomerService
                     shiftId: currentShift?.Id
                 );
             }
-            
-            await transaction.CommitAsync();
-            
+
+            await _unitOfWork.CommitTransactionAsync();
+
             var response = new PayDebtResponse
             {
                 PaymentId = debtPayment.Id,
@@ -372,17 +420,17 @@ public class CustomerService : ICustomerService
                 BalanceBefore = balanceBefore,
                 BalanceAfter = balanceAfter,
                 RemainingDebt = balanceAfter,
-                Message = balanceAfter == 0 
-                    ? "تم تسديد الدين بالكامل" 
+                Message = balanceAfter == 0
+                    ? "تم تسديد الدين بالكامل"
                     : $"تم تسديد {request.Amount:F2} ج.م - المتبقي: {balanceAfter:F2} ج.م"
             };
-            
+
             return ApiResponse<PayDebtResponse>.Ok(response, response.Message);
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
-            return ApiResponse<PayDebtResponse>.Fail("SYSTEM_ERROR", 
+            await _unitOfWork.RollbackTransactionAsync();
+            return ApiResponse<PayDebtResponse>.Fail("SYSTEM_ERROR",
                 $"حدث خطأ أثناء تسجيل الدفع: {ex.Message}");
         }
     }
@@ -418,7 +466,7 @@ public class CustomerService : ICustomerService
     public async Task<List<DebtPaymentDto>> GetDebtPaymentHistoryAsync(int customerId)
     {
         var tenantId = _currentUser.TenantId;
-        
+
         var payments = await _unitOfWork.DebtPayments.Query()
             .Where(dp => dp.CustomerId == customerId && dp.TenantId == tenantId)
             .OrderByDescending(dp => dp.CreatedAt)
@@ -437,46 +485,53 @@ public class CustomerService : ICustomerService
                 CreatedAt = dp.CreatedAt
             })
             .ToListAsync();
-        
+
         return payments;
     }
 
     public async Task<List<CustomerDto>> GetCustomersWithDebtAsync()
     {
         var tenantId = _currentUser.TenantId;
-        
+
         var customers = await _unitOfWork.Customers.Query()
             .Where(c => c.TenantId == tenantId && c.IsActive && c.TotalDue > 0)
             .OrderByDescending(c => c.TotalDue)
             .Select(c => MapToDto(c))
             .ToListAsync();
-        
+
         return customers;
     }
 
+    /// <summary>
+    /// Reduce customer credit balance (subtract from TotalDue).
+    /// CRITICAL: NO transaction management - participates in parent transaction (OrderService.RefundAsync / CancelAsync).
+    /// Parent service is responsible for SaveChanges and Commit.
+    /// </summary>
     public async Task ReduceCreditBalanceAsync(int customerId, decimal amountToReduce)
     {
         if (amountToReduce <= 0) return;
-        
+
         var tenantId = _currentUser.TenantId;
-        
+
         var customer = await _unitOfWork.Customers.Query()
             .FirstOrDefaultAsync(c => c.Id == customerId && c.TenantId == tenantId);
-        
-        if (customer == null) return;
-        
+
+        if (customer == null)
+            return;
+
         // Reduce TotalDue (don't go below zero)
         customer.TotalDue -= amountToReduce;
         if (customer.TotalDue < 0)
             customer.TotalDue = 0;
-        
-        await _unitOfWork.SaveChangesAsync();
+
+        // NO SaveChangesAsync - parent will save
+        // NO Commit - parent will commit
     }
 
     public async Task<bool> DeleteAsync(int id)
     {
         var tenantId = _currentUser.TenantId;
-        
+
         var customer = await _unitOfWork.Customers.Query()
             .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId);
 

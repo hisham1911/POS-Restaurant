@@ -15,19 +15,21 @@ public class ShiftDto
     public string? Notes { get; set; }
     public decimal TotalCash { get; set; }
     public decimal TotalCard { get; set; }
+    public decimal TotalFawry { get; set; }
+    public decimal TotalBankTransfer { get; set; }
     public int TotalOrders { get; set; }
     public string UserName { get; set; } = string.Empty;
-    
+
     // Inactivity tracking
     public DateTime LastActivityAt { get; set; }
     public int InactiveHours { get; set; } // Calculated
-    
+
     // Force close
     public bool IsForceClosed { get; set; }
     public string? ForceClosedByUserName { get; set; }
     public DateTime? ForceClosedAt { get; set; }
     public string? ForceCloseReason { get; set; }
-    
+
     // Handover
     public bool IsHandedOver { get; set; }
     public string? HandedOverFromUserName { get; set; }
@@ -35,11 +37,11 @@ public class ShiftDto
     public DateTime? HandedOverAt { get; set; }
     public decimal HandoverBalance { get; set; }
     public string? HandoverNotes { get; set; }
-    
+
     // Calculated fields
     public int DurationHours { get; set; }
     public int DurationMinutes { get; set; }
-    
+
     // Orders in this shift
     public List<ShiftOrderDto> Orders { get; set; } = new();
 }

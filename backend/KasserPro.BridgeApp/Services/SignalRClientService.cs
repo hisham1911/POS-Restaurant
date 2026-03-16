@@ -93,6 +93,8 @@ public class SignalRClientService : ISignalRClientService
     /// </summary>
     public async Task DisconnectAsync()
     {
+        _disposed = true; // Stop reconnection loop
+
         if (_hubConnection != null)
         {
             try
@@ -115,10 +117,17 @@ public class SignalRClientService : ISignalRClientService
     {
         if (_hubConnection == null) return;
 
-        // Handle print receipt command
+        // Handle print receipt command (sales + daily reports)
         _hubConnection.On<PrintCommandDto>("PrintReceipt", (command) =>
         {
             Log.Information("Received print command: {CommandId}", command.CommandId);
+            OnPrintCommandReceived?.Invoke(this, new PrintCommandEventArgs(command));
+        });
+
+        // Handle debt payment receipt command
+        _hubConnection.On<PrintCommandDto>("PrintDebtPaymentReceipt", (command) =>
+        {
+            Log.Information("Received debt payment print command: {CommandId}", command.CommandId);
             OnPrintCommandReceived?.Invoke(this, new PrintCommandEventArgs(command));
         });
 

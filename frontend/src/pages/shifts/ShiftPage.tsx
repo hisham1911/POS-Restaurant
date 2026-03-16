@@ -67,7 +67,11 @@ export const ShiftPage = () => {
   };
 
   const handleCloseShift = async () => {
-    await closeShift({ closingBalance: Number(closingBalance), notes });
+    await closeShift({ 
+      closingBalance: Number(closingBalance), 
+      notes,
+      rowVersion: currentShift?.rowVersion 
+    });
     // Clear shift persistence when closing shift
     shiftPersistence.clear();
     setShowCloseModal(false);
@@ -240,10 +244,32 @@ export const ShiftPage = () => {
                   <CreditCard className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">المبيعات بالبطاقة</p>
+                  <p className="text-sm text-gray-500">مبيعات إلكترونية</p>
                   <p className="text-xl font-bold text-gray-800">
                     {formatCurrency(currentShift.totalCard)}
                   </p>
+                  {(currentShift.totalFawry > 0 ||
+                    currentShift.totalBankTransfer > 0) && (
+                    <div className="text-xs text-gray-400 mt-1 space-y-0.5">
+                      <p>
+                        بطاقة:{" "}
+                        {formatCurrency(
+                          currentShift.totalCard -
+                            currentShift.totalFawry -
+                            currentShift.totalBankTransfer,
+                        )}
+                      </p>
+                      {currentShift.totalFawry > 0 && (
+                        <p>فوري: {formatCurrency(currentShift.totalFawry)}</p>
+                      )}
+                      {currentShift.totalBankTransfer > 0 && (
+                        <p>
+                          تحويل بنكي:{" "}
+                          {formatCurrency(currentShift.totalBankTransfer)}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </Card>
@@ -305,7 +331,7 @@ export const ShiftPage = () => {
           <Input
             label="رصيد الافتتاح"
             type="number"
-            value={openingBalance}
+            value={openingBalance === "0" ? "" : openingBalance}
             onChange={(e) => setOpeningBalance(e.target.value)}
             placeholder="0.00"
             hint="المبلغ النقدي في الصندوق عند بداية الوردية"
@@ -366,7 +392,7 @@ export const ShiftPage = () => {
           <Input
             label="الرصيد الفعلي في الصندوق"
             type="number"
-            value={closingBalance}
+            value={closingBalance === "0" ? "" : closingBalance}
             onChange={(e) => setClosingBalance(e.target.value)}
             placeholder="0.00"
           />

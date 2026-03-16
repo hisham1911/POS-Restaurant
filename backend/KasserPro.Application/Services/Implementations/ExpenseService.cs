@@ -117,7 +117,7 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<ExpenseDto>> CreateAsync(CreateExpenseRequest request)
     {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             // Validate category exists
@@ -162,7 +162,7 @@ public class ExpenseService : IExpenseService
 
             await _unitOfWork.Expenses.AddAsync(expense);
             await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             // Reload with includes
             var createdExpense = await _unitOfWork.Expenses.Query()
@@ -176,7 +176,7 @@ public class ExpenseService : IExpenseService
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackTransactionAsync();
             _logger.LogError(ex, "Error creating expense");
             return ApiResponse<ExpenseDto>.Fail(ErrorCodes.INTERNAL_ERROR);
         }
@@ -184,7 +184,7 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<ExpenseDto>> UpdateAsync(int id, UpdateExpenseRequest request)
     {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
@@ -219,7 +219,7 @@ public class ExpenseService : IExpenseService
 
             _unitOfWork.Expenses.Update(expense);
             await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             // Reload with includes
             var updatedExpense = await _unitOfWork.Expenses.Query()
@@ -233,7 +233,7 @@ public class ExpenseService : IExpenseService
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackTransactionAsync();
             _logger.LogError(ex, "Error updating expense {Id}", id);
             return ApiResponse<ExpenseDto>.Fail(ErrorCodes.INTERNAL_ERROR);
         }
@@ -241,7 +241,7 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<bool>> DeleteAsync(int id)
     {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
@@ -258,13 +258,13 @@ public class ExpenseService : IExpenseService
 
             _unitOfWork.Expenses.Delete(expense);
             await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             return ApiResponse<bool>.Ok(true);
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackTransactionAsync();
             _logger.LogError(ex, "Error deleting expense {Id}", id);
             return ApiResponse<bool>.Fail(ErrorCodes.INTERNAL_ERROR);
         }
@@ -272,7 +272,7 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<ExpenseDto>> ApproveAsync(int id, ApproveExpenseRequest request)
     {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
@@ -302,7 +302,7 @@ public class ExpenseService : IExpenseService
 
             _unitOfWork.Expenses.Update(expense);
             await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             // Reload with includes
             var approvedExpense = await _unitOfWork.Expenses.Query()
@@ -316,7 +316,7 @@ public class ExpenseService : IExpenseService
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackTransactionAsync();
             _logger.LogError(ex, "Error approving expense {Id}", id);
             return ApiResponse<ExpenseDto>.Fail(ErrorCodes.INTERNAL_ERROR);
         }
@@ -324,7 +324,7 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<ExpenseDto>> RejectAsync(int id, RejectExpenseRequest request)
     {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
@@ -352,7 +352,7 @@ public class ExpenseService : IExpenseService
 
             _unitOfWork.Expenses.Update(expense);
             await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             // Reload with includes
             var rejectedExpense = await _unitOfWork.Expenses.Query()
@@ -366,7 +366,7 @@ public class ExpenseService : IExpenseService
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackTransactionAsync();
             _logger.LogError(ex, "Error rejecting expense {Id}", id);
             return ApiResponse<ExpenseDto>.Fail(ErrorCodes.INTERNAL_ERROR);
         }
@@ -374,7 +374,7 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<ExpenseDto>> PayAsync(int id, PayExpenseRequest request)
     {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
@@ -420,7 +420,7 @@ public class ExpenseService : IExpenseService
             }
 
             await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             // Reload with includes
             var paidExpense = await _unitOfWork.Expenses.Query()
@@ -434,7 +434,7 @@ public class ExpenseService : IExpenseService
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackTransactionAsync();
             _logger.LogError(ex, "Error paying expense {Id}", id);
             return ApiResponse<ExpenseDto>.Fail(ErrorCodes.INTERNAL_ERROR);
         }

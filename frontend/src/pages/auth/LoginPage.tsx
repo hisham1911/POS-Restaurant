@@ -23,7 +23,7 @@ export const LoginPage = () => {
           <div className="w-20 h-20 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <span className="text-4xl">🏪</span>
           </div>
-          <h1 className="text-3xl font-bold text-primary-600">KasserPro</h1>
+          <h1 className="text-3xl font-bold text-primary-600">TajerPro</h1>
           <p className="text-gray-500 mt-2">نظام نقاط البيع</p>
         </div>
 
@@ -52,7 +52,11 @@ export const LoginPage = () => {
               onClick={() => setShowPassword(!showPassword)}
               className="absolute left-3 top-[38px] text-gray-400 hover:text-gray-600 transition-colors"
             >
-              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+              {showPassword ? (
+                <EyeOff className="w-5 h-5" />
+              ) : (
+                <Eye className="w-5 h-5" />
+              )}
             </button>
           </div>
 
@@ -73,10 +77,12 @@ export const LoginPage = () => {
           <div className="mt-6 p-4 bg-gray-50 rounded-xl text-sm">
             <p className="font-medium text-gray-700 mb-2">بيانات تجريبية:</p>
             <p className="text-gray-600">
-              <span className="font-medium">المدير:</span> admin@kasserpro.com / Admin@123
+              <span className="font-medium">المدير:</span> admin@kasserpro.com /
+              Admin@123
             </p>
             <p className="text-gray-600">
-              <span className="font-medium">الكاشير:</span> ahmed@kasserpro.com / 123456
+              <span className="font-medium">الكاشير:</span> ahmed@kasserpro.com
+              / 123456
             </p>
           </div>
         )}

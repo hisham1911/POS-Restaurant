@@ -7,7 +7,7 @@ import {
   selectIsTaxEnabled,
   selectAllowNegativeStock,
 } from "@/store/slices/cartSlice";
-import { selectIsAuthenticated } from "@/store/slices/authSlice";
+import { selectIsAuthenticated, selectCurrentUser } from "@/store/slices/authSlice";
 
 /**
  * مكون لمزامنة إعدادات الضريبة والمخزون من بيانات الشركة إلى السلة
@@ -16,13 +16,14 @@ import { selectIsAuthenticated } from "@/store/slices/authSlice";
 export const TaxSettingsSync = () => {
   const dispatch = useAppDispatch();
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
+  const user = useAppSelector(selectCurrentUser);
   const currentTaxRate = useAppSelector(selectTaxRate);
   const currentIsTaxEnabled = useAppSelector(selectIsTaxEnabled);
   const currentAllowNegativeStock = useAppSelector(selectAllowNegativeStock);
 
-  // Only fetch tenant data when authenticated
+  // Only fetch tenant data when authenticated and user is not SystemOwner
   const { data: tenantData } = useGetCurrentTenantQuery(undefined, {
-    skip: !isAuthenticated,
+    skip: !isAuthenticated || user?.role === "SystemOwner",
   });
 
   const tenant = tenantData?.data;

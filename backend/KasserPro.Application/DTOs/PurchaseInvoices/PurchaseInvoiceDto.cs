@@ -37,6 +37,7 @@ public class PurchaseInvoiceItemDto
     public string? ProductSku { get; set; }
     public int Quantity { get; set; }
     public decimal PurchasePrice { get; set; }
+    public decimal SellingPrice { get; set; }
     public decimal Total { get; set; }
     public string? Notes { get; set; }
 }

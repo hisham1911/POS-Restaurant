@@ -74,7 +74,7 @@ public class ProductService : IProductService
                 TrackInventory = p.TrackInventory,
                 StockQuantity = p.StockQuantity,
                 CategoryId = p.CategoryId,
-                CategoryName = p.Category.Name,
+                CategoryName = p.Category != null ? p.Category.Name : null,
                 // Sellable V1: Inventory management fields
                 LowStockThreshold = p.LowStockThreshold,
                 ReorderPoint = p.ReorderPoint,
@@ -113,7 +113,7 @@ public class ProductService : IProductService
             TrackInventory = product.TrackInventory,
             StockQuantity = product.StockQuantity,
             CategoryId = product.CategoryId,
-            CategoryName = product.Category.Name,
+            CategoryName = product.Category?.Name,
             // Sellable V1: Inventory management fields
             LowStockThreshold = product.LowStockThreshold,
             ReorderPoint = product.ReorderPoint,
@@ -313,20 +313,20 @@ public class ProductService : IProductService
     {
         // Use transaction for atomicity
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
-        
+
         try
         {
             // Validation: Name is required
             if (string.IsNullOrWhiteSpace(request.Name))
                 return ApiResponse<ProductDto>.Fail("اسم المنتج مطلوب");
-            
+
             if (request.Name.Length > 200)
                 return ApiResponse<ProductDto>.Fail("اسم المنتج يجب ألا يتجاوز 200 حرف");
 
             // Validation: Price must be non-negative
             if (request.Price < 0)
                 return ApiResponse<ProductDto>.Fail("السعر يجب أن يكون أكبر من أو يساوي صفر");
-            
+
             // Validation: InitialStock must be non-negative
             if (request.InitialStock < 0)
                 return ApiResponse<ProductDto>.Fail("الكمية الأولية يجب أن تكون أكبر من أو تساوي صفر");

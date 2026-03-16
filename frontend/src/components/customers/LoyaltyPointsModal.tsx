@@ -145,7 +145,7 @@ export const LoyaltyPointsModal = ({
               </label>
               <Input
                 type="number"
-                value={points}
+                value={points === "0" ? "" : points}
                 onChange={(e) => setPoints(e.target.value)}
                 placeholder="أدخل عدد النقاط"
                 min="1"

@@ -76,6 +76,35 @@ const baseQueryWithReauth = retry(
           toast.error(
             "حدث خطأ في الخادم. لا تكرر العملية — تحقق من البيانات أولاً.",
           );
+        } else if (error.status === 400 || error.status === 403 || error.status === 409) {
+          // Handle 400/403/409 errors for mutations
+          const errorData = error.data as ApiErrorResponse | undefined;
+          const message = errorData?.message || "حدث خطأ في الطلب";
+          
+          if (errorData?.errorCode === "NO_OPEN_SHIFT") {
+            toast.error("يجب فتح وردية قبل إنشاء طلب");
+          } else if (errorData?.errorCode === "SHIFT_CONCURRENCY_CONFLICT") {
+            toast.error("تم تعديل الوردية من مستخدم آخر، يرجى تحديث الصفحة");
+            api.dispatch({ type: "api/invalidateTags", payload: ["Shifts"] });
+          } else if (errorData?.errorCode === "SHIFT_BRANCH_MISMATCH") {
+            toast.error("الوردية لا تنتمي للفرع الحالي");
+          } else if (errorData?.errorCode === "INSUFFICIENT_STOCK") {
+            toast.error(message, { duration: 5000 });
+            api.dispatch({ type: "api/invalidateTags", payload: ["Products"] });
+          } else if (errorData?.errorCode === "CUSTOMER_CREDIT_LIMIT_EXCEEDED") {
+            toast.error(message, { duration: 6000 });
+          } else if (errorData?.errorCode === "CUSTOMER_NOT_ACTIVE") {
+            toast.error(message);
+          } else if (errorData?.errorCode === "PAYMENT_INSUFFICIENT") {
+            toast.error(message);
+          } else if (errorData?.errorCode === "PAYMENT_EXCEEDS_DUE") {
+            toast.error(message);
+          } else if (error.status === 409) {
+            toast.error(message || "تم تعديل البيانات من مستخدم آخر - يرجى تحديث الصفحة");
+            api.dispatch({ type: "api/invalidateTags", payload: ["Orders", "Customers", "Shifts"] });
+          } else {
+            toast.error(message);
+          }
         }
         retry.fail(error);
         return result;
@@ -135,6 +164,18 @@ const baseQueryWithReauth = retry(
           toast.error(message, { duration: 5000 });
           // Invalidate products cache to get updated stock
           api.dispatch({ type: "api/invalidateTags", payload: ["Products"] });
+        } else if (errorData?.errorCode === "CUSTOMER_CREDIT_LIMIT_EXCEEDED") {
+          // Show detailed credit limit error
+          toast.error(message, { duration: 6000 });
+        } else if (errorData?.errorCode === "PAYMENT_INSUFFICIENT") {
+          toast.error(message);
+        } else if (errorData?.errorCode === "PAYMENT_EXCEEDS_DUE") {
+          toast.error(message);
+        } else if (error.status === 409) {
+          // Concurrency conflict - show message and invalidate cache
+          toast.error(message || "تم تعديل البيانات من مستخدم آخر - يرجى تحديث الصفحة");
+          // Invalidate all caches to force refetch
+          api.dispatch({ type: "api/invalidateTags", payload: ["Orders", "Customers", "Shifts"] });
         } else {
           toast.error(message);
         }
@@ -184,6 +225,12 @@ export const baseApi = createApi({
     "CashRegisterTransactions",
     "Backup",
     "Permissions",
+    "SystemUsers",
   ],
+  // Enable automatic refetching on focus and reconnect
+  refetchOnFocus: true,
+  refetchOnReconnect: true,
+  // Keep unused data in cache for 60 seconds
+  keepUnusedDataFor: 60,
   endpoints: () => ({}),
 });

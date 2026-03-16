@@ -18,6 +18,8 @@ export interface Customer {
   // Credit Sales Fields
   totalDue: number;
   creditLimit: number;
+  // Concurrency Token (for optimistic locking)
+  rowVersion?: string;
 }
 
 export interface CustomerSummary {
@@ -44,6 +46,8 @@ export interface UpdateCustomerRequest {
   notes?: string;
   isActive?: boolean;
   creditLimit?: number;
+  // Concurrency Token (must be included for updates)
+  rowVersion?: string;
 }
 
 export interface GetOrCreateCustomerRequest {

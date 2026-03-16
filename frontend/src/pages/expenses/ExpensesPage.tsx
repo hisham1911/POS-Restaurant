@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Eye, Edit, Trash2, Receipt, Wallet } from "lucide-react";
+import { Plus, Eye, Edit, Trash2, Receipt, Wallet, ChevronDown } from "lucide-react";
 import {
   useGetExpensesQuery,
   useDeleteExpenseMutation,
@@ -160,42 +160,48 @@ export function ExpensesPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 التصنيف
               </label>
-              <select
-                value={filters.categoryId || ""}
-                onChange={(e) =>
-                  handleFilterChange(
-                    "categoryId",
-                    e.target.value ? Number(e.target.value) : undefined,
-                  )
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">الكل</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={filters.categoryId || ""}
+                  onChange={(e) =>
+                    handleFilterChange(
+                      "categoryId",
+                      e.target.value ? Number(e.target.value) : undefined,
+                    )
+                  }
+                  className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                >
+                  <option value="">الكل</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 الحالة
               </label>
-              <select
-                value={filters.status || ""}
-                onChange={(e) =>
-                  handleFilterChange("status", e.target.value || undefined)
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">الكل</option>
-                <option value="Draft">مسودة</option>
-                <option value="Approved">معتمد</option>
-                <option value="Paid">مدفوع</option>
-                <option value="Rejected">مرفوض</option>
-              </select>
+              <div className="relative">
+                <select
+                  value={filters.status || ""}
+                  onChange={(e) =>
+                    handleFilterChange("status", e.target.value || undefined)
+                  }
+                  className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                >
+                  <option value="">الكل</option>
+                  <option value="Draft">مسودة</option>
+                  <option value="Approved">معتمد</option>
+                  <option value="Paid">مدفوع</option>
+                  <option value="Rejected">مرفوض</option>
+                </select>
+                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>

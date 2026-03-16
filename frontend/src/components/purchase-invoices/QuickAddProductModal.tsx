@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { useCreateProductMutation } from "../../api/productsApi";
 import { useGetCategoriesQuery } from "../../api/categoriesApi";
+import { ProductType } from "../../types/product.types";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { toast } from "sonner";
@@ -21,6 +23,7 @@ export function QuickAddProductModal({
   const [barcode, setBarcode] = useState("");
   const [categoryId, setCategoryId] = useState<number>(0);
   const [price, setPrice] = useState<number>(0);
+  const [productType, setProductType] = useState<ProductType>(ProductType.Physical);
 
   const { data: categoriesResponse } = useGetCategoriesQuery();
   const [createProduct, { isLoading }] = useCreateProductMutation();
@@ -53,9 +56,9 @@ export function QuickAddProductModal({
         categoryId,
         price,
         cost: 0, // Will be set from purchase invoice
-        trackInventory: true,
-        stockQuantity: 0,
-        lowStockThreshold: 5,
+        type: productType,
+        stockQuantity: productType === ProductType.Physical ? 0 : undefined,
+        lowStockThreshold: productType === ProductType.Physical ? 5 : undefined,
       }).unwrap();
 
       if (result.success && result.data) {
@@ -75,6 +78,7 @@ export function QuickAddProductModal({
     setBarcode("");
     setCategoryId(0);
     setPrice(0);
+    setProductType(ProductType.Physical);
     onClose();
   };
 
@@ -125,19 +129,45 @@ export function QuickAddProductModal({
           <label className="block text-sm font-medium mb-1">
             الفئة <span className="text-red-500">*</span>
           </label>
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(Number(e.target.value))}
-            className="w-full px-3 py-2 border rounded-lg"
-            required
-          >
-            <option value={0}>اختر الفئة</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(Number(e.target.value))}
+              className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
+              required
+            >
+              <option value={0}>اختر الفئة</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium mb-1">
+            نوع المنتج <span className="text-red-500">*</span>
+          </label>
+          <div className="relative">
+            <select
+              value={productType}
+              onChange={(e) => setProductType(Number(e.target.value) as ProductType)}
+              className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
+              required
+            >
+              <option value={ProductType.Physical}>منتج مادي (يتتبع المخزون)</option>
+              <option value={ProductType.Service}>خدمة (لا يتتبع المخزون)</option>
+            </select>
+            <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+          </div>
+          <p className="text-xs text-gray-500 mt-1">
+            {productType === ProductType.Physical 
+              ? "المنتجات المادية تتتبع الكمية في المخزون" 
+              : "الخدمات لا تتتبع الكمية (مثل: استشارات، صيانة)"}
+          </p>
         </div>
 
         <div>
@@ -146,8 +176,8 @@ export function QuickAddProductModal({
           </label>
           <input
             type="number"
-            value={price}
-            onChange={(e) => setPrice(Number(e.target.value))}
+            value={price === 0 ? "" : price}
+            onChange={(e) => setPrice(Number(e.target.value) || 0)}
             className="w-full px-3 py-2 border rounded-lg"
             placeholder="0.00"
             min="0"

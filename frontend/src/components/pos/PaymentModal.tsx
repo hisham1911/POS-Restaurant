@@ -54,16 +54,22 @@ export const PaymentModal = ({
   const change = numericAmount - total;
   const amountDue = total - numericAmount;
 
+  // Calculate available credit for customer
+  const availableCredit = selectedCustomer
+    ? selectedCustomer.creditLimit - selectedCustomer.totalDue
+    : 0;
+
   // Check if customer can take credit
   const canTakeCredit =
     selectedCustomer &&
+    selectedCustomer.isActive &&
     (selectedCustomer.creditLimit === 0 ||
-      selectedCustomer.totalDue + amountDue <= selectedCustomer.creditLimit);
+      amountDue <= availableCredit);
 
   const creditLimitExceeded =
     selectedCustomer &&
     selectedCustomer.creditLimit > 0 &&
-    selectedCustomer.totalDue + amountDue > selectedCustomer.creditLimit;
+    amountDue > availableCredit;
 
   const handleNumpadClick = (value: string) => {
     if (value === "C") {
@@ -98,10 +104,17 @@ export const PaymentModal = ({
       return;
     }
 
+    // Validate customer is active
+    if (numericAmount < total && selectedCustomer && !selectedCustomer.isActive) {
+      toast.error("العميل غير نشط - لا يمكن البيع الآجل");
+      return;
+    }
+
     // Validate credit limit
     if (numericAmount < total && creditLimitExceeded) {
       toast.error(
-        `تجاوز حد الائتمان المسموح (${formatCurrency(selectedCustomer!.creditLimit)})`,
+        `تجاوز حد الائتمان. المتاح: ${formatCurrency(availableCredit)} ج.م، المطلوب: ${formatCurrency(amountDue)} ج.م`,
+        { duration: 5000 }
       );
       return;
     }
@@ -198,9 +211,55 @@ export const PaymentModal = ({
                     </div>
                   )}
                   {selectedCustomer.creditLimit > 0 && (
-                    <div className="text-xs text-gray-500">
-                      حد الائتمان:{" "}
-                      {formatCurrency(selectedCustomer.creditLimit)}
+                    <div className="mt-2 p-2 bg-white rounded border border-gray-200">
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-600">حد الائتمان:</span>
+                        <span className="font-medium">
+                          {formatCurrency(selectedCustomer.creditLimit)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span className="text-gray-600">المستخدم:</span>
+                        <span className="font-medium text-orange-600">
+                          {formatCurrency(selectedCustomer.totalDue)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-xs">
+                        <span className="text-gray-600">المتاح:</span>
+                        <span
+                          className={`font-medium ${
+                            availableCredit < 0
+                              ? "text-danger-600"
+                              : "text-success-600"
+                          }`}
+                        >
+                          {formatCurrency(availableCredit)}
+                        </span>
+                      </div>
+                      {/* Progress bar */}
+                      <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full transition-all ${
+                            selectedCustomer.totalDue /
+                              selectedCustomer.creditLimit >
+                            0.9
+                              ? "bg-danger-500"
+                              : selectedCustomer.totalDue /
+                                    selectedCustomer.creditLimit >
+                                  0.7
+                                ? "bg-orange-500"
+                                : "bg-success-500"
+                          }`}
+                          style={{
+                            width: `${Math.min(
+                              (selectedCustomer.totalDue /
+                                selectedCustomer.creditLimit) *
+                                100,
+                              100
+                            )}%`,
+                          }}
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -347,7 +406,12 @@ export const PaymentModal = ({
                     </p>
                     {creditLimitExceeded && (
                       <p className="text-xs text-danger-600 mt-1">
-                        تجاوز حد الائتمان المسموح
+                        تجاوز حد الائتمان - المتاح: {formatCurrency(availableCredit)}
+                      </p>
+                    )}
+                    {selectedCustomer && !selectedCustomer.isActive && (
+                      <p className="text-xs text-danger-600 mt-1">
+                        العميل غير نشط
                       </p>
                     )}
                   </div>

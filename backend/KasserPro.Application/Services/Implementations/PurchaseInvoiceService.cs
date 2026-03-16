@@ -1,35 +1,22 @@
-namespace KasserPro.Application.Services.Implementations;
+﻿namespace KasserPro.Application.Services.Implementations;
 
-using KasserPro.Application.Common;
+using Microsoft.EntityFrameworkCore;
 using KasserPro.Application.Common.Interfaces;
 using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.PurchaseInvoices;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Entities;
 using KasserPro.Domain.Enums;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 public class PurchaseInvoiceService : IPurchaseInvoiceService
 {
     private readonly IUnitOfWork _unitOfWork;
-    private readonly ICurrentUserService _currentUserService;
-    private readonly ILogger<PurchaseInvoiceService> _logger;
-    private readonly ICashRegisterService _cashRegisterService;
-    private readonly IInventoryService _inventoryService;
+    private readonly ICurrentUserService _currentUser;
 
-    public PurchaseInvoiceService(
-        IUnitOfWork unitOfWork,
-        ICurrentUserService currentUserService,
-        ILogger<PurchaseInvoiceService> logger,
-        ICashRegisterService cashRegisterService,
-        IInventoryService inventoryService)
+    public PurchaseInvoiceService(IUnitOfWork unitOfWork, ICurrentUserService currentUser)
     {
         _unitOfWork = unitOfWork;
-        _currentUserService = currentUserService;
-        _logger = logger;
-        _cashRegisterService = cashRegisterService;
-        _inventoryService = inventoryService;
+        _currentUser = currentUser;
     }
 
     public async Task<ApiResponse<PagedResult<PurchaseInvoiceDto>>> GetAllAsync(
@@ -40,784 +27,68 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         int pageNumber = 1,
         int pageSize = 20)
     {
-        try
-        {
-            var query = _unitOfWork.PurchaseInvoices.Query()
-                .Where(pi => pi.TenantId == _currentUserService.TenantId)
-                .Include(pi => pi.Supplier)
-                .Include(pi => pi.Items)
-                .Include(pi => pi.Payments)
-                .AsQueryable();
+        var tenantId = _currentUser.TenantId;
+        var query = _unitOfWork.PurchaseInvoices.Query()
+            .Where(pi => pi.TenantId == tenantId && !pi.IsDeleted);
 
-            // Apply filters
-            if (supplierId.HasValue)
-                query = query.Where(pi => pi.SupplierId == supplierId.Value);
+        if (supplierId.HasValue)
+            query = query.Where(pi => pi.SupplierId == supplierId.Value);
 
-            if (status.HasValue)
-                query = query.Where(pi => pi.Status == status.Value);
+        if (status.HasValue)
+            query = query.Where(pi => pi.Status == status.Value);
 
-            if (fromDate.HasValue)
-                query = query.Where(pi => pi.InvoiceDate >= fromDate.Value);
+        if (fromDate.HasValue)
+            query = query.Where(pi => pi.InvoiceDate >= fromDate.Value);
 
-            if (toDate.HasValue)
-                query = query.Where(pi => pi.InvoiceDate <= toDate.Value);
+        if (toDate.HasValue)
+            query = query.Where(pi => pi.InvoiceDate <= toDate.Value);
 
-            // Order by date descending
-            query = query.OrderByDescending(pi => pi.InvoiceDate);
+        var totalCount = await query.CountAsync();
+        
+        var invoices = await query
+            .OrderByDescending(pi => pi.CreatedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .Select(pi => new PurchaseInvoiceDto
+            {
+                Id = pi.Id,
+                InvoiceNumber = pi.InvoiceNumber,
+                SupplierId = pi.SupplierId,
+                SupplierName = pi.SupplierName,
+                SupplierPhone = pi.SupplierPhone,
+                InvoiceDate = pi.InvoiceDate,
+                Status = pi.Status.ToString(),
+                Subtotal = pi.Subtotal,
+                TaxRate = pi.TaxRate,
+                TaxAmount = pi.TaxAmount,
+                Total = pi.Total,
+                AmountPaid = pi.AmountPaid,
+                AmountDue = pi.AmountDue,
+                Notes = pi.Notes,
+                CreatedByUserName = pi.CreatedByUserName ?? "",
+                ConfirmedByUserName = pi.ConfirmedByUserName,
+                ConfirmedAt = pi.ConfirmedAt,
+                CreatedAt = pi.CreatedAt
+            })
+            .ToListAsync();
 
-            // Pagination
-            var totalCount = await query.CountAsync();
-            var items = await query
-                .Skip((pageNumber - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
+        var result = new PagedResult<PurchaseInvoiceDto>(invoices, totalCount, pageNumber, pageSize);
 
-            var dtos = items.Select(MapToDto).ToList();
-
-            var pagedResult = new PagedResult<PurchaseInvoiceDto>(dtos, totalCount, pageNumber, pageSize);
-
-            return ApiResponse<PagedResult<PurchaseInvoiceDto>>.Ok(pagedResult);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting purchase invoices");
-            return ApiResponse<PagedResult<PurchaseInvoiceDto>>.Fail(ErrorCodes.INTERNAL_ERROR);
-        }
+        return ApiResponse<PagedResult<PurchaseInvoiceDto>>.Ok(result);
     }
 
     public async Task<ApiResponse<PurchaseInvoiceDto>> GetByIdAsync(int id)
     {
-        try
-        {
-            var invoice = await _unitOfWork.PurchaseInvoices.Query()
-                .Where(pi => pi.Id == id && pi.TenantId == _currentUserService.TenantId)
-                .Include(pi => pi.Supplier)
-                .Include(pi => pi.Items)
-                .Include(pi => pi.Payments)
-                .FirstOrDefaultAsync();
-
-            if (invoice == null)
-                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND);
-
-            return ApiResponse<PurchaseInvoiceDto>.Ok(MapToDto(invoice));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting purchase invoice {Id}", id);
-            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.INTERNAL_ERROR);
-        }
-    }
-
-    public async Task<ApiResponse<PurchaseInvoiceDto>> CreateAsync(CreatePurchaseInvoiceRequest request)
-    {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
-        try
-        {
-            // Validate supplier exists
-            var supplier = await _unitOfWork.Suppliers.Query()
-                .FirstOrDefaultAsync(s => s.Id == request.SupplierId && s.TenantId == _currentUserService.TenantId);
-            
-            if (supplier == null)
-                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.SUPPLIER_NOT_FOUND);
-
-            // Validate items
-            if (request.Items == null || request.Items.Count == 0)
-                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_EMPTY);
-
-            // Get tenant for tax settings
-            var tenant = await _unitOfWork.Tenants.Query()
-                .FirstOrDefaultAsync(t => t.Id == _currentUserService.TenantId);
-
-            // Get user name
-            var user = await _unitOfWork.Users.Query()
-                .FirstOrDefaultAsync(u => u.Id == _currentUserService.UserId);
-
-            // Generate invoice number
-            var invoiceNumber = await GenerateInvoiceNumberAsync();
-
-            // Create invoice
-            var invoice = new PurchaseInvoice
-            {
-                TenantId = _currentUserService.TenantId,
-                BranchId = _currentUserService.BranchId,
-                InvoiceNumber = invoiceNumber,
-                SupplierId = request.SupplierId,
-                SupplierName = supplier.Name,
-                SupplierPhone = supplier.Phone,
-                SupplierAddress = supplier.Address,
-                InvoiceDate = request.InvoiceDate,
-                Status = PurchaseInvoiceStatus.Draft,
-                Notes = request.Notes,
-                CreatedByUserId = _currentUserService.UserId,
-                CreatedByUserName = user?.Name ?? _currentUserService.Email ?? "Unknown"
-            };
-
-            // Add items
-            foreach (var itemRequest in request.Items)
-            {
-                var product = await _unitOfWork.Products.Query()
-                    .FirstOrDefaultAsync(p => p.Id == itemRequest.ProductId && p.TenantId == _currentUserService.TenantId);
-
-                if (product == null)
-                    return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PRODUCT_NOT_FOUND);
-
-                var item = new PurchaseInvoiceItem
-                {
-                    ProductId = itemRequest.ProductId,
-                    ProductName = product.Name,
-                    ProductNameEn = product.NameEn,
-                    ProductSku = product.Sku,
-                    ProductBarcode = product.Barcode,
-                    Quantity = itemRequest.Quantity,
-                    PurchasePrice = itemRequest.PurchasePrice,
-                    Total = itemRequest.Quantity * itemRequest.PurchasePrice,
-                    Notes = itemRequest.Notes
-                };
-
-                invoice.Items.Add(item);
-            }
-
-            // Calculate totals
-            CalculateTotals(invoice, tenant!);
-
-            await _unitOfWork.PurchaseInvoices.AddAsync(invoice);
-            await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            // Reload with includes
-            var createdInvoice = await _unitOfWork.PurchaseInvoices.Query()
-                .Where(pi => pi.Id == invoice.Id)
-                .Include(pi => pi.Supplier)
-                .Include(pi => pi.Items)
-                .Include(pi => pi.Payments)
-                .FirstAsync();
-
-            return ApiResponse<PurchaseInvoiceDto>.Ok(MapToDto(createdInvoice));
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            _logger.LogError(ex, "Error creating purchase invoice");
-            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.INTERNAL_ERROR);
-        }
-    }
-
-    public async Task<ApiResponse<PurchaseInvoiceDto>> UpdateAsync(int id, UpdatePurchaseInvoiceRequest request)
-    {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
-        try
-        {
-            var invoice = await _unitOfWork.PurchaseInvoices.Query()
-                .Where(pi => pi.Id == id && pi.TenantId == _currentUserService.TenantId)
-                .Include(pi => pi.Items)
-                .FirstOrDefaultAsync();
-
-            if (invoice == null)
-                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND);
-
-            // Can only edit Draft invoices
-            if (invoice.Status != PurchaseInvoiceStatus.Draft)
-                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_EDITABLE);
-
-            // Validate supplier
-            var supplier = await _unitOfWork.Suppliers.Query()
-                .FirstOrDefaultAsync(s => s.Id == request.SupplierId && s.TenantId == _currentUserService.TenantId);
-            
-            if (supplier == null)
-                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.SUPPLIER_NOT_FOUND);
-
-            // Update invoice
-            invoice.SupplierId = request.SupplierId;
-            invoice.SupplierName = supplier.Name;
-            invoice.SupplierPhone = supplier.Phone;
-            invoice.SupplierAddress = supplier.Address;
-            invoice.InvoiceDate = request.InvoiceDate;
-            invoice.Notes = request.Notes;
-
-            // Update items - remove old items
-            var itemsToRemove = invoice.Items.ToList();
-            foreach (var item in itemsToRemove)
-            {
-                _unitOfWork.PurchaseInvoiceItems.Delete(item);
-            }
-            invoice.Items.Clear();
-
-            // Add new items
-            foreach (var itemRequest in request.Items)
-            {
-                var product = await _unitOfWork.Products.Query()
-                    .FirstOrDefaultAsync(p => p.Id == itemRequest.ProductId && p.TenantId == _currentUserService.TenantId);
-
-                if (product == null)
-                    return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PRODUCT_NOT_FOUND);
-
-                var item = new PurchaseInvoiceItem
-                {
-                    ProductId = itemRequest.ProductId,
-                    ProductName = product.Name,
-                    ProductNameEn = product.NameEn,
-                    ProductSku = product.Sku,
-                    ProductBarcode = product.Barcode,
-                    Quantity = itemRequest.Quantity,
-                    PurchasePrice = itemRequest.PurchasePrice,
-                    Total = itemRequest.Quantity * itemRequest.PurchasePrice,
-                    Notes = itemRequest.Notes
-                };
-
-                invoice.Items.Add(item);
-            }
-
-            // Recalculate totals
-            var tenant = await _unitOfWork.Tenants.Query()
-                .FirstOrDefaultAsync(t => t.Id == _currentUserService.TenantId);
-            CalculateTotals(invoice, tenant!);
-
-            _unitOfWork.PurchaseInvoices.Update(invoice);
-            await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            // Reload with includes
-            var updatedInvoice = await _unitOfWork.PurchaseInvoices.Query()
-                .Where(pi => pi.Id == invoice.Id)
-                .Include(pi => pi.Supplier)
-                .Include(pi => pi.Items)
-                .Include(pi => pi.Payments)
-                .FirstAsync();
-
-            return ApiResponse<PurchaseInvoiceDto>.Ok(MapToDto(updatedInvoice));
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            _logger.LogError(ex, "Error updating purchase invoice {Id}", id);
-            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.INTERNAL_ERROR);
-        }
-    }
-
-    public async Task<ApiResponse<bool>> DeleteAsync(int id)
-    {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
-        try
-        {
-            var invoice = await _unitOfWork.PurchaseInvoices.Query()
-                .FirstOrDefaultAsync(pi => pi.Id == id && pi.TenantId == _currentUserService.TenantId);
-
-            if (invoice == null)
-                return ApiResponse<bool>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND);
-
-            // Can only delete Draft invoices
-            if (invoice.Status != PurchaseInvoiceStatus.Draft)
-                return ApiResponse<bool>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_DELETABLE);
-
-            _unitOfWork.PurchaseInvoices.Delete(invoice);
-            await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            return ApiResponse<bool>.Ok(true);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            _logger.LogError(ex, "Error deleting purchase invoice {Id}", id);
-            return ApiResponse<bool>.Fail(ErrorCodes.INTERNAL_ERROR);
-        }
-    }
-
-    public async Task<ApiResponse<PurchaseInvoiceDto>> ConfirmAsync(int id)
-    {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
-        try
-        {
-            var invoice = await _unitOfWork.PurchaseInvoices.Query()
-                .Where(pi => pi.Id == id && pi.TenantId == _currentUserService.TenantId)
-                .Include(pi => pi.Items)
-                .Include(pi => pi.Supplier)
-                .FirstOrDefaultAsync();
-
-            if (invoice == null)
-                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND);
-
-            // Validate: Can only confirm Draft invoices
-            if (invoice.Status != PurchaseInvoiceStatus.Draft)
-                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_ALREADY_CONFIRMED);
-
-            // Get user name
-            var user = await _unitOfWork.Users.Query()
-                .FirstOrDefaultAsync(u => u.Id == _currentUserService.UserId);
-
-            // Get branch ID explicitly from current user
-            var branchId = _currentUserService.BranchId;
-
-            // Update inventory for each item using BranchInventory
-            foreach (var item in invoice.Items)
-            {
-                var product = await _unitOfWork.Products.Query()
-                    .FirstOrDefaultAsync(p => p.Id == item.ProductId);
-
-                if (product == null)
-                    continue;
-
-                // Get or create BranchInventory record
-                var branchInventory = await _unitOfWork.BranchInventories.Query()
-                    .FirstOrDefaultAsync(bi => bi.BranchId == branchId && bi.ProductId == item.ProductId);
-
-                var balanceBefore = branchInventory?.Quantity ?? 0;
-
-                if (branchInventory == null)
-                {
-                    // Create new BranchInventory record
-                    branchInventory = new BranchInventory
-                    {
-                        TenantId = _currentUserService.TenantId,
-                        BranchId = branchId,
-                        ProductId = item.ProductId,
-                        Quantity = product.TrackInventory ? item.Quantity : 0,
-                        ReorderLevel = product.ReorderPoint ?? 10,
-                        LastUpdatedAt = DateTime.UtcNow
-                    };
-                    await _unitOfWork.BranchInventories.AddAsync(branchInventory);
-                }
-                else if (product.TrackInventory)
-                {
-                    // Update existing BranchInventory
-                    branchInventory.Quantity += item.Quantity;
-                    branchInventory.LastUpdatedAt = DateTime.UtcNow;
-                    _unitOfWork.BranchInventories.Update(branchInventory);
-                }
-
-                // Update cost tracking on Product (global)
-                product.LastPurchasePrice = item.PurchasePrice;
-                product.LastPurchaseDate = invoice.InvoiceDate;
-
-                // Update average cost (weighted average)
-                var totalQuantityAcrossBranches = await _unitOfWork.BranchInventories.Query()
-                    .Where(bi => bi.ProductId == item.ProductId && bi.TenantId == _currentUserService.TenantId)
-                    .SumAsync(bi => bi.Quantity);
-
-                if (product.AverageCost.HasValue && totalQuantityAcrossBranches > 0)
-                {
-                    var oldStock = totalQuantityAcrossBranches - item.Quantity;
-                    var oldTotalCost = product.AverageCost.Value * oldStock;
-                    var newTotalCost = oldTotalCost + (item.PurchasePrice * item.Quantity);
-                    product.AverageCost = newTotalCost / totalQuantityAcrossBranches;
-                }
-                else
-                {
-                    product.AverageCost = item.PurchasePrice;
-                }
-
-                _unitOfWork.Products.Update(product);
-
-                // Create stock movement with BranchInventory balance
-                var movement = new StockMovement
-                {
-                    TenantId = invoice.TenantId,
-                    BranchId = invoice.BranchId,
-                    ProductId = item.ProductId,
-                    Type = StockMovementType.Receiving,
-                    Quantity = item.Quantity,
-                    ReferenceType = "PurchaseInvoice",
-                    ReferenceId = invoice.Id,
-                    Reason = $"Purchase Invoice {invoice.InvoiceNumber}",
-                    BalanceBefore = balanceBefore,
-                    BalanceAfter = branchInventory.Quantity,
-                    UserId = _currentUserService.UserId
-                };
-                await _unitOfWork.StockMovements.AddAsync(movement);
-
-                // Update SupplierProduct
-                var supplierProduct = await _unitOfWork.SupplierProducts.Query()
-                    .FirstOrDefaultAsync(sp => sp.SupplierId == invoice.SupplierId && 
-                                              sp.ProductId == item.ProductId);
-
-                if (supplierProduct != null)
-                {
-                    supplierProduct.LastPurchasePrice = item.PurchasePrice;
-                    supplierProduct.LastPurchaseDate = invoice.InvoiceDate;
-                    supplierProduct.TotalQuantityPurchased += item.Quantity;
-                    supplierProduct.TotalAmountSpent += item.Total;
-                    _unitOfWork.SupplierProducts.Update(supplierProduct);
-                }
-            }
-
-            // Update invoice status
-            invoice.Status = PurchaseInvoiceStatus.Confirmed;
-            invoice.ConfirmedByUserId = _currentUserService.UserId;
-            invoice.ConfirmedByUserName = user?.Name ?? _currentUserService.Email ?? "Unknown";
-            invoice.ConfirmedAt = DateTime.UtcNow;
-
-            _unitOfWork.PurchaseInvoices.Update(invoice);
-
-            // Update supplier totals
-            var supplier = invoice.Supplier;
-            supplier.TotalPurchases += invoice.Total;
-            supplier.TotalDue += invoice.AmountDue;
-            supplier.LastPurchaseDate = invoice.InvoiceDate;
-            _unitOfWork.Suppliers.Update(supplier);
-
-            await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            // Reload with includes
-            var confirmedInvoice = await _unitOfWork.PurchaseInvoices.Query()
-                .Where(pi => pi.Id == invoice.Id)
-                .Include(pi => pi.Supplier)
-                .Include(pi => pi.Items)
-                .Include(pi => pi.Payments)
-                .FirstAsync();
-
-            return ApiResponse<PurchaseInvoiceDto>.Ok(MapToDto(confirmedInvoice));
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            _logger.LogError(ex, "Error confirming purchase invoice {Id}", id);
-            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.INTERNAL_ERROR);
-        }
-    }
-
-    public async Task<ApiResponse<PurchaseInvoiceDto>> CancelAsync(int id, CancelInvoiceRequest request)
-    {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
-        try
-        {
-            var invoice = await _unitOfWork.PurchaseInvoices.Query()
-                .Where(pi => pi.Id == id && pi.TenantId == _currentUserService.TenantId)
-                .Include(pi => pi.Items)
-                .Include(pi => pi.Supplier)
-                .FirstOrDefaultAsync();
-
-            if (invoice == null)
-                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND);
-
-            // Validate: Cannot cancel already cancelled invoice
-            if (invoice.Status == PurchaseInvoiceStatus.Cancelled)
-                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_ALREADY_CANCELLED);
-
-            // Get user name
-            var user = await _unitOfWork.Users.Query()
-                .FirstOrDefaultAsync(u => u.Id == _currentUserService.UserId);
-
-            // Get branch ID explicitly from current user
-            var branchId = _currentUserService.BranchId;
-
-            // If confirmed and user wants to adjust inventory
-            if (invoice.Status == PurchaseInvoiceStatus.Confirmed && request.AdjustInventory)
-            {
-                foreach (var item in invoice.Items)
-                {
-                    var product = await _unitOfWork.Products.Query()
-                        .FirstOrDefaultAsync(p => p.Id == item.ProductId);
-
-                    if (product != null && product.TrackInventory)
-                    {
-                        // Get BranchInventory record
-                        var branchInventory = await _unitOfWork.BranchInventories.Query()
-                            .FirstOrDefaultAsync(bi => bi.BranchId == branchId && bi.ProductId == item.ProductId);
-
-                        if (branchInventory != null)
-                        {
-                            var balanceBefore = branchInventory.Quantity;
-                            
-                            // Check if we have enough stock to deduct
-                            if (branchInventory.Quantity < item.Quantity)
-                            {
-                                _logger.LogWarning(
-                                    "Insufficient stock in branch {BranchId} for product {ProductId}. Available: {Available}, Required: {Required}",
-                                    branchId, item.ProductId, branchInventory.Quantity, item.Quantity);
-                                
-                                // Deduct what's available
-                                branchInventory.Quantity = 0;
-                            }
-                            else
-                            {
-                                branchInventory.Quantity -= item.Quantity;
-                            }
-                            
-                            branchInventory.LastUpdatedAt = DateTime.UtcNow;
-                            _unitOfWork.BranchInventories.Update(branchInventory);
-
-                            // Create stock movement
-                            var movement = new StockMovement
-                            {
-                                TenantId = invoice.TenantId,
-                                BranchId = invoice.BranchId,
-                                ProductId = item.ProductId,
-                                Type = StockMovementType.Adjustment,
-                                Quantity = -item.Quantity,
-                                ReferenceType = "PurchaseInvoiceCancellation",
-                                ReferenceId = invoice.Id,
-                                Reason = $"Cancelled Purchase Invoice {invoice.InvoiceNumber}: {request.Reason}",
-                                BalanceBefore = balanceBefore,
-                                BalanceAfter = branchInventory.Quantity,
-                                UserId = _currentUserService.UserId
-                            };
-                            await _unitOfWork.StockMovements.AddAsync(movement);
-                        }
-                    }
-                }
-
-                invoice.InventoryAdjustedOnCancellation = true;
-            }
-
-            // Update invoice
-            invoice.Status = PurchaseInvoiceStatus.Cancelled;
-            invoice.CancelledByUserId = _currentUserService.UserId;
-            invoice.CancelledByUserName = user?.Name ?? _currentUserService.Email ?? "Unknown";
-            invoice.CancelledAt = DateTime.UtcNow;
-            invoice.CancellationReason = request.Reason;
-
-            _unitOfWork.PurchaseInvoices.Update(invoice);
-
-            // Update supplier totals
-            var supplier = invoice.Supplier;
-            supplier.TotalDue -= invoice.AmountDue;
-            _unitOfWork.Suppliers.Update(supplier);
-
-            await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
-
-            // Reload with includes
-            var cancelledInvoice = await _unitOfWork.PurchaseInvoices.Query()
-                .Where(pi => pi.Id == invoice.Id)
-                .Include(pi => pi.Supplier)
-                .Include(pi => pi.Items)
-                .Include(pi => pi.Payments)
-                .FirstAsync();
-
-            return ApiResponse<PurchaseInvoiceDto>.Ok(MapToDto(cancelledInvoice));
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            _logger.LogError(ex, "Error cancelling purchase invoice {Id}", id);
-            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.INTERNAL_ERROR);
-        }
-    }
-
-    public async Task<ApiResponse<PurchaseInvoicePaymentDto>> AddPaymentAsync(int invoiceId, AddPaymentRequest request)
-    {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
-        try
-        {
-            var invoice = await _unitOfWork.PurchaseInvoices.Query()
-                .Where(pi => pi.Id == invoiceId && pi.TenantId == _currentUserService.TenantId)
-                .Include(pi => pi.Supplier)
-                .FirstOrDefaultAsync();
-
-            if (invoice == null)
-                return ApiResponse<PurchaseInvoicePaymentDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND);
-
-            // Validate amount
-            if (request.Amount <= 0)
-                return ApiResponse<PurchaseInvoicePaymentDto>.Fail(ErrorCodes.PAYMENT_INVALID_AMOUNT);
-
-            if (request.Amount > invoice.AmountDue)
-                return ApiResponse<PurchaseInvoicePaymentDto>.Fail(ErrorCodes.PAYMENT_EXCEEDS_DUE);
-
-            // Get user name
-            var user = await _unitOfWork.Users.Query()
-                .FirstOrDefaultAsync(u => u.Id == _currentUserService.UserId);
-
-            // Create payment
-            var payment = new PurchaseInvoicePayment
-            {
-                PurchaseInvoiceId = invoiceId,
-                Amount = request.Amount,
-                PaymentDate = request.PaymentDate,
-                Method = request.Method,
-                ReferenceNumber = request.ReferenceNumber,
-                Notes = request.Notes,
-                CreatedByUserId = _currentUserService.UserId,
-                CreatedByUserName = user?.Name ?? _currentUserService.Email ?? "Unknown"
-            };
-
-            await _unitOfWork.PurchaseInvoicePayments.AddAsync(payment);
-
-            // Update invoice
-            invoice.AmountPaid += request.Amount;
-            invoice.AmountDue -= request.Amount;
-
-            // Update status
-            if (invoice.AmountDue == 0)
-                invoice.Status = PurchaseInvoiceStatus.Paid;
-            else if (invoice.AmountPaid > 0)
-                invoice.Status = PurchaseInvoiceStatus.PartiallyPaid;
-
-            _unitOfWork.PurchaseInvoices.Update(invoice);
-
-            // Update supplier
-            var supplier = invoice.Supplier;
-            supplier.TotalPaid += request.Amount;
-            supplier.TotalDue -= request.Amount;
-            _unitOfWork.Suppliers.Update(supplier);
-
-            await _unitOfWork.SaveChangesAsync();
-            
-            // INTEGRATION: Record cash register transaction for cash payments
-            if (request.Method == PaymentMethod.Cash)
-            {
-                // Get current shift (optional for purchase invoice payments)
-                var currentShift = await _unitOfWork.Shifts.Query()
-                    .FirstOrDefaultAsync(s => s.TenantId == _currentUserService.TenantId 
-                                           && s.BranchId == _currentUserService.BranchId 
-                                           && s.UserId == _currentUserService.UserId
-                                           && !s.IsClosed);
-                
-                await _cashRegisterService.RecordTransactionAsync(
-                    type: CashRegisterTransactionType.SupplierPayment,
-                    amount: request.Amount, // ✅ POSITIVE amount - type determines sign
-                    description: $"دفع للمورد - فاتورة #{invoice.InvoiceNumber} - {supplier.Name}",
-                    referenceType: "PurchaseInvoicePayment",
-                    referenceId: payment.Id,
-                    shiftId: currentShift?.Id
-                );
-            }
-            
-            await transaction.CommitAsync();
-
-            var paymentDto = new PurchaseInvoicePaymentDto
-            {
-                Id = payment.Id,
-                Amount = payment.Amount,
-                PaymentDate = payment.PaymentDate,
-                Method = payment.Method.ToString(),
-                ReferenceNumber = payment.ReferenceNumber,
-                Notes = payment.Notes,
-                CreatedByUserName = payment.CreatedByUserName ?? string.Empty,
-                CreatedAt = payment.CreatedAt
-            };
-
-            return ApiResponse<PurchaseInvoicePaymentDto>.Ok(paymentDto);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            _logger.LogError(ex, "Error adding payment to purchase invoice {InvoiceId}", invoiceId);
-            return ApiResponse<PurchaseInvoicePaymentDto>.Fail(ErrorCodes.INTERNAL_ERROR);
-        }
-    }
-
-    public async Task<ApiResponse<bool>> DeletePaymentAsync(int invoiceId, int paymentId)
-    {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
-        try
-        {
-            var payment = await _unitOfWork.PurchaseInvoicePayments.Query()
-                .FirstOrDefaultAsync(p => p.Id == paymentId && p.PurchaseInvoiceId == invoiceId);
-
-            if (payment == null)
-                return ApiResponse<bool>.Fail(ErrorCodes.PAYMENT_NOT_FOUND);
-
-            var invoice = await _unitOfWork.PurchaseInvoices.Query()
-                .Where(pi => pi.Id == invoiceId)
-                .Include(pi => pi.Supplier)
-                .FirstOrDefaultAsync();
-
-            if (invoice == null)
-                return ApiResponse<bool>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND);
-
-            // Store payment method before deletion for cash register reversal
-            var wasPaymentCash = payment.Method == PaymentMethod.Cash;
-            var paymentAmount = payment.Amount;
-
-            // Update invoice
-            invoice.AmountPaid -= payment.Amount;
-            invoice.AmountDue += payment.Amount;
-
-            // Update status
-            if (invoice.AmountPaid == 0)
-                invoice.Status = PurchaseInvoiceStatus.Confirmed;
-            else if (invoice.AmountDue > 0)
-                invoice.Status = PurchaseInvoiceStatus.PartiallyPaid;
-
-            _unitOfWork.PurchaseInvoices.Update(invoice);
-
-            // Update supplier
-            var supplier = invoice.Supplier;
-            supplier.TotalPaid -= payment.Amount;
-            supplier.TotalDue += payment.Amount;
-            _unitOfWork.Suppliers.Update(supplier);
-
-            // Delete payment
-            _unitOfWork.PurchaseInvoicePayments.Delete(payment);
-
-            await _unitOfWork.SaveChangesAsync();
-            
-            // INTEGRATION: Reverse cash register transaction for cash payments
-            if (wasPaymentCash)
-            {
-                // Get current shift (optional)
-                var currentShift = await _unitOfWork.Shifts.Query()
-                    .FirstOrDefaultAsync(s => s.TenantId == _currentUserService.TenantId 
-                                           && s.BranchId == _currentUserService.BranchId 
-                                           && s.UserId == _currentUserService.UserId
-                                           && !s.IsClosed);
-                
-                await _cashRegisterService.RecordTransactionAsync(
-                    type: CashRegisterTransactionType.Adjustment,
-                    amount: paymentAmount, // Positive amount to reverse the outflow
-                    description: $"عكس دفع للمورد - فاتورة #{invoice.InvoiceNumber} - {supplier.Name}",
-                    referenceType: "PurchaseInvoicePaymentDeletion",
-                    referenceId: paymentId,
-                    shiftId: currentShift?.Id
-                );
-            }
-            
-            await transaction.CommitAsync();
-
-            return ApiResponse<bool>.Ok(true);
-        }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            _logger.LogError(ex, "Error deleting payment {PaymentId} from invoice {InvoiceId}", paymentId, invoiceId);
-            return ApiResponse<bool>.Fail(ErrorCodes.INTERNAL_ERROR);
-        }
-    }
-
-    private async Task<string> GenerateInvoiceNumberAsync()
-    {
-        var year = DateTime.UtcNow.Year;
-        var lastInvoice = await _unitOfWork.PurchaseInvoices.Query()
-            .Where(pi => pi.TenantId == _currentUserService.TenantId && 
-                        pi.InvoiceDate.Year == year)
-            .OrderByDescending(pi => pi.Id)
-            .FirstOrDefaultAsync();
-
-        var nextNumber = 1;
-        if (lastInvoice != null)
-        {
-            // Extract number from last invoice (PI-2026-0001 -> 0001)
-            var parts = lastInvoice.InvoiceNumber.Split('-');
-            if (parts.Length == 3 && int.TryParse(parts[2], out var lastNumber))
-            {
-                nextNumber = lastNumber + 1;
-            }
-        }
-
-        return $"PI-{year}-{nextNumber:D4}";
-    }
-
-    private void CalculateTotals(PurchaseInvoice invoice, Tenant tenant)
-    {
-        // Subtotal = sum of all items
-        invoice.Subtotal = invoice.Items.Sum(i => i.Total);
-        
-        // Tax = Subtotal * (TaxRate / 100)
-        invoice.TaxRate = tenant.IsTaxEnabled ? tenant.TaxRate : 0;
-        invoice.TaxAmount = Math.Round(invoice.Subtotal * (invoice.TaxRate / 100), 2);
-        
-        // Total = Subtotal + Tax
-        invoice.Total = invoice.Subtotal + invoice.TaxAmount;
-        
-        // AmountDue = Total - AmountPaid
-        invoice.AmountDue = invoice.Total - invoice.AmountPaid;
-    }
-
-    private PurchaseInvoiceDto MapToDto(PurchaseInvoice invoice)
-    {
-        return new PurchaseInvoiceDto
+        var tenantId = _currentUser.TenantId;
+        var invoice = await _unitOfWork.PurchaseInvoices.Query()
+            .Include(pi => pi.Items)
+            .Include(pi => pi.Payments)
+            .FirstOrDefaultAsync(pi => pi.Id == id && pi.TenantId == tenantId && !pi.IsDeleted);
+
+        if (invoice == null)
+            return ApiResponse<PurchaseInvoiceDto>.Fail("الفاتورة غير موجودة");
+
+        var dto = new PurchaseInvoiceDto
         {
             Id = invoice.Id,
             InvoiceNumber = invoice.InvoiceNumber,
@@ -833,20 +104,21 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             AmountPaid = invoice.AmountPaid,
             AmountDue = invoice.AmountDue,
             Notes = invoice.Notes,
-            CreatedByUserName = invoice.CreatedByUserName ?? string.Empty,
+            CreatedByUserName = invoice.CreatedByUserName ?? "",
             ConfirmedByUserName = invoice.ConfirmedByUserName,
             ConfirmedAt = invoice.ConfirmedAt,
             CreatedAt = invoice.CreatedAt,
-            Items = invoice.Items.Select(i => new PurchaseInvoiceItemDto
+            Items = invoice.Items.Select(item => new PurchaseInvoiceItemDto
             {
-                Id = i.Id,
-                ProductId = i.ProductId,
-                ProductName = i.ProductName,
-                ProductSku = i.ProductSku,
-                Quantity = i.Quantity,
-                PurchasePrice = i.PurchasePrice,
-                Total = i.Total,
-                Notes = i.Notes
+                Id = item.Id,
+                ProductId = item.ProductId,
+                ProductName = item.ProductName,
+                ProductSku = item.ProductSku,
+                Quantity = item.Quantity,
+                PurchasePrice = item.PurchasePrice,
+                SellingPrice = item.SellingPrice,
+                Total = item.Total,
+                Notes = item.Notes
             }).ToList(),
             Payments = invoice.Payments.Select(p => new PurchaseInvoicePaymentDto
             {
@@ -856,9 +128,463 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                 Method = p.Method.ToString(),
                 ReferenceNumber = p.ReferenceNumber,
                 Notes = p.Notes,
-                CreatedByUserName = p.CreatedByUserName ?? string.Empty,
+                CreatedByUserName = p.CreatedByUserName ?? "",
                 CreatedAt = p.CreatedAt
             }).ToList()
         };
+
+        return ApiResponse<PurchaseInvoiceDto>.Ok(dto);
+    }
+
+    public async Task<ApiResponse<PurchaseInvoiceDto>> CreateAsync(CreatePurchaseInvoiceRequest request)
+    {
+        // Validation
+        if (request.Items == null || !request.Items.Any())
+            return ApiResponse<PurchaseInvoiceDto>.Fail("يجب إضافة منتج واحد على الأقل");
+
+        var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
+        var userId = _currentUser.UserId;
+
+        // Get supplier
+        var supplier = await _unitOfWork.Suppliers.Query()
+            .FirstOrDefaultAsync(s => s.Id == request.SupplierId && s.TenantId == tenantId && !s.IsDeleted);
+
+        if (supplier == null)
+            return ApiResponse<PurchaseInvoiceDto>.Fail("المورد غير موجود");
+
+        // Get user
+        var user = await _unitOfWork.Users.Query()
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        // Get tenant for tax rate
+        var tenant = await _unitOfWork.Tenants.Query()
+            .FirstOrDefaultAsync(t => t.Id == tenantId);
+
+        var taxRate = tenant?.TaxRate ?? 14m;
+
+        // Generate invoice number
+        var lastInvoice = await _unitOfWork.PurchaseInvoices.Query()
+            .Where(pi => pi.TenantId == tenantId)
+            .OrderByDescending(pi => pi.Id)
+            .FirstOrDefaultAsync();
+
+        var invoiceNumber = GenerateInvoiceNumber(lastInvoice?.InvoiceNumber);
+
+        // Create invoice
+        var invoice = new PurchaseInvoice
+        {
+            TenantId = tenantId,
+            BranchId = branchId,
+            InvoiceNumber = invoiceNumber,
+            SupplierId = supplier.Id,
+            SupplierName = supplier.Name,
+            SupplierPhone = supplier.Phone,
+            SupplierAddress = supplier.Address,
+            InvoiceDate = request.InvoiceDate,
+            Status = PurchaseInvoiceStatus.Draft,
+            TaxRate = taxRate,
+            Notes = request.Notes,
+            CreatedByUserId = userId,
+            CreatedByUserName = user?.Name,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        // Add items
+        decimal subtotal = 0;
+        foreach (var itemRequest in request.Items)
+        {
+            if (itemRequest.Quantity <= 0)
+                return ApiResponse<PurchaseInvoiceDto>.Fail("الكمية يجب أن تكون أكبر من صفر");
+
+            if (itemRequest.PurchasePrice < 0)
+                return ApiResponse<PurchaseInvoiceDto>.Fail("سعر الشراء يجب أن يكون صفر أو أكبر");
+
+            var product = await _unitOfWork.Products.Query()
+                .FirstOrDefaultAsync(p => p.Id == itemRequest.ProductId && p.TenantId == tenantId && !p.IsDeleted);
+
+            if (product == null)
+                return ApiResponse<PurchaseInvoiceDto>.Fail($"المنتج غير موجود");
+
+            if (product.Type == ProductType.Service)
+                return ApiResponse<PurchaseInvoiceDto>.Fail($"لا يمكن إضافة منتجات خدمية ({product.Name}) في فواتير الشراء");
+
+            var itemTotal = itemRequest.Quantity * itemRequest.PurchasePrice;
+            subtotal += itemTotal;
+
+            invoice.Items.Add(new PurchaseInvoiceItem
+            {
+                ProductId = product.Id,
+                ProductName = product.Name,
+                ProductSku = product.Sku,
+                Quantity = itemRequest.Quantity,
+                PurchasePrice = itemRequest.PurchasePrice,
+                SellingPrice = itemRequest.SellingPrice,
+                Total = itemTotal,
+                Notes = itemRequest.Notes
+            });
+        }
+
+        // Calculate totals
+        invoice.Subtotal = subtotal;
+        invoice.TaxAmount = subtotal * (taxRate / 100);
+        invoice.Total = invoice.Subtotal + invoice.TaxAmount;
+        invoice.AmountDue = invoice.Total;
+
+        await _unitOfWork.PurchaseInvoices.AddAsync(invoice);
+        await _unitOfWork.SaveChangesAsync();
+
+        return await GetByIdAsync(invoice.Id);
+    }
+
+    public async Task<ApiResponse<PurchaseInvoiceDto>> UpdateAsync(int id, UpdatePurchaseInvoiceRequest request)
+    {
+        var tenantId = _currentUser.TenantId;
+        var invoice = await _unitOfWork.PurchaseInvoices.Query()
+            .Include(pi => pi.Items)
+            .FirstOrDefaultAsync(pi => pi.Id == id && pi.TenantId == tenantId && !pi.IsDeleted);
+
+        if (invoice == null)
+            return ApiResponse<PurchaseInvoiceDto>.Fail("الفاتورة غير موجودة");
+
+        if (invoice.Status != PurchaseInvoiceStatus.Draft)
+            return ApiResponse<PurchaseInvoiceDto>.Fail("لا يمكن تعديل الفاتورة بعد التأكيد");
+
+        // Validation
+        if (request.Items == null || !request.Items.Any())
+            return ApiResponse<PurchaseInvoiceDto>.Fail("يجب إضافة منتج واحد على الأقل");
+
+        // Get supplier
+        var supplier = await _unitOfWork.Suppliers.Query()
+            .FirstOrDefaultAsync(s => s.Id == request.SupplierId && s.TenantId == tenantId && !s.IsDeleted);
+
+        if (supplier == null)
+            return ApiResponse<PurchaseInvoiceDto>.Fail("المورد غير موجود");
+
+        // Update invoice header
+        invoice.SupplierId = supplier.Id;
+        invoice.SupplierName = supplier.Name;
+        invoice.SupplierPhone = supplier.Phone;
+        invoice.SupplierAddress = supplier.Address;
+        invoice.InvoiceDate = request.InvoiceDate;
+        invoice.Notes = request.Notes;
+        invoice.UpdatedAt = DateTime.UtcNow;
+
+        // Remove old items
+        foreach (var oldItem in invoice.Items.ToList())
+        {
+            _unitOfWork.PurchaseInvoiceItems.Delete(oldItem);
+        }
+        invoice.Items.Clear();
+
+        // Add new items
+        decimal subtotal = 0;
+        foreach (var itemRequest in request.Items)
+        {
+            if (itemRequest.Quantity <= 0)
+                return ApiResponse<PurchaseInvoiceDto>.Fail("الكمية يجب أن تكون أكبر من صفر");
+
+            if (itemRequest.PurchasePrice < 0)
+                return ApiResponse<PurchaseInvoiceDto>.Fail("سعر الشراء يجب أن يكون صفر أو أكبر");
+
+            var product = await _unitOfWork.Products.Query()
+                .FirstOrDefaultAsync(p => p.Id == itemRequest.ProductId && p.TenantId == tenantId && !p.IsDeleted);
+
+            if (product == null)
+                return ApiResponse<PurchaseInvoiceDto>.Fail($"المنتج غير موجود");
+
+            if (product.Type == ProductType.Service)
+                return ApiResponse<PurchaseInvoiceDto>.Fail($"لا يمكن إضافة منتجات خدمية ({product.Name}) في فواتير الشراء");
+
+            var itemTotal = itemRequest.Quantity * itemRequest.PurchasePrice;
+            subtotal += itemTotal;
+
+            invoice.Items.Add(new PurchaseInvoiceItem
+            {
+                ProductId = product.Id,
+                ProductName = product.Name,
+                ProductSku = product.Sku,
+                Quantity = itemRequest.Quantity,
+                PurchasePrice = itemRequest.PurchasePrice,
+                SellingPrice = itemRequest.SellingPrice,
+                Total = itemTotal,
+                Notes = itemRequest.Notes
+            });
+        }
+
+        // Recalculate totals
+        invoice.Subtotal = subtotal;
+        invoice.TaxAmount = subtotal * (invoice.TaxRate / 100);
+        invoice.Total = invoice.Subtotal + invoice.TaxAmount;
+        invoice.AmountDue = invoice.Total - invoice.AmountPaid;
+
+        _unitOfWork.PurchaseInvoices.Update(invoice);
+        await _unitOfWork.SaveChangesAsync();
+
+        return await GetByIdAsync(invoice.Id);
+    }
+
+    public async Task<ApiResponse<bool>> DeleteAsync(int id)
+    {
+        var tenantId = _currentUser.TenantId;
+        var invoice = await _unitOfWork.PurchaseInvoices.Query()
+            .FirstOrDefaultAsync(pi => pi.Id == id && pi.TenantId == tenantId && !pi.IsDeleted);
+
+        if (invoice == null)
+            return ApiResponse<bool>.Fail("الفاتورة غير موجودة");
+
+        if (invoice.Status == PurchaseInvoiceStatus.Confirmed)
+            return ApiResponse<bool>.Fail("لا يمكن حذف فاتورة مؤكدة");
+
+        // Soft delete
+        invoice.IsDeleted = true;
+        invoice.UpdatedAt = DateTime.UtcNow;
+
+        _unitOfWork.PurchaseInvoices.Update(invoice);
+        await _unitOfWork.SaveChangesAsync();
+
+        return ApiResponse<bool>.Ok(true, "تم حذف الفاتورة بنجاح");
+    }
+
+    public async Task<ApiResponse<PurchaseInvoiceDto>> ConfirmAsync(int id)
+    {
+        var tenantId = _currentUser.TenantId;
+        var userId = _currentUser.UserId;
+
+        var invoice = await _unitOfWork.PurchaseInvoices.Query()
+            .Include(pi => pi.Items)
+            .FirstOrDefaultAsync(pi => pi.Id == id && pi.TenantId == tenantId && !pi.IsDeleted);
+
+        if (invoice == null)
+            return ApiResponse<PurchaseInvoiceDto>.Fail("الفاتورة غير موجودة");
+
+        if (invoice.Status != PurchaseInvoiceStatus.Draft)
+            return ApiResponse<PurchaseInvoiceDto>.Fail("الفاتورة مؤكدة مسبقاً");
+
+        var user = await _unitOfWork.Users.Query()
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        // Update invoice status
+        invoice.Status = PurchaseInvoiceStatus.Confirmed;
+        invoice.ConfirmedByUserId = userId;
+        invoice.ConfirmedByUserName = user?.Name;
+        invoice.ConfirmedAt = DateTime.UtcNow;
+        invoice.UpdatedAt = DateTime.UtcNow;
+
+        // Update inventory for each item
+        foreach (var item in invoice.Items)
+        {
+            var product = await _unitOfWork.Products.Query()
+                .FirstOrDefaultAsync(p => p.Id == item.ProductId);
+
+            if (product != null)
+            {
+                var balanceBefore = product.StockQuantity ?? 0;
+                product.StockQuantity = balanceBefore + item.Quantity;
+                product.LastPurchasePrice = item.PurchasePrice;
+                product.LastPurchaseDate = DateTime.UtcNow;
+                product.Price = item.SellingPrice;
+                product.UpdatedAt = DateTime.UtcNow;
+                _unitOfWork.Products.Update(product);
+
+                // Create stock movement
+                var stockMovement = new StockMovement
+                {
+                    TenantId = tenantId,
+                    BranchId = invoice.BranchId,
+                    ProductId = product.Id,
+                    Type = StockMovementType.Receiving,
+                    Quantity = item.Quantity,
+                    ReferenceId = invoice.Id,
+                    ReferenceType = "PurchaseInvoice",
+                    BalanceBefore = balanceBefore,
+                    BalanceAfter = product.StockQuantity ?? 0,
+                    Reason = $"شراء من {invoice.SupplierName}",
+                    UserId = userId,
+                    CreatedAt = DateTime.UtcNow
+                };
+                await _unitOfWork.StockMovements.AddAsync(stockMovement);
+            }
+        }
+
+        _unitOfWork.PurchaseInvoices.Update(invoice);
+        await _unitOfWork.SaveChangesAsync();
+
+        return await GetByIdAsync(invoice.Id);
+    }
+
+    public async Task<ApiResponse<PurchaseInvoiceDto>> CancelAsync(int id, CancelInvoiceRequest request)
+    {
+        var tenantId = _currentUser.TenantId;
+        var userId = _currentUser.UserId;
+
+        var invoice = await _unitOfWork.PurchaseInvoices.Query()
+            .Include(pi => pi.Items)
+            .FirstOrDefaultAsync(pi => pi.Id == id && pi.TenantId == tenantId && !pi.IsDeleted);
+
+        if (invoice == null)
+            return ApiResponse<PurchaseInvoiceDto>.Fail("الفاتورة غير موجودة");
+
+        if (invoice.Status == PurchaseInvoiceStatus.Cancelled)
+            return ApiResponse<PurchaseInvoiceDto>.Fail("الفاتورة ملغاة مسبقاً");
+
+        var user = await _unitOfWork.Users.Query()
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        var wasConfirmed = invoice.Status == PurchaseInvoiceStatus.Confirmed;
+
+        // Update invoice status
+        invoice.Status = PurchaseInvoiceStatus.Cancelled;
+        invoice.CancelledByUserId = userId;
+        invoice.CancelledByUserName = user?.Name;
+        invoice.CancelledAt = DateTime.UtcNow;
+        invoice.CancellationReason = request.Reason;
+        invoice.InventoryAdjustedOnCancellation = request.AdjustInventory;
+        invoice.UpdatedAt = DateTime.UtcNow;
+
+        // Adjust inventory if requested and invoice was confirmed
+        if (request.AdjustInventory && wasConfirmed)
+        {
+            foreach (var item in invoice.Items)
+            {
+                var product = await _unitOfWork.Products.Query()
+                    .FirstOrDefaultAsync(p => p.Id == item.ProductId);
+
+                if (product != null)
+                {
+                    var balanceBefore = product.StockQuantity ?? 0;
+                    product.StockQuantity = balanceBefore - item.Quantity;
+                    product.UpdatedAt = DateTime.UtcNow;
+                    _unitOfWork.Products.Update(product);
+
+                    // Create stock movement
+                    var stockMovement = new StockMovement
+                    {
+                        TenantId = tenantId,
+                        BranchId = invoice.BranchId,
+                        ProductId = product.Id,
+                        Type = StockMovementType.Adjustment,
+                        Quantity = -item.Quantity,
+                        ReferenceId = invoice.Id,
+                        ReferenceType = "PurchaseInvoice",
+                        BalanceBefore = balanceBefore,
+                        BalanceAfter = product.StockQuantity ?? 0,
+                        Reason = $"إلغاء فاتورة شراء: {request.Reason}",
+                        UserId = userId,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    await _unitOfWork.StockMovements.AddAsync(stockMovement);
+                }
+            }
+        }
+
+        _unitOfWork.PurchaseInvoices.Update(invoice);
+        await _unitOfWork.SaveChangesAsync();
+
+        return await GetByIdAsync(invoice.Id);
+    }
+
+    public async Task<ApiResponse<PurchaseInvoicePaymentDto>> AddPaymentAsync(int invoiceId, AddPaymentRequest request)
+    {
+        var tenantId = _currentUser.TenantId;
+        var userId = _currentUser.UserId;
+
+        var invoice = await _unitOfWork.PurchaseInvoices.Query()
+            .FirstOrDefaultAsync(pi => pi.Id == invoiceId && pi.TenantId == tenantId && !pi.IsDeleted);
+
+        if (invoice == null)
+            return ApiResponse<PurchaseInvoicePaymentDto>.Fail("الفاتورة غير موجودة");
+
+        if (invoice.Status != PurchaseInvoiceStatus.Confirmed)
+            return ApiResponse<PurchaseInvoicePaymentDto>.Fail("يجب تأكيد الفاتورة أولاً");
+
+        if (request.Amount <= 0)
+            return ApiResponse<PurchaseInvoicePaymentDto>.Fail("المبلغ يجب أن يكون أكبر من صفر");
+
+        if (request.Amount > invoice.AmountDue)
+            return ApiResponse<PurchaseInvoicePaymentDto>.Fail("المبلغ أكبر من المبلغ المستحق");
+
+        var user = await _unitOfWork.Users.Query()
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        var payment = new PurchaseInvoicePayment
+        {
+            PurchaseInvoiceId = invoiceId,
+            Amount = request.Amount,
+            PaymentDate = request.PaymentDate,
+            Method = request.Method,
+            ReferenceNumber = request.ReferenceNumber,
+            Notes = request.Notes,
+            CreatedByUserId = userId,
+            CreatedByUserName = user?.Name,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await _unitOfWork.PurchaseInvoicePayments.AddAsync(payment);
+
+        // Update invoice amounts
+        invoice.AmountPaid += request.Amount;
+        invoice.AmountDue = invoice.Total - invoice.AmountPaid;
+        invoice.UpdatedAt = DateTime.UtcNow;
+
+        _unitOfWork.PurchaseInvoices.Update(invoice);
+        await _unitOfWork.SaveChangesAsync();
+
+        var dto = new PurchaseInvoicePaymentDto
+        {
+            Id = payment.Id,
+            Amount = payment.Amount,
+            PaymentDate = payment.PaymentDate,
+            Method = payment.Method.ToString(),
+            ReferenceNumber = payment.ReferenceNumber,
+            Notes = payment.Notes,
+            CreatedByUserName = payment.CreatedByUserName ?? "",
+            CreatedAt = payment.CreatedAt
+        };
+
+        return ApiResponse<PurchaseInvoicePaymentDto>.Ok(dto, "تم إضافة الدفعة بنجاح");
+    }
+
+    public async Task<ApiResponse<bool>> DeletePaymentAsync(int invoiceId, int paymentId)
+    {
+        var tenantId = _currentUser.TenantId;
+
+        var invoice = await _unitOfWork.PurchaseInvoices.Query()
+            .FirstOrDefaultAsync(pi => pi.Id == invoiceId && pi.TenantId == tenantId && !pi.IsDeleted);
+
+        if (invoice == null)
+            return ApiResponse<bool>.Fail("الفاتورة غير موجودة");
+
+        var payment = await _unitOfWork.PurchaseInvoicePayments.Query()
+            .FirstOrDefaultAsync(p => p.Id == paymentId && p.PurchaseInvoiceId == invoiceId);
+
+        if (payment == null)
+            return ApiResponse<bool>.Fail("الدفعة غير موجودة");
+
+        // Update invoice amounts
+        invoice.AmountPaid -= payment.Amount;
+        invoice.AmountDue = invoice.Total - invoice.AmountPaid;
+        invoice.UpdatedAt = DateTime.UtcNow;
+
+        _unitOfWork.PurchaseInvoices.Update(invoice);
+        _unitOfWork.PurchaseInvoicePayments.Delete(payment);
+        await _unitOfWork.SaveChangesAsync();
+
+        return ApiResponse<bool>.Ok(true, "تم حذف الدفعة بنجاح");
+    }
+
+    private string GenerateInvoiceNumber(string? lastInvoiceNumber)
+    {
+        var year = DateTime.UtcNow.Year;
+        var prefix = $"PI-{year}-";
+
+        if (string.IsNullOrEmpty(lastInvoiceNumber) || !lastInvoiceNumber.StartsWith(prefix))
+        {
+            return $"{prefix}0001";
+        }
+
+        var lastNumber = int.Parse(lastInvoiceNumber.Substring(prefix.Length));
+        var newNumber = lastNumber + 1;
+        return $"{prefix}{newNumber:D4}";
     }
 }

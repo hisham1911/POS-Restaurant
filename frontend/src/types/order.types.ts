@@ -8,7 +8,7 @@ export type OrderStatus =
 
 export type OrderType = "DineIn" | "Takeaway" | "Delivery" | "Return";
 
-export type PaymentMethod = "Cash" | "Card" | "Fawry";
+export type PaymentMethod = "Cash" | "Card" | "Fawry" | "BankTransfer";
 
 // Query parameters for filtering orders
 export interface OrdersQueryParams {
@@ -52,6 +52,7 @@ export interface OrderItem {
   unitPrice: number;
   originalPrice: number;
   quantity: number;
+  refundedQuantity: number;
   // Discount
   discountType?: string;
   discountValue?: number;
@@ -71,6 +72,8 @@ export interface Order {
   orderNumber: string;
   status: OrderStatus;
   orderType?: OrderType;
+  // Concurrency Token (for optimistic locking)
+  rowVersion?: string;
   // Branch Snapshot
   branchId: number;
   branchName?: string;
@@ -111,6 +114,7 @@ export interface Order {
   refundAmount: number;
   refundedByUserId?: number;
   refundedByUserName?: string;
+  originalOrderId?: number;
   // Shift
   shiftId?: number;
   items: OrderItem[];
@@ -130,6 +134,10 @@ export interface CreateOrderRequest {
     productId: number;
     quantity: number;
     notes?: string;
+    // Item-level discount
+    discountType?: "percentage" | "fixed";
+    discountValue?: number;
+    discountReason?: string;
   }[];
   customerName?: string;
   customerPhone?: string;

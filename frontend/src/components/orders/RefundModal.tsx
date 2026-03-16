@@ -3,6 +3,7 @@ import { X, AlertTriangle, RotateCcw, Minus, Plus } from "lucide-react";
 import { Order, OrderItem } from "@/types/order.types";
 import { useRefundOrderMutation } from "@/api/ordersApi";
 import { formatCurrency } from "@/utils/formatters";
+import { ERROR_MESSAGES } from "@/utils/constants";
 import { Button } from "@/components/common/Button";
 import { toast } from "sonner";
 import clsx from "clsx";
@@ -20,6 +21,9 @@ interface RefundItemState {
   refundQuantity: number;
   unitPrice: number;
   productName: string;
+  discountAmount?: number;
+  discountType?: string;
+  discountValue?: number;
 }
 
 const refundReasons = [
@@ -42,13 +46,18 @@ export const RefundModal = ({
 
   // Track refund quantities for each item
   const [refundItems, setRefundItems] = useState<RefundItemState[]>(() =>
-    order.items.map((item) => ({
-      itemId: item.id,
-      maxQuantity: item.quantity,
-      refundQuantity: 0,
-      unitPrice: item.total / item.quantity,
-      productName: item.productName,
-    })),
+    order.items
+      .filter((item) => item.quantity - (item.refundedQuantity || 0) > 0)
+      .map((item) => ({
+        itemId: item.id,
+        maxQuantity: item.quantity - (item.refundedQuantity || 0),
+        refundQuantity: 0,
+        unitPrice: item.total / item.quantity,
+        productName: item.productName,
+        discountAmount: item.discountAmount,
+        discountType: item.discountType,
+        discountValue: item.discountValue,
+      })),
   );
 
   const [refundOrder, { isLoading }] = useRefundOrderMutation();
@@ -151,10 +160,22 @@ export const RefundModal = ({
         onSuccess?.();
         onClose();
       } else {
-        toast.error(result.message || "فشل في إنشاء فاتورة المرتجع");
+        const errorMsg =
+          (result.errorCode && ERROR_MESSAGES[result.errorCode]) ||
+          result.message ||
+          "فشل في إنشاء فاتورة المرتجع";
+        toast.error(errorMsg);
       }
-    } catch {
-      toast.error("فشل في إنشاء فاتورة المرتجع");
+    } catch (err: unknown) {
+      const apiError = err as {
+        data?: { errorCode?: string; message?: string };
+      };
+      const errorCode = apiError?.data?.errorCode;
+      const errorMsg =
+        (errorCode && ERROR_MESSAGES[errorCode]) ||
+        apiError?.data?.message ||
+        "فشل في إنشاء فاتورة المرتجع";
+      toast.error(errorMsg);
     }
   };
 
@@ -263,8 +284,19 @@ export const RefundModal = ({
                     <tbody className="divide-y divide-gray-100">
                       {refundItems.map((item) => (
                         <tr key={item.itemId} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium text-gray-800">
-                            {item.productName}
+                          <td className="px-4 py-3">
+                            <p className="font-medium text-gray-800">
+                              {item.productName}
+                            </p>
+                            {item.discountAmount && item.discountAmount > 0 ? (
+                              <p className="text-xs text-success-600 mt-0.5">
+                                خصم{" "}
+                                {item.discountType === "Percentage" ||
+                                item.discountType === "percentage"
+                                  ? `${item.discountValue}%`
+                                  : formatCurrency(item.discountValue ?? 0)}
+                              </p>
+                            ) : null}
                           </td>
                           <td className="px-4 py-3 text-center text-gray-600">
                             {formatCurrency(item.unitPrice)}
@@ -286,7 +318,11 @@ export const RefundModal = ({
                               </button>
                               <input
                                 type="number"
-                                value={item.refundQuantity}
+                                value={
+                                  item.refundQuantity === 0
+                                    ? ""
+                                    : item.refundQuantity
+                                }
                                 onChange={(e) =>
                                   setRefundQuantity(
                                     item.itemId,
@@ -295,6 +331,7 @@ export const RefundModal = ({
                                 }
                                 min={0}
                                 max={item.maxQuantity}
+                                placeholder="0"
                                 className="w-16 text-center py-1 border border-gray-200 rounded-lg focus:ring-2 focus:ring-danger-500 focus:border-danger-500"
                               />
                               <button
@@ -354,11 +391,19 @@ export const RefundModal = ({
                   <input
                     type="text"
                     value={customReason}
-                    onChange={(e) => setCustomReason(e.target.value)}
+                    onChange={(e) =>
+                      setCustomReason(e.target.value.slice(0, 500))
+                    }
                     placeholder="أدخل سبب الاسترجاع..."
+                    maxLength={500}
                     className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-danger-500 focus:border-danger-500"
                     autoFocus
                   />
+                  {customReason.length > 450 && (
+                    <p className="text-xs text-gray-500 mt-1 text-left">
+                      {customReason.length}/500
+                    </p>
+                  )}
                 </div>
               )}
             </div>

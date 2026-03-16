@@ -12,6 +12,7 @@ public class PermissionService : IPermissionService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<PermissionService> _logger;
+    private readonly ICurrentUserService _currentUserService;
 
     private static readonly List<Permission> DefaultCashierPermissions = new()
     {
@@ -21,10 +22,12 @@ public class PermissionService : IPermissionService
 
     public PermissionService(
         IUnitOfWork unitOfWork,
-        ILogger<PermissionService> logger)
+        ILogger<PermissionService> logger,
+        ICurrentUserService currentUserService)
     {
         _unitOfWork = unitOfWork;
         _logger = logger;
+        _currentUserService = currentUserService;
     }
 
     public List<Permission> GetDefaultCashierPermissions()
@@ -77,9 +80,13 @@ public class PermissionService : IPermissionService
 
     public async Task<List<UserPermissionsDto>> GetAllCashierPermissionsAsync()
     {
+        var currentTenantId = _currentUserService.TenantId;
+        
         var cashiers = await _unitOfWork.Users
             .Query()
-            .Where(u => u.Role == UserRole.Cashier && u.IsActive)
+            .Where(u => u.Role == UserRole.Cashier 
+                && u.IsActive 
+                && u.TenantId == currentTenantId)
             .ToListAsync();
 
         var result = new List<UserPermissionsDto>();

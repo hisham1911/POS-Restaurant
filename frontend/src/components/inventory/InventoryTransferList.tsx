@@ -16,6 +16,7 @@ import {
   Package,
   Filter,
   AlertTriangle,
+  ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { TransferStatus } from "../../types/inventory.types";
@@ -157,68 +158,77 @@ export default function InventoryTransferList() {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               من فرع
             </label>
-            <select
-              value={filters.fromBranchId || ""}
-              onChange={(e) =>
-                setFilters({
-                  ...filters,
-                  fromBranchId: e.target.value ? Number(e.target.value) : undefined,
-                })
-              }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">جميع الفروع</option>
-              {branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={filters.fromBranchId || ""}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    fromBranchId: e.target.value ? Number(e.target.value) : undefined,
+                  })
+                }
+                className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
+              >
+                <option value="">جميع الفروع</option>
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               إلى فرع
             </label>
-            <select
-              value={filters.toBranchId || ""}
-              onChange={(e) =>
-                setFilters({
-                  ...filters,
-                  toBranchId: e.target.value ? Number(e.target.value) : undefined,
-                })
-              }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">جميع الفروع</option>
-              {branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={filters.toBranchId || ""}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    toBranchId: e.target.value ? Number(e.target.value) : undefined,
+                  })
+                }
+                className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
+              >
+                <option value="">جميع الفروع</option>
+                {branches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>
+                    {branch.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               الحالة
             </label>
-            <select
-              value={filters.status || ""}
-              onChange={(e) =>
-                setFilters({
-                  ...filters,
-                  status: e.target.value ? (e.target.value as TransferStatus) : undefined,
-                })
-              }
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">جميع الحالات</option>
-              <option value="Pending">قيد الانتظار</option>
-              <option value="Approved">تمت الموافقة</option>
-              <option value="Received">تم الاستلام</option>
-              <option value="Cancelled">ملغي</option>
-            </select>
+            <div className="relative">
+              <select
+                value={filters.status || ""}
+                onChange={(e) =>
+                  setFilters({
+                    ...filters,
+                    status: e.target.value ? (e.target.value as TransferStatus) : undefined,
+                  })
+                }
+                className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
+              >
+                <option value="">جميع الحالات</option>
+                <option value="Pending">قيد الانتظار</option>
+                <option value="Approved">تمت الموافقة</option>
+                <option value="Received">تم الاستلام</option>
+                <option value="Cancelled">ملغي</option>
+              </select>
+              <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            </div>
           </div>
         </div>
       </div>

@@ -52,6 +52,9 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
     ContentRootPath = AppContext.BaseDirectory  // Required for Windows Service
 });
 
+// Explicit URL binding — launchSettings.json is NOT published, so set it here
+builder.WebHost.UseUrls(builder.Configuration["Urls"] ?? "http://0.0.0.0:5243");
+
 // Windows Service support (no-op when run as console app)
 builder.Host.UseWindowsService(options => options.ServiceName = "KasserProService");
 
@@ -87,10 +90,29 @@ builder.Services.AddSingleton<KasserPro.Infrastructure.Data.SqliteConfigurationS
 // Audit Interceptor
 builder.Services.AddSingleton<AuditSaveChangesInterceptor>();
 
-// Database
+// Database — resolve relative SQLite path against the app base directory
+// (Windows Services run with System32 as working directory, so relative paths break)
+var rawConnectionString = builder.Configuration.GetConnectionString("DefaultConnection")
+    ?? "Data Source=kasserpro.db;Cache=Shared";
+var sqliteConnBuilder = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(rawConnectionString);
+if (!Path.IsPathRooted(sqliteConnBuilder.DataSource))
+{
+    sqliteConnBuilder.DataSource = Path.Combine(AppContext.BaseDirectory, sqliteConnBuilder.DataSource);
+}
+var resolvedConnectionString = sqliteConnBuilder.ConnectionString;
+Log.Information("SQLite database path: {DbPath}", sqliteConnBuilder.DataSource);
+
+// Override connection string in configuration so all services (BackupService, etc.) use the resolved path
+builder.Configuration["ConnectionStrings:DefaultConnection"] = resolvedConnectionString;
+
 builder.Services.AddDbContext<AppDbContext>((sp, options) =>
 {
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection"));
+    options.UseSqlite(resolvedConnectionString, sqliteOptions =>
+    {
+        // FIX: Set QuerySplittingBehavior to SplitQuery to handle multiple .Include() efficiently
+        // This prevents MultipleCollectionIncludeWarning and improves performance
+        sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
+    });
     options.AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>());
 });
 
@@ -116,6 +138,13 @@ builder.Services.AddScoped<IInventoryReportService, InventoryReportService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<IPurchaseInvoiceService, PurchaseInvoiceService>();
+
+// Report Services
+builder.Services.AddScoped<IFinancialReportService, FinancialReportService>();
+builder.Services.AddScoped<ICustomerReportService, CustomerReportService>();
+builder.Services.AddScoped<IEmployeeReportService, EmployeeReportService>();
+builder.Services.AddScoped<IProductReportService, ProductReportService>();
+builder.Services.AddScoped<ISupplierReportService, SupplierReportService>();
 
 // Inventory Data Migration (for one-time migration)
 builder.Services.AddScoped<InventoryDataMigration>();
@@ -322,6 +351,9 @@ if (!app.Environment.IsEnvironment("Testing"))
 
         // Seed initial data (first run only - seeder checks if data exists)
         await ButcherDataSeeder.SeedAsync(context);
+
+        // Seed multiple tenants for demo purposes (optional)
+        await MultiTenantSeeder.SeedAsync(context);
     }
 }
 
@@ -377,7 +409,7 @@ if (!app.Environment.IsDevelopment())
     _ = Task.Run(async () =>
     {
         await Task.Delay(2000); // Wait for server to start
-        
+
         try
         {
             // Open browser on localhost
@@ -389,7 +421,7 @@ if (!app.Environment.IsDevelopment())
                 CreateNoWindow = true
             };
             System.Diagnostics.Process.Start(startInfo);
-            
+
             Log.Information("Browser opened - Application ready at http://localhost:5243");
         }
         catch (Exception ex)
@@ -416,7 +448,7 @@ static string GetLanIpAddress()
         }
     }
     catch { }
-    
+
     return "192.168.1.X (unknown)";
 }
 

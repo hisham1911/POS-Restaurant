@@ -21,8 +21,21 @@ public class BranchService : IBranchService
     public async Task<ApiResponse<List<BranchDto>>> GetAllAsync()
     {
         var tenantId = _currentUser.TenantId;
-        var branches = await _unitOfWork.Branches.Query()
-            .Where(b => b.TenantId == tenantId)
+        var userId = _currentUser.UserId;
+
+        // Get user to check their assigned branch
+        var user = await _unitOfWork.Users.GetByIdAsync(userId);
+        
+        var query = _unitOfWork.Branches.Query()
+            .Where(b => b.TenantId == tenantId);
+
+        // Cashiers can only see their assigned branch
+        if (user?.Role == Domain.Enums.UserRole.Cashier && user.BranchId.HasValue)
+        {
+            query = query.Where(b => b.Id == user.BranchId.Value);
+        }
+
+        var branches = await query
             .OrderBy(b => b.Name)
             .Select(b => new BranchDto
             {

@@ -94,9 +94,13 @@ public class SimplePrinterService : IPrinterService
     /// </summary>
     private string GenerateReceiptHtml(ReceiptDto receipt, ReceiptPrintSettings rs)
     {
+        // Detect daily report (uses special item encoding – do NOT sum items for subtotal)
+        bool isDailyReport = receipt.ReceiptNumber.Contains("تقرير يومي");
+
         // Calculate totals
-        decimal subtotal = receipt.Items.Sum(i => i.TotalPrice);
-        decimal discount = receipt.TotalAmount < subtotal ? subtotal - receipt.TotalAmount : 0;
+        // For daily reports use NetTotal/TaxAmount/TotalAmount directly (items contain report stats, not product prices)
+        decimal subtotal = isDailyReport ? receipt.NetTotal : receipt.Items.Where(i => i.Quantity > 0 && i.TotalPrice > 0).Sum(i => i.TotalPrice);
+        decimal discount = (!isDailyReport && receipt.TotalAmount < subtotal) ? subtotal - receipt.TotalAmount : 0;
         decimal taxAmount = receipt.TaxAmount;
         decimal total = receipt.TotalAmount;
 
@@ -121,12 +125,40 @@ public class SimplePrinterService : IPrinterService
         string formattedDate = receipt.Date.ToString("dd/MM/yyyy hh:mm tt", new System.Globalization.CultureInfo("ar-EG"));
 
         // Generate item rows
-        string itemsHtml = string.Join("", receipt.Items.Select(item => $@"
-            <div class='item'>
-              <span>{item.Name} × {item.Quantity:F0}</span>
-              <span>{item.TotalPrice:F0} ج.م</span>
-            </div>
-        "));
+        // Item rendering conventions:
+        //   Quantity == -1               -> section header (bold centered divider)
+        //   Quantity == 0, TotalPrice > 0 -> label:value row  (Name ......... Value ج.م)
+        //   Quantity >  0, TotalPrice == 0 -> label:count row  (Name ......... N)
+        //   Quantity >  0, TotalPrice > 0  -> normal product   (Name × N | Price ج.م)
+        var itemRows = new System.Text.StringBuilder();
+        foreach (var item in receipt.Items)
+        {
+            if (item.Quantity == -1)
+            {
+                // Section header – bold, centered, with dashed separator
+                itemRows.Append($"<div style='text-align:center;font-weight:bold;border-top:1px dashed #000;margin:8px 0 4px;padding-top:6px;font-size:{rs.BodyFontSize}px'>{item.Name}</div>");
+            }
+            else if (item.Quantity == 0 && item.TotalPrice == 0)
+            {
+                // Empty divider – skip
+            }
+            else if (item.Quantity == 0 && item.TotalPrice != 0)
+            {
+                // Value-only row: Name ......... Price
+                itemRows.Append($"<div class='item'><span>{item.Name}</span><span>{item.TotalPrice:F2} ج.م</span></div>");
+            }
+            else if (item.Quantity > 0 && item.TotalPrice == 0)
+            {
+                // Count-only row: Name ......... N
+                itemRows.Append($"<div class='item'><span>{item.Name}</span><span>{item.Quantity}</span></div>");
+            }
+            else
+            {
+                // Normal product: Name × Qty | Price
+                itemRows.Append($"<div class='item'><span>{item.Name} × {item.Quantity:F0}</span><span>{item.TotalPrice:F2} ج.م</span></div>");
+            }
+        }
+        string itemsHtml = itemRows.ToString();
 
         // Logo HTML
         string logoHtml = rs.ShowLogo && !string.IsNullOrEmpty(rs.LogoUrl)
@@ -138,10 +170,14 @@ public class SimplePrinterService : IPrinterService
             ? $"<h2 style='font-size:{rs.HeaderFontSize}px; margin:0'>{receipt.BranchName}</h2>"
             : "";
 
-        // Cashier + Payment on same line
-        string cashierPaymentHtml = rs.ShowCashier
-            ? $"<div class='item' style='font-size:{rs.BodyFontSize}px'><span>الكاشير: {receipt.CashierName}</span><span>الدفع: {paymentMethodAr}</span></div>"
-            : $"<div class='item' style='font-size:{rs.BodyFontSize}px'><span>الدفع: {paymentMethodAr}</span><span></span></div>";
+        // Cashier + Payment on same line (skip entirely for daily reports where both are empty)
+        string cashierPaymentHtml = "";
+        if (!string.IsNullOrEmpty(receipt.PaymentMethod) || !string.IsNullOrEmpty(receipt.CashierName))
+        {
+            cashierPaymentHtml = rs.ShowCashier
+                ? $"<div class='item' style='font-size:{rs.BodyFontSize}px'><span>الكاشير: {receipt.CashierName}</span><span>الدفع: {paymentMethodAr}</span></div>"
+                : $"<div class='item' style='font-size:{rs.BodyFontSize}px'><span>الدفع: {paymentMethodAr}</span><span></span></div>";
+        }
 
         // Customer HTML
         string customerHtml = rs.ShowCustomerName && !string.IsNullOrEmpty(receipt.CustomerName)
@@ -204,7 +240,7 @@ public class SimplePrinterService : IPrinterService
     <div class='header'>
         {logoHtml}
         {branchHtml}
-        <div class='item' style='font-size:{rs.BodyFontSize}px'><span>فاتورة رقم</span><span>{receipt.ReceiptNumber}</span></div>
+        <div class='item' style='font-size:{rs.BodyFontSize}px'><span>{(isDailyReport ? "" : "فاتورة رقم")}</span><span>{receipt.ReceiptNumber}</span></div>
         <p style='font-size:{rs.BodyFontSize}px'>{formattedDate}</p>
     </div>
     <div class='line'></div>

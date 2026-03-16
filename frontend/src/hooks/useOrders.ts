@@ -48,6 +48,13 @@ export const useOrders = () => {
       productId: item.product.id,
       quantity: item.quantity,
       notes: item.notes,
+      ...(item.discount
+        ? {
+            discountType: item.discount.type,
+            discountValue: item.discount.value,
+            discountReason: item.discount.reason,
+          }
+        : {}),
     }));
 
     try {
@@ -76,7 +83,7 @@ export const useOrders = () => {
 
   const completeOrder = async (
     orderId: number,
-    data: CompleteOrderRequest
+    data: CompleteOrderRequest,
   ): Promise<Order | null> => {
     try {
       const result = await completeMutation({ orderId, data }).unwrap();
@@ -91,9 +98,12 @@ export const useOrders = () => {
       return null;
     } catch (error) {
       // ❌ لا نمسح السلة عند الفشل - البيانات محفوظة
-      // Error already handled by baseQueryWithReauth
-      const apiError = error as { data?: ApiErrorData };
-      if (!apiError.data?.errorCode) {
+      // Error is handled by baseQueryWithReauth, but we check for specific cases
+      const apiError = error as { data?: ApiErrorData; status?: number };
+      
+      // Don't show generic error if baseQueryWithReauth already showed specific error
+      // Only show generic error for unexpected cases
+      if (!apiError.data?.errorCode && apiError.status !== 400 && apiError.status !== 409) {
         toast.error("فشل في إكمال الطلب");
       }
       return null;
@@ -102,7 +112,7 @@ export const useOrders = () => {
 
   const cancelOrder = async (
     orderId: number,
-    reason?: string
+    reason?: string,
   ): Promise<boolean> => {
     try {
       const result = await cancelMutation({ orderId, reason }).unwrap();

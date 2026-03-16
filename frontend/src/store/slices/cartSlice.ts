@@ -3,10 +3,17 @@ import { Product } from "../../types/product.types";
 
 export type DiscountType = "Percentage" | "Fixed";
 
+export interface ItemDiscount {
+  type: "percentage" | "fixed";
+  value: number;
+  reason?: string;
+}
+
 export interface CartItem {
   product: Product;
   quantity: number;
   notes?: string;
+  discount?: ItemDiscount;
 }
 
 interface CartState {
@@ -34,11 +41,11 @@ const cartSlice = createSlice({
   reducers: {
     addItem: (
       state,
-      action: PayloadAction<{ product: Product; quantity?: number }>
+      action: PayloadAction<{ product: Product; quantity?: number }>,
     ) => {
       const { product, quantity = 1 } = action.payload;
       const existingItem = state.items.find(
-        (item) => item.product.id === product.id
+        (item) => item.product.id === product.id,
       );
 
       // Check stock availability
@@ -79,19 +86,19 @@ const cartSlice = createSlice({
 
     removeItem: (state, action: PayloadAction<number>) => {
       state.items = state.items.filter(
-        (item) => item.product.id !== action.payload
+        (item) => item.product.id !== action.payload,
       );
     },
 
     updateQuantity: (
       state,
-      action: PayloadAction<{ productId: number; quantity: number }>
+      action: PayloadAction<{ productId: number; quantity: number }>,
     ) => {
       const { productId, quantity } = action.payload;
 
       if (quantity <= 0) {
         state.items = state.items.filter(
-          (item) => item.product.id !== productId
+          (item) => item.product.id !== productId,
         );
         return;
       }
@@ -115,7 +122,7 @@ const cartSlice = createSlice({
 
     updateNotes: (
       state,
-      action: PayloadAction<{ productId: number; notes: string }>
+      action: PayloadAction<{ productId: number; notes: string }>,
     ) => {
       const { productId, notes } = action.payload;
       const item = state.items.find((item) => item.product.id === productId);
@@ -137,7 +144,7 @@ const cartSlice = createSlice({
         taxRate: number;
         isTaxEnabled: boolean;
         allowNegativeStock?: boolean;
-      }>
+      }>,
     ) => {
       state.taxRate = action.payload.taxRate;
       state.isTaxEnabled = action.payload.isTaxEnabled;
@@ -149,17 +156,40 @@ const cartSlice = createSlice({
     // تطبيق خصم على الطلب
     setDiscount: (
       state,
-      action: PayloadAction<{
-        type: DiscountType;
-        value: number;
-      } | undefined>
+      action: PayloadAction<
+        | {
+            type: DiscountType;
+            value: number;
+          }
+        | undefined
+      >,
     ) => {
       if (!action.payload) {
         state.discountType = undefined;
         state.discountValue = undefined;
       } else {
         state.discountType = action.payload.type;
-        state.discountValue = action.payload.value;
+        // Clamp percentage discounts at 100%
+        state.discountValue =
+          action.payload.type === "Percentage"
+            ? Math.min(Math.max(0, action.payload.value), 100)
+            : Math.max(0, action.payload.value);
+      }
+    },
+
+    // تطبيق خصم على منتج بعينه
+    setItemDiscount: (
+      state,
+      action: PayloadAction<{
+        productId: number;
+        discount?: ItemDiscount;
+      }>,
+    ) => {
+      const item = state.items.find(
+        (i) => i.product.id === action.payload.productId,
+      );
+      if (item) {
+        item.discount = action.payload.discount;
       }
     },
   },
@@ -173,6 +203,7 @@ export const {
   clearCart,
   setTaxSettings,
   setDiscount,
+  setItemDiscount,
 } = cartSlice.actions;
 
 // Selectors
@@ -194,6 +225,27 @@ export const selectItemsCount = (state: { cart: CartState }) =>
   state.cart.items.reduce((sum, item) => sum + item.quantity, 0);
 
 /**
+ * Helper: calculate item-level discount for a single cart item
+ */
+const calcItemDiscount = (item: CartItem): number => {
+  if (!item.discount) return 0;
+  const lineTotal = item.product.price * item.quantity;
+  if (item.discount.type === "percentage") {
+    return Math.min(lineTotal * (item.discount.value / 100), lineTotal);
+  }
+  return Math.min(item.discount.value, lineTotal);
+};
+
+/**
+ * Total item-level discounts across all cart items
+ */
+export const selectItemDiscountsTotal = (state: { cart: CartState }) =>
+  Math.round(
+    state.cart.items.reduce((sum, item) => sum + calcItemDiscount(item), 0) *
+      100,
+  ) / 100;
+
+/**
  * Subtotal = Sum of all item prices (Net, before tax and discount)
  * Product.price is the NET price (excluding tax)
  */
@@ -201,100 +253,108 @@ export const selectSubtotal = (state: { cart: CartState }) =>
   Math.round(
     state.cart.items.reduce(
       (sum, item) => sum + item.product.price * item.quantity,
-      0
-    ) * 100
+      0,
+    ) * 100,
   ) / 100;
 
 /**
- * Calculate discount amount based on type and value
+ * Calculate order-level discount amount based on type and value
  */
 export const selectDiscountAmount = (state: { cart: CartState }) => {
   if (!state.cart.discountType || !state.cart.discountValue) return 0;
 
   const subtotal = state.cart.items.reduce(
     (sum, item) => sum + item.product.price * item.quantity,
-    0
+    0,
   );
+
+  // Subtract item-level discounts first
+  const itemDiscounts = state.cart.items.reduce(
+    (sum, item) => sum + calcItemDiscount(item),
+    0,
+  );
+  const afterItemDiscounts = subtotal - itemDiscounts;
 
   let discountAmount = 0;
   if (state.cart.discountType === "Percentage") {
-    // Percentage discount: value is percentage (e.g., 10 for 10%)
-    discountAmount = subtotal * (state.cart.discountValue / 100);
+    discountAmount = afterItemDiscounts * (state.cart.discountValue / 100);
   } else {
-    // Fixed discount: value is the amount
     discountAmount = state.cart.discountValue;
   }
 
-  // Discount cannot exceed subtotal
-  return Math.round(Math.min(discountAmount, subtotal) * 100) / 100;
+  // Discount cannot exceed remaining amount
+  return Math.round(Math.min(discountAmount, afterItemDiscounts) * 100) / 100;
 };
 
 /**
- * Tax Exclusive (Additive): Tax is calculated on (Subtotal - Discount)
- * TaxAmount = (Subtotal - Discount) * (TaxRate / 100)
- *
- * Example (100 EGP Net with 10 EGP discount and 14% VAT):
- *   TaxAmount = (100 - 10) * 0.14 = 12.6 EGP
+ * Tax Exclusive (Additive): Tax is calculated on (Subtotal - ItemDiscounts - OrderDiscount)
  */
 export const selectTaxAmount = (state: { cart: CartState }) => {
-  // If tax is disabled, return 0
   if (!state.cart.isTaxEnabled) return 0;
 
   const subtotal = state.cart.items.reduce(
     (sum, item) => sum + item.product.price * item.quantity,
-    0
+    0,
   );
 
-  // Calculate discount
-  let discountAmount = 0;
+  // Item-level discounts
+  const itemDiscounts = state.cart.items.reduce(
+    (sum, item) => sum + calcItemDiscount(item),
+    0,
+  );
+
+  // Order-level discount
+  const afterItemDiscounts = subtotal - itemDiscounts;
+  let orderDiscount = 0;
   if (state.cart.discountType && state.cart.discountValue) {
     if (state.cart.discountType === "Percentage") {
-      discountAmount = subtotal * (state.cart.discountValue / 100);
+      orderDiscount = afterItemDiscounts * (state.cart.discountValue / 100);
     } else {
-      discountAmount = state.cart.discountValue;
+      orderDiscount = state.cart.discountValue;
     }
-    discountAmount = Math.min(discountAmount, subtotal);
+    orderDiscount = Math.min(orderDiscount, afterItemDiscounts);
   }
 
-  // Tax is calculated on (Subtotal - Discount)
-  const taxableAmount = subtotal - discountAmount;
+  const taxableAmount = afterItemDiscounts - orderDiscount;
   const taxAmount = taxableAmount * (state.cart.taxRate / 100);
   return Math.round(taxAmount * 100) / 100;
 };
 
 /**
- * Total = Subtotal - Discount + Tax
- *
- * Example (100 EGP Net with 10 EGP discount and 14% VAT):
- *   Total = 100 - 10 + 12.6 = 102.6 EGP
+ * Total = Subtotal - ItemDiscounts - OrderDiscount + Tax
  */
 export const selectTotal = (state: { cart: CartState }) => {
   const subtotal = state.cart.items.reduce(
     (sum, item) => sum + item.product.price * item.quantity,
-    0
+    0,
   );
 
-  // Calculate discount
-  let discountAmount = 0;
+  // Item-level discounts
+  const itemDiscounts = state.cart.items.reduce(
+    (sum, item) => sum + calcItemDiscount(item),
+    0,
+  );
+
+  // Order-level discount
+  const afterItemDiscounts = subtotal - itemDiscounts;
+  let orderDiscount = 0;
   if (state.cart.discountType && state.cart.discountValue) {
     if (state.cart.discountType === "Percentage") {
-      discountAmount = subtotal * (state.cart.discountValue / 100);
+      orderDiscount = afterItemDiscounts * (state.cart.discountValue / 100);
     } else {
-      discountAmount = state.cart.discountValue;
+      orderDiscount = state.cart.discountValue;
     }
-    discountAmount = Math.min(discountAmount, subtotal);
+    orderDiscount = Math.min(orderDiscount, afterItemDiscounts);
   }
 
-  const afterDiscount = subtotal - discountAmount;
+  const afterAllDiscounts = afterItemDiscounts - orderDiscount;
 
-  // If tax is disabled, Total = Subtotal - Discount
   if (!state.cart.isTaxEnabled) {
-    return Math.round(afterDiscount * 100) / 100;
+    return Math.round(afterAllDiscounts * 100) / 100;
   }
 
-  // Tax Exclusive: Total = (Subtotal - Discount) + Tax
-  const taxAmount = afterDiscount * (state.cart.taxRate / 100);
-  return Math.round((afterDiscount + taxAmount) * 100) / 100;
+  const taxAmount = afterAllDiscounts * (state.cart.taxRate / 100);
+  return Math.round((afterAllDiscounts + taxAmount) * 100) / 100;
 };
 
 export default cartSlice.reducer;

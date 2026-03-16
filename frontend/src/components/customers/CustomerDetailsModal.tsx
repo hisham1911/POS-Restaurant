@@ -56,7 +56,7 @@ export const CustomerDetailsModal = ({
   const customer = customerData?.data || initialCustomer;
 
   // Fetch debt payment history
-  const { data: debtHistoryData, isLoadingDebtHistory } =
+  const { data: debtHistoryData, isLoading: isLoadingDebtHistory } =
     useGetDebtHistoryQuery(customer.id);
 
   const [printDebtPaymentReceipt, { isLoading: isPrinting }] =

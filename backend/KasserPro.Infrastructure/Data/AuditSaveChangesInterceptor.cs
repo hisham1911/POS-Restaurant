@@ -184,6 +184,13 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
         {
             var currentTenantId = tenantIdProp.CurrentValue as int? ?? 0;
             
+            // Special case: Allow System Owner (User with Role = SystemOwner) to have null TenantId
+            if (entry.Entity is Domain.Entities.User user && user.Role == Domain.Enums.UserRole.SystemOwner)
+            {
+                // System Owner can have null TenantId - skip enforcement
+                return;
+            }
+            
             // If TenantId is 0 or not set, we need valid context
             if (currentTenantId == 0)
             {

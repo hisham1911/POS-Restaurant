@@ -427,6 +427,11 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("TEXT");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasColumnType("BLOB");
+
                     b.Property<int>("TenantId")
                         .HasColumnType("INTEGER");
 
@@ -448,6 +453,72 @@ namespace KasserPro.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("Customers");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.DebtPayment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("BalanceAfter")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("BalanceBefore")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("PaymentMethod")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("RecordedByUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("RecordedByUserName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("ReferenceNumber")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("ShiftId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("RecordedByUserId");
+
+                    b.HasIndex("ShiftId");
+
+                    b.HasIndex("CustomerId", "CreatedAt");
+
+                    b.HasIndex("TenantId", "CreatedAt");
+
+                    b.ToTable("DebtPayments");
                 });
 
             modelBuilder.Entity("KasserPro.Domain.Entities.Expense", b =>
@@ -923,6 +994,9 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<int>("OrderType")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("OriginalOrderId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<decimal>("RefundAmount")
                         .HasColumnType("TEXT");
 
@@ -937,6 +1011,11 @@ namespace KasserPro.Infrastructure.Migrations
 
                     b.Property<string>("RefundedByUserName")
                         .HasColumnType("TEXT");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .HasColumnType("BLOB");
 
                     b.Property<decimal>("ServiceChargeAmount")
                         .HasColumnType("TEXT");
@@ -986,6 +1065,8 @@ namespace KasserPro.Infrastructure.Migrations
                     b.HasIndex("OrderNumber")
                         .IsUnique();
 
+                    b.HasIndex("OriginalOrderId");
+
                     b.HasIndex("TenantId");
 
                     b.HasIndex("UserId");
@@ -1005,6 +1086,15 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("CustomName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("CustomTaxRate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal?>("CustomUnitPrice")
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal>("DiscountAmount")
                         .HasColumnType("TEXT");
 
@@ -1016,6 +1106,9 @@ namespace KasserPro.Infrastructure.Migrations
 
                     b.Property<decimal?>("DiscountValue")
                         .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsCustomItem")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
@@ -1032,7 +1125,7 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<string>("ProductBarcode")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("ProductId")
+                    b.Property<int?>("ProductId")
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("ProductName")
@@ -1046,6 +1139,9 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<int>("Quantity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("RefundedQuantity")
                         .HasColumnType("INTEGER");
 
                     b.Property<decimal>("Subtotal")
@@ -1202,6 +1298,9 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<bool>("TrackInventory")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Type")
                         .HasColumnType("INTEGER");
 
                     b.Property<DateTime?>("UpdatedAt")
@@ -1383,6 +1482,9 @@ namespace KasserPro.Infrastructure.Migrations
 
                     b.Property<int>("Quantity")
                         .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("SellingPrice")
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal>("Total")
                         .HasPrecision(18, 2)
@@ -1601,9 +1703,7 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
                         .IsRequired()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("BLOB")
-                        .HasDefaultValue(new byte[0]);
+                        .HasColumnType("BLOB");
 
                     b.Property<int>("TenantId")
                         .HasColumnType("INTEGER");
@@ -2209,6 +2309,48 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("KasserPro.Domain.Entities.DebtPayment", b =>
+                {
+                    b.HasOne("KasserPro.Domain.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KasserPro.Domain.Entities.Customer", "Customer")
+                        .WithMany()
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KasserPro.Domain.Entities.User", "RecordedByUser")
+                        .WithMany()
+                        .HasForeignKey("RecordedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KasserPro.Domain.Entities.Shift", "Shift")
+                        .WithMany()
+                        .HasForeignKey("ShiftId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("KasserPro.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("Customer");
+
+                    b.Navigation("RecordedByUser");
+
+                    b.Navigation("Shift");
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("KasserPro.Domain.Entities.Expense", b =>
                 {
                     b.HasOne("KasserPro.Domain.Entities.User", "ApprovedByUser")
@@ -2372,6 +2514,11 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("KasserPro.Domain.Entities.Order", "OriginalOrder")
+                        .WithMany()
+                        .HasForeignKey("OriginalOrderId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("KasserPro.Domain.Entities.Shift", "Shift")
                         .WithMany("Orders")
                         .HasForeignKey("ShiftId")
@@ -2393,6 +2540,8 @@ namespace KasserPro.Infrastructure.Migrations
 
                     b.Navigation("Customer");
 
+                    b.Navigation("OriginalOrder");
+
                     b.Navigation("Shift");
 
                     b.Navigation("Tenant");
@@ -2410,9 +2559,7 @@ namespace KasserPro.Infrastructure.Migrations
 
                     b.HasOne("KasserPro.Domain.Entities.Product", "Product")
                         .WithMany("OrderItems")
-                        .HasForeignKey("ProductId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("ProductId");
 
                     b.Navigation("Order");
 

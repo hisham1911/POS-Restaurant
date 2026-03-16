@@ -26,6 +26,11 @@ public class PurchaseInvoiceItem : BaseEntity
     public decimal PurchasePrice { get; set; }
     
     /// <summary>
+    /// Selling price per unit (retail price)
+    /// </summary>
+    public decimal SellingPrice { get; set; }
+    
+    /// <summary>
     /// Total for this item (Quantity * PurchasePrice)
     /// </summary>
     public decimal Total { get; set; }

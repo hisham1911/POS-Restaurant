@@ -13,5 +13,6 @@ public class CreatePurchaseInvoiceItemRequest
     public int ProductId { get; set; }
     public int Quantity { get; set; }
     public decimal PurchasePrice { get; set; }
+    public decimal SellingPrice { get; set; }
     public string? Notes { get; set; }
 }

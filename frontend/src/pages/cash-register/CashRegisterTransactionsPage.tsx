@@ -6,6 +6,7 @@ import {
   TrendingDown,
   ListOrdered,
   Building2,
+  ChevronDown,
 } from "lucide-react";
 import { useGetTransactionsQuery } from "../../api/cashRegisterApi";
 import type {
@@ -148,24 +149,27 @@ export function CashRegisterTransactionsPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 نوع المعاملة
               </label>
-              <select
-                value={filters.type || ""}
-                onChange={(e) =>
-                  handleFilterChange("type", e.target.value || undefined)
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">الكل</option>
-                <option value="Opening">فتح وردية</option>
-                <option value="Deposit">إيداع</option>
-                <option value="Withdrawal">سحب</option>
-                <option value="Sale">مبيعات</option>
-                <option value="Refund">مرتجع</option>
-                <option value="Expense">مصروف</option>
-                <option value="SupplierPayment">دفع لمورد</option>
-                <option value="Adjustment">تسوية</option>
-                <option value="Transfer">تحويل</option>
-              </select>
+              <div className="relative">
+                <select
+                  value={filters.type || ""}
+                  onChange={(e) =>
+                    handleFilterChange("type", e.target.value || undefined)
+                  }
+                  className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                >
+                  <option value="">الكل</option>
+                  <option value="Opening">فتح وردية</option>
+                  <option value="Deposit">إيداع</option>
+                  <option value="Withdrawal">سحب</option>
+                  <option value="Sale">مبيعات</option>
+                  <option value="Refund">مرتجع</option>
+                  <option value="Expense">مصروف</option>
+                  <option value="SupplierPayment">دفع لمورد</option>
+                  <option value="Adjustment">تسوية</option>
+                  <option value="Transfer">تحويل</option>
+                </select>
+                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>

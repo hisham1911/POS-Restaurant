@@ -23,12 +23,24 @@ import {
   Boxes,
   HardDrive,
   Shield,
+  Pin,
+  PinOff,
+  type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
 import clsx from "clsx";
 import { BranchSelector } from "./BranchSelector";
+import { NavItemWithSubmenu } from "./NavItemWithSubmenu";
 
-const navItems = [
+const navItems: Array<{
+  path: string;
+  label: string;
+  icon: LucideIcon;
+  permission?: string;
+  adminOnly?: boolean;
+  systemOwnerOnly?: boolean;
+  subItems?: Array<{ path: string; label: string }>;
+}> = [
   {
     path: "/pos",
     label: "نقطة البيع",
@@ -118,12 +130,19 @@ const navItems = [
     icon: Building2,
     systemOwnerOnly: true,
   },
+  {
+    path: "/owner/users",
+    label: "إدارة المستخدمين",
+    icon: Users,
+    systemOwnerOnly: true,
+  },
 ];
 
 export const MainLayout = () => {
   const { user, logout, isAdmin, isSystemOwner } = useAuth();
   const { hasPermission } = usePermission();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true); // الافتراضي مقفول
 
   const currentTime = new Date().toLocaleTimeString("ar-EG", {
     hour: "2-digit",
@@ -151,64 +170,103 @@ export const MainLayout = () => {
   return (
     <div className="h-screen flex w-full overflow-hidden">
       {/* Sidebar - Desktop */}
-      <aside className="hidden lg:flex w-64 bg-gray-900 text-white flex-col shrink-0 border-l border-gray-800 overflow-y-auto">
+      <aside
+        className={clsx(
+          "hidden lg:flex bg-gray-900 text-white flex-col shrink-0 border-l border-gray-800 overflow-y-auto transition-all duration-300",
+          sidebarCollapsed ? "w-20" : "w-64",
+        )}
+      >
         {/* Logo */}
         <div className="p-4 border-b border-gray-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center shrink-0">
               <span className="text-xl">🏪</span>
             </div>
-            <div>
-              <h1 className="font-bold text-lg">KasserPro</h1>
-              <p className="text-xs text-gray-400">نظام نقاط البيع</p>
-            </div>
+            {!sidebarCollapsed && (
+              <div>
+                <h1 className="font-bold text-lg">TajerPro</h1>
+                <p className="text-xs text-gray-400">نظام نقاط البيع</p>
+              </div>
+            )}
           </div>
+        </div>
+
+        {/* Toggle Button */}
+        <div className="px-4 py-2">
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            title={sidebarCollapsed ? "فتح القائمة" : "إغلاق القائمة"}
+          >
+            <Menu className="w-5 h-5" />
+            {!sidebarCollapsed && <span className="text-sm">إغلاق</span>}
+          </button>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {filteredNavItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                clsx(
-                  "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
-                  isActive
-                    ? "bg-primary-600 text-white"
-                    : "text-gray-300 hover:bg-gray-800",
-                )
-              }
-            >
-              <item.icon className="w-5 h-5" />
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
+          {filteredNavItems.map((item) =>
+            item.subItems ? (
+              <NavItemWithSubmenu
+                key={item.path}
+                path={item.path}
+                label={item.label}
+                icon={item.icon}
+                subItems={item.subItems}
+              />
+            ) : (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) =>
+                  clsx(
+                    "flex items-center gap-3 rounded-lg transition-colors",
+                    sidebarCollapsed ? "px-3 py-3 justify-center" : "px-4 py-3",
+                    isActive
+                      ? "bg-primary-600 text-white"
+                      : "text-gray-300 hover:bg-gray-800",
+                  )
+                }
+                title={sidebarCollapsed ? item.label : undefined}
+              >
+                <item.icon className="w-5 h-5 shrink-0" />
+                {!sidebarCollapsed && <span>{item.label}</span>}
+              </NavLink>
+            ),
+          )}
         </nav>
 
         {/* User Info */}
         <div className="p-4 border-t border-gray-800">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center">
-              <User className="w-5 h-5" />
+          {!sidebarCollapsed && (
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 bg-gray-700 rounded-full flex items-center justify-center shrink-0">
+                <User className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="font-medium">{user?.name}</p>
+                <p className="text-xs text-gray-400">
+                  {user?.role === "SystemOwner"
+                    ? "مالك النظام"
+                    : user?.role === "Admin"
+                      ? "مدير"
+                      : "كاشير"}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-medium">{user?.name}</p>
-              <p className="text-xs text-gray-400">
-                {user?.role === "SystemOwner"
-                  ? "مالك النظام"
-                  : user?.role === "Admin"
-                    ? "مدير"
-                    : "كاشير"}
-              </p>
-            </div>
-          </div>
+          )}
           <button
             onClick={logout}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors"
+            className={clsx(
+              "w-full flex items-center gap-2 bg-gray-800 hover:bg-gray-700 rounded-lg transition-colors",
+              sidebarCollapsed
+                ? "justify-center px-3 py-3"
+                : "justify-center px-4 py-2",
+            )}
+            title={sidebarCollapsed ? "تسجيل الخروج" : undefined}
           >
             <LogOut className="w-4 h-4" />
-            <span>تسجيل الخروج</span>
+            {!sidebarCollapsed && <span>تسجيل الخروج</span>}
           </button>
         </div>
       </aside>
@@ -227,7 +285,7 @@ export const MainLayout = () => {
                 <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
                   <span className="text-xl">🏪</span>
                 </div>
-                <span className="font-bold">KasserPro</span>
+                <span className="font-bold">TajerPro</span>
               </div>
               <button
                 onClick={() => setSidebarOpen(false)}
@@ -239,24 +297,35 @@ export const MainLayout = () => {
 
             {/* Navigation */}
             <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-              {filteredNavItems.map((item) => (
-                <NavLink
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setSidebarOpen(false)}
-                  className={({ isActive }) =>
-                    clsx(
-                      "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
-                      isActive
-                        ? "bg-primary-600 text-white"
-                        : "text-gray-300 hover:bg-gray-800",
-                    )
-                  }
-                >
-                  <item.icon className="w-5 h-5" />
-                  <span>{item.label}</span>
-                </NavLink>
-              ))}
+              {filteredNavItems.map((item) =>
+                item.subItems ? (
+                  <NavItemWithSubmenu
+                    key={item.path}
+                    path={item.path}
+                    label={item.label}
+                    icon={item.icon}
+                    subItems={item.subItems}
+                    onItemClick={() => setSidebarOpen(false)}
+                  />
+                ) : (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setSidebarOpen(false)}
+                    className={({ isActive }) =>
+                      clsx(
+                        "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
+                        isActive
+                          ? "bg-primary-600 text-white"
+                          : "text-gray-300 hover:bg-gray-800",
+                      )
+                    }
+                  >
+                    <item.icon className="w-5 h-5" />
+                    <span>{item.label}</span>
+                  </NavLink>
+                ),
+              )}
             </nav>
 
             {/* Logout */}
@@ -289,7 +358,7 @@ export const MainLayout = () => {
               <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
                 <span className="text-sm">🏪</span>
               </div>
-              <span className="font-bold text-primary-600">KasserPro</span>
+              <span className="font-bold text-primary-600">TajerPro</span>
             </div>
           </div>
 

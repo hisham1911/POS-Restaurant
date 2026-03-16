@@ -11,6 +11,8 @@ export interface Shift {
   notes?: string;
   totalCash: number;
   totalCard: number;
+  totalFawry: number;
+  totalBankTransfer: number;
   totalOrders: number;
   userName?: string;
   orders?: ShiftOrder[];
@@ -36,6 +38,9 @@ export interface Shift {
   // Calculated fields
   durationHours: number;
   durationMinutes: number;
+
+  // Concurrency Token (for optimistic locking)
+  rowVersion?: string;
 }
 
 export interface ShiftOrder {
@@ -56,6 +61,8 @@ export interface OpenShiftRequest {
 export interface CloseShiftRequest {
   closingBalance: number;
   notes?: string;
+  // Concurrency Token (must be included for updates)
+  rowVersion?: string;
 }
 
 export interface ForceCloseShiftRequest {
@@ -71,7 +78,7 @@ export interface HandoverShiftRequest {
 }
 
 export interface ShiftWarning {
-  level: 'None' | 'Warning' | 'Critical';
+  level: "None" | "Warning" | "Critical";
   message: string;
   hoursOpen: number;
   shouldWarn: boolean;

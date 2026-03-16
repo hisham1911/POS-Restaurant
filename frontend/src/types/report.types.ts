@@ -19,6 +19,7 @@ export interface ShiftSummary {
   totalOrders: number;
   totalCash: number;
   totalCard: number;
+  totalFawry: number;
   totalSales: number;
   isForceClosed: boolean;
   forceCloseReason?: string;

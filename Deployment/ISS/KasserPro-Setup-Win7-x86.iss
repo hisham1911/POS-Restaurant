@@ -9,7 +9,7 @@
 #define ServiceDisplayName "KasserPro POS Backend"
 #define SourceDir "C:\temp\kasserpro-src-win7-x86"
 #define DbFileName "kasserpro.db"
-#define DeploymentRoot "d:\مسح\POS\Deployment"
+#define DeploymentRoot "f:\POS\Deployment"
 
 [Setup]
 AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}}
@@ -47,6 +47,9 @@ Name: "desktopicon"; Description: "Create desktop shortcuts"; GroupDescription: 
 [Files]
 ; All application files - SKIP the database file so existing client data is preserved
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "{#DbFileName},*.db,*.db.backup,license.key"
+; Service control scripts
+Source: "{#DeploymentRoot}\Scripts\StartKasserPro.bat"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#DeploymentRoot}\Scripts\StopKasserPro.bat"; DestDir: "{app}"; Flags: ignoreversion
 
 [Registry]
 ; Set ASPNETCORE_ENVIRONMENT=Production for the Windows Service
@@ -55,8 +58,12 @@ Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#ServiceName}"; ValueTyp
 [Icons]
 Name: "{commondesktop}\{#AppName} Printer Bridge"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; Comment: "KasserPro Thermal Printer Controller"; Tasks: desktopicon
 Name: "{commondesktop}\{#AppName} POS"; Filename: "{app}\KasserPro.url"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Open KasserPro in browser"; Tasks: desktopicon
+Name: "{commondesktop}\{#AppName} - Start Service"; Filename: "{app}\StartKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Start KasserPro Backend Service"; Tasks: desktopicon
+Name: "{commondesktop}\{#AppName} - Stop Service"; Filename: "{app}\StopKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Stop KasserPro Backend Service"; Tasks: desktopicon
 Name: "{group}\{#AppName} Printer Bridge"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; Comment: "KasserPro Thermal Printer Controller"
 Name: "{group}\{#AppName} POS (Browser)"; Filename: "{app}\KasserPro.url"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Open KasserPro in browser"
+Name: "{group}\{#AppName} - Start Service"; Filename: "{app}\StartKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Start KasserPro Backend Service"
+Name: "{group}\{#AppName} - Stop Service"; Filename: "{app}\StopKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Stop KasserPro Backend Service"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{commonstartup}\KasserPro BridgeApp"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; Comment: "KasserPro Thermal Printer Controller"
 
@@ -100,7 +107,7 @@ end;
 function IsAlreadyInstalled(): Boolean;
 begin
   Result := RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\{#ServiceName}')
-         or FileExists(ExpandConstant('{app}\{#DbFileName}'));
+         or FileExists('C:\{#AppName}\{#DbFileName}');
 end;
 
 function InitializeSetup(): Boolean;

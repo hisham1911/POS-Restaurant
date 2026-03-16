@@ -4,6 +4,7 @@ export interface User {
   email: string;
   role: "Admin" | "Cashier" | "SystemOwner";
   permissions: string[];
+  branchId?: number;
 }
 
 export interface LoginRequest {

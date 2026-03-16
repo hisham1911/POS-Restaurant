@@ -174,7 +174,7 @@ public class TenantService : ITenantService
             };
 
             await _unitOfWork.Tenants.AddAsync(tenant);
-            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync(); // Flush to get DB-generated tenant.Id (transaction still open)
 
             // 2. Create Branch
             var branch = new Branch
@@ -229,10 +229,10 @@ public class TenantService : ITenantService
             };
 
             await _unitOfWork.AuditLogs.AddAsync(auditLog);
-            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.SaveChangesAsync(); // Final flush before commit
 
-            // Commit transaction
-            await transaction.CommitAsync();
+            // Commit via UnitOfWork - ensures ghost-reference nullification
+            await _unitOfWork.CommitTransactionAsync();
 
             _logger.LogInformation(
                 "SystemOwner tenant creation succeeded for TenantId={TenantId}, AdminUserId={AdminUserId}",
@@ -252,7 +252,7 @@ public class TenantService : ITenantService
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackTransactionAsync();
             _logger.LogError(ex,
                 "SystemOwner tenant creation failed and rolled back for TenantName={TenantName}, AdminEmail={AdminEmail}",
                 normalizedTenantName,

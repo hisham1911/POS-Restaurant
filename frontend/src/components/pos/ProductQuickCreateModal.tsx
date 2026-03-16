@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Package, DollarSign, Tag, Hash, Barcode } from "lucide-react";
+import { X, Package, DollarSign, Tag, Hash, Barcode, ChevronDown } from "lucide-react";
 import { useQuickCreateProductMutation } from "@/api/productsApi";
 import { useCategories } from "@/hooks/useProducts";
 import { toast } from "sonner";
@@ -117,7 +117,7 @@ export const ProductQuickCreateModal = ({
                   type="number"
                   step="0.01"
                   min="0"
-                  value={formData.price || ""}
+                  value={formData.price === 0 ? "" : formData.price || ""}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
@@ -136,24 +136,27 @@ export const ProductQuickCreateModal = ({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 التصنيف *
               </label>
-              <select
-                value={formData.categoryId}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    categoryId: parseInt(e.target.value),
-                  })
-                }
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                required
-              >
-                <option value="">اختر التصنيف</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={formData.categoryId}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      categoryId: parseInt(e.target.value),
+                    })
+                  }
+                  className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
+                  required
+                >
+                  <option value="">اختر التصنيف</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
 
             {/* Product Type */}
@@ -161,24 +164,27 @@ export const ProductQuickCreateModal = ({
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 نوع المنتج *
               </label>
-              <select
-                value={formData.type}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    type: parseInt(e.target.value) as ProductType,
-                  })
-                }
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                required
-              >
-                <option value={ProductType.Service}>
-                  خدمة (لا يتتبع المخزون)
-                </option>
-                <option value={ProductType.Physical}>
-                  منتج مادي (يتتبع المخزون)
-                </option>
-              </select>
+              <div className="relative">
+                <select
+                  value={formData.type}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      type: parseInt(e.target.value) as ProductType,
+                    })
+                  }
+                  className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
+                  required
+                >
+                  <option value={ProductType.Service}>
+                    خدمة (لا يتتبع المخزون)
+                  </option>
+                  <option value={ProductType.Physical}>
+                    منتج مادي (يتتبع المخزون)
+                  </option>
+                </select>
+                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
               <p className="mt-1 text-xs text-gray-500">
                 {formData.type === ProductType.Service
                   ? "الخدمات لا تحتاج تتبع مخزون (مثل: التوصيل، الصيانة)"
@@ -197,7 +203,7 @@ export const ProductQuickCreateModal = ({
                   <input
                     type="number"
                     min="0"
-                    value={formData.initialStock || ""}
+                    value={formData.initialStock === 0 ? "" : formData.initialStock || ""}
                     onChange={(e) =>
                       setFormData({
                         ...formData,

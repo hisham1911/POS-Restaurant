@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🏪 KasserPro
+# 🏪 TajerPro
 
 ### Modern Point of Sale System | نظام نقاط البيع الحديث
 
@@ -21,6 +21,7 @@ A full-featured, production-ready Point of Sale system built with Clean Architec
 ## 🚀 Quick Start للمطورين
 
 ### بناء جميع الإصدارات:
+
 ```powershell
 cd Deployment\Scripts
 .\BUILD_ALL.ps1
@@ -29,6 +30,7 @@ cd Deployment\Scripts
 **النتيجة:** 4 ملفات تثبيت جاهزة في `Deployment\Installers\`
 
 ### للتطوير المحلي:
+
 ```bash
 # Backend
 cd backend/KasserPro.API
@@ -46,14 +48,15 @@ npm run dev
 
 ### الإصدارات المتاحة:
 
-| الملف | نظام التشغيل | المعمارية | الحجم |
-|------|--------------|-----------|------|
-| KasserPro-Setup.exe | Win10/11 | x64 | ~124 MB |
-| KasserPro-Setup-x86.exe | Win10/11 | x86 | ~74 MB |
-| KasserPro-Setup-Win7-x64.exe | Win7 SP1+ | x64 | ~79 MB |
-| KasserPro-Setup-Win7-x86.exe | Win7 SP1+ | x86 | ~71 MB |
+| الملف                       | نظام التشغيل | المعمارية | الحجم   |
+| --------------------------- | ------------ | --------- | ------- |
+| TajerPro-Setup.exe          | Win10/11     | x64       | ~124 MB |
+| TajerPro-Setup-x86.exe      | Win10/11     | x86       | ~74 MB  |
+| TajerPro-Setup-Win7-x64.exe | Win7 SP1+    | x64       | ~79 MB  |
+| TajerPro-Setup-Win7-x86.exe | Win7 SP1+    | x86       | ~71 MB  |
 
 ### 📁 Deployment Structure:
+
 ```
 Deployment/
 ├── Installers/       → ملفات التثبيت النهائية

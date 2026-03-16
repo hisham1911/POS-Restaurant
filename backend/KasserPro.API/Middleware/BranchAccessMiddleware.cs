@@ -59,6 +59,14 @@ public class BranchAccessMiddleware
         }
 
         // P0 SECURITY: Validate branch access
+        // Admin and SystemOwner can access any branch in their tenant
+        if (user.Role == Domain.Enums.UserRole.Admin || user.Role == Domain.Enums.UserRole.SystemOwner)
+        {
+            await _next(context);
+            return;
+        }
+
+        // Cashiers can only access their assigned branch
         if (user.BranchId.HasValue && user.BranchId.Value != requestedBranchId)
         {
             _logger.LogWarning(

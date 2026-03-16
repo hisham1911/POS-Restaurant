@@ -44,13 +44,29 @@ public interface IUnitOfWork : IDisposable
     Task<int> SaveChangesAsync();
 
     /// <summary>
-    /// Begin a database transaction for atomic operations
+    /// Begin a database transaction for atomic operations.
+    /// If a transaction is already active, returns the existing transaction to prevent nesting.
     /// </summary>
     Task<IDbContextTransaction> BeginTransactionAsync();
-    
+
     /// <summary>
     /// P0-8: True if a database transaction is currently active on this context.
-    /// Used by RecordTransactionAsync to avoid nested transaction errors.
+    /// Used by sub-services to avoid nested transaction errors.
     /// </summary>
     bool HasActiveTransaction { get; }
+
+    /// <summary>
+    /// Get the current active transaction, or null if none exists.
+    /// </summary>
+    IDbContextTransaction? CurrentTransaction { get; }
+
+    /// <summary>
+    /// Commit the current active transaction.
+    /// </summary>
+    Task CommitTransactionAsync();
+
+    /// <summary>
+    /// Rollback the current active transaction.
+    /// </summary>
+    Task RollbackTransactionAsync();
 }

@@ -24,6 +24,7 @@ import {
   ChevronLeft,
   ShoppingCart,
   Sparkles,
+  ChevronDown,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
@@ -305,9 +306,7 @@ export const SettingsPage = () => {
             {/* Cashier Mode */}
             <button
               onClick={() => {
-                console.log('🎯 Switching to cashier mode...');
                 setMode("cashier");
-                console.log('✅ Mode set to:', localStorage.getItem('pos_mode'));
                 toast.success("تم التبديل إلى وضع الكاشير");
               }}
               className={clsx(
@@ -363,9 +362,7 @@ export const SettingsPage = () => {
             {/* Standard Mode */}
             <button
               onClick={() => {
-                console.log('🎯 Switching to standard mode...');
                 setMode("standard");
-                console.log('✅ Mode set to:', localStorage.getItem('pos_mode'));
                 toast.success("تم التبديل إلى الوضع الأساسي");
               }}
               className={clsx(
@@ -469,31 +466,37 @@ export const SettingsPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 العملة
               </label>
-              <select
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value="EGP">جنيه مصري (EGP)</option>
-                <option value="SAR">ريال سعودي (SAR)</option>
-                <option value="AED">درهم إماراتي (AED)</option>
-                <option value="USD">دولار أمريكي (USD)</option>
-              </select>
+              <div className="relative">
+                <select
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                >
+                  <option value="EGP">جنيه مصري (EGP)</option>
+                  <option value="SAR">ريال سعودي (SAR)</option>
+                  <option value="AED">درهم إماراتي (AED)</option>
+                  <option value="USD">دولار أمريكي (USD)</option>
+                </select>
+                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 المنطقة الزمنية
               </label>
-              <select
-                value={timezone}
-                onChange={(e) => setTimezone(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-              >
-                <option value="Africa/Cairo">القاهرة (Africa/Cairo)</option>
-                <option value="Asia/Riyadh">الرياض (Asia/Riyadh)</option>
-                <option value="Asia/Dubai">دبي (Asia/Dubai)</option>
-              </select>
+              <div className="relative">
+                <select
+                  value={timezone}
+                  onChange={(e) => setTimezone(e.target.value)}
+                  className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                >
+                  <option value="Africa/Cairo">القاهرة (Africa/Cairo)</option>
+                  <option value="Asia/Riyadh">الرياض (Asia/Riyadh)</option>
+                  <option value="Asia/Dubai">دبي (Asia/Dubai)</option>
+                </select>
+                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
           </div>
         </div>
@@ -545,8 +548,8 @@ export const SettingsPage = () => {
                 min="0"
                 max="100"
                 step="0.01"
-                value={taxRate}
-                onChange={(e) => setTaxRate(parseFloat(e.target.value) || 0)}
+                value={taxRate === 14 ? "" : taxRate}
+                onChange={(e) => setTaxRate(parseFloat(e.target.value) || 14)}
                 disabled={!isTaxEnabled}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-lg"
                 placeholder="14"
@@ -672,7 +675,7 @@ export const SettingsPage = () => {
                   type="number"
                   min="200"
                   max="400"
-                  value={receiptCustomWidth}
+                  value={receiptCustomWidth === 280 ? "" : receiptCustomWidth}
                   onChange={(e) =>
                     setReceiptCustomWidth(parseInt(e.target.value) || 280)
                   }

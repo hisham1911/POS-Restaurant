@@ -8,6 +8,7 @@ using KasserPro.Infrastructure.Data;
 public class UnitOfWork : IUnitOfWork
 {
     private readonly AppDbContext _context;
+    private IDbContextTransaction? _currentTransaction;
 
     public UnitOfWork(AppDbContext context)
     {
@@ -88,13 +89,70 @@ public class UnitOfWork : IUnitOfWork
     public async Task<int> SaveChangesAsync() => await _context.SaveChangesAsync();
 
     /// <summary>
-    /// Begin a database transaction for atomic operations (e.g., Order + Payments)
+    /// Begin a database transaction for atomic operations.
+    /// CRITICAL FIX: If a transaction is already active, return it instead of creating a nested one.
+    /// This prevents "The connection is already in a transaction" errors in SQLite.
     /// </summary>
     public async Task<IDbContextTransaction> BeginTransactionAsync()
-        => await _context.Database.BeginTransactionAsync();
+    {
+        // Check both our tracked transaction AND EF Core's CurrentTransaction
+        var existingTransaction = _currentTransaction ?? _context.Database.CurrentTransaction;
 
-    // P0-8: Check if a transaction is already in progress
-    public bool HasActiveTransaction => _context.Database.CurrentTransaction != null;
+        if (existingTransaction != null)
+        {
+            // Transaction already active - return it to prevent nesting
+            // NOTE: Caller must check if they own this transaction before committing/rolling back
+            return existingTransaction;
+        }
 
-    public void Dispose() => _context.Dispose();
+        // No active transaction - create a new one and track it
+        _currentTransaction = await _context.Database.BeginTransactionAsync();
+        return _currentTransaction;
+    }
+
+    /// <summary>
+    /// P0-8: Check if a transaction is already in progress.
+    /// Uses dual-check: our tracked transaction AND EF Core's CurrentTransaction.
+    /// </summary>
+    public bool HasActiveTransaction =>
+        _currentTransaction != null || _context.Database.CurrentTransaction != null;
+
+    /// <summary>
+    /// Get the current active transaction, or null if none exists.
+    /// </summary>
+    public IDbContextTransaction? CurrentTransaction =>
+        _currentTransaction ?? _context.Database.CurrentTransaction;
+
+    /// <summary>
+    /// Commit the current active transaction and clear the reference.
+    /// </summary>
+    public async Task CommitTransactionAsync()
+    {
+        if (_currentTransaction != null)
+        {
+            await _currentTransaction.CommitAsync();
+            await _currentTransaction.DisposeAsync();
+            _currentTransaction = null;
+        }
+    }
+
+    /// <summary>
+    /// Rollback the current active transaction and clear the reference.
+    /// </summary>
+    public async Task RollbackTransactionAsync()
+    {
+        if (_currentTransaction != null)
+        {
+            await _currentTransaction.RollbackAsync();
+            await _currentTransaction.DisposeAsync();
+            _currentTransaction = null;
+        }
+    }
+
+    public void Dispose()
+    {
+        // Clear our transaction reference when disposing
+        _currentTransaction = null;
+        _context.Dispose();
+    }
 }

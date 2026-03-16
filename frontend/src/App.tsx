@@ -10,6 +10,7 @@ import {
   selectToken,
   logout as logoutAction,
 } from "./store/slices/authSlice";
+import { clearBranch } from "./store/slices/branchSlice";
 import { useGetCurrentShiftQuery } from "./api/shiftsApi";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { MainLayout } from "./components/layout/MainLayout";
@@ -28,6 +29,25 @@ import CustomersPage from "./pages/customers/CustomersPage";
 import SuppliersPage from "./pages/suppliers/SuppliersPage";
 import { BranchesPage } from "./pages/branches/BranchesPage";
 import DailyReportPage from "./pages/reports/DailyReportPage";
+import SalesReportPage from "./pages/reports/SalesReportPage";
+import InventoryReportsPage from "./pages/reports/InventoryReportsPage";
+import ProfitLossReportPage from "./pages/reports/ProfitLossReportPage";
+import ExpensesReportPage from "./pages/reports/ExpensesReportPage";
+import TransferHistoryReportPage from "./pages/reports/TransferHistoryReportPage";
+import TopCustomersReportPage from "./pages/reports/TopCustomersReportPage";
+import CustomerDebtsReportPage from "./pages/reports/CustomerDebtsReportPage";
+import CustomerActivityReportPage from "./pages/reports/CustomerActivityReportPage";
+import ReportsDashboardPage from "./pages/reports/ReportsDashboardPage";
+import CashierPerformanceReportPage from "./pages/reports/CashierPerformanceReportPage";
+import ShiftDetailsReportPage from "./pages/reports/ShiftDetailsReportPage";
+import SalesByEmployeeReportPage from "./pages/reports/SalesByEmployeeReportPage";
+import ProductMovementReportPage from "./pages/reports/ProductMovementReportPage";
+import ProfitableProductsReportPage from "./pages/reports/ProfitableProductsReportPage";
+import SlowMovingProductsReportPage from "./pages/reports/SlowMovingProductsReportPage";
+import CogsReportPage from "./pages/reports/CogsReportPage";
+import SupplierPurchasesReportPage from "./pages/reports/SupplierPurchasesReportPage";
+import SupplierDebtsReportPage from "./pages/reports/SupplierDebtsReportPage";
+import SupplierPerformanceReportPage from "./pages/reports/SupplierPerformanceReportPage";
 import AuditLogPage from "./pages/audit/AuditLogPage";
 import SettingsPage from "./pages/settings/SettingsPage";
 import PermissionsPage from "./pages/settings/PermissionsPage";
@@ -42,6 +62,7 @@ import { CashRegisterDashboard } from "./pages/cash-register/CashRegisterDashboa
 import { CashRegisterTransactionsPage } from "./pages/cash-register/CashRegisterTransactionsPage";
 import InventoryPage from "./pages/inventory/InventoryPage";
 import TenantCreationPage from "./pages/owner/TenantCreationPage";
+import SystemUsersPage from "./pages/system/SystemUsersPage";
 import { BackupPage } from "./pages/backup/BackupPage";
 import NotFound from "./pages/NotFound";
 
@@ -257,7 +278,197 @@ const AppRoutes = () => (
         element={
           <NonSystemOwnerRoute>
             <PermissionRoute permission="ReportsView">
+              <ReportsDashboardPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/daily"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
               <DailyReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/sales"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <SalesReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/inventory"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <InventoryReportsPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/profit-loss"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <ProfitLossReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/expenses"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <ExpensesReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/transfer-history"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <TransferHistoryReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/customers/top"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <TopCustomersReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/customers/debts"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <CustomerDebtsReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/customers/activity"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <CustomerActivityReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/employees/cashier-performance"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <CashierPerformanceReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/employees/shifts"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <ShiftDetailsReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/employees/sales"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <SalesByEmployeeReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/products/movement"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <ProductMovementReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/products/profitability"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <ProfitableProductsReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/products/slow"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <SlowMovingProductsReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/products/cogs"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <CogsReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/suppliers/purchases"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <SupplierPurchasesReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/suppliers/debts"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <SupplierDebtsReportPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/reports/suppliers/performance"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="ReportsView">
+              <SupplierPerformanceReportPage />
             </PermissionRoute>
           </NonSystemOwnerRoute>
         }
@@ -390,6 +601,14 @@ const AppRoutes = () => (
           </SystemOwnerRoute>
         }
       />
+      <Route
+        path="/owner/users"
+        element={
+          <SystemOwnerRoute>
+            <SystemUsersPage />
+          </SystemOwnerRoute>
+        }
+      />
     </Route>
     <Route path="*" element={<NotFound />} />
   </Routes>
@@ -441,6 +660,21 @@ const App = () => {
       console.warn("Failed to validate JWT - logging out", e);
       localStorage.removeItem("persist:auth");
       dispatch(logoutAction());
+    }
+  }, []); // Only run once on startup
+
+  // CRITICAL: Clear branch state on app startup to prevent branch mismatch
+  // This ensures that when a user logs in, they start with a clean branch state
+  useEffect(() => {
+    if (isAuthenticated) {
+      // Clear persisted branch from localStorage
+      try {
+        localStorage.removeItem("persist:branch");
+      } catch (e) {
+        // ignore localStorage errors
+      }
+      // Clear branch state in Redux
+      dispatch(clearBranch());
     }
   }, []); // Only run once on startup
 

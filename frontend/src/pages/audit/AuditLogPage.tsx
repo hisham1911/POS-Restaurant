@@ -18,6 +18,7 @@ import {
   CheckCircle,
   XCircle,
   FileEdit,
+  ChevronDown,
 } from "lucide-react";
 import { useGetAuditLogsQuery } from "@/api/auditApi";
 import { formatDateTime } from "@/utils/formatters";
@@ -276,31 +277,37 @@ const AuditLogPage = () => {
           {/* Entity Type Filter */}
           <div>
             <label className="block text-xs text-gray-500 mb-1">نوع العملية</label>
-            <select
-              value={filters.entityType || ""}
-              onChange={(e) => handleFilterChange("entityType", e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            >
-              <option value="">الكل</option>
-              {Object.entries(entityConfig).map(([key, { label }]) => (
-                <option key={key} value={key}>{label}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={filters.entityType || ""}
+                onChange={(e) => handleFilterChange("entityType", e.target.value)}
+                className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+              >
+                <option value="">الكل</option>
+                {Object.entries(entityConfig).map(([key, { label }]) => (
+                  <option key={key} value={key}>{label}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            </div>
           </div>
 
           {/* Action Filter */}
           <div>
             <label className="block text-xs text-gray-500 mb-1">نوع الإجراء</label>
-            <select
-              value={filters.action || ""}
-              onChange={(e) => handleFilterChange("action", e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-            >
-              <option value="">الكل</option>
-              <option value="Create">إنشاء</option>
-              <option value="Update">تعديل</option>
-              <option value="Delete">حذف</option>
-            </select>
+            <div className="relative">
+              <select
+                value={filters.action || ""}
+                onChange={(e) => handleFilterChange("action", e.target.value)}
+                className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+              >
+                <option value="">الكل</option>
+                <option value="Create">إنشاء</option>
+                <option value="Update">تعديل</option>
+                <option value="Delete">حذف</option>
+              </select>
+              <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            </div>
           </div>
 
           {/* From Date */}

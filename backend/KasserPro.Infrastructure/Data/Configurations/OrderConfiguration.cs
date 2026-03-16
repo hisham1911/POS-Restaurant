@@ -28,5 +28,10 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
             .WithOne(i => i.Order)
             .HasForeignKey(i => i.OrderId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // Composite index for reporting queries (TenantId + BranchId + Status + CompletedAt)
+        builder.HasIndex(o => new { o.TenantId, o.BranchId, o.Status, o.CompletedAt })
+            .HasDatabaseName("IX_Orders_Tenant_Branch_Status_CompletedAt")
+            .HasFilter("\"IsDeleted\" = 0");
     }
 }

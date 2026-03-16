@@ -10,7 +10,7 @@ public class CreateOrderRequest
     public int? CustomerId { get; set; }
     public string? Notes { get; set; }
     public List<CreateOrderItemRequest> Items { get; set; } = new();
-    
+
     // Order-level discount
     public string? DiscountType { get; set; } // "Percentage" or "Fixed"
     public decimal? DiscountValue { get; set; }
@@ -21,6 +21,11 @@ public class CreateOrderItemRequest
     public int ProductId { get; set; }
     public int Quantity { get; set; } = 1;
     public string? Notes { get; set; }
+
+    // Item-level discount
+    public string? DiscountType { get; set; } // "percentage" or "fixed"
+    public decimal? DiscountValue { get; set; }
+    public string? DiscountReason { get; set; }
 }
 
 public class AddOrderItemRequest
@@ -28,6 +33,10 @@ public class AddOrderItemRequest
     public int ProductId { get; set; }
     public int Quantity { get; set; } = 1;
     public string? Notes { get; set; }
+    // Item-level discount (parity with CreateOrderItemRequest)
+    public string? DiscountType { get; set; }
+    public decimal? DiscountValue { get; set; }
+    public string? DiscountReason { get; set; }
 }
 
 public class CompleteOrderRequest

@@ -57,6 +57,7 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
       if (result.success) {
         toast.success(result.data.message || 'تم تسديد الدين بنجاح');
         onSuccess?.();
+        onClose(); // Close modal after success
       } else {
         toast.error(result.message || 'فشل تسديد الدين');
       }
@@ -141,17 +142,17 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.amount}
+                  value={formData.amount === 0 ? "" : formData.amount}
                   onChange={(e) =>
                     setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })
                   }
                   className={clsx(
-                    'w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-lg font-semibold',
+                    'w-full px-4 py-3 pl-12 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-lg font-semibold text-right',
                     errors.amount ? 'border-red-500' : 'border-gray-200'
                   )}
                   placeholder="0.00"
                   disabled={isLoading}
-                  dir="ltr"
+                  dir="rtl"
                 />
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
                   ج.م

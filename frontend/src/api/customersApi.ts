@@ -147,6 +147,8 @@ export const customersApi = baseApi.injectEndpoints({
       invalidatesTags: (_result, _error, { customerId }) => [
         { type: "Customers", id: customerId },
         { type: "Customers", id: "LIST" },
+        { type: "Customers", id: "DEBT-LIST" },
+        { type: "Customers", id: `debt-${customerId}` },
       ],
     }),
 

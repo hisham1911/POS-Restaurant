@@ -23,17 +23,10 @@ import { ShiftWarningBanner } from "@/components/shifts";
 export const POSPage = () => {
   const { mode } = usePOSMode();
 
-  // Debug logging
-  console.log('🔍 POSPage - Current mode:', mode);
-  console.log('🔍 POSPage - localStorage:', localStorage.getItem('pos_mode'));
-
   // Redirect to workspace if mode is standard
   if (mode === "standard") {
-    console.log('🔄 Redirecting to workspace...');
     return <Navigate to="/pos-workspace" replace />;
   }
-
-  console.log('✅ Staying in cashier mode');
 
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [showPayment, setShowPayment] = useState(false);

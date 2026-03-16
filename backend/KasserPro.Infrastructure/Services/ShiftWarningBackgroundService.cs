@@ -34,22 +34,34 @@ public class ShiftWarningBackgroundService : BackgroundService
     {
         _logger.LogInformation("Shift Warning Background Service started");
 
-        // Wait 1 minute before first check to allow system to fully start
-        await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
-
-        while (!stoppingToken.IsCancellationRequested)
+        try
         {
-            try
-            {
-                await CheckShiftWarningsAsync(stoppingToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error occurred while checking shift warnings");
-            }
+            // Wait 1 minute before first check to allow system to fully start
+            await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
 
-            // Wait for the next check interval
-            await Task.Delay(_checkInterval, stoppingToken);
+            while (!stoppingToken.IsCancellationRequested)
+            {
+                try
+                {
+                    await CheckShiftWarningsAsync(stoppingToken);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error occurred while checking shift warnings");
+                }
+
+                // Wait for the next check interval
+                await Task.Delay(_checkInterval, stoppingToken);
+            }
+        }
+        catch (TaskCanceledException)
+        {
+            // Expected when application is shutting down
+            _logger.LogInformation("Shift Warning Background Service is stopping");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unexpected error in Shift Warning Background Service");
         }
 
         _logger.LogInformation("Shift Warning Background Service stopped");

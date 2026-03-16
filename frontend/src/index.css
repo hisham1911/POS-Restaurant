@@ -1,8 +1,8 @@
-/* Offline Font Stack - @fontsource/cairo */
-/* Cairo loaded from npm for consistent rendering across all systems */
+/* Offline Font Stack - Optimized for Windows 7 */
+/* Override @fontsource font-display for instant rendering */
 
 :root {
-  /* Arabic fonts (Cairo from @fontsource + system fallbacks) */
+  /* Arabic fonts (Cairo with Windows 7 fallbacks) */
   --font-family-arabic: 'Cairo', 'Tahoma', 'Arial', 'Segoe UI', sans-serif;
   
   /* English fonts */

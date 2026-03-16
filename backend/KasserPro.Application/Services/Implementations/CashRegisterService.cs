@@ -83,7 +83,7 @@ public class CashRegisterService : ICashRegisterService
         {
             // Use current user's branch if not specified
             var targetBranchId = branchId ?? _currentUserService.BranchId;
-            
+
             var query = _unitOfWork.CashRegisterTransactions.Query()
                 .Where(t => t.TenantId == _currentUserService.TenantId &&
                            t.BranchId == targetBranchId)
@@ -128,11 +128,11 @@ public class CashRegisterService : ICashRegisterService
 
     public async Task<ApiResponse<CashRegisterTransactionDto>> CreateTransactionAsync(CreateCashRegisterTransactionRequest request)
     {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             // Validate transaction type (only Deposit or Withdrawal allowed for manual transactions)
-            if (request.Type != CashRegisterTransactionType.Deposit && 
+            if (request.Type != CashRegisterTransactionType.Deposit &&
                 request.Type != CashRegisterTransactionType.Withdrawal)
             {
                 return ApiResponse<CashRegisterTransactionDto>.Fail(ErrorCodes.CASH_REGISTER_INVALID_TYPE);
@@ -166,8 +166,8 @@ public class CashRegisterService : ICashRegisterService
 
             // Calculate new balance
             var balanceBefore = currentBalance;
-            var balanceAfter = request.Type == CashRegisterTransactionType.Deposit 
-                ? balanceBefore + request.Amount 
+            var balanceAfter = request.Type == CashRegisterTransactionType.Deposit
+                ? balanceBefore + request.Amount
                 : balanceBefore - request.Amount;
 
             // Create transaction
@@ -189,7 +189,7 @@ public class CashRegisterService : ICashRegisterService
 
             await _unitOfWork.CashRegisterTransactions.AddAsync(cashTransaction);
             await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             // Reload with includes
             var createdTransaction = await _unitOfWork.CashRegisterTransactions.Query()
@@ -201,7 +201,7 @@ public class CashRegisterService : ICashRegisterService
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackTransactionAsync();
             _logger.LogError(ex, "Error creating cash register transaction");
             return ApiResponse<CashRegisterTransactionDto>.Fail(ErrorCodes.INTERNAL_ERROR);
         }
@@ -209,7 +209,7 @@ public class CashRegisterService : ICashRegisterService
 
     public async Task<ApiResponse<bool>> ReconcileAsync(int shiftId, ReconcileCashRegisterRequest request)
     {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             var shift = await _unitOfWork.Shifts.Query()
@@ -272,13 +272,13 @@ public class CashRegisterService : ICashRegisterService
             }
 
             await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             return ApiResponse<bool>.Ok(true);
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackTransactionAsync();
             _logger.LogError(ex, "Error reconciling cash register for shift {ShiftId}", shiftId);
             return ApiResponse<bool>.Fail(ErrorCodes.INTERNAL_ERROR);
         }
@@ -286,7 +286,7 @@ public class CashRegisterService : ICashRegisterService
 
     public async Task<ApiResponse<bool>> TransferCashAsync(TransferCashRequest request)
     {
-        var transaction = await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
         try
         {
             // Validate branches
@@ -337,7 +337,7 @@ public class CashRegisterService : ICashRegisterService
             };
 
             await _unitOfWork.CashRegisterTransactions.AddAsync(withdrawalTransaction);
-            await _unitOfWork.SaveChangesAsync(); // Save to get ID
+            await _unitOfWork.SaveChangesAsync(); // Flush to get withdrawal ID for FK reference
 
             // Create deposit transaction (target)
             var targetBalance = await GetCurrentBalanceForBranchAsync(request.TargetBranchId);
@@ -360,20 +360,20 @@ public class CashRegisterService : ICashRegisterService
             };
 
             await _unitOfWork.CashRegisterTransactions.AddAsync(depositTransaction);
-            await _unitOfWork.SaveChangesAsync();
 
-            // Link transactions
+            // Link withdrawal → deposit (bidirectional reference)
             withdrawalTransaction.TransferReferenceId = depositTransaction.Id;
             _unitOfWork.CashRegisterTransactions.Update(withdrawalTransaction);
-            await _unitOfWork.SaveChangesAsync();
 
-            await transaction.CommitAsync();
+            // Single final flush before commit
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             return ApiResponse<bool>.Ok(true);
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
+            await _unitOfWork.RollbackTransactionAsync();
             _logger.LogError(ex, "Error transferring cash");
             return ApiResponse<bool>.Fail(ErrorCodes.INTERNAL_ERROR);
         }
@@ -438,14 +438,15 @@ public class CashRegisterService : ICashRegisterService
     {
         // P0-8: If we're already inside a caller's transaction (e.g., CompleteAsync),
         // piggyback on it. If not, create our own to ensure read+write atomicity.
-        var ownsTransaction = !_unitOfWork.HasActiveTransaction;
+        var hasExistingTransaction = _unitOfWork.HasActiveTransaction;
+        var ownsTransaction = !hasExistingTransaction;
         IDbContextTransaction? transaction = null;
-        
+
         if (ownsTransaction)
         {
             transaction = await _unitOfWork.BeginTransactionAsync();
         }
-        
+
         try
         {
             // Read current balance — inside transaction, so SQLite write lock protects us
@@ -489,30 +490,27 @@ public class CashRegisterService : ICashRegisterService
             };
 
             await _unitOfWork.CashRegisterTransactions.AddAsync(cashTransaction);
-            await _unitOfWork.SaveChangesAsync();
-            
-            if (ownsTransaction && transaction != null)
+
+            // CRITICAL: Only save and commit if we own the transaction
+            // When called as sub-service, parent will SaveChanges+Commit for all changes
+            if (ownsTransaction)
             {
-                await transaction.CommitAsync();
+                await _unitOfWork.SaveChangesAsync();
+                await _unitOfWork.CommitTransactionAsync();
             }
+            // else: NO SaveChangesAsync - parent will save
 
             _logger.LogInformation("Cash register transaction recorded: {Type} - {Amount}", type, amount);
         }
         catch (Exception ex)
         {
-            if (ownsTransaction && transaction != null)
+            // CRITICAL: Only rollback if we own the transaction
+            if (ownsTransaction)
             {
-                await transaction.RollbackAsync();
+                try { await _unitOfWork.RollbackTransactionAsync(); } catch { /* Already rolled back */ }
             }
             _logger.LogError(ex, "Error recording cash register transaction");
             throw;
-        }
-        finally
-        {
-            if (ownsTransaction)
-            {
-                transaction?.Dispose();
-            }
         }
     }
 
@@ -544,7 +542,7 @@ public class CashRegisterService : ICashRegisterService
     {
         var year = DateTime.UtcNow.Year;
         var lastTransaction = await _unitOfWork.CashRegisterTransactions.Query()
-            .Where(t => t.TenantId == _currentUserService.TenantId && 
+            .Where(t => t.TenantId == _currentUserService.TenantId &&
                        t.TransactionDate.Year == year)
             .OrderByDescending(t => t.Id)
             .FirstOrDefaultAsync();

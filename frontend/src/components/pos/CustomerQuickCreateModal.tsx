@@ -61,33 +61,39 @@ export const CustomerQuickCreateModal = ({
 
   return (
     <Portal>
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
-        <div className="bg-white rounded-xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+      <div 
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50"
+        onClick={onClose}
+      >
+        <div 
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Header */}
-          <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <User className="w-5 h-5 text-primary-600" />
-              إضافة عميل جديد
-            </h2>
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
+                <User className="w-5 h-5 text-primary-600" />
+              </div>
+              <h2 className="text-xl font-bold text-gray-800">إضافة عميل جديد</h2>
+            </div>
             <button
               onClick={onClose}
-              className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-full transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
             {/* Phone (Required) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 رقم الهاتف <span className="text-danger-500">*</span>
               </label>
               <div className="relative">
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  <Phone className="w-4 h-4" />
-                </div>
+                <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
                   name="phone"
@@ -96,40 +102,36 @@ export const CustomerQuickCreateModal = ({
                   required
                   dir="ltr"
                   placeholder="01xxxxxxxxx"
-                  className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
             </div>
 
             {/* Name (Optional) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 الاسم
               </label>
               <div className="relative">
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  <User className="w-4 h-4" />
-                </div>
+                <User className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
                   name="name"
                   value={formData.name}
                   onChange={handleChange}
                   placeholder="اسم العميل (اختياري)"
-                  className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
             </div>
 
             {/* Email (Optional) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 البريد الإلكتروني
               </label>
               <div className="relative">
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  <Mail className="w-4 h-4" />
-                </div>
+                <Mail className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="email"
                   name="email"
@@ -137,77 +139,74 @@ export const CustomerQuickCreateModal = ({
                   onChange={handleChange}
                   dir="ltr"
                   placeholder="email@example.com"
-                  className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
             </div>
 
             {/* Address (Optional) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 العنوان
               </label>
               <div className="relative">
-                <div className="absolute right-3 top-3 text-gray-400">
-                  <MapPin className="w-4 h-4" />
-                </div>
+                <MapPin className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
                   name="address"
                   value={formData.address}
                   onChange={handleChange}
                   placeholder="عنوان العميل (اختياري)"
-                  className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
             </div>
 
             {/* Notes (Optional) */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 ملاحظات
               </label>
               <div className="relative">
-                <div className="absolute right-3 top-3 text-gray-400">
-                  <FileText className="w-4 h-4" />
-                </div>
+                <FileText className="absolute right-3 top-3 w-5 h-5 text-gray-400" />
                 <textarea
                   name="notes"
                   value={formData.notes}
                   onChange={handleChange}
                   rows={3}
                   placeholder="ملاحظات إضافية (اختياري)"
-                  className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                  className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
                 />
               </div>
             </div>
-
-            {/* Actions */}
-            <div className="flex gap-3 pt-2">
-              <button
-                type="button"
-                onClick={onClose}
-                disabled={isLoading}
-                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                إلغاء
-              </button>
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="flex-1 px-4 py-2.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {isLoading ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    جاري الحفظ...
-                  </>
-                ) : (
-                  "حفظ"
-                )}
-              </button>
-            </div>
           </form>
+
+          {/* Actions */}
+          <div className="flex gap-3 p-6 border-t border-gray-200 flex-shrink-0">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              إلغاء
+            </button>
+            <button
+              type="submit"
+              onClick={handleSubmit}
+              disabled={isLoading}
+              className="flex-1 px-4 py-2.5 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {isLoading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  جاري الحفظ...
+                </>
+              ) : (
+                "حفظ"
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </Portal>

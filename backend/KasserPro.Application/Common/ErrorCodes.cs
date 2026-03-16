@@ -33,6 +33,7 @@ public static class ErrorCodes
     public const string PRODUCT_INACTIVE = "PRODUCT_INACTIVE";
     public const string PRODUCT_OUT_OF_STOCK = "PRODUCT_OUT_OF_STOCK";
     public const string PRODUCT_INVALID_PRICE = "PRODUCT_INVALID_PRICE";
+    public const string PRODUCT_SERVICE_NOT_PURCHASABLE = "PRODUCT_SERVICE_NOT_PURCHASABLE";
     public const string INSUFFICIENT_STOCK = "INSUFFICIENT_STOCK";
 
     // Category Errors (1500-1599)
@@ -56,6 +57,8 @@ public static class ErrorCodes
     public const string PAYMENT_OVERPAYMENT_LIMIT = "PAYMENT_OVERPAYMENT_LIMIT";
     
     // Customer Errors (1750-1799)
+    public const string CUSTOMER_NOT_FOUND = "CUSTOMER_NOT_FOUND";
+    public const string CUSTOMER_NOT_ACTIVE = "CUSTOMER_NOT_ACTIVE";
     public const string CUSTOMER_CREDIT_LIMIT_EXCEEDED = "CUSTOMER_CREDIT_LIMIT_EXCEEDED";
 
     // Shift Errors (1800-1899)
@@ -183,6 +186,7 @@ public static class ErrorMessages
         { ErrorCodes.PRODUCT_INACTIVE, "المنتج غير نشط" },
         { ErrorCodes.PRODUCT_OUT_OF_STOCK, "المنتج غير متوفر" },
         { ErrorCodes.PRODUCT_INVALID_PRICE, "سعر المنتج غير صحيح" },
+        { ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE, "لا يمكن إضافة منتجات خدمية في فواتير الشراء" },
         { ErrorCodes.INSUFFICIENT_STOCK, "الكمية المطلوبة غير متوفرة" },
 
         // Category
@@ -206,6 +210,8 @@ public static class ErrorMessages
         { ErrorCodes.PAYMENT_OVERPAYMENT_LIMIT, "المبلغ المدفوع يتجاوز الحد المسموح" },
         
         // Customer
+        { ErrorCodes.CUSTOMER_NOT_FOUND, "العميل غير موجود" },
+        { ErrorCodes.CUSTOMER_NOT_ACTIVE, "العميل غير نشط" },
         { ErrorCodes.CUSTOMER_CREDIT_LIMIT_EXCEEDED, "تجاوز حد الائتمان المسموح للعميل" },
 
         // Shift

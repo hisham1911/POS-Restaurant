@@ -11,6 +11,11 @@ const initialState: BranchState = {
   branches: [],
 };
 
+interface SetBranchesPayload {
+  branches: Branch[];
+  userBranchId?: number | null;
+}
+
 const branchSlice = createSlice({
   name: "branch",
   initialState,
@@ -18,11 +23,29 @@ const branchSlice = createSlice({
     setCurrentBranch: (state, action: PayloadAction<Branch | null>) => {
       state.currentBranch = action.payload;
     },
-    setBranches: (state, action: PayloadAction<Branch[]>) => {
-      state.branches = action.payload;
-      // Auto-select first branch if no current branch
-      if (!state.currentBranch && action.payload.length > 0) {
-        state.currentBranch = action.payload[0];
+    setBranches: (state, action: PayloadAction<Branch[] | SetBranchesPayload>) => {
+      // Support both old and new payload formats
+      const branches = Array.isArray(action.payload) 
+        ? action.payload 
+        : action.payload.branches;
+      const userBranchId = Array.isArray(action.payload) 
+        ? null 
+        : action.payload.userBranchId;
+
+      state.branches = branches;
+      
+      // Auto-select branch logic:
+      // 1. If user has a specific branchId (Cashier), select that branch
+      // 2. Otherwise, select first branch (Admin/SystemOwner)
+      if (!state.currentBranch && branches.length > 0) {
+        if (userBranchId) {
+          // Find user's assigned branch
+          const userBranch = branches.find(b => b.id === userBranchId);
+          state.currentBranch = userBranch || branches[0];
+        } else {
+          // No specific branch - select first one
+          state.currentBranch = branches[0];
+        }
       }
     },
     clearBranch: (state) => {

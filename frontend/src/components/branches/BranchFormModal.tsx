@@ -83,19 +83,18 @@ export const BranchFormModal = ({ branch, onClose }: BranchFormModalProps) => {
 
   return (
     <Portal>
-      {/* Backdrop */}
-      <div className="fixed inset-0 bg-black/50 z-[100]" onClick={onClose} />
-
-      {/* Modal */}
-      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div 
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50"
+        onClick={onClose}
+      >
         <div
-          className="bg-white rounded-2xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b sticky top-0 bg-white z-10">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
                 <Building2 className="w-5 h-5 text-primary-600" />
               </div>
               <h2 className="text-xl font-bold text-gray-800">
@@ -111,7 +110,7 @@ export const BranchFormModal = ({ branch, onClose }: BranchFormModalProps) => {
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-6">
+          <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto flex-1">
             {/* Basic Info */}
             <div className="space-y-4">
               <h3 className="font-semibold text-gray-800">
@@ -215,36 +214,37 @@ export const BranchFormModal = ({ branch, onClose }: BranchFormModalProps) => {
                   onChange={(e) => handleChange("address", e.target.value)}
                   placeholder="مثال: 123 شارع الجمهورية، القاهرة"
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent resize-none"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
                 />
               </div>
             </div>
-
-            {/* Actions */}
-            <div className="flex gap-3 pt-4 border-t">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                disabled={isLoading}
-                className="flex-1"
-              >
-                إلغاء
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                disabled={isLoading}
-                className="flex-1"
-              >
-                {isLoading
-                  ? "جاري الحفظ..."
-                  : isEditMode
-                    ? "حفظ التعديلات"
-                    : "إضافة الفرع"}
-              </Button>
-            </div>
           </form>
+
+          {/* Actions */}
+          <div className="flex gap-3 p-6 border-t border-gray-200 flex-shrink-0">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              disabled={isLoading}
+              className="flex-1"
+            >
+              إلغاء
+            </Button>
+            <Button
+              type="submit"
+              onClick={handleSubmit}
+              variant="primary"
+              disabled={isLoading}
+              className="flex-1"
+            >
+              {isLoading
+                ? "جاري الحفظ..."
+                : isEditMode
+                  ? "حفظ التعديلات"
+                  : "إضافة الفرع"}
+            </Button>
+          </div>
         </div>
       </div>
     </Portal>

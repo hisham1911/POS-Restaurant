@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test System Users API</title>
+</head>
+<body>
+    <h1>Test System Users API</h1>
+    <button onclick="testLogin()">1. Login</button>
+    <button onclick="testGetUsers()">2. Get Users</button>
+    <div id="result" style="margin-top: 20px; white-space: pre-wrap;"></div>
+
+    <script>
+        let token = '';
+
+        async function testLogin() {
+            try {
+                const response = await fetch('http://localhost:5243/api/auth/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: 'owner@kasserpro.com',
+                        password: 'Owner@123'
+                    })
+                });
+
+                const data = await response.json();
+                console.log('Login response:', data);
+
+                if (data.success && data.data.accessToken) {
+                    token = data.data.accessToken;
+                    document.getElementById('result').textContent = 
+                        'Login successful!\nToken: ' + token.substring(0, 50) + '...';
+                } else {
+                    document.getElementById('result').textContent = 
+                        'Login failed: ' + JSON.stringify(data, null, 2);
+                }
+            } catch (error) {
+                document.getElementById('result').textContent = 
+                    'Error: ' + error.message;
+            }
+        }
+
+        async function testGetUsers() {
+            if (!token) {
+                document.getElementById('result').textContent = 
+                    'Please login first!';
+                return;
+            }
+
+            try {
+                const response = await fetch('http://localhost:5243/api/system/users', {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': 'Bearer ' + token,
+                    }
+                });
+
+                const data = await response.json();
+                console.log('Users response:', data);
+
+                document.getElementById('result').textContent = 
+                    'Users Count: ' + (data.data ? data.data.length : 0) + '\n\n' +
+                    JSON.stringify(data, null, 2);
+            } catch (error) {
+                document.getElementById('result').textContent = 
+                    'Error: ' + error.message;
+            }
+        }
+    </script>
+</body>
+</html>

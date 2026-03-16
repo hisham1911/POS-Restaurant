@@ -1,0 +1,38 @@
+WIN7 BUILD STARTED 03/08/2026 22:09:30
+[22:09:30] [1/4] Creating .NET 6 compatible source...
+[22:09:42]   Source copied
+[22:09:43]   global.json created
+[22:09:44]   Patched: KasserPro.API.csproj -> net6.0
+[22:09:44]   Patched: KasserPro.Application.csproj -> net6.0
+[22:09:44]   Patched: KasserPro.Application.Core.csproj -> net6.0
+[22:09:44]   Patched: KasserPro.BridgeApp.csproj -> net6.0-windows
+[22:09:44]   Patched: KasserPro.Domain.csproj -> net6.0
+[22:09:44]   Patched: KasserPro.Infrastructure.csproj -> net6.0
+[22:09:44]   Patched: KasserPro.Tests.csproj -> net6.0
+[22:09:44]   Packages downgraded for net6.0 compatibility
+[22:09:45]   Rate limiting code patched out for .NET 6 compatibility
+[22:09:45]   Verify: EF Core=7.0.20 | FluentValidation=11.3.0
+[22:09:45]   OpenApi removed=True
+[22:09:45] [2/4] Publishing .NET 6 x64 (Win7)...
+[22:10:08]   Win7 API x64 OK
+[22:10:27]   Win7 Bridge x64 OK
+[22:10:27]   x64 ready | Bridge: 140.8 MB
+[22:10:27] [3/4] Publishing .NET 6 x86 (Win7)...
+[22:10:51]   Win7 API x86 OK
+[22:11:07]   Win7 Bridge x86 OK
+[22:11:07]   x86 ready | Bridge: 133.3 MB
+[22:11:07] [4/4] Building Win7 Installers...
+[22:11:07]   Building KasserPro-Setup-Win7-x64.exe...
+[22:15:10]      Compressing: C:\temp\kasserpro-src-win7-x64\bridge\KasserPro.BridgeApp.pdb
+[22:15:11]   Error in F:\POS\Deployment\ISS\KasserPro-Setup-Win7-x64.iss: The system cannot find the file specified.
+[22:15:11]   Compile aborted.
+
+[22:15:11]   Building KasserPro-Setup-Win7-x86.exe...
+[22:19:31]   
+[22:19:31]   Successful compile (259.813 sec). Resulting Setup program filename is:
+[22:19:31]   f:\POS\Deployment\Installers\KasserPro-Setup-Win7-x86.exe
+[22:19:31] ========= WIN7 BUILD SUMMARY =========
+[22:19:31]   KasserPro-Setup-Win7-x86.exe - 70.1 MB
+[22:19:31]   KasserPro-Setup.exe - 75.6 MB
+[22:19:31] =======================================
+WIN7_BUILD_FINISHED

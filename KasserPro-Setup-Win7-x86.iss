@@ -1,14 +1,14 @@
-﻿; KasserPro POS System - Inno Setup Script
-; Developer password required: KasserPro@Installer2026
+﻿; TajerPro POS System - Inno Setup Script
+; Developer password required: TajerPro@Installer2026
 ; MAC address binding active (license.key created on first install)
 
-#define AppName "KasserPro"
+#define AppName "TajerPro"
 #define AppVersion "1.0"
-#define AppPublisher "KasserPro Software"
-#define ServiceName "KasserProService"
-#define ServiceDisplayName "KasserPro POS Backend"
-#define SourceDir "C:\temp\kasserpro-src-win7-x86"
-#define DbFileName "kasserpro.db"
+#define AppPublisher "TajerPro Software"
+#define ServiceName "TajerProService"
+#define ServiceDisplayName "TajerPro POS Backend"
+#define SourceDir "C:\temp\tajerpro-src-win7-x86"
+#define DbFileName "tajerpro.db"
 
 [Setup]
 AppId={{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}}
@@ -23,11 +23,11 @@ DisableDirPage=yes
 DisableProgramGroupPage=no
 DefaultGroupName={#AppName}
 OutputDir=C:\temp
-OutputBaseFilename=KasserPro-Setup-Win7-x86
+OutputBaseFilename=TajerPro-Setup-Win7-x86
 Compression=lzma2/ultra64
 SolidCompression=yes
 PrivilegesRequired=admin
-Password=KasserPro@Installer2026
+Password=TajerPro@Installer2026
 Encryption=yes
 WizardStyle=modern
 CloseApplications=yes

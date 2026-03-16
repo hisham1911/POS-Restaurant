@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { useAddPaymentMutation } from '../../api/purchaseInvoiceApi';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
@@ -45,9 +46,6 @@ export function AddPaymentModal({ invoiceId, amountDue, onClose }: AddPaymentMod
         notes: notes.trim() || undefined,
       };
       
-      console.log('Sending payment data:', paymentData);
-      console.log('Payment data JSON:', JSON.stringify(paymentData, null, 2));
-      
       const result = await addPayment({
         invoiceId,
         payment: paymentData,
@@ -86,8 +84,8 @@ export function AddPaymentModal({ invoiceId, amountDue, onClose }: AddPaymentMod
           </label>
           <input
             type="number"
-            value={amount}
-            onChange={(e) => setAmount(Number(e.target.value))}
+            value={amount === 0 ? "" : amount}
+            onChange={(e) => setAmount(Number(e.target.value) || 0)}
             className="w-full px-3 py-2 border rounded-lg"
             min="0.01"
             max={amountDue}
@@ -116,16 +114,19 @@ export function AddPaymentModal({ invoiceId, amountDue, onClose }: AddPaymentMod
           <label className="block text-sm font-medium mb-1">
             طريقة الدفع <span className="text-red-500">*</span>
           </label>
-          <select
-            value={method}
-            onChange={(e) => setMethod(e.target.value as PaymentMethod)}
-            className="w-full px-3 py-2 border rounded-lg"
-            required
-          >
-            <option value="Cash">نقدي</option>
-            <option value="Card">بطاقة</option>
-            <option value="Fawry">فوري</option>
-          </select>
+          <div className="relative">
+            <select
+              value={method}
+              onChange={(e) => setMethod(e.target.value as PaymentMethod)}
+              className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
+              required
+            >
+              <option value="Cash">نقدي</option>
+              <option value="Card">بطاقة</option>
+              <option value="Fawry">فوري</option>
+            </select>
+            <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+          </div>
         </div>
 
         <div>

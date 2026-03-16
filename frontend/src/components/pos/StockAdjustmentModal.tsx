@@ -83,31 +83,37 @@ export const StockAdjustmentModal = ({
 
   return (
     <Portal>
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md animate-scale-in">
+      <div 
+        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50"
+        onClick={onClose}
+      >
+        <div 
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-scale-in"
+          onClick={(e) => e.stopPropagation()}
+        >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
+              <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
                 <Package className="w-5 h-5 text-primary-600" />
               </div>
               <div>
-                <h2 className="text-lg font-bold">تعديل المخزون</h2>
+                <h2 className="text-xl font-bold text-gray-800">تعديل المخزون</h2>
                 <p className="text-sm text-gray-500">{product.name}</p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center hover:bg-danger-50 hover:text-danger-500 transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
 
-          <div className="p-6 space-y-6">
+          <div className="p-6 space-y-4 overflow-y-auto flex-1">
             {/* Current Stock Display */}
-            <div className="bg-gray-50 rounded-xl p-4 text-center">
-              <p className="text-sm text-gray-500 mb-1">المخزون الحالي</p>
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-4 text-center border border-gray-200">
+              <p className="text-sm text-gray-600 mb-1">المخزون الحالي</p>
               <p className="text-3xl font-bold text-gray-800">{currentStock}</p>
             </div>
 
@@ -118,10 +124,11 @@ export const StockAdjustmentModal = ({
               </label>
               <input
                 type="number"
-                value={newQuantity}
+                value={newQuantity === "0" ? "" : newQuantity}
                 onChange={(e) => setNewQuantity(e.target.value)}
                 min="0"
-                className="w-full px-4 py-3 text-center text-2xl font-bold border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                placeholder="0"
+                className="w-full px-4 py-3 text-center text-2xl font-bold border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
               {/* Change Preview */}
               {quantityChange !== 0 && (
@@ -149,7 +156,7 @@ export const StockAdjustmentModal = ({
                     type="button"
                     onClick={() => setAdjustmentType(type.id)}
                     className={clsx(
-                      "flex items-center gap-2 p-3 rounded-lg border-2 transition-all",
+                      "flex items-center gap-2 p-3 rounded-xl border-2 transition-all",
                       adjustmentType === type.id
                         ? "border-primary-600 bg-primary-50 text-primary-700"
                         : "border-gray-200 hover:border-gray-300",
@@ -172,13 +179,13 @@ export const StockAdjustmentModal = ({
                 value={reason}
                 onChange={(e) => setReason(e.target.value)}
                 placeholder="أي تفاصيل إضافية..."
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
 
             {/* Warning for large changes */}
             {Math.abs(quantityChange) > 50 && (
-              <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg text-amber-700">
+              <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-700">
                 <AlertTriangle className="w-5 h-5 shrink-0" />
                 <span className="text-sm">
                   تغيير كبير في المخزون - يرجى التأكد
@@ -188,7 +195,7 @@ export const StockAdjustmentModal = ({
           </div>
 
           {/* Footer */}
-          <div className="flex gap-3 p-6 border-t bg-gray-50 rounded-b-2xl">
+          <div className="flex gap-3 p-6 border-t border-gray-200 flex-shrink-0">
             <Button variant="secondary" onClick={onClose} className="flex-1">
               إلغاء
             </Button>

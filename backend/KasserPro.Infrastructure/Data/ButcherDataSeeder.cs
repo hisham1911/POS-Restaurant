@@ -33,6 +33,7 @@ public static class ButcherDataSeeder
         await SeedShiftsAndOrdersAsync(context, tenant, branch, users, products, customers);
         await SeedPurchaseInvoicesAsync(context, tenant, branch, users[0], suppliers, products);
         await SeedExpensesAsync(context, tenant, branch, users[0]);
+        await SeedCashRegisterTransactionsAsync(context, tenant, branch, users[0]);
 
         Console.WriteLine("✅ تم تحميل بيانات المجزر بنجاح!");
     }
@@ -69,10 +70,7 @@ public static class ButcherDataSeeder
         var existing = await context.Tenants.FirstOrDefaultAsync();
         if (existing != null)
         {
-            existing.Name = "مجزر الأمانة";
-            existing.NameEn = "Al-Amana Butcher";
-            existing.ReceiptFooterMessage = "شكراً لثقتكم - لحوم طازجة يومياً";
-            await context.SaveChangesAsync();
+            Console.WriteLine("   ✓ المتجر موجود مسبقاً");
             return existing;
         }
 
@@ -126,8 +124,29 @@ public static class ButcherDataSeeder
 
     private static async Task<List<User>> SeedUsersAsync(AppDbContext context, Tenant tenant, Branch branch)
     {
-        if (await context.Users.AnyAsync())
-            return await context.Users.ToListAsync();
+        if (await context.Users.AnyAsync(u => u.TenantId == tenant.Id))
+        {
+            Console.WriteLine("   ✓ المستخدمين موجودين مسبقاً");
+            return await context.Users.Where(u => u.TenantId == tenant.Id).ToListAsync();
+        }
+
+        // Create System Owner first (if not exists)
+        if (!await context.Users.AnyAsync(u => u.Role == UserRole.SystemOwner))
+        {
+            var systemOwner = new User
+            {
+                TenantId = null,
+                BranchId = null,
+                Name = "System Owner",
+                Email = "owner@kasserpro.com",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Owner@123"),
+                Role = UserRole.SystemOwner,
+                IsActive = true
+            };
+            context.Users.Add(systemOwner);
+            await context.SaveChangesAsync();
+            Console.WriteLine("   ✓ System Owner: owner@kasserpro.com (Password: Owner@123)");
+        }
 
         var users = new List<User>
         {
@@ -259,17 +278,35 @@ public static class ButcherDataSeeder
     {
         var customers = new List<Customer>
         {
-            new() { TenantId = tenant.Id, Name = "محمد أحمد", Phone = "01001234567", Email = "mohamed@email.com", Address = "المعادي، القاهرة", LoyaltyPoints = 180, TotalOrders = 15, TotalSpent = 4500, LastOrderAt = DateTime.UtcNow.AddDays(-2), IsActive = true },
-            new() { TenantId = tenant.Id, Name = "أحمد حسن", Phone = "01112345678", Email = "ahmed@email.com", Address = "الزمالك، القاهرة", LoyaltyPoints = 320, TotalOrders = 28, TotalSpent = 8200, LastOrderAt = DateTime.UtcNow.AddDays(-1), IsActive = true },
-            new() { TenantId = tenant.Id, Name = "خالد محمود", Phone = "01223456789", Email = "khaled@email.com", Address = "مدينة نصر، القاهرة", LoyaltyPoints = 150, TotalOrders = 12, TotalSpent = 3800, LastOrderAt = DateTime.UtcNow.AddDays(-4), IsActive = true },
-            new() { TenantId = tenant.Id, Name = "عمر سعيد", Phone = "01098765432", Email = "omar@email.com", Address = "المهندسين، الجيزة", LoyaltyPoints = 280, TotalOrders = 22, TotalSpent = 7100, LastOrderAt = DateTime.UtcNow.AddDays(-3), IsActive = true },
-            new() { TenantId = tenant.Id, Name = "يوسف علي", Phone = "01198765432", Email = null, Address = "حلوان، القاهرة", LoyaltyPoints = 90, TotalOrders = 8, TotalSpent = 2400, LastOrderAt = DateTime.UtcNow.AddDays(-7), IsActive = true },
-            new() { TenantId = tenant.Id, Name = "حسام الدين", Phone = "01287654321", Email = "hossam@email.com", Address = "الدقي، الجيزة", LoyaltyPoints = 200, TotalOrders = 16, TotalSpent = 5200, LastOrderAt = DateTime.UtcNow.AddDays(-5), IsActive = true }
+            // عملاء VIP (كبار العملاء)
+            new() { TenantId = tenant.Id, Name = "محمد أحمد السيد", Phone = "01001234567", Email = "mohamed.ahmed@email.com", Address = "المعادي، القاهرة", LoyaltyPoints = 450, TotalOrders = 35, TotalSpent = 12500, LastOrderAt = DateTime.UtcNow.AddDays(-1), IsActive = true },
+            new() { TenantId = tenant.Id, Name = "أحمد حسن علي", Phone = "01112345678", Email = "ahmed.hassan@email.com", Address = "الزمالك، القاهرة", LoyaltyPoints = 520, TotalOrders = 42, TotalSpent = 15800, LastOrderAt = DateTime.UtcNow.AddHours(-6), IsActive = true },
+            new() { TenantId = tenant.Id, Name = "خالد محمود فتحي", Phone = "01223456789", Email = "khaled.mahmoud@email.com", Address = "مدينة نصر، القاهرة", LoyaltyPoints = 380, TotalOrders = 28, TotalSpent = 9800, LastOrderAt = DateTime.UtcNow.AddDays(-2), IsActive = true },
+            
+            // عملاء منتظمين
+            new() { TenantId = tenant.Id, Name = "عمر سعيد محمد", Phone = "01098765432", Email = "omar.saeed@email.com", Address = "المهندسين، الجيزة", LoyaltyPoints = 280, TotalOrders = 22, TotalSpent = 7100, LastOrderAt = DateTime.UtcNow.AddDays(-3), IsActive = true },
+            new() { TenantId = tenant.Id, Name = "يوسف علي حسن", Phone = "01198765432", Email = "youssef.ali@email.com", Address = "حلوان، القاهرة", LoyaltyPoints = 190, TotalOrders = 15, TotalSpent = 4800, LastOrderAt = DateTime.UtcNow.AddDays(-5), IsActive = true },
+            new() { TenantId = tenant.Id, Name = "حسام الدين إبراهيم", Phone = "01287654321", Email = "hossam.ibrahim@email.com", Address = "الدقي، الجيزة", LoyaltyPoints = 220, TotalOrders = 18, TotalSpent = 5900, LastOrderAt = DateTime.UtcNow.AddDays(-4), IsActive = true },
+            new() { TenantId = tenant.Id, Name = "كريم عبدالله", Phone = "01156789012", Email = "karim.abdullah@email.com", Address = "العباسية، القاهرة", LoyaltyPoints = 160, TotalOrders = 12, TotalSpent = 3900, LastOrderAt = DateTime.UtcNow.AddDays(-6), IsActive = true },
+            new() { TenantId = tenant.Id, Name = "طارق سمير", Phone = "01267890123", Email = "tarek.samir@email.com", Address = "الهرم، الجيزة", LoyaltyPoints = 140, TotalOrders = 10, TotalSpent = 3200, LastOrderAt = DateTime.UtcNow.AddDays(-8), IsActive = true },
+            
+            // عملاء جدد
+            new() { TenantId = tenant.Id, Name = "ياسر محمود", Phone = "01078901234", Email = null, Address = "شبرا، القاهرة", LoyaltyPoints = 45, TotalOrders = 3, TotalSpent = 980, LastOrderAt = DateTime.UtcNow.AddDays(-10), IsActive = true },
+            new() { TenantId = tenant.Id, Name = "وليد أحمد", Phone = "01189012345", Email = null, Address = "المطرية، القاهرة", LoyaltyPoints = 30, TotalOrders = 2, TotalSpent = 650, LastOrderAt = DateTime.UtcNow.AddDays(-12), IsActive = true },
+            
+            // عملاء مطاعم (جملة)
+            new() { TenantId = tenant.Id, Name = "مطعم الأمير - أحمد صلاح", Phone = "01090123456", Email = "alamir.restaurant@email.com", Address = "وسط البلد، القاهرة", LoyaltyPoints = 850, TotalOrders = 65, TotalSpent = 28500, LastOrderAt = DateTime.UtcNow.AddHours(-12), IsActive = true },
+            new() { TenantId = tenant.Id, Name = "مطعم الفردوس - محمد عبدالرحمن", Phone = "01201234567", Email = "alferdous.rest@email.com", Address = "مصر الجديدة، القاهرة", LoyaltyPoints = 720, TotalOrders = 52, TotalSpent = 22800, LastOrderAt = DateTime.UtcNow.AddDays(-1), IsActive = true },
+            new() { TenantId = tenant.Id, Name = "كافتيريا النخيل - سامي حسن", Phone = "01012345678", Email = null, Address = "المعادي، القاهرة", LoyaltyPoints = 480, TotalOrders = 38, TotalSpent = 15200, LastOrderAt = DateTime.UtcNow.AddDays(-2), IsActive = true },
+            
+            // عملاء محلات جزارة (منافسين/موزعين)
+            new() { TenantId = tenant.Id, Name = "محل الرحمة - عبدالله محمد", Phone = "01123456789", Email = null, Address = "إمبابة، الجيزة", LoyaltyPoints = 620, TotalOrders = 45, TotalSpent = 19500, LastOrderAt = DateTime.UtcNow.AddDays(-3), IsActive = true },
+            new() { TenantId = tenant.Id, Name = "سوبر ماركت الخير - حسن علي", Phone = "01234567890", Email = "alkheir.market@email.com", Address = "فيصل، الجيزة", LoyaltyPoints = 550, TotalOrders = 40, TotalSpent = 17800, LastOrderAt = DateTime.UtcNow.AddDays(-4), IsActive = true }
         };
 
         context.Customers.AddRange(customers);
         await context.SaveChangesAsync();
-        Console.WriteLine($"   ✓ العملاء: {customers.Count}");
+        Console.WriteLine($"   ✓ العملاء: {customers.Count} (VIP: 3, منتظمين: 5, جدد: 2, مطاعم: 3, محلات: 2)");
         return customers;
     }
 
@@ -277,14 +314,19 @@ public static class ButcherDataSeeder
     {
         var suppliers = new List<Supplier>
         {
-            new() { TenantId = tenant.Id, BranchId = branch.Id, Name = "مزرعة الأمل للحوم", Phone = "0233334444", Email = "info@amal-farm.com", Address = "طريق مصر إسكندرية الصحراوي", ContactPerson = "أحمد محمود", TaxNumber = "123-456-789", Notes = "مورد رئيسي للحوم البقري", IsActive = true },
-            new() { TenantId = tenant.Id, BranchId = branch.Id, Name = "شركة اللحوم الطازجة", Phone = "0244445555", Email = "sales@fresh-meat.com", Address = "العاشر من رمضان", ContactPerson = "محمد حسن", TaxNumber = "234-567-890", Notes = "لحوم مستوردة", IsActive = true },
-            new() { TenantId = tenant.Id, BranchId = branch.Id, Name = "مجازر الصفوة", Phone = "0255556666", Email = "contact@safwa-meat.com", Address = "سوق العبور، القاهرة", ContactPerson = "خالد سعيد", TaxNumber = "345-678-901", Notes = "لحوم محلية طازجة", IsActive = true }
+            // موردين رئيسيين
+            new() { TenantId = tenant.Id, BranchId = branch.Id, Name = "مزرعة الأمل للحوم", Phone = "0233334444", Email = "info@amal-farm.com", Address = "طريق مصر إسكندرية الصحراوي، كم 28", ContactPerson = "أحمد محمود السيد", TaxNumber = "123-456-789", Notes = "مورد رئيسي للحوم البقري الطازجة - توريد يومي", IsActive = true },
+            new() { TenantId = tenant.Id, BranchId = branch.Id, Name = "شركة اللحوم الطازجة المتحدة", Phone = "0244445555", Email = "sales@fresh-meat.com", Address = "المنطقة الصناعية، العاشر من رمضان", ContactPerson = "محمد حسن علي", TaxNumber = "234-567-890", Notes = "لحوم مستوردة عالية الجودة - توريد أسبوعي", IsActive = true },
+            new() { TenantId = tenant.Id, BranchId = branch.Id, Name = "مجازر الصفوة", Phone = "0255556666", Email = "contact@safwa-meat.com", Address = "سوق العبور، القاهرة", ContactPerson = "خالد سعيد محمود", TaxNumber = "345-678-901", Notes = "لحوم محلية طازجة - أسعار منافسة", IsActive = true },
+            
+            // موردين إضافيين
+            new() { TenantId = tenant.Id, BranchId = branch.Id, Name = "مزارع الوادي الجديد", Phone = "0266667777", Email = "newvalley@email.com", Address = "الوادي الجديد، الخارجة", ContactPerson = "عمر فتحي", TaxNumber = "456-789-012", Notes = "لحوم عضوية - توريد شهري", IsActive = true },
+            new() { TenantId = tenant.Id, BranchId = branch.Id, Name = "شركة الذبائح المصرية", Phone = "0277778888", Email = "egy-meat@email.com", Address = "مدينة السادات، المنوفية", ContactPerson = "ياسر محمد", TaxNumber = "567-890-123", Notes = "متخصصون في اللحوم المفرومة والمصنعة", IsActive = true }
         };
 
         context.Suppliers.AddRange(suppliers);
         await context.SaveChangesAsync();
-        Console.WriteLine($"   ✓ الموردين: {suppliers.Count}");
+        Console.WriteLine($"   ✓ الموردين: {suppliers.Count} (رئيسيين: 3، إضافيين: 2)");
         return suppliers;
     }
 
@@ -425,6 +467,10 @@ public static class ButcherDataSeeder
         List<Product> products, Customer? customer, DateTime orderTime, int orderNum,
         OrderStatus status, Branch branch)
     {
+        // Add variety to order types
+        var orderTypes = new[] { OrderType.Takeaway, OrderType.Takeaway, OrderType.Takeaway, OrderType.Delivery, OrderType.DineIn };
+        var orderType = orderTypes[_random.Next(orderTypes.Length)];
+
         var order = new Order
         {
             TenantId = tenantId,
@@ -434,7 +480,7 @@ public static class ButcherDataSeeder
             UserId = userId,
             UserName = userName,
             Status = status,
-            OrderType = OrderType.Takeaway, // معظم طلبات المجزر تيك أواي
+            OrderType = orderType,
             CreatedAt = orderTime,
             BranchName = branch.Name,
             BranchAddress = branch.Address,
@@ -637,23 +683,53 @@ public static class ButcherDataSeeder
         var categories = await context.ExpenseCategories.Where(c => c.TenantId == tenant.Id).ToListAsync();
         var expenses = new List<Expense>();
 
-        // Create 8 expenses over the past 30 days
-        for (int i = 0; i < 8; i++)
+        // Create 15 expenses over the past 60 days (more realistic)
+        var expenseData = new[]
         {
-            var category = categories[_random.Next(categories.Count)];
-            var expenseDate = DateTime.UtcNow.AddDays(-_random.Next(1, 30));
+            // رواتب (شهرية)
+            (CategoryName: "رواتب", Amount: 12000m, Days: 5, Description: "رواتب الموظفين - شهر مارس"),
+            (CategoryName: "رواتب", Amount: 12000m, Days: 35, Description: "رواتب الموظفين - شهر فبراير"),
+            
+            // إيجار (شهري)
+            (CategoryName: "إيجار", Amount: 8000m, Days: 3, Description: "إيجار المحل - شهر مارس"),
+            (CategoryName: "إيجار", Amount: 8000m, Days: 33, Description: "إيجار المحل - شهر فبراير"),
+            
+            // كهرباء (شهري)
+            (CategoryName: "كهرباء", Amount: 1850m, Days: 8, Description: "فاتورة الكهرباء - شهر فبراير"),
+            (CategoryName: "كهرباء", Amount: 1620m, Days: 38, Description: "فاتورة الكهرباء - شهر يناير"),
+            
+            // صيانة (متفرقة)
+            (CategoryName: "صيانة", Amount: 450m, Days: 12, Description: "صيانة الثلاجات"),
+            (CategoryName: "صيانة", Amount: 680m, Days: 25, Description: "إصلاح ماكينة الفرم"),
+            (CategoryName: "صيانة", Amount: 320m, Days: 42, Description: "صيانة دورية للمعدات"),
+            
+            // مواصلات (أسبوعية)
+            (CategoryName: "مواصلات", Amount: 280m, Days: 2, Description: "مواصلات التوصيل - أسبوع 1"),
+            (CategoryName: "مواصلات", Amount: 310m, Days: 9, Description: "مواصلات التوصيل - أسبوع 2"),
+            (CategoryName: "مواصلات", Amount: 265m, Days: 16, Description: "مواصلات التوصيل - أسبوع 3"),
+            
+            // أخرى (متفرقة)
+            (CategoryName: "أخرى", Amount: 520m, Days: 6, Description: "مستلزمات تغليف ونظافة"),
+            (CategoryName: "أخرى", Amount: 380m, Days: 18, Description: "رسوم حكومية وتراخيص"),
+            (CategoryName: "أخرى", Amount: 450m, Days: 28, Description: "مصاريف إدارية متنوعة")
+        };
+
+        foreach (var (categoryName, amount, daysAgo, description) in expenseData)
+        {
+            var category = categories.First(c => c.Name == categoryName);
+            var expenseDate = DateTime.UtcNow.AddDays(-daysAgo);
 
             var expense = new Expense
             {
                 TenantId = tenant.Id,
                 BranchId = branch.Id,
                 CategoryId = category.Id,
-                ExpenseNumber = $"EXP-{expenseDate:yyyyMMdd}-{i + 1:D3}",
-                Amount = _random.Next(200, 3000),
-                Description = $"{category.Name} - {expenseDate:MMMM yyyy}",
+                ExpenseNumber = $"EXP-{expenseDate:yyyyMMdd}-{expenses.Count + 1:D3}",
+                Amount = amount,
+                Description = description,
                 ExpenseDate = expenseDate,
                 Status = ExpenseStatus.Approved,
-                PaymentMethod = _random.Next(2) == 0 ? PaymentMethod.Cash : PaymentMethod.Card,
+                PaymentMethod = amount > 5000 ? PaymentMethod.Card : (_random.Next(2) == 0 ? PaymentMethod.Cash : PaymentMethod.Card),
                 PaymentDate = expenseDate,
                 CreatedByUserId = admin.Id,
                 CreatedByUserName = admin.Name,
@@ -672,7 +748,7 @@ public static class ButcherDataSeeder
         context.Expenses.AddRange(expenses);
         await context.SaveChangesAsync();
 
-        Console.WriteLine($"   ✓ المصروفات: {expenses.Count}");
+        Console.WriteLine($"   ✓ المصروفات: {expenses.Count} (رواتب: 2، إيجار: 2، كهرباء: 2، صيانة: 3، مواصلات: 3، أخرى: 3)");
     }
 
     private static async Task SeedCashRegisterTransactionsAsync(AppDbContext context, Tenant tenant, Branch branch, User admin)

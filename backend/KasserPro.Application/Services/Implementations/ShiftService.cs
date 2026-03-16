@@ -40,9 +40,9 @@ public class ShiftService : IShiftService
             .Include(s => s.User)
             .Include(s => s.Orders.OrderByDescending(o => o.CreatedAt))
                 .ThenInclude(o => o.Payments)
-            .FirstOrDefaultAsync(s => s.UserId == userId 
-                                   && s.TenantId == tenantId 
-                                   && s.BranchId == branchId 
+            .FirstOrDefaultAsync(s => s.UserId == userId
+                                   && s.TenantId == tenantId
+                                   && s.BranchId == branchId
                                    && !s.IsClosed);
 
         // Return success with null data if no shift is open (not an error)
@@ -64,7 +64,7 @@ public class ShiftService : IShiftService
         // SECURITY: Validate TenantId and BranchId
         if (tenantId <= 0)
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.TENANT_NOT_FOUND, "معرف المستأجر غير صالح");
-        
+
         if (branchId <= 0)
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.BRANCH_NOT_FOUND, "معرف الفرع غير صالح");
 
@@ -80,17 +80,17 @@ public class ShiftService : IShiftService
 
         // Check for existing open shift for this user in this branch
         var existingShift = await _unitOfWork.Shifts.Query()
-            .FirstOrDefaultAsync(s => s.UserId == userId 
-                                   && s.TenantId == tenantId 
-                                   && s.BranchId == branchId 
+            .FirstOrDefaultAsync(s => s.UserId == userId
+                                   && s.TenantId == tenantId
+                                   && s.BranchId == branchId
                                    && !s.IsClosed);
 
         if (existingShift != null)
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_ALREADY_OPEN, "يوجد وردية مفتوحة بالفعل في هذا الفرع");
 
         // Use transaction for atomicity - Shift + Cash Register Opening
-        await using var transaction = await _unitOfWork.BeginTransactionAsync();
-        
+        await _unitOfWork.BeginTransactionAsync();
+
         try
         {
             var shift = new Shift
@@ -117,7 +117,7 @@ public class ShiftService : IShiftService
                 shiftId: shift.Id
             );
 
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             shift.User = user;
 
@@ -125,8 +125,8 @@ public class ShiftService : IShiftService
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
-            return ApiResponse<ShiftDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR, 
+            await _unitOfWork.RollbackTransactionAsync();
+            return ApiResponse<ShiftDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR,
                 $"حدث خطأ أثناء فتح الوردية: {ex.Message}");
         }
     }
@@ -134,7 +134,7 @@ public class ShiftService : IShiftService
     /// <summary>
     /// Close a shift with optimistic concurrency control.
     /// Uses RowVersion to prevent race conditions when multiple requests try to close the same shift.
-    /// 
+    ///
     /// Scenario: If two admins click "Close Shift" at the exact same millisecond:
     /// - First request: Loads shift with RowVersion = 0x00000001
     /// - Second request: Loads shift with RowVersion = 0x00000001
@@ -155,16 +155,16 @@ public class ShiftService : IShiftService
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.TENANT_NOT_FOUND, "سياق المستأجر غير صالح");
 
         // Use transaction for atomicity
-        await using var transaction = await _unitOfWork.BeginTransactionAsync();
+        await _unitOfWork.BeginTransactionAsync();
 
         try
         {
             var shift = await _unitOfWork.Shifts.Query()
                 .Include(s => s.User)
                 .Include(s => s.Orders).ThenInclude(o => o.Payments)
-                .FirstOrDefaultAsync(s => s.UserId == userId 
-                                       && s.TenantId == tenantId 
-                                       && s.BranchId == branchId 
+                .FirstOrDefaultAsync(s => s.UserId == userId
+                                       && s.TenantId == tenantId
+                                       && s.BranchId == branchId
                                        && !s.IsClosed);
 
             if (shift == null)
@@ -178,23 +178,16 @@ public class ShiftService : IShiftService
             // Get current cash balance from cash register
             var balanceResponse = await _cashRegisterService.GetCurrentBalanceAsync(branchId);
             if (!balanceResponse.Success)
-                return ApiResponse<ShiftDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR, 
+                return ApiResponse<ShiftDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR,
                     "فشل الحصول على رصيد الخزينة");
 
             var currentCashBalance = balanceResponse.Data!.CurrentBalance;
 
-            // Calculate totals from completed orders
-            var completedOrders = shift.Orders.Where(o => o.Status == OrderStatus.Completed).ToList();
-            
-            shift.TotalOrders = completedOrders.Count;
-            shift.TotalCash = Math.Round(completedOrders
-                .SelectMany(o => o.Payments)
-                .Where(p => p.Method == PaymentMethod.Cash)
-                .Sum(p => p.Amount), 2);
-            shift.TotalCard = Math.Round(completedOrders
-                .SelectMany(o => o.Payments)
-                .Where(p => p.Method != PaymentMethod.Cash)
-                .Sum(p => p.Amount), 2);
+            // FIX C-2/C-3/H-8: Use unified helper for 100% parity with ForceCloseAsync
+            var (totalOrders, totalCash, totalCard, _, _) = CalculateShiftFinancials(shift.Orders);
+            shift.TotalOrders = totalOrders;
+            shift.TotalCash = totalCash;
+            shift.TotalCard = totalCard;
 
             shift.ClosingBalance = Math.Round(request.ClosingBalance, 2);
             shift.ExpectedBalance = Math.Round(currentCashBalance, 2); // Use cash register balance
@@ -204,24 +197,24 @@ public class ShiftService : IShiftService
             shift.Notes = request.Notes;
 
             _unitOfWork.Shifts.Update(shift);
-            
+
             // This will throw DbUpdateConcurrencyException if RowVersion doesn't match
             await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             return ApiResponse<ShiftDto>.Ok(MapToDto(shift), "تم إغلاق الوردية بنجاح");
         }
         catch (DbUpdateConcurrencyException)
         {
             // Another request already closed this shift
-            await transaction.RollbackAsync();
-            return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_CONCURRENCY_CONFLICT, 
+            await _unitOfWork.RollbackTransactionAsync();
+            return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_CONCURRENCY_CONFLICT,
                 "تم إغلاق الوردية بواسطة مستخدم آخر. يرجى تحديث الصفحة.");
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
-            return ApiResponse<ShiftDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR, 
+            await _unitOfWork.RollbackTransactionAsync();
+            return ApiResponse<ShiftDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR,
                 $"حدث خطأ أثناء إغلاق الوردية: {ex.Message}");
         }
     }
@@ -291,19 +284,19 @@ public class ShiftService : IShiftService
         if (shift.IsForceClosed)
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_ALREADY_FORCE_CLOSED, "تم إغلاق الوردية بالقوة مسبقاً");
 
-        await using var transaction = await _unitOfWork.BeginTransactionAsync();
-        
+        await _unitOfWork.BeginTransactionAsync();
+
         try
         {
-            // Calculate totals from orders
+            // FIX C-2/C-3/H-8: Use unified helper for 100% parity with CloseAsync
             var completedOrders = await _unitOfWork.Orders.Query()
                 .Include(o => o.Payments)
-                .Where(o => o.ShiftId == shiftId && o.Status == OrderStatus.Completed)
+                .Where(o => o.ShiftId == shiftId && (o.Status == OrderStatus.Completed
+                    || o.Status == OrderStatus.PartiallyRefunded
+                    || o.Status == OrderStatus.Refunded))
                 .ToListAsync();
 
-            var allPayments = completedOrders.SelectMany(o => o.Payments).ToList();
-            var totalCash = Math.Round(allPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount), 2);
-            var totalCard = Math.Round(allPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount), 2);
+            var (totalOrders, totalCash, totalCard, _, _) = CalculateShiftFinancials(completedOrders);
 
             // Set closing values
             shift.ClosingBalance = request.ActualBalance ?? (shift.OpeningBalance + totalCash);
@@ -311,7 +304,7 @@ public class ShiftService : IShiftService
             shift.Difference = shift.ClosingBalance - shift.ExpectedBalance;
             shift.TotalCash = totalCash;
             shift.TotalCard = totalCard;
-            shift.TotalOrders = completedOrders.Count;
+            shift.TotalOrders = totalOrders;
             shift.ClosedAt = DateTime.UtcNow;
             shift.IsClosed = true;
             shift.IsForceClosed = true;
@@ -323,14 +316,14 @@ public class ShiftService : IShiftService
 
             _unitOfWork.Shifts.Update(shift);
             await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             return ApiResponse<ShiftDto>.Ok(MapToDto(shift), "تم إغلاق الوردية بالقوة بنجاح");
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
-            return ApiResponse<ShiftDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR, 
+            await _unitOfWork.RollbackTransactionAsync();
+            return ApiResponse<ShiftDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR,
                 $"حدث خطأ أثناء إغلاق الوردية بالقوة: {ex.Message}");
         }
     }
@@ -377,17 +370,17 @@ public class ShiftService : IShiftService
 
         // Check if target user has an open shift in this branch
         var existingShift = await _unitOfWork.Shifts.Query()
-            .FirstOrDefaultAsync(s => s.UserId == request.ToUserId 
-                                   && s.TenantId == tenantId 
-                                   && s.BranchId == branchId 
+            .FirstOrDefaultAsync(s => s.UserId == request.ToUserId
+                                   && s.TenantId == tenantId
+                                   && s.BranchId == branchId
                                    && !s.IsClosed);
 
         if (existingShift != null)
-            return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_USER_HAS_OPEN_SHIFT, 
+            return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_USER_HAS_OPEN_SHIFT,
                 "المستخدم المستلم لديه وردية مفتوحة بالفعل");
 
-        await using var transaction = await _unitOfWork.BeginTransactionAsync();
-        
+        await _unitOfWork.BeginTransactionAsync();
+
         try
         {
             // Record handover details
@@ -406,14 +399,14 @@ public class ShiftService : IShiftService
 
             _unitOfWork.Shifts.Update(shift);
             await _unitOfWork.SaveChangesAsync();
-            await transaction.CommitAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
             return ApiResponse<ShiftDto>.Ok(MapToDto(shift), "تم تسليم الوردية بنجاح");
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync();
-            return ApiResponse<ShiftDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR, 
+            await _unitOfWork.RollbackTransactionAsync();
+            return ApiResponse<ShiftDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR,
                 $"حدث خطأ أثناء تسليم الوردية: {ex.Message}");
         }
     }
@@ -479,9 +472,9 @@ public class ShiftService : IShiftService
 
         // Get current open shift
         var shift = await _unitOfWork.Shifts.Query()
-            .FirstOrDefaultAsync(s => s.UserId == userId 
-                                   && s.TenantId == tenantId 
-                                   && s.BranchId == branchId 
+            .FirstOrDefaultAsync(s => s.UserId == userId
+                                   && s.TenantId == tenantId
+                                   && s.BranchId == branchId
                                    && !s.IsClosed);
 
         // No open shift - no warnings
@@ -541,21 +534,56 @@ public class ShiftService : IShiftService
         });
     }
 
+    /// <summary>
+    /// FIX C-2/C-3/H-8: Single source of truth for shift financial calculations.
+    /// Used by both CloseAsync and ForceCloseAsync to guarantee 100% parity.
+    /// Includes Completed, PartiallyRefunded, and Refunded orders.
+    /// TotalCard includes Card payments ONLY (excludes Fawry and BankTransfer).
+    /// TotalFawry and TotalBankTransfer provide granular breakdown.
+    /// </summary>
+    private static (int TotalOrders, decimal TotalCash, decimal TotalCard, decimal TotalFawry, decimal TotalBankTransfer) CalculateShiftFinancials(
+        IEnumerable<Order> orders)
+    {
+        var completedOrders = orders.Where(o =>
+            o.Status == OrderStatus.Completed
+            || o.Status == OrderStatus.PartiallyRefunded
+            || o.Status == OrderStatus.Refunded).ToList();
+
+        var salesOrders = completedOrders.Where(o => o.OrderType != OrderType.Return).ToList();
+        var returnOrders = completedOrders.Where(o => o.OrderType == OrderType.Return).ToList();
+
+        var salesPayments = salesOrders.SelectMany(o => o.Payments ?? Enumerable.Empty<Payment>()).ToList();
+        var returnPayments = returnOrders.SelectMany(o => o.Payments ?? Enumerable.Empty<Payment>()).ToList();
+
+        var totalCash = Math.Round(
+            salesPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)
+            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)), 2);
+        var totalCard = Math.Round(
+            salesPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)
+            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)), 2);
+        var totalFawry = Math.Round(
+            salesPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)
+            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)), 2);
+        var totalBankTransfer = Math.Round(
+            salesPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)
+            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)), 2);
+
+        return (salesOrders.Count, totalCash, totalCard, totalFawry, totalBankTransfer);
+    }
+
     private static ShiftDto MapToDto(Shift shift)
     {
-        // Calculate totals dynamically from loaded orders (for open shifts)
-        var completedOrders = shift.Orders?.Where(o => o.Status == OrderStatus.Completed).ToList() ?? new();
-        
-        // Calculate payment totals from completed orders
-        var allPayments = completedOrders.SelectMany(o => o.Payments ?? Enumerable.Empty<Payment>()).ToList();
-        var calculatedTotalCash = Math.Round(allPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount), 2);
-        var calculatedTotalCard = Math.Round(allPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount), 2);
-        var calculatedTotalOrders = completedOrders.Count;
+        // FIX C-2/C-3/H-8: Use unified helper for DTO calculation too
+        var (calculatedTotalOrders, calculatedTotalCash, calculatedTotalCard, calculatedTotalFawry, calculatedTotalBankTransfer) =
+            CalculateShiftFinancials(shift.Orders ?? new List<Order>());
 
         // Use calculated values for open shifts, stored values for closed shifts
         var totalCash = shift.IsClosed ? shift.TotalCash : calculatedTotalCash;
         var totalCard = shift.IsClosed ? shift.TotalCard : calculatedTotalCard;
         var totalOrders = shift.IsClosed ? shift.TotalOrders : calculatedTotalOrders;
+        // Fawry/BankTransfer are always computed from orders (not stored separately on entity)
+        var totalFawry = calculatedTotalFawry;
+        var totalBankTransfer = calculatedTotalBankTransfer;
 
         // Calculate duration
         var endTime = shift.ClosedAt ?? DateTime.UtcNow;
@@ -579,9 +607,11 @@ public class ShiftService : IShiftService
             Notes = shift.Notes,
             TotalCash = totalCash,
             TotalCard = totalCard,
+            TotalFawry = totalFawry,
+            TotalBankTransfer = totalBankTransfer,
             TotalOrders = totalOrders,
             UserName = shift.User?.Name ?? string.Empty,
-            
+
             // New fields
             LastActivityAt = shift.LastActivityAt,
             InactiveHours = inactiveHours,
@@ -597,7 +627,7 @@ public class ShiftService : IShiftService
             HandoverNotes = shift.HandoverNotes,
             DurationHours = durationHours,
             DurationMinutes = durationMinutes,
-            
+
             Orders = shift.Orders?.Select(o => new ShiftOrderDto
             {
                 Id = o.Id,

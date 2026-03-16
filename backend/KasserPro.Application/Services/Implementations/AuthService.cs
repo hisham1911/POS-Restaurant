@@ -179,11 +179,13 @@ public class AuthService : IAuthService
             claims.Add(new Claim("permission", permission.ToString()));
         }
 
+        var expiryHours = int.TryParse(_config["Jwt:ExpiryInHours"], out var hours) ? hours : 24;
+        
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],
             audience: _config["Jwt:Audience"],
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(int.Parse(_config["Jwt:ExpiryInHours"]!)),
+            expires: DateTime.UtcNow.AddHours(expiryHours),
             signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
         );
 

@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
 using KasserPro.Application.DTOs.Customers;
+using KasserPro.Application.DTOs.Orders;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Enums;
 using KasserPro.API.Middleware;
@@ -241,54 +242,57 @@ public class CustomersController : ControllerBase
             var tenantResult = await _tenantService.GetCurrentTenantAsync();
             var tenant = tenantResult.Data;
 
-            var printCommand = new
+            // Create proper PrintCommandDto for debt payment receipt
+            var printCommand = new PrintCommandDto
             {
                 CommandId = Guid.NewGuid().ToString(),
-                Receipt = new
+                Receipt = new ReceiptDto
                 {
                     ReceiptNumber = $"PAY-{payment.Id}",
                     BranchName = tenant?.Name ?? "KasserPro Store",
-                    Date = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
+                    Date = DateTime.Now,
                     CustomerName = payment.CustomerName ?? "",
-                    CustomerPhone = payment.CustomerPhone ?? "",
-                    Amount = payment.Amount,
                     PaymentMethod = payment.PaymentMethod.ToString(),
-                    ReferenceNumber = payment.ReferenceNumber ?? "",
-                    Notes = payment.Notes ?? "",
-                    BalanceBefore = payment.BalanceBefore,
-                    BalanceAfter = payment.BalanceAfter,
                     CashierName = payment.RecordedByUserName ?? userName,
-                    IsDebtPayment = true
+                    // For debt payment receipt - show only the 3 amounts we need
+                    NetTotal = payment.BalanceBefore, // المجموع (الدين الكلي قبل الدفع)
+                    TaxAmount = 0, // No tax for debt payment
+                    TotalAmount = payment.BalanceBefore, // Same as NetTotal (no tax)
+                    AmountPaid = payment.Amount, // المبلغ المدفوع
+                    ChangeAmount = 0,
+                    AmountDue = payment.BalanceAfter, // المتبقي على العميل
+                    Items = new List<ReceiptItemDto>() // Empty - debt payment uses special format
                 },
-                Settings = tenant != null ? new
+                Settings = new ReceiptPrintSettings
                 {
-                    PaperSize = tenant.ReceiptPaperSize,
-                    CustomWidth = tenant.ReceiptCustomWidth,
-                    HeaderFontSize = tenant.ReceiptHeaderFontSize,
-                    BodyFontSize = tenant.ReceiptBodyFontSize,
-                    TotalFontSize = tenant.ReceiptTotalFontSize,
-                    ShowBranchName = tenant.ReceiptShowBranchName,
-                    ShowCashier = tenant.ReceiptShowCashier,
-                    ShowThankYou = tenant.ReceiptShowThankYou,
-                    ShowCustomerName = tenant.ReceiptShowCustomerName,
-                    ShowLogo = tenant.ReceiptShowLogo,
-                    FooterMessage = tenant.ReceiptFooterMessage,
-                    PhoneNumber = tenant.ReceiptPhoneNumber,
-                    LogoUrl = tenant.LogoUrl
-                } : (object?)null
+                    PaperSize = tenant?.ReceiptPaperSize ?? "80mm",
+                    CustomWidth = tenant?.ReceiptCustomWidth,
+                    HeaderFontSize = tenant?.ReceiptHeaderFontSize ?? 12,
+                    BodyFontSize = tenant?.ReceiptBodyFontSize ?? 9,
+                    TotalFontSize = tenant?.ReceiptTotalFontSize ?? 11,
+                    ShowBranchName = tenant?.ReceiptShowBranchName ?? true,
+                    ShowCashier = tenant?.ReceiptShowCashier ?? true,
+                    ShowThankYou = tenant?.ReceiptShowThankYou ?? true,
+                    ShowCustomerName = tenant?.ReceiptShowCustomerName ?? true,
+                    ShowLogo = tenant?.ReceiptShowLogo ?? true,
+                    FooterMessage = tenant?.ReceiptFooterMessage,
+                    PhoneNumber = tenant?.ReceiptPhoneNumber,
+                    LogoUrl = tenant?.LogoUrl
+                }
             };
 
             var branchGroup = $"branch-{branchId}";
 
-            // Send to specific branch group
+            // Send to specific branch group using PrintReceipt (not PrintDebtPaymentReceipt)
+            // This ensures it's handled by the standard print handler
             await _hubContext.Clients.Group(branchGroup)
-                .SendAsync("PrintDebtPaymentReceipt", printCommand);
+                .SendAsync("PrintReceipt", printCommand);
 
             // Also send to default group as fallback
             if (branchGroup != "branch-default")
             {
                 await _hubContext.Clients.Group("branch-default")
-                    .SendAsync("PrintDebtPaymentReceipt", printCommand);
+                    .SendAsync("PrintReceipt", printCommand);
             }
 
             _logger.LogInformation("Print command sent for debt payment {PaymentId} to branch group {BranchId}", paymentId, branchId);

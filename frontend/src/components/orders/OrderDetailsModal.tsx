@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Printer, RotateCcw, User, Phone } from "lucide-react";
+import { X, Printer, RotateCcw, User, Phone, Tag } from "lucide-react";
 import { Order } from "@/types/order.types";
 import { formatCurrency, formatDateTime } from "@/utils/formatters";
 import { ORDER_STATUS, PAYMENT_METHODS } from "@/utils/constants";
@@ -142,19 +142,54 @@ export const OrderDetailsModal = ({
               <h3 className="font-semibold mb-3">المنتجات</h3>
               <div className="space-y-2">
                 {order.items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                  >
-                    <div>
-                      <p className="font-medium">{item.productName}</p>
-                      <p className="text-sm text-gray-500">
-                        {item.quantity} × {formatCurrency(item.unitPrice)}
-                      </p>
+                  <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium">{item.productName}</p>
+                        <p className="text-sm text-gray-500">
+                          {item.quantity} × {formatCurrency(item.unitPrice)}
+                          {item.refundedQuantity > 0 && (
+                            <span className="text-orange-500 mr-2">
+                              (مسترجع: {item.refundedQuantity})
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="text-left shrink-0">
+                        {item.discountAmount > 0 ? (
+                          <>
+                            <p className="text-sm text-gray-400 line-through">
+                              {formatCurrency(item.unitPrice * item.quantity)}
+                            </p>
+                            <p className="font-semibold text-success-600">
+                              {formatCurrency(item.total)}
+                            </p>
+                          </>
+                        ) : (
+                          <p className="font-semibold">
+                            {formatCurrency(item.total)}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                    <p className="font-semibold">
-                      {formatCurrency(item.total)}
-                    </p>
+                    {item.discountAmount > 0 && (
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <Tag className="w-3.5 h-3.5 text-success-600" />
+                        <span className="text-xs text-success-600 font-medium">
+                          خصم{" "}
+                          {item.discountType === "Percentage" ||
+                          item.discountType === "percentage"
+                            ? `${item.discountValue}%`
+                            : formatCurrency(item.discountValue ?? 0)}{" "}
+                          (-{formatCurrency(item.discountAmount)})
+                        </span>
+                        {item.discountReason && (
+                          <span className="text-xs text-gray-400">
+                            • {item.discountReason}
+                          </span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -166,9 +201,31 @@ export const OrderDetailsModal = ({
                 <span className="text-gray-500">المجموع الفرعي</span>
                 <span>{formatCurrency(order.subtotal)}</span>
               </div>
+              {/* Item-level discounts total */}
+              {order.items.some((i) => i.discountAmount > 0) && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 flex items-center gap-1">
+                    <Tag className="w-3.5 h-3.5" />
+                    خصومات المنتجات
+                  </span>
+                  <span className="text-success-600">
+                    -
+                    {formatCurrency(
+                      order.items.reduce((s, i) => s + i.discountAmount, 0),
+                    )}
+                  </span>
+                </div>
+              )}
               {order.discountAmount > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">الخصم</span>
+                  <span className="text-gray-500">
+                    خصم الطلب
+                    {(order.discountType === "Percentage" ||
+                      order.discountType === "percentage") &&
+                    order.discountValue
+                      ? ` (${order.discountValue}%)`
+                      : ""}
+                  </span>
                   <span className="text-danger-500">
                     -{formatCurrency(order.discountAmount)}
                   </span>

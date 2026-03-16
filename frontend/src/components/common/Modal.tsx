@@ -47,28 +47,28 @@ export const Modal = ({
   return (
     <Portal>
       <div
-        className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] animate-fade-in"
+        className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4 animate-fade-in"
         onClick={onClose}
       >
         <div
           className={clsx(
-            "bg-white rounded-2xl shadow-xl w-full mx-4 animate-scale-in max-h-[90vh] overflow-auto",
+            "bg-white rounded-2xl shadow-2xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-scale-in",
             sizes[size],
           )}
           onClick={(e) => e.stopPropagation()}
         >
           {title && (
-            <div className="flex items-center justify-between px-6 py-4 border-b">
-              <h2 className="text-xl font-bold">{title}</h2>
+            <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+              <h2 className="text-xl font-bold text-gray-800">{title}</h2>
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-gray-500" />
               </button>
             </div>
           )}
-          <div className="p-6">{children}</div>
+          <div className="p-6 overflow-y-auto flex-1">{children}</div>
         </div>
       </div>
     </Portal>

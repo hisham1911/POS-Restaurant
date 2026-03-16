@@ -64,11 +64,11 @@ public class OrderService : IOrderService
         // SHIFT VALIDATION: Check for open shift in this branch for this user
         // Strict validation: Shift must belong to the same TenantId, BranchId, and UserId
         var currentShift = await _unitOfWork.Shifts.Query()
-            .FirstOrDefaultAsync(s => s.TenantId == tenantId 
-                                   && s.BranchId == branchId 
+            .FirstOrDefaultAsync(s => s.TenantId == tenantId
+                                   && s.BranchId == branchId
                                    && s.UserId == userId
                                    && !s.IsClosed);
-        
+
         if (currentShift == null)
             return ApiResponse<OrderDto>.Fail(ErrorCodes.NO_OPEN_SHIFT, "يجب فتح وردية قبل إنشاء طلب");
 
@@ -82,7 +82,7 @@ public class OrderService : IOrderService
         // CUSTOMER LOOKUP: If CustomerId is provided, fetch customer details for snapshot
         string? customerName = request.CustomerName;
         string? customerPhone = request.CustomerPhone;
-        
+
         if (request.CustomerId.HasValue)
         {
             var customer = await _unitOfWork.Customers.GetByIdAsync(request.CustomerId.Value);
@@ -131,11 +131,11 @@ public class OrderService : IOrderService
                 return ApiResponse<OrderDto>.Fail("الكمية يجب أن تكون أكبر من صفر");
 
             var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId);
-            
+
             // VALIDATION: Product must exist AND be active
             if (product == null)
                 return ApiResponse<OrderDto>.Fail(ErrorCodes.PRODUCT_NOT_FOUND, $"المنتج غير موجود: {item.ProductId}");
-            
+
             if (!product.IsActive)
                 return ApiResponse<OrderDto>.Fail(ErrorCodes.PRODUCT_INACTIVE, $"المنتج غير متاح للبيع: {product.Name}");
 
@@ -148,7 +148,7 @@ public class OrderService : IOrderService
                     product.Id, _currentUser.BranchId);
                 if (currentStock < item.Quantity && !tenant.AllowNegativeStock)
                 {
-                    return ApiResponse<OrderDto>.Fail(ErrorCodes.INSUFFICIENT_STOCK, 
+                    return ApiResponse<OrderDto>.Fail(ErrorCodes.INSUFFICIENT_STOCK,
                         $"المخزون غير كافٍ للمنتج: {product.Name}. المتاح: {currentStock}، المطلوب: {item.Quantity}");
                 }
             }
@@ -156,7 +156,7 @@ public class OrderService : IOrderService
             // Dynamic Tax Rate Priority: Product → Tenant
             // If product has specific tax rate, use it; otherwise use tenant's rate
             var taxRate = product.TaxRate ?? tenantTaxRate;
-            
+
             // If tax is disabled at tenant level, override to 0
             if (!tenant.IsTaxEnabled)
                 taxRate = 0m;
@@ -179,7 +179,7 @@ public class OrderService : IOrderService
                 TaxInclusive = false, // Always Tax Exclusive (Additive)
                 Notes = item.Notes
             };
-            
+
             // Calculate tax amount and totals with proper rounding
             CalculateItemTotals(orderItem);
             order.Items.Add(orderItem);
@@ -197,6 +197,7 @@ public class OrderService : IOrderService
     {
         var order = await _unitOfWork.Orders.Query()
             .Include(o => o.Items)
+            .Include(o => o.Payments)
             .FirstOrDefaultAsync(o => o.Id == id && o.TenantId == _currentUser.TenantId);
 
         if (order == null)
@@ -210,7 +211,7 @@ public class OrderService : IOrderService
         var today = DateTime.UtcNow.Date;
         var tenantId = _currentUser.TenantId;
         var branchId = _currentUser.BranchId;
-        
+
         var orders = await _unitOfWork.Orders.Query()
             .Include(o => o.Items)
             .Include(o => o.Payments)
@@ -225,7 +226,7 @@ public class OrderService : IOrderService
     {
         var tenantId = _currentUser.TenantId;
         var branchId = _currentUser.BranchId;
-        
+
         var query = _unitOfWork.Orders.Query()
             .Include(o => o.Items)
             .Include(o => o.Payments)
@@ -276,14 +277,14 @@ public class OrderService : IOrderService
     public async Task<ApiResponse<PagedResult<OrderDto>>> GetByCustomerIdAsync(int customerId, int page = 1, int pageSize = 10)
     {
         var tenantId = _currentUser.TenantId;
-        
+
         var query = _unitOfWork.Orders.Query()
             .Include(o => o.Items)
             .Include(o => o.Payments)
             .Where(o => o.TenantId == tenantId && o.CustomerId == customerId);
-        
+
         var totalCount = await query.CountAsync();
-        
+
         var orders = await query
             .OrderByDescending(o => o.CreatedAt)
             .Skip((page - 1) * pageSize)
@@ -319,7 +320,7 @@ public class OrderService : IOrderService
         var product = await _unitOfWork.Products.GetByIdAsync(request.ProductId);
         if (product == null)
             return ApiResponse<OrderDto>.Fail(ErrorCodes.PRODUCT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PRODUCT_NOT_FOUND));
-        
+
         // VALIDATION: Product must be active
         if (!product.IsActive)
             return ApiResponse<OrderDto>.Fail(ErrorCodes.PRODUCT_INACTIVE, $"المنتج غير متاح للبيع: {product.Name}");
@@ -335,18 +336,18 @@ public class OrderService : IOrderService
             // Calculate total quantity in order for this product
             var existingQty = order.Items.Where(i => i.ProductId == product.Id).Sum(i => i.Quantity);
             var totalRequested = existingQty + request.Quantity;
-            
+
             if (currentStock < totalRequested && tenant?.AllowNegativeStock != true)
             {
                 var available = Math.Max(0, currentStock - existingQty);
-                return ApiResponse<OrderDto>.Fail(ErrorCodes.INSUFFICIENT_STOCK, 
+                return ApiResponse<OrderDto>.Fail(ErrorCodes.INSUFFICIENT_STOCK,
                     $"المخزون غير كافٍ للمنتج: {product.Name}. المتاح: {available}، المطلوب: {request.Quantity}");
             }
         }
 
         // Dynamic Tax Rate Priority: Product → Tenant
         var taxRate = product.TaxRate ?? tenantTaxRate;
-        
+
         // If tax is disabled at tenant level, override to 0
         if (tenant?.IsTaxEnabled != true)
             taxRate = 0m;
@@ -369,7 +370,7 @@ public class OrderService : IOrderService
             TaxInclusive = false, // Always Tax Exclusive (Additive)
             Notes = request.Notes
         };
-        
+
         // Calculate tax amount and totals with proper rounding
         CalculateItemTotals(orderItem);
 
@@ -410,7 +411,7 @@ public class OrderService : IOrderService
 
         // Use custom tax rate if provided, otherwise use tenant default
         var taxRate = request.TaxRate ?? tenantTaxRate;
-        
+
         // If tax is disabled at tenant level, override to 0
         if (tenant?.IsTaxEnabled != true)
             taxRate = 0m;
@@ -424,25 +425,25 @@ public class OrderService : IOrderService
             CustomName = request.Name,
             CustomUnitPrice = request.UnitPrice,
             CustomTaxRate = taxRate,
-            
+
             // Snapshot fields (populated from custom data)
             ProductName = request.Name,
             ProductNameEn = null,
             ProductSku = null,
             ProductBarcode = null,
-            
+
             // Price Snapshot
             UnitPrice = request.UnitPrice,
             UnitCost = null,
             OriginalPrice = request.UnitPrice,
             Quantity = request.Quantity,
-            
+
             // Tax Snapshot
             TaxRate = taxRate,
             TaxInclusive = false, // Always Tax Exclusive (Additive)
             Notes = request.Notes
         };
-        
+
         // Calculate tax amount and totals with proper rounding
         CalculateItemTotals(orderItem);
 
@@ -485,7 +486,7 @@ public class OrderService : IOrderService
     {
         // Use transaction for atomicity - Order + Payments must succeed together
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
-        
+
         try
         {
             var order = await _unitOfWork.Orders.Query()
@@ -503,24 +504,24 @@ public class OrderService : IOrderService
 
             // Validate payment amount
             decimal totalPaymentAmount = request.Payments.Sum(p => p.Amount);
-            
+
             // Allow partial payment ONLY if customer is linked
             if (totalPaymentAmount < order.Total)
             {
                 if (!order.CustomerId.HasValue)
                 {
-                    return ApiResponse<OrderDto>.Fail(ErrorCodes.PAYMENT_INSUFFICIENT, 
+                    return ApiResponse<OrderDto>.Fail(ErrorCodes.PAYMENT_INSUFFICIENT,
                         $"المبلغ المدفوع ({totalPaymentAmount:F2}) أقل من إجمالي الطلب ({order.Total:F2}). البيع الآجل يتطلب ربط عميل بالطلب.");
                 }
-                
+
                 // Validate credit limit
                 var amountDue = order.Total - totalPaymentAmount;
                 var canTakeCredit = await _customerService.ValidateCreditLimitAsync(order.CustomerId.Value, amountDue);
-                
+
                 if (!canTakeCredit)
                 {
                     var customer = await _unitOfWork.Customers.GetByIdAsync(order.CustomerId.Value);
-                    return ApiResponse<OrderDto>.Fail(ErrorCodes.CUSTOMER_CREDIT_LIMIT_EXCEEDED, 
+                    return ApiResponse<OrderDto>.Fail(ErrorCodes.CUSTOMER_CREDIT_LIMIT_EXCEEDED,
                         $"تجاوز حد الائتمان. الحد المسموح: {customer?.CreditLimit:F2} ج.م، الرصيد الحالي: {customer?.TotalDue:F2} ج.م");
                 }
             }
@@ -528,7 +529,7 @@ public class OrderService : IOrderService
             // VALIDATION: Overpayment limit (max 2x Total to prevent money laundering/errors)
             decimal maxAllowedPayment = order.Total * 2;
             if (totalPaymentAmount > maxAllowedPayment)
-                return ApiResponse<OrderDto>.Fail(ErrorCodes.PAYMENT_OVERPAYMENT_LIMIT, 
+                return ApiResponse<OrderDto>.Fail(ErrorCodes.PAYMENT_OVERPAYMENT_LIMIT,
                     $"المبلغ المدفوع ({totalPaymentAmount:F2}) يتجاوز الحد المسموح ({maxAllowedPayment:F2})");
 
             // Add payments
@@ -538,7 +539,7 @@ public class OrderService : IOrderService
             {
                 if (paymentReq.Amount <= 0)
                     continue;
-                    
+
                 var payment = new Payment
                 {
                     TenantId = _currentUser.TenantId,
@@ -551,7 +552,7 @@ public class OrderService : IOrderService
                 await _unitOfWork.Payments.AddAsync(payment);
                 order.Payments.Add(payment);
                 totalPaid += payment.Amount;
-                
+
                 // Track cash payments for cash register
                 if (payment.Method == PaymentMethod.Cash)
                     cashPaymentAmount += payment.Amount;
@@ -565,7 +566,7 @@ public class OrderService : IOrderService
             order.CompletedAt = DateTime.UtcNow;
 
             await _unitOfWork.SaveChangesAsync();
-            
+
             // P0-3: Re-validate stock INSIDE the write transaction.
             // This is the authoritative check. The CreateAsync check is just a UX hint.
             // SQLite's write lock guarantees no other writer can change stock between
@@ -591,7 +592,7 @@ public class OrderService : IOrderService
                     }
                 }
             }
-            
+
             // Decrement stock ONLY for products that track inventory (skip custom items)
             // Fetch all products in one query for performance
             var productIds = order.Items
@@ -599,38 +600,38 @@ public class OrderService : IOrderService
                 .Select(i => i.ProductId!.Value)
                 .Distinct()
                 .ToList();
-            
+
             var products = await _unitOfWork.Products.Query()
                 .Where(p => productIds.Contains(p.Id))
                 .ToDictionaryAsync(p => p.Id, p => p);
-            
+
             var stockItems = order.Items
-                .Where(i => i.ProductId.HasValue 
-                         && !i.IsCustomItem 
-                         && products.ContainsKey(i.ProductId.Value) 
+                .Where(i => i.ProductId.HasValue
+                         && !i.IsCustomItem
+                         && products.ContainsKey(i.ProductId.Value)
                          && products[i.ProductId.Value].TrackInventory)
                 .Select(i => (i.ProductId!.Value, i.Quantity))
                 .ToList();
-            
+
             if (stockItems.Any())
             {
                 await _inventoryService.BatchDecrementStockAsync(stockItems, order.Id);
             }
-            
+
             // Update customer statistics if order has a customer
             if (order.CustomerId.HasValue)
             {
                 // Calculate loyalty points: 1 point per 1 currency unit
                 int loyaltyPoints = (int)Math.Floor(order.Total);
                 await _customerService.UpdateOrderStatsAsync(order.CustomerId.Value, order.Total, loyaltyPoints);
-                
+
                 // Update credit balance if there's unpaid amount
                 if (order.AmountDue > 0)
                 {
                     await _customerService.UpdateCreditBalanceAsync(order.CustomerId.Value, order.AmountDue);
                 }
             }
-            
+
             // INTEGRATION: Record cash register transaction for cash payments
             if (cashPaymentAmount > 0)
             {
@@ -643,7 +644,7 @@ public class OrderService : IOrderService
                     shiftId: order.ShiftId
                 );
             }
-            
+
             // Commit transaction - all operations succeeded
             await transaction.CommitAsync();
 
@@ -653,7 +654,7 @@ public class OrderService : IOrderService
         {
             // Rollback transaction - something failed
             await transaction.RollbackAsync();
-            return ApiResponse<OrderDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR, 
+            return ApiResponse<OrderDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR,
                 $"حدث خطأ أثناء إتمام الطلب: {ex.Message}");
         }
     }
@@ -663,7 +664,7 @@ public class OrderService : IOrderService
         var order = await _unitOfWork.Orders.Query()
             .Include(o => o.Items)
             .FirstOrDefaultAsync(o => o.Id == orderId && o.TenantId == _currentUser.TenantId);
-            
+
         if (order == null)
             return ApiResponse<bool>.Fail(ErrorCodes.ORDER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.ORDER_NOT_FOUND));
 
@@ -680,7 +681,7 @@ public class OrderService : IOrderService
         if (order.CustomerId.HasValue && order.AmountDue > 0)
         {
             await _customerService.ReduceCreditBalanceAsync(
-                order.CustomerId.Value, 
+                order.CustomerId.Value,
                 order.AmountDue
             );
         }
@@ -697,7 +698,7 @@ public class OrderService : IOrderService
     public async Task<ApiResponse<OrderDto>> RefundAsync(int orderId, int userId, string? reason, List<RefundItemDto>? items = null)
     {
         var isPartialRefund = items != null && items.Count > 0;
-        
+
         // For full refund, reason is required
         if (!isPartialRefund && string.IsNullOrWhiteSpace(reason))
             return ApiResponse<OrderDto>.Fail(ErrorCodes.VALIDATION_ERROR, "سبب الاسترجاع مطلوب للاسترجاع الكامل");
@@ -717,7 +718,7 @@ public class OrderService : IOrderService
 
             // Validate: Order must be Completed or PartiallyRefunded
             if (originalOrder.Status != OrderStatus.Completed && originalOrder.Status != OrderStatus.PartiallyRefunded)
-                return ApiResponse<OrderDto>.Fail(ErrorCodes.ORDER_INVALID_STATE_TRANSITION, 
+                return ApiResponse<OrderDto>.Fail(ErrorCodes.ORDER_INVALID_STATE_TRANSITION,
                     "يمكن استرجاع الطلبات المكتملة أو المستردة جزئياً فقط");
 
             // Get user for snapshot
@@ -727,8 +728,8 @@ public class OrderService : IOrderService
 
             // Get current shift (optional for return orders)
             var currentShift = await _unitOfWork.Shifts.Query()
-                .FirstOrDefaultAsync(s => s.TenantId == _currentUser.TenantId 
-                                       && s.BranchId == _currentUser.BranchId 
+                .FirstOrDefaultAsync(s => s.TenantId == _currentUser.TenantId
+                                       && s.BranchId == _currentUser.BranchId
                                        && s.UserId == userId
                                        && !s.IsClosed);
 
@@ -760,7 +761,7 @@ public class OrderService : IOrderService
                 CurrencyCode = originalOrder.CurrencyCode,
                 TaxRate = originalOrder.TaxRate,
                 // Notes linking to original order
-                Notes = $"مرتجع للطلب #{originalOrder.OrderNumber}" + 
+                Notes = $"مرتجع للطلب #{originalOrder.OrderNumber}" +
                         (string.IsNullOrWhiteSpace(refundReason) ? "" : $" - السبب: {refundReason}"),
                 CompletedAt = DateTime.UtcNow
             };
@@ -772,15 +773,15 @@ public class OrderService : IOrderService
                 {
                     var orderItem = originalOrder.Items.FirstOrDefault(i => i.Id == refundItem.ItemId);
                     if (orderItem == null)
-                        return ApiResponse<OrderDto>.Fail(ErrorCodes.VALIDATION_ERROR, 
+                        return ApiResponse<OrderDto>.Fail(ErrorCodes.VALIDATION_ERROR,
                             $"عنصر الطلب رقم {refundItem.ItemId} غير موجود");
 
                     if (refundItem.Quantity <= 0)
-                        return ApiResponse<OrderDto>.Fail(ErrorCodes.VALIDATION_ERROR, 
+                        return ApiResponse<OrderDto>.Fail(ErrorCodes.VALIDATION_ERROR,
                             "كمية الاسترجاع يجب أن تكون أكبر من صفر");
 
                     if (refundItem.Quantity > orderItem.Quantity)
-                        return ApiResponse<OrderDto>.Fail(ErrorCodes.VALIDATION_ERROR, 
+                        return ApiResponse<OrderDto>.Fail(ErrorCodes.VALIDATION_ERROR,
                             $"كمية الاسترجاع ({refundItem.Quantity}) أكبر من الكمية المتاحة ({orderItem.Quantity}) للمنتج {orderItem.ProductName}");
 
                     // Calculate refund amount for this item (proportional)
@@ -820,13 +821,13 @@ public class OrderService : IOrderService
                         {
                             var currentStock = await _inventoryService.GetCurrentStockAsync(orderItem.ProductId.Value);
                             var newStock = await _inventoryService.IncrementStockAsync(orderItem.ProductId.Value, refundItem.Quantity, originalOrder.Id);
-                            
-                            stockChanges.Add(new 
-                            { 
-                                ProductId = orderItem.ProductId.Value, 
+
+                            stockChanges.Add(new
+                            {
+                                ProductId = orderItem.ProductId.Value,
                                 ProductName = orderItem.ProductName,
                                 Quantity = refundItem.Quantity,
-                                BalanceBefore = currentStock, 
+                                BalanceBefore = currentStock,
                                 BalanceAfter = newStock,
                                 Reason = refundItem.Reason ?? refundReason
                             });
@@ -836,7 +837,7 @@ public class OrderService : IOrderService
                     // Build combined reason
                     if (!string.IsNullOrWhiteSpace(refundItem.Reason))
                     {
-                        refundReason += (string.IsNullOrEmpty(refundReason) ? "" : " | ") + 
+                        refundReason += (string.IsNullOrEmpty(refundReason) ? "" : " | ") +
                             $"{orderItem.ProductName}: {refundItem.Reason}";
                     }
                 }
@@ -882,14 +883,14 @@ public class OrderService : IOrderService
                         {
                             var currentStock = await _inventoryService.GetCurrentStockAsync(item.ProductId.Value);
                             var newStock = await _inventoryService.IncrementStockAsync(item.ProductId.Value, item.Quantity, originalOrder.Id);
-                            
-                            stockChanges.Add(new 
-                            { 
-                                ProductId = item.ProductId.Value, 
+
+                            stockChanges.Add(new
+                            {
+                                ProductId = item.ProductId.Value,
                                 ProductName = item.ProductName,
-                                Quantity = item.Quantity, 
-                                BalanceBefore = currentStock, 
-                                BalanceAfter = newStock 
+                                Quantity = item.Quantity,
+                                BalanceBefore = currentStock,
+                                BalanceAfter = newStock
                             });
                         }
                     }
@@ -911,8 +912,8 @@ public class OrderService : IOrderService
 
             // Update original order metadata
             originalOrder.RefundedAt = DateTime.UtcNow;
-            originalOrder.RefundReason = string.IsNullOrWhiteSpace(originalOrder.RefundReason) 
-                ? refundReason 
+            originalOrder.RefundReason = string.IsNullOrWhiteSpace(originalOrder.RefundReason)
+                ? refundReason
                 : originalOrder.RefundReason + " | " + refundReason;
             originalOrder.RefundedByUserId = userId;
             originalOrder.RefundedByUserName = refundUser.Name;
@@ -938,41 +939,41 @@ public class OrderService : IOrderService
             {
                 int pointsToDeduct = (int)Math.Floor(totalRefundAmount);
                 await _customerService.DeductRefundStatsAsync(
-                    originalOrder.CustomerId.Value, 
+                    originalOrder.CustomerId.Value,
                     totalRefundAmount,
                     pointsToDeduct
                 );
-                
+
                 // ✅ FIX: Reduce customer's TotalDue if order had unpaid amount
                 if (originalOrder.AmountDue > 0)
                 {
                     // Calculate proportional debt reduction
-                    var debtToReduce = isPartialRefund 
+                    var debtToReduce = isPartialRefund
                         ? Math.Round((totalRefundAmount / originalOrder.Total) * originalOrder.AmountDue, 2)
                         : originalOrder.AmountDue;
-                    
+
                     await _customerService.ReduceCreditBalanceAsync(
-                        originalOrder.CustomerId.Value, 
+                        originalOrder.CustomerId.Value,
                         debtToReduce
                     );
                 }
             }
 
             await _unitOfWork.SaveChangesAsync();
-            
+
             // INTEGRATION: Record cash register transaction for cash refunds
             // Calculate cash refund amount from original order's cash payments
             var originalCashPayments = originalOrder.Payments
                 .Where(p => p.Method == PaymentMethod.Cash)
                 .Sum(p => p.Amount);
-            
+
             if (originalCashPayments > 0)
             {
                 // Calculate proportional cash refund
-                var cashRefundAmount = isPartialRefund 
+                var cashRefundAmount = isPartialRefund
                     ? Math.Round((totalRefundAmount / originalOrder.Total) * originalCashPayments, 2)
                     : originalCashPayments;
-                
+
                 if (cashRefundAmount > 0)
                 {
                     await _cashRegisterService.RecordTransactionAsync(
@@ -985,7 +986,7 @@ public class OrderService : IOrderService
                     );
                 }
             }
-            
+
             await transaction.CommitAsync();
 
             // Update original order notes with return order reference
@@ -994,17 +995,17 @@ public class OrderService : IOrderService
                 : originalOrder.Notes + $" | تم إنشاء مرتجع: #{returnOrder.OrderNumber}";
             await _unitOfWork.SaveChangesAsync();
 
-            var message = isPartialRefund 
-                ? $"تم إنشاء فاتورة المرتجع الجزئي #{returnOrder.OrderNumber}" 
+            var message = isPartialRefund
+                ? $"تم إنشاء فاتورة المرتجع الجزئي #{returnOrder.OrderNumber}"
                 : $"تم إنشاء فاتورة المرتجع #{returnOrder.OrderNumber}";
-            
+
             // Return the NEW return order (not the original)
             return ApiResponse<OrderDto>.Ok(MapToDto(returnOrder), message);
         }
         catch (Exception ex)
         {
             await transaction.RollbackAsync();
-            return ApiResponse<OrderDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR, 
+            return ApiResponse<OrderDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR,
                 $"حدث خطأ أثناء استرجاع الطلب: {ex.Message}");
         }
     }
@@ -1023,12 +1024,12 @@ public class OrderService : IOrderService
     /// <summary>
     /// Calculate item totals including tax amount with proper rounding.
     /// Tax Exclusive (Additive): Price is NET (excluding tax), tax is added on top.
-    /// 
+    ///
     /// Formulas:
     ///   NetTotal = UnitPrice * Quantity
     ///   TaxAmount = NetTotal * (TaxRate / 100)
     ///   Total = NetTotal + TaxAmount
-    /// 
+    ///
     /// Example (100 EGP Net with 14% VAT):
     ///   NetTotal = 100 EGP
     ///   TaxAmount = 100 * 0.14 = 14 EGP
@@ -1038,7 +1039,7 @@ public class OrderService : IOrderService
     {
         // Subtotal = Net price * Quantity (before tax, before discount)
         item.Subtotal = Math.Round(item.UnitPrice * item.Quantity, 2);
-        
+
         // Apply discount if any
         if (item.DiscountType == "percentage" && item.DiscountValue.HasValue)
             item.DiscountAmount = Math.Round(item.Subtotal * (item.DiscountValue.Value / 100m), 2);
@@ -1046,14 +1047,14 @@ public class OrderService : IOrderService
             item.DiscountAmount = Math.Round(item.DiscountValue.Value, 2);
         else
             item.DiscountAmount = 0;
-        
+
         // Net amount after discount
         var netAfterDiscount = Math.Round(item.Subtotal - item.DiscountAmount, 2);
-        
+
         // Tax Exclusive (Additive): Calculate tax and add on top
         // TaxAmount = NetAmount * (TaxRate / 100)
         item.TaxAmount = Math.Round(netAfterDiscount * (item.TaxRate / 100m), 2);
-        
+
         // Total = Net + Tax
         item.Total = Math.Round(netAfterDiscount + item.TaxAmount, 2);
     }
@@ -1062,7 +1063,7 @@ public class OrderService : IOrderService
     {
         // Subtotal = Sum of all item subtotals (net amounts before item-level tax)
         order.Subtotal = Math.Round(order.Items.Sum(i => i.Subtotal), 2);
-        
+
         // Apply order-level discount (on subtotal, before tax)
         if (order.DiscountType == "percentage" && order.DiscountValue.HasValue)
             order.DiscountAmount = Math.Round(order.Subtotal * (order.DiscountValue.Value / 100m), 2);
@@ -1070,12 +1071,12 @@ public class OrderService : IOrderService
             order.DiscountAmount = Math.Round(order.DiscountValue.Value, 2);
         else
             order.DiscountAmount = 0;
-        
+
         if (order.DiscountAmount > order.Subtotal)
             order.DiscountAmount = order.Subtotal;
-        
+
         var afterDiscount = order.Subtotal - order.DiscountAmount;
-        
+
         // P0-4: Tax = SUM of per-item taxes (respects product-specific tax rates).
         // If there's an order-level discount, scale item taxes proportionally.
         if (order.DiscountAmount > 0 && order.Subtotal > 0)
@@ -1094,10 +1095,10 @@ public class OrderService : IOrderService
             // No order-level discount: tax = simple sum of item.TaxAmount
             order.TaxAmount = Math.Round(order.Items.Sum(i => i.TaxAmount), 2);
         }
-        
+
         // Service charge on net amount after discount
         order.ServiceChargeAmount = Math.Round(afterDiscount * (order.ServiceChargePercent / 100m), 2);
-        
+
         // Total = (Subtotal - Discount) + Tax + Service Charge
         order.Total = Math.Round(afterDiscount + order.TaxAmount + order.ServiceChargeAmount, 2);
         order.AmountDue = Math.Round(order.Total - order.AmountPaid, 2);

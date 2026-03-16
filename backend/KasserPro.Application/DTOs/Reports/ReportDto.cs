@@ -5,17 +5,17 @@ public class DailyReportDto
     public DateTime Date { get; set; }
     public int BranchId { get; set; }
     public string? BranchName { get; set; }
-    
+
     // Shift Information (NEW)
     public int TotalShifts { get; set; }
     public List<ShiftSummaryDto> Shifts { get; set; } = new();
-    
+
     // Order Counts
     public int TotalOrders { get; set; }
     public int CompletedOrders { get; set; }
     public int CancelledOrders { get; set; }
     public int PendingOrders { get; set; }
-    
+
     // Sales Totals
     public decimal GrossSales { get; set; }      // Subtotal before discounts
     public decimal TotalDiscount { get; set; }
@@ -23,16 +23,16 @@ public class DailyReportDto
     public decimal TotalTax { get; set; }
     public decimal TotalSales { get; set; }      // Final total (Net + Tax)
     public decimal TotalRefunds { get; set; }    // Total refunds from return orders
-    
+
     // Payment Breakdown
     public decimal TotalCash { get; set; }
     public decimal TotalCard { get; set; }
     public decimal TotalFawry { get; set; }
     public decimal TotalOther { get; set; }
-    
+
     // Top Products
     public List<TopProductDto> TopProducts { get; set; } = new();
-    
+
     // Hourly Breakdown (optional)
     public List<HourlySalesDto> HourlySales { get; set; } = new();
 }
@@ -46,6 +46,7 @@ public class ShiftSummaryDto
     public int TotalOrders { get; set; }
     public decimal TotalCash { get; set; }
     public decimal TotalCard { get; set; }
+    public decimal TotalFawry { get; set; }
     public decimal TotalSales { get; set; }
     public bool IsForceClosed { get; set; }
     public string? ForceCloseReason { get; set; }

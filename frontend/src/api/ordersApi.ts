@@ -158,6 +158,8 @@ export const ordersApi = baseApi.injectEndpoints({
         { type: "Orders", id: orderId },
         { type: "Orders", id: "LIST" },
         "Shifts",
+        "Customers", // Invalidate customers in case order affects customer debt
+        "Inventory", // Invalidate inventory as stock is updated
       ],
     }),
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ClipboardList, Building2 } from "lucide-react";
+import { ClipboardList, Building2, ChevronDown } from "lucide-react";
 import {
   useGetPurchaseInvoicesQuery,
   useDeletePurchaseInvoiceMutation,
@@ -127,42 +127,48 @@ export function PurchaseInvoicesPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">المورد</label>
-              <select
-                value={supplierId || ""}
-                onChange={(e) =>
-                  setSupplierId(
-                    e.target.value ? Number(e.target.value) : undefined,
-                  )
-                }
-                className="w-full px-3 py-2 border rounded-lg"
-              >
-                <option value="">الكل</option>
-                {suppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={supplierId || ""}
+                  onChange={(e) =>
+                    setSupplierId(
+                      e.target.value ? Number(e.target.value) : undefined,
+                    )
+                  }
+                  className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                >
+                  <option value="">الكل</option>
+                  {suppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">الحالة</label>
-              <select
-                value={status || ""}
-                onChange={(e) =>
-                  setStatus(
-                    (e.target.value as PurchaseInvoiceStatus) || undefined,
-                  )
-                }
-                className="w-full px-3 py-2 border rounded-lg"
-              >
-                <option value="">الكل</option>
-                <option value="Draft">مسودة</option>
-                <option value="Confirmed">مؤكدة</option>
-                <option value="Paid">مدفوعة</option>
-                <option value="PartiallyPaid">مدفوعة جزئياً</option>
-                <option value="Cancelled">ملغاة</option>
-              </select>
+              <div className="relative">
+                <select
+                  value={status || ""}
+                  onChange={(e) =>
+                    setStatus(
+                      (e.target.value as PurchaseInvoiceStatus) || undefined,
+                    )
+                  }
+                  className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                >
+                  <option value="">الكل</option>
+                  <option value="Draft">مسودة</option>
+                  <option value="Confirmed">مؤكدة</option>
+                  <option value="Paid">مدفوعة</option>
+                  <option value="PartiallyPaid">مدفوعة جزئياً</option>
+                  <option value="Cancelled">ملغاة</option>
+                </select>
+                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>

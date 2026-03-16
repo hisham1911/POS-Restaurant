@@ -15,18 +15,20 @@ const authPersistConfig = {
   whitelist: ["token", "user", "isAuthenticated"],
 }
 
-const branchPersistConfig = {
-  key: "branch",
-  storage,
-  whitelist: ["currentBranch"],
-}
+// REMOVED: Branch persistence causes issues when switching users
+// Branch should be selected fresh on each login, not persisted
+// const branchPersistConfig = {
+//   key: "branch",
+//   storage,
+//   whitelist: ["currentBranch"],
+// }
 
 const rootReducer = combineReducers({
   [baseApi.reducerPath]: baseApi.reducer,
   auth: persistReducer(authPersistConfig, authReducer),
   cart: cartReducer,
   ui: uiReducer,
-  branch: persistReducer(branchPersistConfig, branchReducer),
+  branch: branchReducer, // No persistence - fresh state on each session
 })
 
 export const store = configureStore({

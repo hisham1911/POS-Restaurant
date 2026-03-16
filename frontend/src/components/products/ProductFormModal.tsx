@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { X, Image as ImageIcon, Package, Wrench } from "lucide-react";
+import { X, Image as ImageIcon, Package, Wrench, ChevronDown } from "lucide-react";
 import {
   Product,
   CreateProductRequest,
@@ -11,6 +11,7 @@ import { useGetBranchesQuery } from "@/api/branchesApi";
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
 import { Modal } from "@/components/common/Modal";
+import { numberToDisplay, displayToNumber } from "@/hooks/useNumberInput";
 import clsx from "clsx";
 
 interface ProductFormModalProps {
@@ -168,21 +169,24 @@ export const ProductFormModal = ({
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               التصنيف *
             </label>
-            <select
-              value={formData.categoryId}
-              onChange={(e) =>
-                setFormData({ ...formData, categoryId: Number(e.target.value) })
-              }
-              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              required
-            >
-              <option value="">اختر التصنيف</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={formData.categoryId}
+                onChange={(e) =>
+                  setFormData({ ...formData, categoryId: Number(e.target.value) })
+                }
+                className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
+                required
+              >
+                <option value="">اختر التصنيف</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            </div>
           </div>
 
           <div>
@@ -301,13 +305,14 @@ export const ProductFormModal = ({
               type="number"
               min="0"
               step="0.01"
-              value={formData.price}
+              value={numberToDisplay(formData.price)}
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  price: parseFloat(e.target.value) || 0,
+                  price: displayToNumber(e.target.value),
                 })
               }
+              placeholder="0.00"
               required
             />
             <Input
@@ -315,13 +320,14 @@ export const ProductFormModal = ({
               type="number"
               min="0"
               step="0.01"
-              value={formData.cost}
+              value={numberToDisplay(formData.cost)}
               onChange={(e) =>
                 setFormData({
                   ...formData,
-                  cost: parseFloat(e.target.value) || 0,
+                  cost: displayToNumber(e.target.value),
                 })
               }
+              placeholder="0.00"
             />
           </div>
 
@@ -428,26 +434,28 @@ export const ProductFormModal = ({
                   label="الكمية المتاحة *"
                   type="number"
                   min="0"
-                  value={formData.stockQuantity}
+                  value={numberToDisplay(formData.stockQuantity)}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      stockQuantity: parseInt(e.target.value) || 0,
+                      stockQuantity: displayToNumber(e.target.value),
                     })
                   }
+                  placeholder="0"
                   required
                 />
                 <Input
                   label="حد التنبيه"
                   type="number"
                   min="0"
-                  value={formData.lowStockThreshold}
+                  value={formData.lowStockThreshold === 5 ? "" : formData.lowStockThreshold}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
                       lowStockThreshold: parseInt(e.target.value) || 5,
                     })
                   }
+                  placeholder="5"
                 />
                 <Input
                   label="نقطة إعادة الطلب"
@@ -477,13 +485,14 @@ export const ProductFormModal = ({
                       <input
                         type="number"
                         min="0"
-                        value={branchStocks[branch.id] || 0}
+                        value={branchStocks[branch.id] === 0 ? "" : branchStocks[branch.id] || ""}
                         onChange={(e) =>
                           setBranchStocks({
                             ...branchStocks,
                             [branch.id]: parseInt(e.target.value) || 0,
                           })
                         }
+                        placeholder="0"
                         className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
                       />
                     </div>

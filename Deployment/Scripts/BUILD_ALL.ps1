@@ -14,7 +14,7 @@ $ScriptDir = $PSScriptRoot
 $DeploymentRoot = Split-Path $ScriptDir -Parent
 $ProjectRoot = Split-Path $DeploymentRoot -Parent
 $ISSPath = Join-Path $DeploymentRoot 'ISS'
-$ISCC = 'C:\Users\mo\AppData\Local\Programs\Inno Setup 6\ISCC.exe'
+$ISCC = 'C:\Users\Hisham\AppData\Local\Programs\Inno Setup 6\ISCC.exe'
 
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "   KasserPro Build All Versions v2.0   " -ForegroundColor Cyan
@@ -48,12 +48,12 @@ if (-not $SkipBackend) {
     dotnet publish $apiProject `
         -c Release -r win-x64 --self-contained -o C:\temp\kasserpro-src `
         -p:PublishSingleFile=false -p:PublishReadyToRun=false
-    
+
     $bridgeProject = Join-Path $ProjectRoot 'backend\KasserPro.BridgeApp\KasserPro.BridgeApp.csproj'
     dotnet publish $bridgeProject `
         -c Release -r win-x64 --self-contained -o C:\temp\kasserpro-src `
         -p:PublishSingleFile=true -p:PublishReadyToRun=false
-    
+
     $iconPath = Join-Path $DeploymentRoot 'Icons\kasserpro.ico'
     Copy-Item $iconPath 'C:\temp\kasserpro-src\' -Force
     Write-Host "✓ .NET 8 x64 published" -ForegroundColor Green
@@ -68,12 +68,12 @@ if (-not $SkipBackend) {
     $apiProject = Join-Path $ProjectRoot 'backend\KasserPro.API\KasserPro.API.csproj'
     dotnet publish $apiProject `-c Release -r win-x86 --self-contained -o C:\temp\kasserpro-src-x86 `
         -p:PublishSingleFile=false -p:PublishReadyToRun=false
-    
+
     $bridgeProject = Join-Path $ProjectRoot 'backend\KasserPro.BridgeApp\KasserPro.BridgeApp.csproj'
     dotnet publish $bridgeProject `
         -c Release -r win-x86 --self-contained -o C:\temp\kasserpro-src-x86 `
         -p:PublishSingleFile=true -p:PublishReadyToRun=false
-    
+
     $iconPath = Join-Path $DeploymentRoot 'Icons\kasserpro.ico'
     Copy-Item $iconPath 'C:\temp\kasserpro-src-x86\' -Force
     Write-Host "✓ .NET 8 x86 published" -ForegroundColor Green
@@ -88,11 +88,11 @@ if (-not $SkipBackend) {
     dotnet publish "C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj" `
         -c Release -r win-x64 --self-contained -o C:\temp\kasserpro-src-win7-x64 `
         -p:PublishSingleFile=false -p:PublishReadyToRun=false
-    
+
     dotnet publish "C:\temp\net6src\backend\KasserPro.BridgeApp\KasserPro.BridgeApp.csproj" `
         -c Release -r win-x64 --self-contained -o C:\temp\kasserpro-src-win7-x64 `
         -p:PublishSingleFile=true -p:PublishReadyToRun=false
-    
+
     $iconPath = Join-Path $DeploymentRoot 'Icons\kasserpro.ico'
     Copy-Item $iconPath 'C:\temp\kasserpro-src-win7-x64\' -Force
     Write-Host "✓ .NET 6 x64 published" -ForegroundColor Green
@@ -107,11 +107,11 @@ if (-not $SkipBackend) {
     dotnet publish "C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj" `
         -c Release -r win-x86 --self-contained -o C:\temp\kasserpro-src-win7-x86 `
         -p:PublishSingleFile=false -p:PublishReadyToRun=false
-    
+
     dotnet publish "C:\temp\net6src\backend\KasserPro.BridgeApp\KasserPro.BridgeApp.csproj" `
         -c Release -r win-x86 --self-contained -o C:\temp\kasserpro-src-win7-x86 `
         -p:PublishSingleFile=true -p:PublishReadyToRun=false
-    
+
     $iconPath = Join-Path $DeploymentRoot 'Icons\kasserpro.ico'
     Copy-Item $iconPath 'C:\temp\kasserpro-src-win7-x86\' -Force
     Write-Host "✓ .NET 6 x86 published" -ForegroundColor Green
@@ -123,23 +123,23 @@ if (-not $SkipBackend) {
 # Step 6: Build All Installers
 if (-not $SkipInstallers) {
     Write-Host "[6/7] Building Installers" -ForegroundColor Green
-    
+
     Write-Host "  Building KasserPro-Setup.exe Win10-11 x64" -ForegroundColor Cyan
     $issFile = Join-Path $ISSPath 'KasserPro-Setup.iss'
     & $ISCC $issFile
-    
+
     Write-Host "  Building KasserPro-Setup-x86.exe Win10-11 x86" -ForegroundColor Cyan
     $issFile = Join-Path $ISSPath 'KasserPro-Setup-x86.iss'
     & $ISCC $issFile
-    
+
     Write-Host "  Building KasserPro-Setup-Win7-x64.exe Win7 x64" -ForegroundColor Cyan
     $issFile = Join-Path $ISSPath 'KasserPro-Setup-Win7-x64.iss'
     & $ISCC $issFile
-    
+
     Write-Host "  Building KasserPro-Setup-Win7-x86.exe Win7 x86" -ForegroundColor Cyan
     $issFile = Join-Path $ISSPath 'KasserPro-Setup-Win7-x86.iss'
     & $ISCC $issFile
-    
+
     Write-Host "✓ All installers built successfully" -ForegroundColor Green
     Write-Host ""
 } else {

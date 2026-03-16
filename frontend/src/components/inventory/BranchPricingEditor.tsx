@@ -11,7 +11,7 @@ import {
   selectBranches,
 } from "../../store/slices/branchSlice";
 import { selectIsAdmin } from "../../store/slices/authSlice";
-import { DollarSign, Edit, Trash2, Plus, AlertTriangle, X } from "lucide-react";
+import { DollarSign, Edit, Trash2, Plus, AlertTriangle, X, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import { formatDateOnly } from "../../utils/formatters";
 
@@ -153,18 +153,21 @@ export default function BranchPricingEditor() {
         <label className="block text-sm font-medium text-gray-700 mb-2">
           اختر الفرع
         </label>
-        <select
-          value={selectedBranchId}
-          onChange={(e) => setSelectedBranchId(Number(e.target.value))}
-          className="w-full md:w-64 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-        >
-          <option value={0}>اختر فرع</option>
-          {branches.map((branch) => (
-            <option key={branch.id} value={branch.id}>
-              {branch.name}
-            </option>
-          ))}
-        </select>
+        <div className="relative w-full md:w-64">
+          <select
+            value={selectedBranchId}
+            onChange={(e) => setSelectedBranchId(Number(e.target.value))}
+            className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
+          >
+            <option value={0}>اختر فرع</option>
+            {branches.map((branch) => (
+              <option key={branch.id} value={branch.id}>
+                {branch.name}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+        </div>
       </div>
 
       {/* Add/Edit Form */}
@@ -195,25 +198,28 @@ export default function BranchPricingEditor() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 المنتج
               </label>
-              <select
-                value={formData.productId}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    productId: Number(e.target.value),
-                  })
-                }
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
-                disabled={!!editingPriceId}
-              >
-                <option value={0}>اختر المنتج</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name} - السعر الافتراضي: {product.price} ج.م
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={formData.productId}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      productId: Number(e.target.value),
+                    })
+                  }
+                  className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  required
+                  disabled={!!editingPriceId}
+                >
+                  <option value={0}>اختر المنتج</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name} - السعر الافتراضي: {product.price} ج.م
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>
@@ -224,11 +230,12 @@ export default function BranchPricingEditor() {
                 type="number"
                 step="0.01"
                 min="0"
-                value={formData.price}
+                value={formData.price === 0 ? "" : formData.price}
                 onChange={(e) =>
-                  setFormData({ ...formData, price: Number(e.target.value) })
+                  setFormData({ ...formData, price: Number(e.target.value) || 0 })
                 }
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="0.00"
                 required
               />
             </div>

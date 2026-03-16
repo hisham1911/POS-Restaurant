@@ -33,8 +33,8 @@ public class InventoryService : IInventoryService
         {
             var tenantId = _currentUserService.TenantId;
             var userId = _currentUserService.UserId;
-            
-            _logger.LogInformation("GetBranchInventory called: BranchId={BranchId}, TenantId={TenantId}, UserId={UserId}", 
+
+            _logger.LogInformation("GetBranchInventory called: BranchId={BranchId}, TenantId={TenantId}, UserId={UserId}",
                 branchId, tenantId, userId);
 
             var inventories = await _context.BranchInventories
@@ -44,7 +44,7 @@ public class InventoryService : IInventoryService
                 .OrderBy(i => i.Product.Name)
                 .ToListAsync();
 
-            _logger.LogInformation("Found {Count} inventory records for BranchId={BranchId}, TenantId={TenantId}", 
+            _logger.LogInformation("Found {Count} inventory records for BranchId={BranchId}, TenantId={TenantId}",
                 inventories.Count, branchId, tenantId);
 
             var dtos = inventories.Select(i => new BranchInventoryDto
@@ -76,7 +76,7 @@ public class InventoryService : IInventoryService
         try
         {
             var product = await _context.Products
-                .FirstOrDefaultAsync(p => p.Id == productId && 
+                .FirstOrDefaultAsync(p => p.Id == productId &&
                                         p.TenantId == _currentUserService.TenantId);
 
             if (product == null)
@@ -95,7 +95,9 @@ public class InventoryService : IInventoryService
                 ProductName = product.Name,
                 ProductSku = product.Sku,
                 TotalQuantity = inventories.Sum(i => i.Quantity),
-                BranchInventories = inventories.Select(i => new BranchInventoryDto
+                BranchInventories = inventories
+                    .Where(i => i.Branch != null && i.Product != null)
+                    .Select(i => new BranchInventoryDto
                 {
                     Id = i.Id,
                     BranchId = i.BranchId,
@@ -125,7 +127,7 @@ public class InventoryService : IInventoryService
         try
         {
             var query = _context.BranchInventories
-                .Where(i => i.TenantId == _currentUserService.TenantId && 
+                .Where(i => i.TenantId == _currentUserService.TenantId &&
                            i.Quantity <= i.ReorderLevel);
 
             if (branchId.HasValue)
@@ -138,7 +140,9 @@ public class InventoryService : IInventoryService
                 .ThenBy(i => i.Product.Name)
                 .ToListAsync();
 
-            var dtos = inventories.Select(i => new BranchInventoryDto
+            var dtos = inventories
+                .Where(i => i.Branch != null && i.Product != null)
+                .Select(i => new BranchInventoryDto
             {
                 Id = i.Id,
                 BranchId = i.BranchId,
@@ -291,7 +295,7 @@ public class InventoryService : IInventoryService
                     productId);
                 continue; // Skip inventory operations for service products
             }
-            
+
             var inventory = await _context.BranchInventories
                 .FirstOrDefaultAsync(i => i.ProductId == productId && i.BranchId == branchId);
 

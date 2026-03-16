@@ -8,6 +8,7 @@ import {
   selectIsAdmin,
   selectIsSystemOwner,
 } from "../store/slices/authSlice";
+import { clearBranch } from "../store/slices/branchSlice";
 import { useLoginMutation } from "../api/authApi";
 import { LoginRequest } from "../types/auth.types";
 import { toast } from "sonner";
@@ -30,6 +31,17 @@ export const useAuth = () => {
       const result = await loginMutation(credentials).unwrap();
 
       if (result.success && result.data) {
+        // CRITICAL: Clear persisted branch state from localStorage BEFORE setting new credentials
+        // This prevents redux-persist from rehydrating old branch data for the new user
+        try {
+          localStorage.removeItem("persist:branch");
+        } catch (e) {
+          // ignore localStorage errors
+        }
+        
+        // Clear branch state in Redux
+        dispatch(clearBranch());
+        
         dispatch(
           setCredentials({
             user: result.data.user,
@@ -51,6 +63,7 @@ export const useAuth = () => {
 
   const logout = () => {
     dispatch(logoutAction());
+    dispatch(clearBranch());
     dispatch(baseApi.util.resetApiState());
     navigate("/login");
     toast.success("تم تسجيل الخروج");

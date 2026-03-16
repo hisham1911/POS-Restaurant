@@ -8,7 +8,7 @@ import { store, persistor } from "./store";
 import App from "./App";
 import { TaxSettingsSync } from "./components/common/TaxSettingsSync";
 
-// Import Cairo font (offline support)
+// Import Cairo font from @fontsource (Windows 7 compatible)
 import "@fontsource/cairo/400.css";
 import "@fontsource/cairo/500.css";
 import "@fontsource/cairo/600.css";

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, Save, Upload } from 'lucide-react';
+import { ArrowRight, Save, Upload, ChevronDown } from 'lucide-react';
 import {
   useGetExpenseByIdQuery,
   useCreateExpenseMutation,
@@ -141,19 +141,22 @@ export function ExpenseFormPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 التصنيف <span className="text-red-500">*</span>
               </label>
-              <select
-                value={formData.categoryId}
-                onChange={(e) => handleChange('categoryId', Number(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value={0}>اختر التصنيف</option>
-                {categories.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={formData.categoryId}
+                  onChange={(e) => handleChange('categoryId', Number(e.target.value))}
+                  className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                  required
+                >
+                  <option value={0}>اختر التصنيف</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
 
             {/* Amount */}
@@ -165,9 +168,10 @@ export function ExpenseFormPage() {
                 type="number"
                 step="0.01"
                 min="0"
-                value={formData.amount}
-                onChange={(e) => handleChange('amount', Number(e.target.value))}
+                value={formData.amount === 0 ? "" : formData.amount}
+                onChange={(e) => handleChange('amount', Number(e.target.value) || 0)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="0.00"
                 required
               />
             </div>

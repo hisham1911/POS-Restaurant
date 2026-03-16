@@ -18,6 +18,7 @@ export interface PurchaseInvoiceItem {
   productSku?: string;
   quantity: number;
   purchasePrice: number;
+  sellingPrice: number;
   total: number;
   notes?: string;
 }
@@ -60,6 +61,7 @@ export interface CreatePurchaseInvoiceItemRequest {
   productId: number;
   quantity: number;
   purchasePrice: number;
+  sellingPrice: number;
   notes?: string;
 }
 
@@ -75,6 +77,7 @@ export interface UpdatePurchaseInvoiceItemRequest {
   productId: number;
   quantity: number;
   purchasePrice: number;
+  sellingPrice: number;
   notes?: string;
 }
 

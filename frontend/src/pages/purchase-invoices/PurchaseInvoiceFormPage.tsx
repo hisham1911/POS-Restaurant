@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { ChevronDown } from 'lucide-react';
 import {
   useCreatePurchaseInvoiceMutation,
   useUpdatePurchaseInvoiceMutation,
@@ -18,6 +19,7 @@ import type { CreatePurchaseInvoiceItemRequest } from '../../types/purchaseInvoi
 interface InvoiceItem extends CreatePurchaseInvoiceItemRequest {
   tempId: string;
   productName?: string;
+  productType?: number; // ProductType enum
 }
 
 export function PurchaseInvoiceFormPage() {
@@ -34,6 +36,7 @@ export function PurchaseInvoiceFormPage() {
   const [selectedProductId, setSelectedProductId] = useState<number>(0);
   const [quantity, setQuantity] = useState<number>(1);
   const [purchasePrice, setPurchasePrice] = useState<number>(0);
+  const [sellingPrice, setSellingPrice] = useState<number>(0);
   const [itemNotes, setItemNotes] = useState<string>('');
   const [showQuickAddProduct, setShowQuickAddProduct] = useState(false);
   
@@ -64,6 +67,7 @@ export function PurchaseInvoiceFormPage() {
           productName: item.productName,
           quantity: item.quantity,
           purchasePrice: item.purchasePrice,
+          sellingPrice: item.sellingPrice,
           notes: item.notes,
         }))
       );
@@ -76,6 +80,11 @@ export function PurchaseInvoiceFormPage() {
       return;
     }
 
+    if (sellingPrice <= 0) {
+      toast.error('يرجى إدخال سعر البيع');
+      return;
+    }
+
     const product = products.find((p) => p.id === selectedProductId);
     if (!product) return;
 
@@ -83,8 +92,10 @@ export function PurchaseInvoiceFormPage() {
       tempId: `temp-${Date.now()}`,
       productId: selectedProductId,
       productName: product.name,
+      productType: product.type,
       quantity,
       purchasePrice,
+      sellingPrice,
       notes: itemNotes,
     };
 
@@ -92,11 +103,17 @@ export function PurchaseInvoiceFormPage() {
     setSelectedProductId(0);
     setQuantity(1);
     setPurchasePrice(0);
+    setSellingPrice(0);
     setItemNotes('');
   };
 
   const handleProductCreated = (productId: number) => {
     setSelectedProductId(productId);
+    // Auto-fill selling price from newly created product
+    const product = products.find((p) => p.id === productId);
+    if (product) {
+      setSellingPrice(product.price);
+    }
     toast.success('تم إضافة المنتج. يمكنك الآن إضافته للفاتورة');
   };
 
@@ -128,6 +145,7 @@ export function PurchaseInvoiceFormPage() {
         productId: item.productId,
         quantity: item.quantity,
         purchasePrice: item.purchasePrice,
+        sellingPrice: item.sellingPrice,
         notes: item.notes,
       })),
       notes,
@@ -190,19 +208,22 @@ export function PurchaseInvoiceFormPage() {
               <label className="block text-sm font-medium mb-1">
                 المورد <span className="text-red-500">*</span>
               </label>
-              <select
-                value={supplierId}
-                onChange={(e) => setSupplierId(Number(e.target.value))}
-                className="w-full px-3 py-2 border rounded-lg"
-                required
-              >
-                <option value={0}>اختر المورد</option>
-                {suppliers.map((supplier) => (
-                  <option key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={supplierId}
+                  onChange={(e) => setSupplierId(Number(e.target.value))}
+                  className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                  required
+                >
+                  <option value={0}>اختر المورد</option>
+                  {suppliers.map((supplier) => (
+                    <option key={supplier.id} value={supplier.id}>
+                      {supplier.name}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>
@@ -243,31 +264,43 @@ export function PurchaseInvoiceFormPage() {
               + منتج جديد
             </Button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium mb-1">المنتج</label>
-              <select
-                value={selectedProductId}
-                onChange={(e) => setSelectedProductId(Number(e.target.value))}
-                className="w-full px-3 py-2 border rounded-lg"
-              >
-                <option value={0}>اختر المنتج</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name} {product.sku && `(${product.sku})`}
-                  </option>
-                ))}
-              </select>
+              <div className="relative">
+                <select
+                  value={selectedProductId}
+                  onChange={(e) => {
+                    const productId = Number(e.target.value);
+                    setSelectedProductId(productId);
+                    // Auto-fill selling price from product
+                    const product = products.find((p) => p.id === productId);
+                    if (product) {
+                      setSellingPrice(product.price);
+                    }
+                  }}
+                  className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                >
+                  <option value={0}>اختر المنتج</option>
+                  {products.map((product) => (
+                    <option key={product.id} value={product.id}>
+                      {product.name} {product.sku && `(${product.sku})`}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-medium mb-1">الكمية</label>
               <input
                 type="number"
-                value={quantity}
-                onChange={(e) => setQuantity(Number(e.target.value))}
+                value={quantity === 1 ? "" : quantity}
+                onChange={(e) => setQuantity(Number(e.target.value) || 1)}
                 className="w-full px-3 py-2 border rounded-lg"
                 min="1"
+                placeholder="1"
               />
             </div>
 
@@ -275,11 +308,25 @@ export function PurchaseInvoiceFormPage() {
               <label className="block text-sm font-medium mb-1">سعر الشراء</label>
               <input
                 type="number"
-                value={purchasePrice}
-                onChange={(e) => setPurchasePrice(Number(e.target.value))}
+                value={purchasePrice === 0 ? "" : purchasePrice}
+                onChange={(e) => setPurchasePrice(Number(e.target.value) || 0)}
                 className="w-full px-3 py-2 border rounded-lg"
                 min="0"
                 step="0.01"
+                placeholder="0.00"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">سعر البيع</label>
+              <input
+                type="number"
+                value={sellingPrice === 0 ? "" : sellingPrice}
+                onChange={(e) => setSellingPrice(Number(e.target.value) || 0)}
+                className="w-full px-3 py-2 border rounded-lg"
+                min="0"
+                step="0.01"
+                placeholder="0.00"
               />
             </div>
 
@@ -313,6 +360,7 @@ export function PurchaseInvoiceFormPage() {
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">المنتج</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الكمية</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">سعر الشراء</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">سعر البيع</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الإجمالي</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">ملاحظات</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">إجراءات</th>
@@ -321,7 +369,7 @@ export function PurchaseInvoiceFormPage() {
               <tbody className="divide-y divide-gray-200">
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                       لم يتم إضافة منتجات بعد
                     </td>
                   </tr>
@@ -331,6 +379,7 @@ export function PurchaseInvoiceFormPage() {
                       <td className="px-4 py-3 text-sm">{item.productName}</td>
                       <td className="px-4 py-3 text-sm">{item.quantity}</td>
                       <td className="px-4 py-3 text-sm">{formatCurrency(item.purchasePrice)}</td>
+                      <td className="px-4 py-3 text-sm font-medium text-green-600">{formatCurrency(item.sellingPrice)}</td>
                       <td className="px-4 py-3 text-sm font-medium">
                         {formatCurrency(item.quantity * item.purchasePrice)}
                       </td>

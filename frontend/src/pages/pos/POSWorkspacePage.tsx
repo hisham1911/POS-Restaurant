@@ -52,17 +52,10 @@ type WorkspaceTab = "cart" | "customer" | "payment" | "summary";
 export const POSWorkspacePage = () => {
   const { mode } = usePOSMode();
 
-  // Debug logging
-  console.log('🔍 POSWorkspacePage - Current mode:', mode);
-  console.log('🔍 POSWorkspacePage - localStorage:', localStorage.getItem('pos_mode'));
-
   // Redirect to cashier mode if mode is cashier
   if (mode === "cashier") {
-    console.log('🔄 Redirecting to cashier...');
     return <Navigate to="/pos" replace />;
   }
-
-  console.log('✅ Staying in workspace mode');
 
   // State
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
@@ -234,13 +227,20 @@ export const POSWorkspacePage = () => {
       return;
     }
 
+    // Validate customer is active
+    if (numericAmount < total && selectedCustomer && !selectedCustomer.isActive) {
+      toast.error("العميل غير نشط - لا يمكن البيع الآجل");
+      return;
+    }
+
     // Validate credit limit
     if (selectedCustomer && selectedCustomer.creditLimit > 0) {
-      const creditLimitExceeded =
-        selectedCustomer.totalDue + amountDue > selectedCustomer.creditLimit;
+      const availableCredit = selectedCustomer.creditLimit - selectedCustomer.totalDue;
+      const creditLimitExceeded = amountDue > availableCredit;
       if (numericAmount < total && creditLimitExceeded) {
         toast.error(
-          `تجاوز حد الائتمان المسموح (${formatCurrency(selectedCustomer.creditLimit)})`
+          `تجاوز حد الائتمان. المتاح: ${formatCurrency(availableCredit)} ج.م، المطلوب: ${formatCurrency(amountDue)} ج.م`,
+          { duration: 5000 }
         );
         return;
       }
@@ -345,15 +345,21 @@ export const POSWorkspacePage = () => {
   const change = numericAmount - total;
   const amountDue = total - numericAmount;
 
+  // Calculate available credit for customer
+  const availableCredit = selectedCustomer
+    ? selectedCustomer.creditLimit - selectedCustomer.totalDue
+    : 0;
+
   const canTakeCredit =
     selectedCustomer &&
+    selectedCustomer.isActive &&
     (selectedCustomer.creditLimit === 0 ||
-      selectedCustomer.totalDue + amountDue <= selectedCustomer.creditLimit);
+      amountDue <= availableCredit);
 
   const creditLimitExceeded =
     selectedCustomer &&
     selectedCustomer.creditLimit > 0 &&
-    selectedCustomer.totalDue + amountDue > selectedCustomer.creditLimit;
+    amountDue > availableCredit;
 
   const paymentMethods: {
     id: PaymentMethod;
@@ -617,7 +623,7 @@ export const POSWorkspacePage = () => {
                             {/* Input */}
                             <input
                               type="number"
-                              value={discountInputValue}
+                              value={discountInputValue === "0" ? "" : discountInputValue}
                               onChange={(e) => setDiscountInputValue(e.target.value)}
                               placeholder={discountInputType === "Percentage" ? "0-100" : "0.00"}
                               className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-primary-500 focus:outline-none"
@@ -978,7 +984,12 @@ export const POSWorkspacePage = () => {
                         </p>
                         {creditLimitExceeded && (
                           <p className="text-xs text-danger-600 mt-1">
-                            تجاوز حد الائتمان المسموح
+                            تجاوز حد الائتمان - المتاح: {formatCurrency(availableCredit)}
+                          </p>
+                        )}
+                        {selectedCustomer && !selectedCustomer.isActive && (
+                          <p className="text-xs text-danger-600 mt-1">
+                            العميل غير نشط
                           </p>
                         )}
                       </div>

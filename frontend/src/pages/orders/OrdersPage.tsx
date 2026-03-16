@@ -9,6 +9,7 @@ import {
   ChevronLeft,
   ChevronRight,
   X,
+  ChevronDown,
 } from "lucide-react";
 import { useOrders } from "@/hooks/useOrders";
 import { Button } from "@/components/common/Button";
@@ -217,20 +218,23 @@ export const OrdersPage = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   الحالة
                 </label>
-                <select
-                  value={filters.status || ""}
-                  onChange={(e) =>
-                    handleFilterChange("status", e.target.value || undefined)
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-sm"
-                >
-                  <option value="">الكل</option>
-                  <option value="Completed">مكتمل</option>
-                  <option value="Cancelled">ملغي</option>
-                  <option value="Pending">قيد الانتظار</option>
-                  <option value="Refunded">مسترجع</option>
-                  <option value="PartiallyRefunded">مسترجع جزئياً</option>
-                </select>
+                <div className="relative">
+                  <select
+                    value={filters.status || ""}
+                    onChange={(e) =>
+                      handleFilterChange("status", e.target.value || undefined)
+                    }
+                    className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm text-sm"
+                  >
+                    <option value="">الكل</option>
+                    <option value="Completed">مكتمل</option>
+                    <option value="Cancelled">ملغي</option>
+                    <option value="Pending">قيد الانتظار</option>
+                    <option value="Refunded">مسترجع</option>
+                    <option value="PartiallyRefunded">مسترجع جزئياً</option>
+                  </select>
+                  <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                </div>
               </div>
 
               <div>

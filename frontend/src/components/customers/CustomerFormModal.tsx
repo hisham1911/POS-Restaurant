@@ -89,6 +89,7 @@ export const CustomerFormModal = ({
           creditLimit: formData.creditLimit
             ? parseFloat(formData.creditLimit)
             : 0,
+          rowVersion: customer.rowVersion, // Include for concurrency control
         };
 
         const result = await updateCustomer({
@@ -127,44 +128,40 @@ export const CustomerFormModal = ({
 
   return (
     <Portal>
-      {/* Backdrop */}
       <div 
-        className="fixed inset-0 bg-black/60 z-[110]" 
+        className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50"
         onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+      >
         <div 
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col animate-scale-in"
+          className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-scale-in"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b">
+          <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-primary-100 flex items-center justify-center">
+              <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
                 {isEditing ? (
                   <Edit className="w-5 h-5 text-primary-600" />
                 ) : (
                   <UserPlus className="w-5 h-5 text-primary-600" />
                 )}
               </div>
-              <h2 className="text-lg font-bold">
+              <h2 className="text-xl font-bold text-gray-800">
                 {isEditing ? "تعديل العميل" : "إضافة عميل جديد"}
               </h2>
             </div>
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center hover:bg-danger-50 hover:text-danger-500 transition-colors"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-5 h-5 text-gray-500" />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
             {/* Phone */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 رقم الهاتف <span className="text-danger-500">*</span>
               </label>
               <input
@@ -175,9 +172,9 @@ export const CustomerFormModal = ({
                 }
                 placeholder="01xxxxxxxxx"
                 disabled={isEditing}
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
+                className={`w-full px-4 py-2.5 border rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
                   isEditing ? "bg-gray-100 cursor-not-allowed" : ""
-                } ${errors.phone ? "border-danger-500" : "border-gray-200"}`}
+                } ${errors.phone ? "border-danger-500" : "border-gray-300"}`}
                 dir="ltr"
               />
               {errors.phone && (
@@ -187,7 +184,7 @@ export const CustomerFormModal = ({
 
             {/* Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 الاسم
               </label>
               <input
@@ -197,13 +194,13 @@ export const CustomerFormModal = ({
                   setFormData({ ...formData, name: e.target.value })
                 }
                 placeholder="اسم العميل"
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 البريد الإلكتروني
               </label>
               <input
@@ -213,8 +210,8 @@ export const CustomerFormModal = ({
                   setFormData({ ...formData, email: e.target.value })
                 }
                 placeholder="email@example.com"
-                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
-                  errors.email ? "border-danger-500" : "border-gray-200"
+                className={`w-full px-4 py-2.5 border rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
+                  errors.email ? "border-danger-500" : "border-gray-300"
                 }`}
                 dir="ltr"
               />
@@ -225,7 +222,7 @@ export const CustomerFormModal = ({
 
             {/* Address */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 العنوان
               </label>
               <input
@@ -235,13 +232,13 @@ export const CustomerFormModal = ({
                   setFormData({ ...formData, address: e.target.value })
                 }
                 placeholder="عنوان العميل"
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
               />
             </div>
 
             {/* Notes */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
                 ملاحظات
               </label>
               <textarea
@@ -251,26 +248,26 @@ export const CustomerFormModal = ({
                 }
                 placeholder="ملاحظات إضافية..."
                 rows={2}
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 resize-none"
               />
             </div>
 
             {/* Credit Limit */}
             {isEditing && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   حد الائتمان (ج.م)
                 </label>
                 <input
                   type="number"
-                  value={formData.creditLimit}
+                  value={formData.creditLimit === "0" ? "" : formData.creditLimit}
                   onChange={(e) =>
                     setFormData({ ...formData, creditLimit: e.target.value })
                   }
                   placeholder="0 = بدون حد"
                   min="0"
                   step="0.01"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   dir="ltr"
                 />
                 <p className="text-xs text-gray-500 mt-1">
@@ -278,28 +275,29 @@ export const CustomerFormModal = ({
                 </p>
               </div>
             )}
-
-            {/* Actions */}
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={onClose}
-                className="flex-1"
-                disabled={isLoading}
-              >
-                إلغاء
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                isLoading={isLoading}
-                className="flex-1"
-              >
-                {isEditing ? "حفظ التعديلات" : "إضافة العميل"}
-              </Button>
-            </div>
           </form>
+
+          {/* Actions */}
+          <div className="flex gap-3 p-6 border-t border-gray-200 flex-shrink-0">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onClose}
+              className="flex-1"
+              disabled={isLoading}
+            >
+              إلغاء
+            </Button>
+            <Button
+              type="submit"
+              onClick={handleSubmit}
+              variant="primary"
+              isLoading={isLoading}
+              className="flex-1"
+            >
+              {isEditing ? "حفظ التعديلات" : "إضافة العميل"}
+            </Button>
+          </div>
         </div>
       </div>
     </Portal>

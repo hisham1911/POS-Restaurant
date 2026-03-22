@@ -34,13 +34,13 @@ public static class RealisticDataSeeder
         }
 
         Console.WriteLine("🔄 تحميل البيانات...");
-        
+
         var branch = await context.Branches.FirstAsync(b => b.TenantId == tenant.Id);
         var admin = await context.Users.FirstAsync(u => u.TenantId == tenant.Id && u.Role == UserRole.Admin);
-        
+
         // Enhance categories and products
         await EnhanceCategoriesAndProductsAsync(context, tenant);
-        
+
         var products = await context.Products.Where(p => p.TenantId == tenant.Id).ToListAsync();
         var customers = await context.Customers.Where(c => c.TenantId == tenant.Id).ToListAsync();
 
@@ -323,7 +323,7 @@ public static class RealisticDataSeeder
             for (int i = 0; i < orderCount; i++)
             {
                 var orderTime = shiftDate.AddMinutes(_random.Next(480, 840)); // 8am to 10pm
-                
+
                 // All historical orders are completed (85%), cancelled (10%), or refunded (5%)
                 OrderStatus status;
                 var statusRoll = _random.Next(100);
@@ -398,7 +398,7 @@ public static class RealisticDataSeeder
         {
             var orderTime = DateTime.UtcNow.AddHours(-_random.Next(1, 4));
             OrderStatus status = i == 0 ? OrderStatus.Draft : (i == 1 ? OrderStatus.Pending : OrderStatus.Completed);
-            
+
             Customer? customer = null;
             if (customers.Count > 0 && _random.Next(100) < 50)
             {
@@ -574,13 +574,13 @@ public static class RealisticDataSeeder
         {
             // 20% of orders have debt
             var hasDebt = _random.Next(100) < 20 && customer != null;
-            
+
             if (hasDebt)
             {
                 var paidPercentage = _random.Next(50, 90) / 100m;
                 order.AmountPaid = Math.Round(order.Total * paidPercentage, 2);
                 order.AmountDue = order.Total - order.AmountPaid;
-                
+
                 // Update customer debt
                 if (customer != null)
                 {
@@ -594,7 +594,7 @@ public static class RealisticDataSeeder
             {
                 order.AmountPaid = order.Total;
                 order.AmountDue = 0;
-                
+
                 // Update customer purchases even if no debt
                 if (customer != null)
                 {
@@ -818,12 +818,12 @@ public static class RealisticDataSeeder
                 var oldStock = product.StockQuantity ?? 0;
                 var oldAvgCost = product.AverageCost ?? product.Cost ?? 0m;
                 var newStock = oldStock + qty;
-                
+
                 // Calculate weighted average cost
                 var totalOldValue = oldStock * oldAvgCost;
                 var totalNewValue = qty * (product.Cost ?? 0m);
                 product.AverageCost = newStock > 0 ? (totalOldValue + totalNewValue) / newStock : product.Cost;
-                
+
                 product.StockQuantity = newStock;
             }
 
@@ -852,7 +852,7 @@ public static class RealisticDataSeeder
                     CreatedAt = invoiceDate.AddDays(_random.Next(1, 7))
                 };
                 invoice.Payments.Add(payment);
-                
+
                 invoice.AmountPaid = invoice.Total;
                 invoice.AmountDue = 0;
                 supplier.TotalPaid += invoice.Total;
@@ -861,20 +861,20 @@ public static class RealisticDataSeeder
             {
                 var paidPercentage = _random.Next(30, 70) / 100m;
                 var paidAmount = Math.Round(invoice.Total * paidPercentage, 2);
-                
+
                 // Create 1-3 partial payments
                 var paymentCount = _random.Next(1, 4);
                 var remainingAmount = paidAmount;
-                
+
                 for (int p = 0; p < paymentCount && remainingAmount > 0; p++)
                 {
-                    var paymentAmount = p == paymentCount - 1 
+                    var paymentAmount = p == paymentCount - 1
                         ? remainingAmount // Last payment takes the remaining
                         : Math.Round(remainingAmount / (paymentCount - p) * _random.Next(50, 150) / 100m, 2);
-                    
+
                     if (paymentAmount > remainingAmount)
                         paymentAmount = remainingAmount;
-                    
+
                     var payment = new PurchaseInvoicePayment
                     {
                         Amount = paymentAmount,
@@ -894,7 +894,7 @@ public static class RealisticDataSeeder
                     invoice.Payments.Add(payment);
                     remainingAmount -= paymentAmount;
                 }
-                
+
                 invoice.AmountPaid = paidAmount;
                 invoice.AmountDue = invoice.Total - paidAmount;
                 supplier.TotalPaid += paidAmount;
@@ -917,7 +917,7 @@ public static class RealisticDataSeeder
         var existingInventory = await context.Set<BranchInventory>()
             .Where(bi => bi.BranchId == branch.Id)
             .ToListAsync();
-            
+
         if (existingInventory.Count == 0)
         {
             var branchInventories = products.Select(p => new BranchInventory

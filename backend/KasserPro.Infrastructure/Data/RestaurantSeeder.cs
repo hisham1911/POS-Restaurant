@@ -231,6 +231,9 @@ public static class RestaurantSeeder
             }
         }
         await context.SaveChangesAsync();
+
+        // Create return orders (2-3% of completed orders)
+        await CreateReturnOrdersAsync(context, tenant, branch, cashiers, completedOrders);
     }
 
     private static Order CreateRestaurantOrder(
@@ -372,7 +375,7 @@ public static class RestaurantSeeder
                 Amount = amount,
                 Description = description,
                 ExpenseDate = expenseDate,
-                Status = ExpenseStatus.Approved,
+                Status = ExpenseStatus.Paid,
                 PaymentMethod = amount > 5000 ? PaymentMethod.Card : (_random.Next(2) == 0 ? PaymentMethod.Cash : PaymentMethod.Card),
                 PaymentDate = expenseDate,
                 CreatedByUserId = admin.Id,
@@ -390,6 +393,123 @@ public static class RestaurantSeeder
         }
 
         context.Expenses.AddRange(expenses);
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task CreateReturnOrdersAsync(AppDbContext context, Tenant tenant, Branch branch, List<User> cashiers, List<Order> completedOrders)
+    {
+        // Create returns for 2-3% of completed orders
+        var returnCount = Math.Max(1, (int)(completedOrders.Count * 0.025));
+        var ordersToReturn = completedOrders
+            .OrderBy(o => Guid.NewGuid())
+            .Take(returnCount)
+            .ToList();
+
+        foreach (var originalOrder in ordersToReturn)
+        {
+            var returnDate = originalOrder.CompletedAt!.Value.AddHours(_random.Next(2, 48));
+            var cashier = cashiers[_random.Next(cashiers.Count)];
+
+            // Get shift for return date
+            var shift = await context.Shifts
+                .Where(s => s.TenantId == tenant.Id 
+                         && s.BranchId == branch.Id
+                         && s.OpenedAt.Date == returnDate.Date)
+                .FirstOrDefaultAsync();
+
+            if (shift == null) continue;
+
+            var returnOrder = new Order
+            {
+                TenantId = tenant.Id,
+                BranchId = branch.Id,
+                ShiftId = shift.Id,
+                OrderNumber = $"RET-{returnDate:yyyyMMdd}-{_random.Next(1000, 9999)}",
+                UserId = cashier.Id,
+                UserName = cashier.Name,
+                Status = OrderStatus.Completed,
+                OrderType = OrderType.Return,
+                CreatedAt = returnDate,
+                CompletedAt = returnDate.AddMinutes(5),
+                CompletedByUserId = cashier.Id,
+                BranchName = branch.Name,
+                BranchAddress = branch.Address,
+                BranchPhone = branch.Phone,
+                CurrencyCode = "EGP",
+                TaxRate = 14,
+                CustomerId = originalOrder.CustomerId,
+                CustomerName = originalOrder.CustomerName,
+                CustomerPhone = originalOrder.CustomerPhone
+            };
+
+            // Return 1-2 items from original order
+            var itemsToReturn = originalOrder.Items
+                .OrderBy(i => Guid.NewGuid())
+                .Take(_random.Next(1, Math.Min(3, originalOrder.Items.Count + 1)))
+                .ToList();
+
+            decimal subtotal = 0;
+            decimal taxAmount = 0;
+
+            foreach (var originalItem in itemsToReturn)
+            {
+                var returnQty = -Math.Abs(originalItem.Quantity); // Negative quantity for returns
+                var netPrice = originalItem.UnitPrice * Math.Abs(returnQty);
+                var itemTax = netPrice * (14m / 100m);
+
+                var returnItem = new OrderItem
+                {
+                    ProductId = originalItem.ProductId,
+                    ProductName = originalItem.ProductName,
+                    ProductNameEn = originalItem.ProductNameEn,
+                    ProductSku = originalItem.ProductSku,
+                    UnitPrice = originalItem.UnitPrice,
+                    UnitCost = originalItem.UnitCost,
+                    OriginalPrice = originalItem.OriginalPrice,
+                    Quantity = returnQty,
+                    TaxRate = 14,
+                    TaxInclusive = false,
+                    TaxAmount = -Math.Round(itemTax, 2),
+                    Subtotal = -Math.Round(netPrice, 2),
+                    Total = -Math.Round(netPrice + itemTax, 2)
+                };
+
+                returnOrder.Items.Add(returnItem);
+                subtotal -= netPrice;
+                taxAmount -= itemTax;
+            }
+
+            returnOrder.Subtotal = Math.Round(subtotal, 2);
+            returnOrder.TaxAmount = Math.Round(taxAmount, 2);
+            returnOrder.Total = Math.Round(subtotal + taxAmount, 2);
+            returnOrder.AmountPaid = returnOrder.Total;
+            returnOrder.AmountDue = 0;
+
+            // Refund payment
+            var refundMethod = originalOrder.Payments.FirstOrDefault()?.Method ?? PaymentMethod.Cash;
+            returnOrder.Payments.Add(new Payment
+            {
+                TenantId = tenant.Id,
+                BranchId = branch.Id,
+                Method = refundMethod,
+                Amount = returnOrder.Total,
+                CreatedAt = returnDate.AddMinutes(5)
+            });
+
+            context.Orders.Add(returnOrder);
+
+            // Restore stock for returned items
+            foreach (var item in returnOrder.Items)
+            {
+                var product = await context.Products.FindAsync(item.ProductId);
+                if (product != null && product.StockQuantity.HasValue)
+                {
+                    product.StockQuantity += Math.Abs(item.Quantity);
+                    product.LastStockUpdate = returnDate;
+                }
+            }
+        }
+
         await context.SaveChangesAsync();
     }
 

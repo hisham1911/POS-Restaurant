@@ -577,11 +577,11 @@ public class OrderService : IOrderService
             {
                 foreach (var item in order.Items.Where(i => i.ProductId.HasValue && !i.IsCustomItem))
                 {
-                    var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value);
+                    var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId!.Value);
                     if (product != null && product.TrackInventory)
                     {
                         var branchStock = await _inventoryService.GetAvailableQuantityAsync(
-                            item.ProductId.Value, _currentUser.BranchId);
+                            item.ProductId!.Value, _currentUser.BranchId);
                         if (branchStock < item.Quantity)
                         {
                             await transaction.RollbackAsync();

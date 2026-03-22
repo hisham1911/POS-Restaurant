@@ -361,25 +361,18 @@ public class ProductService : IProductService
             // Create BranchInventory records ONLY if TrackInventory is enabled (Physical products)
             if (product.TrackInventory)
             {
-                var branches = await _unitOfWork.Branches.Query()
-                    .Where(b => b.TenantId == _currentUser.TenantId)
-                    .ToListAsync();
-
-                foreach (var branch in branches)
+                // Quick create from POS should only add stock to current branch
+                var branchInventory = new BranchInventory
                 {
-                    var branchInventory = new BranchInventory
-                    {
-                        TenantId = _currentUser.TenantId,
-                        BranchId = branch.Id,
-                        ProductId = product.Id,
-                        Quantity = request.InitialStock,
-                        ReorderLevel = 5,
-                        LastUpdatedAt = DateTime.UtcNow
-                    };
+                    TenantId = _currentUser.TenantId,
+                    BranchId = _currentUser.BranchId, // Only current branch
+                    ProductId = product.Id,
+                    Quantity = request.InitialStock,
+                    ReorderLevel = 5,
+                    LastUpdatedAt = DateTime.UtcNow
+                };
 
-                    await _unitOfWork.BranchInventories.AddAsync(branchInventory);
-                }
-
+                await _unitOfWork.BranchInventories.AddAsync(branchInventory);
                 await _unitOfWork.SaveChangesAsync();
             }
 

@@ -379,31 +379,70 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
 
             if (product != null)
             {
-                var balanceBefore = product.StockQuantity ?? 0;
-                product.StockQuantity = balanceBefore + item.Quantity;
+                // Update BranchInventory (the authoritative stock location)
+                var branchInventory = await _unitOfWork.BranchInventories.Query()
+                    .FirstOrDefaultAsync(bi => bi.ProductId == product.Id 
+                                            && bi.BranchId == invoice.BranchId 
+                                            && bi.TenantId == tenantId);
+
+                if (branchInventory == null)
+                {
+                    // Create BranchInventory if it doesn't exist
+                    branchInventory = new BranchInventory
+                    {
+                        TenantId = tenantId,
+                        BranchId = invoice.BranchId,
+                        ProductId = product.Id,
+                        Quantity = item.Quantity,
+                        ReorderLevel = product.LowStockThreshold ?? 10,
+                        LastUpdatedAt = DateTime.UtcNow
+                    };
+                    await _unitOfWork.BranchInventories.AddAsync(branchInventory);
+                }
+                else
+                {
+                    var balanceBefore = branchInventory.Quantity;
+                    branchInventory.Quantity += item.Quantity;
+                    branchInventory.LastUpdatedAt = DateTime.UtcNow;
+                    _unitOfWork.BranchInventories.Update(branchInventory);
+
+                    // Create stock movement
+                    var stockMovement = new StockMovement
+                    {
+                        TenantId = tenantId,
+                        BranchId = invoice.BranchId,
+                        ProductId = product.Id,
+                        Type = StockMovementType.Receiving,
+                        Quantity = item.Quantity,
+                        ReferenceId = invoice.Id,
+                        ReferenceType = "PurchaseInvoice",
+                        BalanceBefore = balanceBefore,
+                        BalanceAfter = branchInventory.Quantity,
+                        Reason = $"شراء من {invoice.SupplierName}",
+                        UserId = userId,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    await _unitOfWork.StockMovements.AddAsync(stockMovement);
+                }
+
+                // Update product metadata (not stock quantity)
                 product.LastPurchasePrice = item.PurchasePrice;
                 product.LastPurchaseDate = DateTime.UtcNow;
-                product.Price = item.SellingPrice;
+                product.LastStockUpdate = DateTime.UtcNow;
+                
+                // Update average cost using weighted average
+                var oldStock = branchInventory.Quantity - item.Quantity;
+                var oldAvgCost = product.AverageCost ?? product.Cost ?? 0m;
+                var newStock = branchInventory.Quantity;
+                if (newStock > 0)
+                {
+                    var totalOldValue = oldStock * oldAvgCost;
+                    var totalNewValue = item.Quantity * item.PurchasePrice;
+                    product.AverageCost = (totalOldValue + totalNewValue) / newStock;
+                }
+                
                 product.UpdatedAt = DateTime.UtcNow;
                 _unitOfWork.Products.Update(product);
-
-                // Create stock movement
-                var stockMovement = new StockMovement
-                {
-                    TenantId = tenantId,
-                    BranchId = invoice.BranchId,
-                    ProductId = product.Id,
-                    Type = StockMovementType.Receiving,
-                    Quantity = item.Quantity,
-                    ReferenceId = invoice.Id,
-                    ReferenceType = "PurchaseInvoice",
-                    BalanceBefore = balanceBefore,
-                    BalanceAfter = product.StockQuantity ?? 0,
-                    Reason = $"شراء من {invoice.SupplierName}",
-                    UserId = userId,
-                    CreatedAt = DateTime.UtcNow
-                };
-                await _unitOfWork.StockMovements.AddAsync(stockMovement);
             }
         }
 

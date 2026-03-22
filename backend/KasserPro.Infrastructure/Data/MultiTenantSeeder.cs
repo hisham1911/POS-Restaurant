@@ -134,15 +134,15 @@ public static class MultiTenantSeeder
         var products = new List<Product>
         {
             // أدوات مطبخ
-            new() { TenantId = tenant.Id, CategoryId = categories[0].Id, Name = "طقم سكاكين", NameEn = "Knife Set", Sku = "KIT001", Price = 150, Cost = 80, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 50, IsActive = true },
-            new() { TenantId = tenant.Id, CategoryId = categories[0].Id, Name = "مقشرة خضار", NameEn = "Vegetable Peeler", Sku = "KIT002", Price = 25, Cost = 12, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 100, IsActive = true },
+            new() { TenantId = tenant.Id, CategoryId = categories[0].Id, Name = "طقم سكاكين", NameEn = "Knife Set", Sku = "KIT001", Price = 150, Cost = 80, AverageCost = 80, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 50, IsActive = true },
+            new() { TenantId = tenant.Id, CategoryId = categories[0].Id, Name = "مقشرة خضار", NameEn = "Vegetable Peeler", Sku = "KIT002", Price = 25, Cost = 12, AverageCost = 12, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 100, IsActive = true },
             
             // أجهزة كهربائية
-            new() { TenantId = tenant.Id, CategoryId = categories[1].Id, Name = "خلاط كهربائي", NameEn = "Electric Blender", Sku = "ELC001", Price = 450, Cost = 280, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 20, IsActive = true },
-            new() { TenantId = tenant.Id, CategoryId = categories[1].Id, Name = "محمصة خبز", NameEn = "Toaster", Sku = "ELC002", Price = 320, Cost = 200, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 15, IsActive = true },
+            new() { TenantId = tenant.Id, CategoryId = categories[1].Id, Name = "خلاط كهربائي", NameEn = "Electric Blender", Sku = "ELC001", Price = 450, Cost = 280, AverageCost = 280, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 20, IsActive = true },
+            new() { TenantId = tenant.Id, CategoryId = categories[1].Id, Name = "محمصة خبز", NameEn = "Toaster", Sku = "ELC002", Price = 320, Cost = 200, AverageCost = 200, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 15, IsActive = true },
             
             // أواني وأطباق
-            new() { TenantId = tenant.Id, CategoryId = categories[2].Id, Name = "طقم أطباق", NameEn = "Dish Set", Sku = "DSH001", Price = 280, Cost = 150, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 30, IsActive = true }
+            new() { TenantId = tenant.Id, CategoryId = categories[2].Id, Name = "طقم أطباق", NameEn = "Dish Set", Sku = "DSH001", Price = 280, Cost = 150, AverageCost = 150, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 30, IsActive = true }
         };
         context.Products.AddRange(products);
         await context.SaveChangesAsync();
@@ -217,10 +217,10 @@ public static class MultiTenantSeeder
 
         var products = new List<Product>
         {
-            new() { TenantId = tenant.Id, CategoryId = categories[0].Id, Name = "أرز", NameEn = "Rice", Sku = "GRC001", Price = 45, Cost = 35, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 200, IsActive = true },
-            new() { TenantId = tenant.Id, CategoryId = categories[0].Id, Name = "سكر", NameEn = "Sugar", Sku = "GRC002", Price = 35, Cost = 28, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 150, IsActive = true },
-            new() { TenantId = tenant.Id, CategoryId = categories[1].Id, Name = "عصير", NameEn = "Juice", Sku = "BEV001", Price = 15, Cost = 10, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 300, IsActive = true },
-            new() { TenantId = tenant.Id, CategoryId = categories[2].Id, Name = "صابون", NameEn = "Soap", Sku = "CLN001", Price = 20, Cost = 12, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 180, IsActive = true }
+            new() { TenantId = tenant.Id, CategoryId = categories[0].Id, Name = "أرز", NameEn = "Rice", Sku = "GRC001", Price = 45, Cost = 35, AverageCost = 35, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 200, IsActive = true },
+            new() { TenantId = tenant.Id, CategoryId = categories[0].Id, Name = "سكر", NameEn = "Sugar", Sku = "GRC002", Price = 35, Cost = 28, AverageCost = 28, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 150, IsActive = true },
+            new() { TenantId = tenant.Id, CategoryId = categories[1].Id, Name = "عصير", NameEn = "Juice", Sku = "BEV001", Price = 15, Cost = 10, AverageCost = 10, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 300, IsActive = true },
+            new() { TenantId = tenant.Id, CategoryId = categories[2].Id, Name = "صابون", NameEn = "Soap", Sku = "CLN001", Price = 20, Cost = 12, AverageCost = 12, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 180, IsActive = true }
         };
         context.Products.AddRange(products);
         await context.SaveChangesAsync();
@@ -295,10 +295,10 @@ public static class MultiTenantSeeder
 
         var products = new List<Product>
         {
-            new() { TenantId = tenant.Id, CategoryId = categories[0].Id, Name = "كباب", NameEn = "Kebab", Sku = "GRL001", Price = 80, Cost = 45, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 100, IsActive = true },
-            new() { TenantId = tenant.Id, CategoryId = categories[0].Id, Name = "كفتة", NameEn = "Kofta", Sku = "GRL002", Price = 70, Cost = 40, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 120, IsActive = true },
-            new() { TenantId = tenant.Id, CategoryId = categories[1].Id, Name = "سلطة", NameEn = "Salad", Sku = "APP001", Price = 25, Cost = 10, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 80, IsActive = true },
-            new() { TenantId = tenant.Id, CategoryId = categories[2].Id, Name = "عصير طازج", NameEn = "Fresh Juice", Sku = "DRK001", Price = 30, Cost = 15, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 150, IsActive = true }
+            new() { TenantId = tenant.Id, CategoryId = categories[0].Id, Name = "كباب", NameEn = "Kebab", Sku = "GRL001", Price = 80, Cost = 45, AverageCost = 45, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 100, IsActive = true },
+            new() { TenantId = tenant.Id, CategoryId = categories[0].Id, Name = "كفتة", NameEn = "Kofta", Sku = "GRL002", Price = 70, Cost = 40, AverageCost = 40, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 120, IsActive = true },
+            new() { TenantId = tenant.Id, CategoryId = categories[1].Id, Name = "سلطة", NameEn = "Salad", Sku = "APP001", Price = 25, Cost = 10, AverageCost = 10, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 80, IsActive = true },
+            new() { TenantId = tenant.Id, CategoryId = categories[2].Id, Name = "عصير طازج", NameEn = "Fresh Juice", Sku = "DRK001", Price = 30, Cost = 15, AverageCost = 15, TaxRate = 14, TaxInclusive = false, TrackInventory = true, StockQuantity = 150, IsActive = true }
         };
         context.Products.AddRange(products);
         await context.SaveChangesAsync();

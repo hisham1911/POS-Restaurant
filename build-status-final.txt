@@ -1,0 +1,89 @@
+DONE_AT=2026-03-22 02:46:20
+ISCC_COUNT=0
+DOTNET_COUNT=5
+---EXE---
+KasserPro-Setup.exe | 80.0 MB | 2026-03-22 02:39:00
+KasserPro-Setup-Win7-x64.exe | 77.7 MB | 2026-03-22 02:43:37
+KasserPro-Setup-Win7-x86.exe | 67.8 MB | 2026-03-22 02:46:19
+KasserPro-Setup-x86.exe | 70.0 MB | 2026-03-22 02:41:15
+---LOG-LAST-120---
+BUILD STARTED 03/22/2026 02:33:17
+[02:33:17] =========================================
+[02:33:17]    KasserPro Full Build - All 4 Versions
+[02:33:18] =========================================
+[02:33:18] [1/8] Frontend already built - checking...
+[02:33:18]   OK: Frontend dist exists
+[02:33:18] [2/8] Publishing .NET 8 x64 (Win10/11)...
+[02:33:44]   API x64 OK
+[02:33:56]   Bridge x64 OK
+[02:33:57]   .NET 8 x64 published
+[02:33:57] [3/8] Publishing .NET 8 x86 (Win10/11)...
+[02:34:13]   API x86 OK
+[02:34:24]   Bridge x86 OK
+[02:34:24]   .NET 8 x86 published
+[02:34:24] [4/8] Preparing .NET 6 source for Win7...
+[02:34:24]   Creating .NET 6 compatible source copy...
+[02:34:57]   Patched: KasserPro.API.csproj -> net6.0
+[02:34:57]   Patched: KasserPro.Application.csproj -> net6.0
+[02:34:57]   Patched: KasserPro.Application.Core.csproj -> net6.0
+[02:34:57]   Patched: KasserPro.BridgeApp.csproj -> net6.0
+[02:34:57]   Patched: KasserPro.Domain.csproj -> net6.0
+[02:34:57]   Patched: KasserPro.Infrastructure.csproj -> net6.0
+[02:34:57]   Patched: KasserPro.Tests.csproj -> net6.0
+[02:34:57]   BridgeApp packages fixed for net6
+[02:34:57]   Program.cs: RateLimiting removed
+[02:34:57]   SystemController.cs: RateLimiting removed
+[02:35:01]   No RateLimiting references found
+[02:35:01] [5/8] Publishing .NET 6 x64 (Win7)...
+[02:35:04]   C:\Program Files\dotnet\sdk\8.0.418\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.EolTargetFrameworks.targets(32,5): warning NETSDK1138: The target framework 'net6.0' is out of support and will not receive security updates in the future. Please refer to https://aka.ms/dotnet-core-support for more information about the support policy. [C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj]
+[02:35:04]   C:\Program Files\dotnet\sdk\8.0.418\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.EolTargetFrameworks.targets(32,5): warning NETSDK1138: The target framework 'net6.0' is out of support and will not receive security updates in the future. Please refer to https://aka.ms/dotnet-core-support for more information about the support policy. [C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj]
+[02:35:05]   C:\temp\net6src\backend\KasserPro.Application\KasserPro.Application.csproj : warning NU1601: Dependency specified was Microsoft.Extensions.Configuration.Abstractions (>= 6.0.36) but ended up with Microsoft.Extensions.Configuration.Abstractions 7.0.0. [C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj]
+[02:35:06]   C:\temp\net6src\backend\KasserPro.Application\KasserPro.Application.csproj : warning NU1601: Dependency specified was Microsoft.Extensions.Logging.Abstractions (>= 6.0.36) but ended up with Microsoft.Extensions.Logging.Abstractions 7.0.0. [C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj]
+[02:35:06]   C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj : warning NU1601: Dependency specified was Microsoft.Extensions.Hosting.WindowsServices (>= 6.0.36) but ended up with Microsoft.Extensions.Hosting.WindowsServices 7.0.0.
+[02:35:06]   C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj : warning NU1601: Dependency specified was Serilog.AspNetCore (>= 6.0.36) but ended up with Serilog.AspNetCore 6.1.0.
+[02:35:06]   C:\Program Files\dotnet\sdk\8.0.418\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.EolTargetFrameworks.targets(32,5): warning NETSDK1138: The target framework 'net6.0' is out of support and will not receive security updates in the future. Please refer to https://aka.ms/dotnet-core-support for more information about the support policy. [C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj]
+[02:35:06]   C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj : warning NU1601: Dependency specified was Microsoft.Extensions.Hosting.WindowsServices (>= 6.0.36) but ended up with Microsoft.Extensions.Hosting.WindowsServices 7.0.0.
+[02:35:06]   C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj : warning NU1601: Dependency specified was Serilog.AspNetCore (>= 6.0.36) but ended up with Serilog.AspNetCore 6.1.0.
+[02:35:07]   C:\temp\net6src\backend\KasserPro.Application\KasserPro.Application.csproj : warning NU1601: Dependency specified was Microsoft.Extensions.Configuration.Abstractions (>= 6.0.36) but ended up with Microsoft.Extensions.Configuration.Abstractions 7.0.0.
+[02:35:07]   C:\temp\net6src\backend\KasserPro.Application\KasserPro.Application.csproj : warning NU1601: Dependency specified was Microsoft.Extensions.Logging.Abstractions (>= 6.0.36) but ended up with Microsoft.Extensions.Logging.Abstractions 7.0.0.
+[02:35:41]   Win7 API x64 OK
+[02:35:42]   Win7 Bridge x64: copied from net8 x64 build
+[02:35:42]   .NET 6 x64 published
+[02:35:42] [6/8] Publishing .NET 6 x86 (Win7)...
+[02:35:48]   C:\Program Files\dotnet\sdk\8.0.418\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.EolTargetFrameworks.targets(32,5): warning NETSDK1138: The target framework 'net6.0' is out of support and will not receive security updates in the future. Please refer to https://aka.ms/dotnet-core-support for more information about the support policy. [C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj]
+[02:35:48]   C:\Program Files\dotnet\sdk\8.0.418\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.EolTargetFrameworks.targets(32,5): warning NETSDK1138: The target framework 'net6.0' is out of support and will not receive security updates in the future. Please refer to https://aka.ms/dotnet-core-support for more information about the support policy. [C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj]
+[02:35:49]   C:\temp\net6src\backend\KasserPro.Application\KasserPro.Application.csproj : warning NU1601: Dependency specified was Microsoft.Extensions.Configuration.Abstractions (>= 6.0.36) but ended up with Microsoft.Extensions.Configuration.Abstractions 7.0.0. [C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj]
+[02:35:49]   C:\temp\net6src\backend\KasserPro.Application\KasserPro.Application.csproj : warning NU1601: Dependency specified was Microsoft.Extensions.Logging.Abstractions (>= 6.0.36) but ended up with Microsoft.Extensions.Logging.Abstractions 7.0.0. [C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj]
+[02:35:50]   C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj : warning NU1601: Dependency specified was Microsoft.Extensions.Hosting.WindowsServices (>= 6.0.36) but ended up with Microsoft.Extensions.Hosting.WindowsServices 7.0.0.
+[02:35:50]   C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj : warning NU1601: Dependency specified was Serilog.AspNetCore (>= 6.0.36) but ended up with Serilog.AspNetCore 6.1.0.
+[02:35:51]   C:\Program Files\dotnet\sdk\8.0.418\Sdks\Microsoft.NET.Sdk\targets\Microsoft.NET.EolTargetFrameworks.targets(32,5): warning NETSDK1138: The target framework 'net6.0' is out of support and will not receive security updates in the future. Please refer to https://aka.ms/dotnet-core-support for more information about the support policy. [C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj]
+[02:35:53]   C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj : warning NU1601: Dependency specified was Microsoft.Extensions.Hosting.WindowsServices (>= 6.0.36) but ended up with Microsoft.Extensions.Hosting.WindowsServices 7.0.0.
+[02:35:53]   C:\temp\net6src\backend\KasserPro.API\KasserPro.API.csproj : warning NU1601: Dependency specified was Serilog.AspNetCore (>= 6.0.36) but ended up with Serilog.AspNetCore 6.1.0.
+[02:35:56]   C:\temp\net6src\backend\KasserPro.Application\KasserPro.Application.csproj : warning NU1601: Dependency specified was Microsoft.Extensions.Configuration.Abstractions (>= 6.0.36) but ended up with Microsoft.Extensions.Configuration.Abstractions 7.0.0.
+[02:35:57]   C:\temp\net6src\backend\KasserPro.Application\KasserPro.Application.csproj : warning NU1601: Dependency specified was Microsoft.Extensions.Logging.Abstractions (>= 6.0.36) but ended up with Microsoft.Extensions.Logging.Abstractions 7.0.0.
+[02:36:23]   Win7 API x86 OK
+[02:36:24]   Win7 Bridge x86: copied from net8 x86 build
+[02:36:24]   .NET 6 x86 published
+[02:36:24] [7/8] Building Installers...
+[02:36:24]   Building KasserPro-Setup.exe (Win10/11 x64)...
+[02:39:00]   
+[02:39:00]   Successful compile (156.015 sec). Resulting Setup program filename is:
+[02:39:00]   f:\POS\Deployment\Installers\KasserPro-Setup.exe
+[02:39:00]   Building KasserPro-Setup-x86.exe (Win10/11 x86)...
+[02:41:15]   
+[02:41:15]   Successful compile (134.453 sec). Resulting Setup program filename is:
+[02:41:15]   f:\POS\Deployment\Installers\KasserPro-Setup-x86.exe
+[02:41:15]   Building KasserPro-Setup-Win7-x64.exe...
+[02:43:37]   
+[02:43:37]   Successful compile (141.422 sec). Resulting Setup program filename is:
+[02:43:37]   f:\POS\Deployment\Installers\KasserPro-Setup-Win7-x64.exe
+[02:43:37]   Building KasserPro-Setup-Win7-x86.exe...
+[02:46:19]   
+[02:46:20]   Successful compile (161.922 sec). Resulting Setup program filename is:
+[02:46:20]   f:\POS\Deployment\Installers\KasserPro-Setup-Win7-x86.exe
+[02:46:20] [8/8] ========= BUILD SUMMARY =========
+[02:46:20]   KasserPro-Setup-Win7-x64.exe - 77.7 MB
+[02:46:20]   KasserPro-Setup-Win7-x86.exe - 67.8 MB
+[02:46:20]   KasserPro-Setup-x86.exe - 70 MB
+[02:46:20]   KasserPro-Setup.exe - 80 MB
+[02:46:20]   Total: 4 installers built

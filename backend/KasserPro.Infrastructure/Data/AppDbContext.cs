@@ -423,7 +423,11 @@ public class AppDbContext : DbContext
             switch (entry.State)
             {
                 case EntityState.Added:
-                    entry.Entity.CreatedAt = DateTime.UtcNow;
+                    // Only set CreatedAt if it's still the default value (not manually set)
+                    if (entry.Entity.CreatedAt == default || entry.Entity.CreatedAt.Year < 2020)
+                    {
+                        entry.Entity.CreatedAt = DateTime.UtcNow;
+                    }
                     break;
                 case EntityState.Modified:
                     entry.Entity.UpdatedAt = DateTime.UtcNow;

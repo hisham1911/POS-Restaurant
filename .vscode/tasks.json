@@ -481,6 +481,27 @@
 			"command": "cd frontend; npm run build",
 			"isBackground": false,
 			"group": "build"
+		},
+		{
+			"label": "status-snapshot-now",
+			"type": "shell",
+			"command": "$log='F:\\POS\\build-log.txt'; Write-Host 'DOTNET:'; (Get-Process dotnet -ErrorAction SilentlyContinue | Measure-Object).Count; Write-Host 'ISCC:'; (Get-Process ISCC -ErrorAction SilentlyContinue | Measure-Object).Count; Write-Host '---LOG-LAST-40---'; if (Test-Path $log) { Get-Content $log -Tail 40 } else { Write-Host 'MISSING-LOG' }; Write-Host '---EXE---'; Get-ChildItem 'F:\\POS\\Deployment\\Installers\\KasserPro-Setup*.exe' | Sort-Object Name | ForEach-Object { '{0} | {1:N1} MB | {2:yyyy-MM-dd HH:mm:ss}' -f $_.Name, ($_.Length/1MB), $_.LastWriteTime }",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "wait-build-finish-and-report",
+			"type": "shell",
+			"command": "$log='F:\\POS\\build-log.txt'; $deadline=(Get-Date).AddMinutes(20); while((Get-Process ISCC -ErrorAction SilentlyContinue) -and (Get-Date) -lt $deadline){ Start-Sleep -Seconds 15 }; Write-Host 'ISCC_COUNT:' ((Get-Process ISCC -ErrorAction SilentlyContinue | Measure-Object).Count); Write-Host 'DOTNET_COUNT:' ((Get-Process dotnet -ErrorAction SilentlyContinue | Measure-Object).Count); Write-Host '---LOG-LAST-80---'; if(Test-Path $log){ Get-Content $log -Tail 80 } else { Write-Host 'MISSING-LOG' }; Write-Host '---EXE---'; Get-ChildItem 'F:\\POS\\Deployment\\Installers\\KasserPro-Setup*.exe' | Sort-Object Name | ForEach-Object { '{0} | {1:N1} MB | {2:yyyy-MM-dd HH:mm:ss}' -f $_.Name, ($_.Length/1MB), $_.LastWriteTime }",
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "wait2-check-f-build",
+			"type": "shell",
+			"command": "Start-Sleep 120; Write-Host 'PROC'; Get-Process -Name dotnet,ISCC -ErrorAction SilentlyContinue | Select-Object Name,Id,CPU | Format-Table -AutoSize; Write-Host 'FILES'; Get-ChildItem 'F:\\POS\\Deployment\\Installers\\KasserPro-Setup*.exe' -ErrorAction SilentlyContinue | Sort-Object Name | ForEach-Object { Write-Host ('{0} - {1:N1} MB - {2:yyyy-MM-dd HH:mm:ss}' -f $_.Name, ($_.Length/1MB), $_.LastWriteTime) }; Write-Host 'LOGEND'; Get-Content 'F:\\POS\\build-log.txt' -Tail 30",
+			"isBackground": false,
+			"group": "build"
 		}
 	]
 }

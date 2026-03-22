@@ -354,6 +354,17 @@ if (!app.Environment.IsEnvironment("Testing"))
 
         // Seed multiple tenants for demo purposes (optional)
         await MultiTenantSeeder.SeedAsync(context);
+
+        // Seed realistic data for 120 days (comprehensive dataset)
+        // Never block API startup if optional seed data fails.
+        try
+        {
+            await RealisticDataSeeder.SeedAsync(context);
+        }
+        catch (Exception seedEx)
+        {
+            Log.Warning(seedEx, "Realistic data seeding failed; continuing startup");
+        }
     }
 }
 
@@ -432,25 +443,24 @@ if (!app.Environment.IsDevelopment())
 }
 
 app.Run();
-
-// Helper: Get LAN IP address
-static string GetLanIpAddress()
-{
-    try
-    {
-        var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
-        foreach (var ip in host.AddressList)
-        {
-            if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-            {
-                return ip.ToString();
-            }
-        }
-    }
-    catch { }
-
-    return "192.168.1.X (unknown)";
-}
+// Helper: Get LAN IP address (reserved for future network features)
+// static string GetLanIpAddress()
+// {
+//     try
+//     {
+//         var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
+//         foreach (var ip in host.AddressList)
+//         {
+//             if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+//             {
+//                 return ip.ToString();
+//             }
+//         }
+//     }
+//     catch { }
+// 
+//     return "192.168.1.X (unknown)";
+// }
 
 }
 catch (Exception ex)

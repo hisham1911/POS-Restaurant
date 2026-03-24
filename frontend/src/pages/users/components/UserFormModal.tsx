@@ -30,6 +30,7 @@ export default function UserFormModal({ user, onClose }: UserFormModalProps) {
 
   const isEditing = !!user;
   const isLoading = creating || updating;
+  const shouldShowBranchField = role === "Cashier";
 
   useEffect(() => {
     if (user) {
@@ -40,6 +41,13 @@ export default function UserFormModal({ user, onClose }: UserFormModalProps) {
       setBranchId(user.branchId);
     }
   }, [user]);
+
+  useEffect(() => {
+    // Branch selection is only relevant for cashiers in the form UX.
+    if (role !== "Cashier") {
+      setBranchId(undefined);
+    }
+  }, [role]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,7 +95,7 @@ export default function UserFormModal({ user, onClose }: UserFormModalProps) {
 
   return (
     <Portal>
-      <div 
+      <div
         className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50"
         onClick={onClose}
       >
@@ -179,28 +187,30 @@ export default function UserFormModal({ user, onClose }: UserFormModalProps) {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">الفرع</label>
-              <div className="relative">
-                <select
-                  value={branchId || ""}
-                  onChange={(e) =>
-                    setBranchId(
-                      e.target.value ? Number(e.target.value) : undefined,
-                    )
-                  }
-                  className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
-                >
-                  <option value="">اختر الفرع</option>
-                  {branches.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+            {shouldShowBranchField && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">الفرع</label>
+                <div className="relative">
+                  <select
+                    value={branchId || ""}
+                    onChange={(e) =>
+                      setBranchId(
+                        e.target.value ? Number(e.target.value) : undefined,
+                      )
+                    }
+                    className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
+                  >
+                    <option value="">اختر الفرع</option>
+                    {branches.map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {branch.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                </div>
               </div>
-            </div>
+            )}
           </form>
 
           <div className="flex gap-3 p-6 border-t border-gray-200 flex-shrink-0">

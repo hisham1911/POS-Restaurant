@@ -14,7 +14,7 @@ interface AddPaymentModalProps {
 }
 
 export function AddPaymentModal({ invoiceId, amountDue, onClose }: AddPaymentModalProps) {
-  const [amount, setAmount] = useState<number>(amountDue);
+  const [amount, setAmount] = useState<string>(String(amountDue));
   const [paymentDate, setPaymentDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
@@ -27,19 +27,20 @@ export function AddPaymentModal({ invoiceId, amountDue, onClose }: AddPaymentMod
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (amount <= 0) {
+    const numAmount = Number(amount) || 0;
+    if (numAmount <= 0) {
       toast.error('المبلغ يجب أن يكون أكبر من صفر');
       return;
     }
 
-    if (amount > amountDue) {
+    if (numAmount > amountDue) {
       toast.error(`المبلغ يتجاوز المبلغ المستحق (${formatCurrency(amountDue)})`);
       return;
     }
 
     try {
       const paymentData = {
-        amount,
+        amount: numAmount,
         paymentDate: new Date(paymentDate).toISOString(),
         method,
         referenceNumber: referenceNumber.trim() || undefined,
@@ -84,8 +85,8 @@ export function AddPaymentModal({ invoiceId, amountDue, onClose }: AddPaymentMod
           </label>
           <input
             type="number"
-            value={amount === 0 ? "" : amount}
-            onChange={(e) => setAmount(Number(e.target.value) || 0)}
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
             className="w-full px-3 py-2 border rounded-lg"
             min="0.01"
             max={amountDue}

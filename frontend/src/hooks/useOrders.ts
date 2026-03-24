@@ -8,6 +8,8 @@ import {
 import { useCart } from "./useCart";
 import { CompleteOrderRequest, Order } from "../types/order.types";
 import { toast } from "sonner";
+import { useAppSelector } from "../store/hooks";
+import { selectCurrentBranch } from "../store/slices/branchSlice";
 
 // Error response type from API
 interface ApiErrorData {
@@ -17,6 +19,7 @@ interface ApiErrorData {
 
 export const useOrders = () => {
   const { items, clearCart, discountType, discountValue } = useCart();
+  const currentBranch = useAppSelector(selectCurrentBranch);
 
   // Note: useGetOrdersQuery now returns paginated data, but we keep it for backward compatibility
   // For the full list with filters, use useGetOrdersQuery directly in components
@@ -44,6 +47,11 @@ export const useOrders = () => {
       return null;
     }
 
+    if (!currentBranch?.id) {
+      toast.error("يرجى اختيار الفرع أولاً");
+      return null;
+    }
+
     const orderItems = items.map((item) => ({
       productId: item.product.id,
       quantity: item.quantity,
@@ -59,6 +67,7 @@ export const useOrders = () => {
 
     try {
       const result = await createMutation({
+        branchId: currentBranch.id,
         items: orderItems,
         customerId,
         discountType,
@@ -100,10 +109,14 @@ export const useOrders = () => {
       // ❌ لا نمسح السلة عند الفشل - البيانات محفوظة
       // Error is handled by baseQueryWithReauth, but we check for specific cases
       const apiError = error as { data?: ApiErrorData; status?: number };
-      
+
       // Don't show generic error if baseQueryWithReauth already showed specific error
       // Only show generic error for unexpected cases
-      if (!apiError.data?.errorCode && apiError.status !== 400 && apiError.status !== 409) {
+      if (
+        !apiError.data?.errorCode &&
+        apiError.status !== 400 &&
+        apiError.status !== 409
+      ) {
         toast.error("فشل في إكمال الطلب");
       }
       return null;

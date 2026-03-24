@@ -645,6 +645,9 @@ public class OrderService : IOrderService
                 );
             }
 
+            // Save all changes (customer stats, credit balance, cash register)
+            await _unitOfWork.SaveChangesAsync();
+
             // Commit transaction - all operations succeeded
             await transaction.CommitAsync();
 

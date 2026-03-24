@@ -40,21 +40,33 @@ public class BranchAccessMiddleware
         // Validate header branch against user's authorized branch
         if (!int.TryParse(headerBranchId, out var requestedBranchId))
         {
-            await _next(context);
+            context.Response.StatusCode = 400;
+            context.Response.ContentType = "application/json";
+
+            var badRequestResponse = ApiResponse<object>.Fail("INVALID_BRANCH_HEADER", "قيمة X-Branch-Id غير صحيحة");
+            await context.Response.WriteAsync(JsonSerializer.Serialize(badRequestResponse));
             return;
         }
 
         var userIdClaim = context.User.FindFirst("userId")?.Value;
         if (!int.TryParse(userIdClaim, out var userId))
         {
-            await _next(context);
+            context.Response.StatusCode = 401;
+            context.Response.ContentType = "application/json";
+
+            var unauthorizedResponse = ApiResponse<object>.Fail("UNAUTHORIZED", "بيانات المستخدم غير صالحة");
+            await context.Response.WriteAsync(JsonSerializer.Serialize(unauthorizedResponse));
             return;
         }
 
         var user = await unitOfWork.Users.GetByIdAsync(userId);
         if (user == null)
         {
-            await _next(context);
+            context.Response.StatusCode = 401;
+            context.Response.ContentType = "application/json";
+
+            var userNotFoundResponse = ApiResponse<object>.Fail("UNAUTHORIZED", "المستخدم غير موجود أو غير مفعل");
+            await context.Response.WriteAsync(JsonSerializer.Serialize(userNotFoundResponse));
             return;
         }
 
@@ -78,6 +90,21 @@ public class BranchAccessMiddleware
             
             var response = ApiResponse<object>.Fail("BRANCH_ACCESS_DENIED", "ليس لديك صلاحية الوصول لهذا الفرع");
             await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+            return;
+        }
+
+        if (!user.BranchId.HasValue)
+        {
+            _logger.LogWarning(
+                "SECURITY: Branch header rejected - User {UserId} has no assigned branch but requested Branch {RequestedBranch}",
+                userId,
+                requestedBranchId);
+
+            context.Response.StatusCode = 403;
+            context.Response.ContentType = "application/json";
+
+            var noBranchResponse = ApiResponse<object>.Fail("BRANCH_ACCESS_DENIED", "لا يوجد فرع مرتبط بالمستخدم");
+            await context.Response.WriteAsync(JsonSerializer.Serialize(noBranchResponse));
             return;
         }
 

@@ -564,7 +564,7 @@ export const SettingsPage = () => {
                 min="0"
                 max="100"
                 step="0.01"
-                value={taxRate === 14 ? "" : taxRate}
+                value={taxRate}
                 onChange={(e) => setTaxRate(parseFloat(e.target.value) || 14)}
                 disabled={!isTaxEnabled}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-lg"
@@ -691,7 +691,7 @@ export const SettingsPage = () => {
                   type="number"
                   min="200"
                   max="400"
-                  value={receiptCustomWidth === 280 ? "" : receiptCustomWidth}
+                  value={receiptCustomWidth}
                   onChange={(e) =>
                     setReceiptCustomWidth(parseInt(e.target.value) || 280)
                   }

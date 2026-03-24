@@ -58,7 +58,7 @@ export const ProductFormModal = ({
   });
 
   const [showIconPicker, setShowIconPicker] = useState(false);
-  const [branchStocks, setBranchStocks] = useState<Record<number, number>>({});
+  const [branchStocks, setBranchStocks] = useState<Record<number, number | string>>({});
   const [useBranchSpecificStock, setUseBranchSpecificStock] = useState(false);
 
   // Initialize branch stocks with default quantity
@@ -114,7 +114,14 @@ export const ProductFormModal = ({
         stockQuantity: formData.stockQuantity,
         lowStockThreshold: formData.lowStockThreshold,
         reorderPoint: formData.reorderPoint ?? undefined,
-        branchStockQuantities: useBranchSpecificStock ? branchStocks : undefined,
+        branchStockQuantities: useBranchSpecificStock
+          ? Object.fromEntries(
+              Object.entries(branchStocks).map(([key, value]) => [
+                key,
+                typeof value === 'string' ? parseInt(value) || 0 : value
+              ])
+            )
+          : undefined,
       };
       await createProduct(createData);
     }
@@ -137,7 +144,7 @@ export const ProductFormModal = ({
           <h3 className="text-sm font-semibold text-gray-700 border-b pb-2">
             المعلومات الأساسية
           </h3>
-          
+
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="اسم المنتج (عربي) *"
@@ -210,7 +217,7 @@ export const ProductFormModal = ({
                   <div className="text-xs opacity-75">يتم تتبع المخزون</div>
                 </div>
               </button>
-              
+
               <button
                 type="button"
                 onClick={() => setFormData({ ...formData, type: ProductType.Service })}
@@ -229,8 +236,8 @@ export const ProductFormModal = ({
               </button>
             </div>
             <p className="text-xs text-gray-500 mt-2">
-              {formData.type === ProductType.Physical 
-                ? "المنتجات المادية يتم تتبع مخزونها تلقائياً" 
+              {formData.type === ProductType.Physical
+                ? "المنتجات المادية يتم تتبع مخزونها تلقائياً"
                 : "الخدمات لا تحتاج لتتبع مخزون"}
             </p>
           </div>
@@ -241,7 +248,7 @@ export const ProductFormModal = ({
           <h3 className="text-sm font-semibold text-gray-700 border-b pb-2">
             الأيقونة
           </h3>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               أيقونة المنتج
@@ -298,7 +305,7 @@ export const ProductFormModal = ({
           <h3 className="text-sm font-semibold text-gray-700 border-b pb-2">
             التسعير والضرائب
           </h3>
-          
+
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="سعر البيع *"
@@ -386,7 +393,7 @@ export const ProductFormModal = ({
           <h3 className="text-sm font-semibold text-gray-700 border-b pb-2">
             الأكواد
           </h3>
-          
+
           <div className="grid grid-cols-2 gap-4">
             <Input
               label="SKU"
@@ -412,7 +419,7 @@ export const ProductFormModal = ({
               <Package className="w-4 h-4" />
               المخزون
             </h3>
-            
+
             {!isEditing && (
               <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
                 <input
@@ -448,7 +455,7 @@ export const ProductFormModal = ({
                   label="حد التنبيه"
                   type="number"
                   min="0"
-                  value={formData.lowStockThreshold === 5 ? "" : formData.lowStockThreshold}
+                  value={formData.lowStockThreshold || ""}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
@@ -485,7 +492,7 @@ export const ProductFormModal = ({
                       <input
                         type="number"
                         min="0"
-                        value={branchStocks[branch.id] === 0 ? "" : branchStocks[branch.id] || ""}
+                        value={branchStocks[branch.id] || ""}
                         onChange={(e) =>
                           setBranchStocks({
                             ...branchStocks,

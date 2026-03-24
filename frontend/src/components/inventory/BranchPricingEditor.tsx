@@ -11,7 +11,15 @@ import {
   selectBranches,
 } from "../../store/slices/branchSlice";
 import { selectIsAdmin } from "../../store/slices/authSlice";
-import { DollarSign, Edit, Trash2, Plus, AlertTriangle, X, ChevronDown } from "lucide-react";
+import {
+  DollarSign,
+  Edit,
+  Trash2,
+  Plus,
+  AlertTriangle,
+  X,
+  ChevronDown,
+} from "lucide-react";
 import { toast } from "sonner";
 import { formatDateOnly } from "../../utils/formatters";
 
@@ -28,7 +36,7 @@ export default function BranchPricingEditor() {
 
   const [formData, setFormData] = useState({
     productId: 0,
-    price: 0,
+    price: "" as string | number,
     effectiveFrom: new Date().toISOString().split("T")[0],
   });
 
@@ -51,7 +59,9 @@ export default function BranchPricingEditor() {
       toast.error("الرجاء اختيار المنتج");
       return;
     }
-    if (formData.price <= 0) {
+
+    const numPrice = Number(formData.price) || 0;
+    if (numPrice <= 0) {
       toast.error("السعر يجب أن يكون أكبر من صفر");
       return;
     }
@@ -60,7 +70,7 @@ export default function BranchPricingEditor() {
       await setBranchPrice({
         branchId: selectedBranchId,
         productId: formData.productId,
-        price: formData.price,
+        price: numPrice,
         effectiveFrom: formData.effectiveFrom,
       }).unwrap();
 
@@ -69,7 +79,7 @@ export default function BranchPricingEditor() {
       setEditingPriceId(null);
       setFormData({
         productId: 0,
-        price: 0,
+        price: "" as string | number,
         effectiveFrom: new Date().toISOString().split("T")[0],
       });
     } catch (error: any) {
@@ -230,9 +240,9 @@ export default function BranchPricingEditor() {
                 type="number"
                 step="0.01"
                 min="0"
-                value={formData.price === 0 ? "" : formData.price}
+                value={formData.price}
                 onChange={(e) =>
-                  setFormData({ ...formData, price: Number(e.target.value) || 0 })
+                  setFormData({ ...formData, price: e.target.value })
                 }
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"

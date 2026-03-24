@@ -1,27 +1,32 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, Save, Upload, ChevronDown } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import { ArrowRight, Save, Upload, ChevronDown } from "lucide-react";
 import {
   useGetExpenseByIdQuery,
   useCreateExpenseMutation,
   useUpdateExpenseMutation,
   useUploadAttachmentMutation,
-} from '../../api/expensesApi';
-import { useGetExpenseCategoriesQuery } from '../../api/expenseCategoriesApi';
-import { Button } from '../../components/common/Button';
-import { Card } from '../../components/common/Card';
-import { Loading } from '../../components/common/Loading';
-import type { CreateExpenseRequest, UpdateExpenseRequest } from '../../types/expense.types';
+} from "../../api/expensesApi";
+import { useGetExpenseCategoriesQuery } from "../../api/expenseCategoriesApi";
+import { Button } from "../../components/common/Button";
+import { Card } from "../../components/common/Card";
+import { Loading } from "../../components/common/Loading";
+import type {
+  CreateExpenseRequest,
+  UpdateExpenseRequest,
+} from "../../types/expense.types";
 
 export function ExpenseFormPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const isEditMode = !!id;
 
-  const { data: expenseResponse, isLoading: isLoadingExpense } = useGetExpenseByIdQuery(Number(id), {
-    skip: !isEditMode,
-  });
-  const { data: categoriesResponse, isLoading: isLoadingCategories } = useGetExpenseCategoriesQuery();
+  const { data: expenseResponse, isLoading: isLoadingExpense } =
+    useGetExpenseByIdQuery(Number(id), {
+      skip: !isEditMode,
+    });
+  const { data: categoriesResponse, isLoading: isLoadingCategories } =
+    useGetExpenseCategoriesQuery();
   const [createExpense, { isLoading: isCreating }] = useCreateExpenseMutation();
   const [updateExpense, { isLoading: isUpdating }] = useUpdateExpenseMutation();
   const [uploadAttachment] = useUploadAttachmentMutation();
@@ -29,29 +34,35 @@ export function ExpenseFormPage() {
   const expense = expenseResponse?.data;
   const categories = categoriesResponse?.data || [];
 
-  const [formData, setFormData] = useState<CreateExpenseRequest | UpdateExpenseRequest>({
+  type ExpenseFormData = Omit<
+    CreateExpenseRequest | UpdateExpenseRequest,
+    "amount"
+  > & { amount: string | number };
+
+  const [formData, setFormData] = useState<ExpenseFormData>({
     categoryId: 0,
-    amount: 0,
-    description: '',
-    expenseDate: new Date().toISOString().split('T')[0],
-    notes: '',
-    referenceNumber: '',
-    beneficiary: '',
+    amount: "",
+    description: "",
+    expenseDate: new Date().toISOString().split("T")[0],
+    notes: "",
+    referenceNumber: "",
+    beneficiary: "",
   });
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   useEffect(() => {
     if (expense && isEditMode) {
-      setFormData({
+      const updatedData: ExpenseFormData = {
         categoryId: expense.categoryId,
-        amount: expense.amount,
+        amount: String(expense.amount),
         description: expense.description,
-        expenseDate: expense.expenseDate.split('T')[0],
-        notes: expense.notes || '',
-        referenceNumber: expense.referenceNumber || '',
-        beneficiary: expense.beneficiary || '',
-      });
+        expenseDate: expense.expenseDate.split("T")[0],
+        notes: expense.notes || "",
+        referenceNumber: expense.referenceNumber || "",
+        beneficiary: expense.beneficiary || "",
+      };
+      setFormData(updatedData);
     }
   }, [expense, isEditMode]);
 
@@ -68,31 +79,38 @@ export function ExpenseFormPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const numAmount = Number(formData.amount) || 0;
+
     // Validation
     if (!formData.categoryId) {
-      alert('يرجى اختيار التصنيف');
+      alert("يرجى اختيار التصنيف");
       return;
     }
-    if (formData.amount <= 0) {
-      alert('يرجى إدخال مبلغ صحيح');
+    if (numAmount <= 0) {
+      alert("يرجى إدخال مبلغ صحيح");
       return;
     }
     if (!formData.description.trim()) {
-      alert('يرجى إدخال الوصف');
+      alert("يرجى إدخال الوصف");
       return;
     }
 
     try {
       let expenseId: number;
 
+      const expenseData = {
+        ...formData,
+        amount: numAmount,
+      };
+
       if (isEditMode) {
         const result = await updateExpense({
           id: Number(id),
-          expense: formData,
+          expense: expenseData,
         }).unwrap();
         expenseId = result.data!.id;
       } else {
-        const result = await createExpense(formData).unwrap();
+        const result = await createExpense(expenseData).unwrap();
         expenseId = result.data!.id;
 
         // Upload attachments for new expense
@@ -105,8 +123,8 @@ export function ExpenseFormPage() {
 
       navigate(`/expenses/${expenseId}`);
     } catch (error) {
-      console.error('Failed to save expense:', error);
-      alert('حدث خطأ أثناء حفظ المصروف');
+      console.error("Failed to save expense:", error);
+      alert("حدث خطأ أثناء حفظ المصروف");
     }
   };
 
@@ -116,7 +134,7 @@ export function ExpenseFormPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center gap-4">
-        <Link to={isEditMode ? `/expenses/${id}` : '/expenses'}>
+        <Link to={isEditMode ? `/expenses/${id}` : "/expenses"}>
           <Button variant="outline">
             <ArrowRight className="w-4 h-4 ml-2" />
             رجوع
@@ -124,10 +142,10 @@ export function ExpenseFormPage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-gray-900">
-            {isEditMode ? 'تعديل المصروف' : 'مصروف جديد'}
+            {isEditMode ? "تعديل المصروف" : "مصروف جديد"}
           </h1>
           <p className="text-gray-600 mt-1">
-            {isEditMode ? 'تعديل بيانات المصروف' : 'إضافة مصروف جديد للنظام'}
+            {isEditMode ? "تعديل بيانات المصروف" : "إضافة مصروف جديد للنظام"}
           </p>
         </div>
       </div>
@@ -144,7 +162,9 @@ export function ExpenseFormPage() {
               <div className="relative">
                 <select
                   value={formData.categoryId}
-                  onChange={(e) => handleChange('categoryId', Number(e.target.value))}
+                  onChange={(e) =>
+                    handleChange("categoryId", Number(e.target.value))
+                  }
                   className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
                   required
                 >
@@ -168,8 +188,8 @@ export function ExpenseFormPage() {
                 type="number"
                 step="0.01"
                 min="0"
-                value={formData.amount === 0 ? "" : formData.amount}
-                onChange={(e) => handleChange('amount', Number(e.target.value) || 0)}
+                value={formData.amount}
+                onChange={(e) => handleChange("amount", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="0.00"
                 required
@@ -184,7 +204,7 @@ export function ExpenseFormPage() {
               <input
                 type="date"
                 value={formData.expenseDate}
-                onChange={(e) => handleChange('expenseDate', e.target.value)}
+                onChange={(e) => handleChange("expenseDate", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 required
               />
@@ -192,11 +212,13 @@ export function ExpenseFormPage() {
 
             {/* Vendor Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">المستفيد</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                المستفيد
+              </label>
               <input
                 type="text"
                 value={formData.beneficiary}
-                onChange={(e) => handleChange('beneficiary', e.target.value)}
+                onChange={(e) => handleChange("beneficiary", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="اسم المستفيد أو الجهة"
               />
@@ -204,11 +226,15 @@ export function ExpenseFormPage() {
 
             {/* Receipt Number */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">رقم المرجع</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                رقم المرجع
+              </label>
               <input
                 type="text"
                 value={formData.referenceNumber}
-                onChange={(e) => handleChange('referenceNumber', e.target.value)}
+                onChange={(e) =>
+                  handleChange("referenceNumber", e.target.value)
+                }
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="رقم الإيصال أو الفاتورة"
               />
@@ -221,7 +247,7 @@ export function ExpenseFormPage() {
               </label>
               <textarea
                 value={formData.description}
-                onChange={(e) => handleChange('description', e.target.value)}
+                onChange={(e) => handleChange("description", e.target.value)}
                 rows={3}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="وصف تفصيلي للمصروف..."
@@ -231,10 +257,12 @@ export function ExpenseFormPage() {
 
             {/* Notes */}
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1">ملاحظات</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                ملاحظات
+              </label>
               <textarea
                 value={formData.notes}
-                onChange={(e) => handleChange('notes', e.target.value)}
+                onChange={(e) => handleChange("notes", e.target.value)}
                 rows={2}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="ملاحظات إضافية..."
@@ -244,7 +272,9 @@ export function ExpenseFormPage() {
             {/* File Upload (only for new expenses) */}
             {!isEditMode && (
               <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-1">المرفقات</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  المرفقات
+                </label>
                 <div className="flex items-center gap-2">
                   <input
                     type="file"
@@ -282,12 +312,12 @@ export function ExpenseFormPage() {
 
           {/* Actions */}
           <div className="flex gap-2 justify-end mt-6 pt-6 border-t border-gray-200">
-            <Link to={isEditMode ? `/expenses/${id}` : '/expenses'}>
+            <Link to={isEditMode ? `/expenses/${id}` : "/expenses"}>
               <Button variant="outline">إلغاء</Button>
             </Link>
             <Button type="submit" disabled={isCreating || isUpdating}>
               <Save className="w-4 h-4 ml-2" />
-              {isCreating || isUpdating ? 'جاري الحفظ...' : 'حفظ'}
+              {isCreating || isUpdating ? "جاري الحفظ..." : "حفظ"}
             </Button>
           </div>
         </Card>

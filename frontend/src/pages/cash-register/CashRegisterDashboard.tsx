@@ -73,6 +73,7 @@ export function CashRegisterDashboard() {
 
     try {
       await deposit({
+        branchId: currentBranch.id,
         amount,
         description: depositDescription,
       }).unwrap();
@@ -99,6 +100,7 @@ export function CashRegisterDashboard() {
 
     try {
       await withdraw({
+        branchId: currentBranch.id,
         amount,
         description: withdrawDescription,
       }).unwrap();

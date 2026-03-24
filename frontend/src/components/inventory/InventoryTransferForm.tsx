@@ -7,7 +7,13 @@ import {
   selectCurrentBranch,
 } from "../../store/slices/branchSlice";
 import { selectIsAdmin } from "../../store/slices/authSlice";
-import { ArrowRight, Package, AlertTriangle, X, ChevronDown } from "lucide-react";
+import {
+  ArrowRight,
+  Package,
+  AlertTriangle,
+  X,
+  ChevronDown,
+} from "lucide-react";
 import { toast } from "sonner";
 import type { CreateTransferRequest } from "../../types/inventory.types";
 
@@ -24,11 +30,13 @@ export default function InventoryTransferForm({
   const branches = useAppSelector(selectBranches);
   const currentBranch = useAppSelector(selectCurrentBranch);
 
-  const [formData, setFormData] = useState<CreateTransferRequest>({
+  const [formData, setFormData] = useState<
+    Omit<CreateTransferRequest, "quantity"> & { quantity: string | number }
+  >({
     fromBranchId: currentBranch?.id || 0,
     toBranchId: 0,
     productId: 0,
-    quantity: 1,
+    quantity: "" as string | number,
     reason: "",
     notes: "",
   });
@@ -52,6 +60,8 @@ export default function InventoryTransferForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const numQuantity = Number(formData.quantity) || 0;
+
     // Validation
     if (!formData.fromBranchId) {
       toast.error("الرجاء اختيار الفرع المصدر");
@@ -65,7 +75,7 @@ export default function InventoryTransferForm({
       toast.error("الرجاء اختيار المنتج");
       return;
     }
-    if (formData.quantity <= 0) {
+    if (numQuantity <= 0) {
       toast.error("الكمية يجب أن تكون أكبر من صفر");
       return;
     }
@@ -75,7 +85,10 @@ export default function InventoryTransferForm({
     }
 
     try {
-      await createTransfer(formData).unwrap();
+      await createTransfer({
+        ...formData,
+        quantity: numQuantity,
+      }).unwrap();
       toast.success("تم إنشاء طلب النقل بنجاح");
 
       // Reset form
@@ -83,7 +96,7 @@ export default function InventoryTransferForm({
         fromBranchId: currentBranch?.id || 0,
         toBranchId: 0,
         productId: 0,
-        quantity: 1,
+        quantity: "" as string | number,
         reason: "",
         notes: "",
       });
@@ -168,7 +181,10 @@ export default function InventoryTransferForm({
               <select
                 value={formData.toBranchId}
                 onChange={(e) =>
-                  setFormData({ ...formData, toBranchId: Number(e.target.value) })
+                  setFormData({
+                    ...formData,
+                    toBranchId: Number(e.target.value),
+                  })
                 }
                 className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 required
@@ -240,9 +256,9 @@ export default function InventoryTransferForm({
           <input
             type="number"
             min="1"
-            value={formData.quantity === 1 ? "" : formData.quantity}
+            value={formData.quantity}
             onChange={(e) =>
-              setFormData({ ...formData, quantity: Number(e.target.value) || 1 })
+              setFormData({ ...formData, quantity: e.target.value })
             }
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             placeholder="1"

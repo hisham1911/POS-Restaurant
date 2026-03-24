@@ -117,6 +117,21 @@ public class UserManagementService : IUserManagementService
                 return ApiResponse<UserDto>.Fail("ليس لديك صلاحية إنشاء حساب مالك النظام");
             }
 
+            // Branch assignment policy:
+            // - Admin/SystemOwner: no fixed branch (null)
+            // - Cashier: must be attached to a specific branch
+            int? resolvedBranchId;
+            if (requestedRole == UserRole.Cashier)
+            {
+                resolvedBranchId = request.BranchId ?? _currentUserService.BranchId;
+                if (!resolvedBranchId.HasValue)
+                    return ApiResponse<UserDto>.Fail("يجب تحديد فرع للمستخدم الكاشير");
+            }
+            else
+            {
+                resolvedBranchId = null;
+            }
+
             var user = new User
             {
                 Name = request.Name,
@@ -125,7 +140,7 @@ public class UserManagementService : IUserManagementService
                 Phone = request.Phone,
                 Role = requestedRole,
                 TenantId = _currentUserService.TenantId,
-                BranchId = request.BranchId ?? _currentUserService.BranchId,
+                BranchId = resolvedBranchId,
                 IsActive = true
             };
 
@@ -185,16 +200,31 @@ public class UserManagementService : IUserManagementService
 
             if (currentUserRole == UserRole.Admin && requestedRole == UserRole.SystemOwner)
             {
-                _logger.LogWarning("Admin {UserId} tried to escalate user {TargetUserId} to SystemOwner", 
+                _logger.LogWarning("Admin {UserId} tried to escalate user {TargetUserId} to SystemOwner",
                     _currentUserService.UserId, userId);
                 return ApiResponse<UserDto>.Fail("ليس لديك صلاحية تعيين مالك النظام");
+            }
+
+            // Branch assignment policy:
+            // - Admin/SystemOwner: no fixed branch (null)
+            // - Cashier: must be attached to a specific branch
+            int? resolvedBranchId;
+            if (requestedRole == UserRole.Cashier)
+            {
+                resolvedBranchId = request.BranchId ?? user.BranchId ?? _currentUserService.BranchId;
+                if (!resolvedBranchId.HasValue)
+                    return ApiResponse<UserDto>.Fail("يجب تحديد فرع للمستخدم الكاشير");
+            }
+            else
+            {
+                resolvedBranchId = null;
             }
 
             user.Name = request.Name;
             user.Email = request.Email;
             user.Phone = request.Phone;
             user.Role = requestedRole;
-            user.BranchId = request.BranchId;
+            user.BranchId = resolvedBranchId;
 
             _unitOfWork.Users.Update(user);
             await _unitOfWork.SaveChangesAsync();
@@ -274,7 +304,7 @@ public class UserManagementService : IUserManagementService
             _unitOfWork.Users.Update(user);
             await _unitOfWork.SaveChangesAsync();
 
-            _logger.LogInformation("User {UserId} status changed to {Status} by {AdminId}", 
+            _logger.LogInformation("User {UserId} status changed to {Status} by {AdminId}",
                 userId, isActive ? "Active" : "Inactive", _currentUserService.UserId);
 
             return ApiResponse<bool>.Ok(true, isActive ? "تم تفعيل المستخدم" : "تم تعطيل المستخدم");

@@ -274,7 +274,11 @@ builder.Services.AddRateLimiter(options =>
 
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 });
-builder.Services.AddControllers()
+builder.Services.AddControllers(options =>
+    {
+        // Enforce branch ownership on route/query/body branch identifiers for all actions.
+        options.Filters.Add<BranchScopeAuthorizationFilter>();
+    })
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());

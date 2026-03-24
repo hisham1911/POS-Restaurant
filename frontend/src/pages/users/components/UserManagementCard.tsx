@@ -121,7 +121,7 @@ export default function UserManagementCard() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-600">
-                    {user.branchName || "-"}
+                    {user.role === "Admin" ? "كل الفروع" : user.branchName || "-"}
                   </td>
                   <td className="px-4 py-3 text-sm">
                     <span

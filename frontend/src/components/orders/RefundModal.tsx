@@ -318,11 +318,7 @@ export const RefundModal = ({
                               </button>
                               <input
                                 type="number"
-                                value={
-                                  item.refundQuantity === 0
-                                    ? ""
-                                    : item.refundQuantity
-                                }
+                                value={item.refundQuantity || ""}
                                 onChange={(e) =>
                                   setRefundQuantity(
                                     item.itemId,

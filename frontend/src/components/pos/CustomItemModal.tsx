@@ -152,7 +152,7 @@ export const CustomItemModal = ({
                 <input
                   type="number"
                   min="1"
-                  value={formData.quantity === 1 ? "" : formData.quantity}
+                  value={formData.quantity}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
@@ -176,7 +176,7 @@ export const CustomItemModal = ({
                 step="0.01"
                 min="0"
                 max="100"
-                value={formData.taxRate === 14 ? "" : formData.taxRate}
+                value={formData.taxRate}
                 onChange={(e) =>
                   setFormData({
                     ...formData,

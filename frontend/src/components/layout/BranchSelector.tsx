@@ -5,6 +5,7 @@ import { useGetBranchesQuery } from "@/api/branchesApi";
 import { setCurrentBranch, setBranches, selectCurrentBranch, selectBranches } from "@/store/slices/branchSlice";
 import { selectCurrentUser } from "@/store/slices/authSlice";
 import { baseApi } from "@/api/baseApi";
+import { clearCart } from "@/store/slices/cartSlice";
 
 export const BranchSelector = () => {
   const dispatch = useAppDispatch();
@@ -28,8 +29,26 @@ export const BranchSelector = () => {
     const branch = branches.find((b) => b.id === branchId);
     if (branch) {
       dispatch(setCurrentBranch(branch));
-      // Invalidate all cached data when branch changes
-      dispatch(baseApi.util.invalidateTags(["Products", "Categories", "Orders", "Shifts"]));
+      // Prevent accidental checkout with items from the previous branch.
+      dispatch(clearCart());
+      // Invalidate all branch-sensitive caches when branch changes.
+      dispatch(
+        baseApi.util.invalidateTags([
+          "Products",
+          "Categories",
+          "Orders",
+          "Shifts",
+          "Customers",
+          "Inventory",
+          "Suppliers",
+          "PurchaseInvoice",
+          "Reports",
+          "Expense",
+          "Expenses",
+          "CashRegisterBalance",
+          "CashRegisterTransactions",
+        ]),
+      );
     }
   };
 
@@ -44,7 +63,7 @@ export const BranchSelector = () => {
 
   // Cashiers can only see their assigned branch (no dropdown)
   const isCashier = currentUser?.role === "Cashier";
-  
+
   // Show static branch name for cashiers or single-branch users
   if (isCashier || branches.length <= 1) {
     return (

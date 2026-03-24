@@ -33,6 +33,9 @@ public class InventoryReportService : IInventoryReportService
     {
         try
         {
+            if (!CanAccessBranch(branchId))
+                return ApiResponse<BranchInventoryReportDto>.Fail(ErrorCodes.FORBIDDEN, "ليس لديك صلاحية الوصول لهذا الفرع");
+
             var branch = await _context.Branches
                 .FirstOrDefaultAsync(b => b.Id == branchId && b.TenantId == _currentUserService.TenantId);
 
@@ -172,6 +175,15 @@ public class InventoryReportService : IInventoryReportService
     {
         try
         {
+            // Non-admin users are always scoped to their own branch.
+            if (!IsPrivilegedRole())
+            {
+                if (branchId.HasValue && !CanAccessBranch(branchId.Value))
+                    return ApiResponse<TransferHistoryReportDto>.Fail(ErrorCodes.FORBIDDEN, "ليس لديك صلاحية الوصول لهذا الفرع");
+
+                branchId = _currentUserService.BranchId;
+            }
+
             // Default date range: last 30 days
             var from = fromDate ?? DateTime.UtcNow.AddDays(-30);
             var to = toDate ?? DateTime.UtcNow;
@@ -210,7 +222,7 @@ public class InventoryReportService : IInventoryReportService
             // Calculate statistics
             var totalTransfers = transfers.Count;
             var completedTransfers = transfers.Count(t => t.Status == InventoryTransferStatus.Completed);
-            var pendingTransfers = transfers.Count(t => t.Status == InventoryTransferStatus.Pending || 
+            var pendingTransfers = transfers.Count(t => t.Status == InventoryTransferStatus.Pending ||
                                                         t.Status == InventoryTransferStatus.Approved);
             var cancelledTransfers = transfers.Count(t => t.Status == InventoryTransferStatus.Cancelled);
             var totalQuantityTransferred = transfers
@@ -228,9 +240,9 @@ public class InventoryReportService : IInventoryReportService
                 var branch = await _context.Branches.FindAsync(bId);
                 if (branch == null) continue;
 
-                var sent = transfers.Where(t => t.FromBranchId == bId && 
+                var sent = transfers.Where(t => t.FromBranchId == bId &&
                                                t.Status == InventoryTransferStatus.Completed);
-                var received = transfers.Where(t => t.ToBranchId == bId && 
+                var received = transfers.Where(t => t.ToBranchId == bId &&
                                                    t.Status == InventoryTransferStatus.Completed);
 
                 var quantitySent = sent.Sum(t => t.Quantity);
@@ -274,6 +286,15 @@ public class InventoryReportService : IInventoryReportService
     {
         try
         {
+            // Non-admin users are always scoped to their own branch.
+            if (!IsPrivilegedRole())
+            {
+                if (branchId.HasValue && !CanAccessBranch(branchId.Value))
+                    return ApiResponse<LowStockSummaryReportDto>.Fail(ErrorCodes.FORBIDDEN, "ليس لديك صلاحية الوصول لهذا الفرع");
+
+                branchId = _currentUserService.BranchId;
+            }
+
             // Query low stock items
             var query = _context.BranchInventories
                 .Where(bi => bi.TenantId == _currentUserService.TenantId &&
@@ -331,7 +352,7 @@ public class InventoryReportService : IInventoryReportService
             {
                 var branch = g.First().Branch;
                 var criticalCount = g.Count(bi => bi.Quantity == 0);
-                var estimatedValue = g.Sum(bi => 
+                var estimatedValue = g.Sum(bi =>
                     Math.Max(0, bi.ReorderLevel - bi.Quantity) * (bi.Product.AverageCost ?? 0));
 
                 return new BranchLowStockStatsDto
@@ -361,5 +382,19 @@ public class InventoryReportService : IInventoryReportService
             _logger.LogError(ex, "Error generating low stock summary report");
             return ApiResponse<LowStockSummaryReportDto>.Fail(ErrorCodes.INTERNAL_ERROR, "حدث خطأ في إنشاء التقرير");
         }
+    }
+
+    private bool CanAccessBranch(int branchId)
+    {
+        if (IsPrivilegedRole())
+            return true;
+
+        return _currentUserService.BranchId > 0 && _currentUserService.BranchId == branchId;
+    }
+
+    private bool IsPrivilegedRole()
+    {
+        return string.Equals(_currentUserService.Role, "Admin", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(_currentUserService.Role, "SystemOwner", StringComparison.OrdinalIgnoreCase);
     }
 }

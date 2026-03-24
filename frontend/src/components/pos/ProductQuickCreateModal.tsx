@@ -17,12 +17,12 @@ export const ProductQuickCreateModal = ({
   onSuccess,
   initialName = "",
 }: ProductQuickCreateModalProps) => {
-  const [formData, setFormData] = useState<QuickCreateProductRequest>({
+  const [formData, setFormData] = useState<Omit<QuickCreateProductRequest, 'price' | 'initialStock'> & { price: string | number; initialStock: string | number }>({
     name: initialName,
-    price: 0,
+    price: "" as string | number,
     categoryId: 0,
     type: ProductType.Service, // افتراضياً خدمة للإنشاء السريع
-    initialStock: 0,
+    initialStock: "" as string | number,
     sku: "",
     barcode: "",
   });
@@ -38,7 +38,8 @@ export const ProductQuickCreateModal = ({
       return;
     }
 
-    if (formData.price <= 0) {
+    const numPrice = Number(formData.price) || 0;
+    if (numPrice <= 0) {
       toast.error("الرجاء إدخال سعر صحيح");
       return;
     }
@@ -49,7 +50,11 @@ export const ProductQuickCreateModal = ({
     }
 
     try {
-      const result = await quickCreate(formData).unwrap();
+      const result = await quickCreate({
+        ...formData,
+        price: numPrice,
+        initialStock: Number(formData.initialStock) || 0,
+      }).unwrap();
 
       if (result.success && result.data) {
         toast.success(`تم إضافة المنتج: ${result.data.name}`);
@@ -117,11 +122,11 @@ export const ProductQuickCreateModal = ({
                   type="number"
                   step="0.01"
                   min="0"
-                  value={formData.price === 0 ? "" : formData.price || ""}
+                  value={formData.price || ""}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      price: parseFloat(e.target.value) || 0,
+                      price: e.target.value,
                     })
                   }
                   className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
@@ -203,11 +208,11 @@ export const ProductQuickCreateModal = ({
                   <input
                     type="number"
                     min="0"
-                    value={formData.initialStock === 0 ? "" : formData.initialStock || ""}
+                    value={formData.initialStock || ""}
                     onChange={(e) =>
                       setFormData({
                         ...formData,
-                        initialStock: parseInt(e.target.value) || 0,
+                        initialStock: e.target.value,
                       })
                     }
                     className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"

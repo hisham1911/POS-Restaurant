@@ -22,7 +22,7 @@ export function QuickAddProductModal({
   const [sku, setSku] = useState("");
   const [barcode, setBarcode] = useState("");
   const [categoryId, setCategoryId] = useState<number>(0);
-  const [price, setPrice] = useState<number>(0);
+  const [price, setPrice] = useState<string>("");
   const [productType, setProductType] = useState<ProductType>(ProductType.Physical);
 
   const { data: categoriesResponse } = useGetCategoriesQuery();
@@ -43,7 +43,8 @@ export function QuickAddProductModal({
       return;
     }
 
-    if (price <= 0) {
+    const numPrice = Number(price) || 0;
+    if (numPrice <= 0) {
       toast.error("يرجى إدخال سعر البيع");
       return;
     }
@@ -54,7 +55,7 @@ export function QuickAddProductModal({
         sku: sku.trim() || undefined,
         barcode: barcode.trim() || undefined,
         categoryId,
-        price,
+        price: numPrice,
         cost: 0, // Will be set from purchase invoice
         type: productType,
         stockQuantity: productType === ProductType.Physical ? 0 : undefined,
@@ -77,7 +78,7 @@ export function QuickAddProductModal({
     setSku("");
     setBarcode("");
     setCategoryId(0);
-    setPrice(0);
+    setPrice("");
     setProductType(ProductType.Physical);
     onClose();
   };
@@ -176,8 +177,8 @@ export function QuickAddProductModal({
           </label>
           <input
             type="number"
-            value={price === 0 ? "" : price}
-            onChange={(e) => setPrice(Number(e.target.value) || 0)}
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
             className="w-full px-3 py-2 border rounded-lg"
             placeholder="0.00"
             min="0"

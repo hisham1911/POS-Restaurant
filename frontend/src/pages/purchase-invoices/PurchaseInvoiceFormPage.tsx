@@ -34,9 +34,9 @@ export function PurchaseInvoiceFormPage() {
   const [notes, setNotes] = useState<string>('');
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number>(0);
-  const [quantity, setQuantity] = useState<number>(1);
-  const [purchasePrice, setPurchasePrice] = useState<number>(0);
-  const [sellingPrice, setSellingPrice] = useState<number>(0);
+  const [quantity, setQuantity] = useState<string>('');
+  const [purchasePrice, setPurchasePrice] = useState<string>('');
+  const [sellingPrice, setSellingPrice] = useState<string>('');
   const [itemNotes, setItemNotes] = useState<string>('');
   const [showQuickAddProduct, setShowQuickAddProduct] = useState(false);
   
@@ -75,12 +75,16 @@ export function PurchaseInvoiceFormPage() {
   }, [invoice, isEditMode]);
 
   const handleAddItem = () => {
-    if (!selectedProductId || quantity <= 0 || purchasePrice <= 0) {
+    const numQuantity = Number(quantity) || 0;
+    const numPurchasePrice = Number(purchasePrice) || 0;
+    const numSellingPrice = Number(sellingPrice) || 0;
+
+    if (!selectedProductId || numQuantity <= 0 || numPurchasePrice <= 0) {
       toast.error('يرجى ملء جميع بيانات المنتج');
       return;
     }
 
-    if (sellingPrice <= 0) {
+    if (numSellingPrice <= 0) {
       toast.error('يرجى إدخال سعر البيع');
       return;
     }
@@ -93,17 +97,17 @@ export function PurchaseInvoiceFormPage() {
       productId: selectedProductId,
       productName: product.name,
       productType: product.type,
-      quantity,
-      purchasePrice,
-      sellingPrice,
+      quantity: numQuantity,
+      purchasePrice: numPurchasePrice,
+      sellingPrice: numSellingPrice,
       notes: itemNotes,
     };
 
     setItems([...items, newItem]);
     setSelectedProductId(0);
-    setQuantity(1);
-    setPurchasePrice(0);
-    setSellingPrice(0);
+    setQuantity('');
+    setPurchasePrice('');
+    setSellingPrice('');
     setItemNotes('');
   };
 
@@ -112,7 +116,7 @@ export function PurchaseInvoiceFormPage() {
     // Auto-fill selling price from newly created product
     const product = products.find((p) => p.id === productId);
     if (product) {
-      setSellingPrice(product.price);
+      setSellingPrice(String(product.price));
     }
     toast.success('تم إضافة المنتج. يمكنك الآن إضافته للفاتورة');
   };
@@ -276,7 +280,7 @@ export function PurchaseInvoiceFormPage() {
                     // Auto-fill selling price from product
                     const product = products.find((p) => p.id === productId);
                     if (product) {
-                      setSellingPrice(product.price);
+                      setSellingPrice(String(product.price));
                     }
                   }}
                   className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
@@ -296,8 +300,8 @@ export function PurchaseInvoiceFormPage() {
               <label className="block text-sm font-medium mb-1">الكمية</label>
               <input
                 type="number"
-                value={quantity === 1 ? "" : quantity}
-                onChange={(e) => setQuantity(Number(e.target.value) || 1)}
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg"
                 min="1"
                 placeholder="1"
@@ -308,8 +312,8 @@ export function PurchaseInvoiceFormPage() {
               <label className="block text-sm font-medium mb-1">سعر الشراء</label>
               <input
                 type="number"
-                value={purchasePrice === 0 ? "" : purchasePrice}
-                onChange={(e) => setPurchasePrice(Number(e.target.value) || 0)}
+                value={purchasePrice}
+                onChange={(e) => setPurchasePrice(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg"
                 min="0"
                 step="0.01"
@@ -321,8 +325,8 @@ export function PurchaseInvoiceFormPage() {
               <label className="block text-sm font-medium mb-1">سعر البيع</label>
               <input
                 type="number"
-                value={sellingPrice === 0 ? "" : sellingPrice}
-                onChange={(e) => setSellingPrice(Number(e.target.value) || 0)}
+                value={sellingPrice}
+                onChange={(e) => setSellingPrice(e.target.value)}
                 className="w-full px-3 py-2 border rounded-lg"
                 min="0"
                 step="0.01"

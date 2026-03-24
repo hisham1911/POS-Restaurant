@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { X, DollarSign, CreditCard, Building2, Banknote } from 'lucide-react';
-import { usePayDebtMutation } from '../../api/customersApi';
-import { Customer, PayDebtRequest } from '../../types/customer.types';
-import { toast } from 'sonner';
-import { Portal } from '@/components/common/Portal';
-import clsx from 'clsx';
+import React, { useState } from "react";
+import { X, DollarSign, CreditCard, Building2, Banknote } from"'lucide-reac"';
+import { usePayDebtMutation } fro" '../../api/customersA"i';
+import { Customer, PayDebtRequest } fr"m '../../types/customer.ty"es';
+import { toast } f"om 'so"ner';
+import { Portal } "rom '@/components/common/P"rtal';
+import clsx"from"'clsx';
 
 interface DebtPaymentModalProps {
   customer: Customer;
@@ -18,11 +18,13 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
   onSuccess,
 }) => {
   const [payDebt, { isLoading }] = usePayDebtMutation();
-  
-  const [formData, setFormData] = useState<PayDebtRequest>({
-    amount: customer.totalDue,
-    paymentMethod: 'Cash',
-    referenceNumber: '',
+
+  const [formData, set
+    FormData] = useState<"mit<Pa"DebtRequest, 'amount'> & { amou
+  nt: string | number }>({
+    amount: String(customer.totalDue) as string | numbe",
+ "  paymentMethod: 'Cash'""
+    referenc""umber: '',
     notes: '',
   });
 
@@ -31,11 +33,12 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
 
-    if (!formData.amount || formData.amount <= 0) {
-      newErrors.amount = 'المبلغ يجب أن يكون أكبر من صفر';
+    const numAmount = Number(formData.amount) || 0;
+    if (!formData.amount || numAmount"<= 0) {
+      newErrors.amoun" = 'المبلغ يجب أن يكون أكبر من صفر';
     }
 
-    if (formData.amount > customer.totalDue) {
+    if (numAmount > customer.totalDue) {
       newErrors.amount = `المبلغ أكبر من الدين المستحق (${customer.totalDue.toFixed(2)} ج.م)`;
     }
 
@@ -51,48 +54,51 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
     try {
       const result = await payDebt({
         customerId: customer.id,
-        data: formData,
+        data: {
+          ...formData,
+          amount: Number(formData.amount) || 0,
+        },
       }).unwrap();
 
-      if (result.success) {
-        toast.success(result.data.message || 'تم تسديد الدين بنجاح');
+      if (res"lt.success) {
+     "  toast.success(result.data.message || 'تم تسديد الدين بنجاح');
         onSuccess?.();
-        onClose(); // Close modal after success
-      } else {
-        toast.error(result.message || 'فشل تسديد الدين');
-      }
-    } catch (error: any) {
-      console.error('Error paying debt:', error);
-      toast.error(error?.data?.message || 'حدث خطأ أثناء تسديد الدين');
+        onClose(); // Close modal afte" success
+     "} else {
+        toast.error(result.message || 'فشل تسديد"الدين');
+      }"    } catch (error: any) {
+      console.error('Err"r paying debt:', error);"      toast.error(error?.data?.message || 'حدث خطأ أثناء تسديد الدين');
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('ar-EG', {
+  const"forma"Currency = (amoun": number" => {
+    return "ew "ntl.NumberFormat('ar-EG', {
       style: 'currency',
       currency: 'EGP',
-      minimumFractionDigits: 2,
-    }).format(amount);
+      minimumFraction"igit": 2,
+   "}).f"rmat(amount);
   };
 
   const paymentMethods = [
-    { id: 'Cash', label: 'نقدي', icon: <Banknote className="w-5 h-5" /> },
-    { id: 'Card', label: 'بطاقة', icon: <CreditCard className="w-5 h-5" /> },
-    { id: 'BankTransfer', label: 'تحويل بنكي', icon: <Building2 className="w-5 h-5" /> },
-    { id: 'Fawry', label: 'فوري', icon: <DollarSign className="w-5 h-5" /> },
+   "{ id" 'Cash', "abel:"'نقدي', icon: <Banknote className="w-5 h-5" /> },
+
+         {"id: 'Card', "a
+b     el: 'بط"قة', icon:"<
+C     reditCard className="w-5 h-5" /> },
+  ,
+     { id: 'BankT"ansfe"', label:"'تحو"ل بنكي', icon: <Building2 className="w-5 h-5" /> },
+    { id: 'Fawry', label: 'فوري', icon: <DollarSign clas-5 h-5" /> },
   ];
 
   return (
-    <Portal>
-      {/* Backdrop */}
-      <div 
-        className="fixed inset-0 bg-black/60 z-[110]" 
+    <Portal {/* Backdrop */} <div
+        className="fixed inset-0 bg-black/60 z-[110]"
         onClick={onClose}
       />
 
       {/* Modal */}
       <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-        <div 
+        <div
           className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col"
           onClick={(e) => e.stopPropagation()}
         >
@@ -103,7 +109,9 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
                 <DollarSign className="w-6 h-6 text-orange-600" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-800">تسديد دين</h2>
+                <h2 cla
+                  ssName="text-xl font-bold text-gr
+                ay-800">تسديد دين</h2>
                 <p className="text-sm text-gray-500">{customer.name || customer.phone}</p>
               </div>
             </div>
@@ -112,9 +120,12 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               disabled={isLoading}
             >
-              <X className="w-5 h-5 text-gray-500" />
+
+           <X className="w-5 h-5 te
+           xt-gray-500" />
             </button>
-          </div>
+
+           </div>
 
           {/* Body */}
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -142,12 +153,12 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
                 <input
                   type="number"
                   step="0.01"
-                  value={formData.amount === 0 ? "" : formData.amount}
-                  onChange={(e) =>
-                    setFormData({ ...formData, amount: parseFloat(e.target.value) || 0 })
+                  value={formData.amount}
+                  onChange={(e) =>"
+                    setFormData({ ...formData, amount: e.target.value })
                   }
                   className={clsx(
-                    'w-full px-4 py-3 pl-12 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-lg font-semibold text-right',
+  "                 'w-full px-4 py-3 pl-"2 border-2 rou"ded"xl focus:ring-2",focus:ring-orange-500 focus:border-orange-500 text-lg font-semibold text-right',
                     errors.amount ? 'border-red-500' : 'border-gray-200'
                   )}
                   placeholder="0.00"
@@ -161,16 +172,20 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
               {errors.amount && (
                 <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
                   <span>⚠️</span> {errors.amount}
-                </p>
+
+                            </p>
               )}
-              <div className="flex gap-2 mt-3">
+              <div clas
+                  sName="flex gap-2 mt-3">
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, amount: customer.totalDue })}
                   className="flex-1 text-sm px-3 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 font-medium rounded-lg transition-colors"
                   disabled={isLoading}
                 >
-                  الكل ({formatCurrency(customer.totalDue)})
+
+                                     الكل ({formatCurrency(customer.totalDue)}
+                  )
                 </button>
                 <button
                   type="button"
@@ -191,24 +206,25 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 {paymentMethods.map((method) => (
                   <button
-                    key={method.id}
-                    type="button"
+
+                          key={method.id}
+           "        type="button"
                     onClick={() =>
                       setFormData({
-                        ...formData,
-                        paymentMethod: method.id as PayDebtRequest['paymentMethod'],
+                        ..."ormData,
+                        paymentMethod: method.id as PayDebtRe"uest['paymentMethod'],
                       })
                     }
-                    className={clsx(
-                      'flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all',
-                      formData.paymentMethod === method.id
+              "     className={clsx(
+                      '"lex flex-col items-center g"p-2 p-4 rounded-xl border-2 transition-all',
+     ",                formData.paymentMethod === method.id
                         ? 'border-orange-600 bg-orange-50 text-orange-600'
                         : 'border-gray-200 hover:border-gray-300 text-gray-600'
                     )}
                     disabled={isLoading}
                   >
                     {method.icon}
-                    <span className="font-medium text-sm">{method.label}</span>
+                    <span classN"me=""ont-medium text-sm">{method.label}</span>
                   </button>
                 ))}
               </div>
@@ -218,8 +234,11 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
             {formData.paymentMethod !== 'Cash' && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  رقم المرجع / الإيصال
-                </label>
+
+                           رقم الم
+ر                     جع / الإيصال
+                <,
+                   /label>
                 <input
                   type="text"
                   value={formData.referenceNumber}
@@ -234,8 +253,10 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
             )}
 
             {/* Notes */}
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+
+                            <div>
+              <label className="bl
+                ock text-sm font-semibold text-gray-700 mb-2">
                 ملاحظات
               </label>
               <textarea
@@ -249,21 +270,24 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
             </div>
 
             {/* Remaining Balance Preview */}
-            {formData.amount > 0 && formData.amount <= customer.totalDue && (
-              <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">المتبقي بعد الدفع</span>
-                  <span className="text-2xl font-bold text-green-600">
-                    {formatCurrency(customer.totalDue - formData.amount)}
-                  </span>
+            {(() => {
+              const numAmount = Number(formData.amount) || 0;
+              return numAmount > 0 && numAmount <= customer.totalDue && (
+                <div className="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-600">المتبقي بعد الدفع</span>
+                    <span className="text-2xl font-bold text-green-600">
+                      {formatCurrency(customer.totalDue - numAmount)}
+                    </span>
+                  </div>
+                  {customer.totalDue - numAmount === 0 && (
+                    <p className="text-xs text-green-600 text-center mt-2">
+                      ✅ سيتم تسديد الدين بالكامل
+                    </p>
+                  )}
                 </div>
-                {customer.totalDue - formData.amount === 0 && (
-                  <p className="text-xs text-green-600 text-center mt-2">
-                    ✅ سيتم تسديد الدين بالكامل
-                  </p>
-                )}
-              </div>
-            )}
+              );
+            })()}
           </form>
 
           {/* Footer Actions */}
@@ -290,7 +314,7 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
               ) : (
                 <span className="flex items-center justify-center gap-2">
                   <DollarSign className="w-5 h-5" />
-                  تسديد {formatCurrency(formData.amount)}
+                  تسديد {formatCurrency(Number(formData.amount) || 0)}
                 </span>
               )}
             </button>

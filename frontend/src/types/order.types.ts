@@ -129,6 +129,7 @@ export interface Payment {
 }
 
 export interface CreateOrderRequest {
+  branchId?: number;
   orderType?: OrderType;
   items: {
     productId: number;

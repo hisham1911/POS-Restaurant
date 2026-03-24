@@ -1,14 +1,14 @@
 // Cash Register Transaction Type Enum
-export type CashRegisterTransactionType = 
-  | 'Opening'
-  | 'Deposit'
-  | 'Withdrawal'
-  | 'Sale'
-  | 'Refund'
-  | 'Expense'
-  | 'SupplierPayment'
-  | 'Adjustment'
-  | 'Transfer';
+export type CashRegisterTransactionType =
+  | "Opening"
+  | "Deposit"
+  | "Withdrawal"
+  | "Sale"
+  | "Refund"
+  | "Expense"
+  | "SupplierPayment"
+  | "Adjustment"
+  | "Transfer";
 
 // Cash Register Transaction Interface
 export interface CashRegisterTransaction {
@@ -58,10 +58,11 @@ export interface CashRegisterSummary {
 
 // Request DTOs
 export interface CreateCashRegisterTransactionRequest {
-  type: 'Deposit' | 'Withdrawal';
+  type: "Deposit" | "Withdrawal";
   amount: number;
   description: string;
   shiftId?: number;
+  branchId?: number;
 }
 
 export interface ReconcileCashRegisterRequest {

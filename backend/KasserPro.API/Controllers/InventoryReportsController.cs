@@ -35,7 +35,7 @@ public class InventoryReportsController : ControllerBase
         [FromQuery] bool? lowStockOnly = null)
     {
         var result = await _reportService.GetBranchInventoryReportAsync(branchId, categoryId, lowStockOnly);
-        
+
         if (!result.Success)
             return BadRequest(result);
 
@@ -48,13 +48,14 @@ public class InventoryReportsController : ControllerBase
     /// <param name="categoryId">Optional category filter</param>
     /// <param name="lowStockOnly">Show only products with low stock in any branch</param>
     [HttpGet("unified")]
+    [Authorize(Roles = "Admin,SystemOwner")]
     [ProducesResponseType(typeof(List<UnifiedInventoryReportDto>), 200)]
     public async Task<IActionResult> GetUnifiedInventoryReport(
         [FromQuery] int? categoryId = null,
         [FromQuery] bool? lowStockOnly = null)
     {
         var result = await _reportService.GetUnifiedInventoryReportAsync(categoryId, lowStockOnly);
-        
+
         if (!result.Success)
             return BadRequest(result);
 
@@ -75,7 +76,7 @@ public class InventoryReportsController : ControllerBase
         [FromQuery] int? branchId = null)
     {
         var result = await _reportService.GetTransferHistoryReportAsync(fromDate, toDate, branchId);
-        
+
         if (!result.Success)
             return BadRequest(result);
 
@@ -91,7 +92,7 @@ public class InventoryReportsController : ControllerBase
     public async Task<IActionResult> GetLowStockSummaryReport([FromQuery] int? branchId = null)
     {
         var result = await _reportService.GetLowStockSummaryReportAsync(branchId);
-        
+
         if (!result.Success)
             return BadRequest(result);
 
@@ -109,7 +110,7 @@ public class InventoryReportsController : ControllerBase
         [FromQuery] bool? lowStockOnly = null)
     {
         var result = await _reportService.GetBranchInventoryReportAsync(branchId, categoryId, lowStockOnly);
-        
+
         if (!result.Success)
             return BadRequest(result);
 
@@ -124,13 +125,14 @@ public class InventoryReportsController : ControllerBase
     /// Export unified inventory report to CSV
     /// </summary>
     [HttpGet("unified/export")]
+    [Authorize(Roles = "Admin,SystemOwner")]
     [ProducesResponseType(typeof(FileContentResult), 200)]
     public async Task<IActionResult> ExportUnifiedInventoryReport(
         [FromQuery] int? categoryId = null,
         [FromQuery] bool? lowStockOnly = null)
     {
         var result = await _reportService.GetUnifiedInventoryReportAsync(categoryId, lowStockOnly);
-        
+
         if (!result.Success)
             return BadRequest(result);
 
@@ -143,7 +145,7 @@ public class InventoryReportsController : ControllerBase
     private string GenerateBranchInventoryCsv(BranchInventoryReportDto report)
     {
         var csv = new System.Text.StringBuilder();
-        
+
         // Header
         csv.AppendLine($"Branch Inventory Report - {report.BranchName}");
         csv.AppendLine($"Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
@@ -152,10 +154,10 @@ public class InventoryReportsController : ControllerBase
         csv.AppendLine($"Low Stock Count: {report.LowStockCount}");
         csv.AppendLine($"Total Value: {report.TotalValue:F2}");
         csv.AppendLine();
-        
+
         // Column headers
         csv.AppendLine("Product Name,SKU,Category,Quantity,Reorder Level,Status,Average Cost,Total Value,Last Updated");
-        
+
         // Data rows
         foreach (var item in report.Items)
         {
@@ -165,22 +167,22 @@ public class InventoryReportsController : ControllerBase
                           $"{item.AverageCost:F2},{item.TotalValue:F2}," +
                           $"\"{item.LastUpdatedAt:yyyy-MM-dd HH:mm:ss}\"");
         }
-        
+
         return csv.ToString();
     }
 
     private string GenerateUnifiedInventoryCsv(List<UnifiedInventoryReportDto> reports)
     {
         var csv = new System.Text.StringBuilder();
-        
+
         // Header
         csv.AppendLine("Unified Inventory Report");
         csv.AppendLine($"Generated: {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
         csv.AppendLine();
-        
+
         // Column headers
         csv.AppendLine("Product Name,SKU,Category,Total Quantity,Branch Count,Low Stock Branches,Average Cost,Total Value");
-        
+
         // Data rows
         foreach (var item in reports)
         {
@@ -188,7 +190,7 @@ public class InventoryReportsController : ControllerBase
                           $"{item.TotalQuantity},{item.BranchCount},{item.LowStockBranchCount}," +
                           $"{item.AverageCost:F2},{item.TotalValue:F2}");
         }
-        
+
         return csv.ToString();
     }
 }

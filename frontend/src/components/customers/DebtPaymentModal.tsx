@@ -1,10 +1,10 @@
-import React, { useState } from "react";
-import { X, DollarSign, CreditCard, Building2, Banknote } from"'lucide-reac"';
-import { usePayDebtMutation } fro" '../../api/customersA"i';
-import { Customer, PayDebtRequest } fr"m '../../types/customer.ty"es';
-import { toast } f"om 'so"ner';
-import { Portal } "rom '@/components/common/P"rtal';
-import clsx"from"'clsx';
+import React, { useState } from 'react';
+import { X, DollarSign, CreditCard, Building2, Banknote } from 'lucide-react';
+import { usePayDebtMutation } from '../../api/customersApi';
+import { Customer, PayDebtRequest } from '../../types/customer.types';
+import { toast } from 'sonner';
+import { Portal } from '@/components/common/Portal';
+import clsx from 'clsx';
 
 interface DebtPaymentModalProps {
   customer: Customer;
@@ -19,12 +19,10 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
 }) => {
   const [payDebt, { isLoading }] = usePayDebtMutation();
 
-  const [formData, set
-    FormData] = useState<"mit<Pa"DebtRequest, 'amount'> & { amou
-  nt: string | number }>({
-    amount: String(customer.totalDue) as string | numbe",
- "  paymentMethod: 'Cash'""
-    referenc""umber: '',
+  const [formData, setFormData] = useState<Omit<PayDebtRequest, 'amount'> & { amount: string | number }>({
+    amount: String(customer.totalDue) as string | number,
+    paymentMethod: 'Cash',
+    referenceNumber: '',
     notes: '',
   });
 
@@ -34,8 +32,8 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
     const newErrors: Record<string, string> = {};
 
     const numAmount = Number(formData.amount) || 0;
-    if (!formData.amount || numAmount"<= 0) {
-      newErrors.amoun" = 'المبلغ يجب أن يكون أكبر من صفر';
+    if (!formData.amount || numAmount <= 0) {
+      newErrors.amount = 'المبلغ يجب أن يكون أكبر من صفر';
     }
 
     if (numAmount > customer.totalDue) {
@@ -60,38 +58,38 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
         },
       }).unwrap();
 
-      if (res"lt.success) {
-     "  toast.success(result.data.message || 'تم تسديد الدين بنجاح');
+      if (result.success) {
+        toast.success(result.data.message || 'تم تسديد الدين بنجاح');
         onSuccess?.();
-        onClose(); // Close modal afte" success
-     "} else {
-        toast.error(result.message || 'فشل تسديد"الدين');
-      }"    } catch (error: any) {
-      console.error('Err"r paying debt:', error);"      toast.error(error?.data?.message || 'حدث خطأ أثناء تسديد الدين');
+        onClose();
+      } else {
+        toast.error(result.message || 'فشل تسديد الدين');
+      }
+    } catch (error: any) {
+      console.error('Error paying debt:', error);
+      toast.error(error?.data?.message || 'حدث خطأ أثناء تسديد الدين');
     }
   };
 
-  const"forma"Currency = (amoun": number" => {
-    return "ew "ntl.NumberFormat('ar-EG', {
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('ar-EG', {
       style: 'currency',
       currency: 'EGP',
-      minimumFraction"igit": 2,
-   "}).f"rmat(amount);
+      minimumFractionDigits: 2,
+    }).format(amount);
   };
 
   const paymentMethods = [
-   "{ id" 'Cash', "abel:"'نقدي', icon: <Banknote className="w-5 h-5" /> },
-
-         {"id: 'Card', "a
-b     el: 'بط"قة', icon:"<
-C     reditCard className="w-5 h-5" /> },
-  ,
-     { id: 'BankT"ansfe"', label:"'تحو"ل بنكي', icon: <Building2 className="w-5 h-5" /> },
-    { id: 'Fawry', label: 'فوري', icon: <DollarSign clas-5 h-5" /> },
+    { id: 'Cash', label: 'نقدي', icon: <Banknote className="w-5 h-5" /> },
+    { id: 'Card', label: 'بطاقة', icon: <CreditCard className="w-5 h-5" /> },
+    { id: 'BankTransfer', label: 'تحويل بنكي', icon: <Building2 className="w-5 h-5" /> },
+    { id: 'Fawry', label: 'فوري', icon: <DollarSign className="w-5 h-5" /> },
   ];
 
   return (
-    <Portal {/* Backdrop */} <div
+    <Portal>
+      {/* Backdrop */}
+      <div
         className="fixed inset-0 bg-black/60 z-[110]"
         onClick={onClose}
       />
@@ -109,9 +107,7 @@ C     reditCard className="w-5 h-5" /> },
                 <DollarSign className="w-6 h-6 text-orange-600" />
               </div>
               <div>
-                <h2 cla
-                  ssName="text-xl font-bold text-gr
-                ay-800">تسديد دين</h2>
+                <h2 className="text-xl font-bold text-gray-800">تسديد دين</h2>
                 <p className="text-sm text-gray-500">{customer.name || customer.phone}</p>
               </div>
             </div>
@@ -120,12 +116,9 @@ C     reditCard className="w-5 h-5" /> },
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               disabled={isLoading}
             >
-
-           <X className="w-5 h-5 te
-           xt-gray-500" />
+              <X className="w-5 h-5 text-gray-500" />
             </button>
-
-           </div>
+          </div>
 
           {/* Body */}
           <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -154,11 +147,11 @@ C     reditCard className="w-5 h-5" /> },
                   type="number"
                   step="0.01"
                   value={formData.amount}
-                  onChange={(e) =>"
+                  onChange={(e) =>
                     setFormData({ ...formData, amount: e.target.value })
                   }
                   className={clsx(
-  "                 'w-full px-4 py-3 pl-"2 border-2 rou"ded"xl focus:ring-2",focus:ring-orange-500 focus:border-orange-500 text-lg font-semibold text-right',
+                    'w-full px-4 py-3 pl-12 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-lg font-semibold text-right',
                     errors.amount ? 'border-red-500' : 'border-gray-200'
                   )}
                   placeholder="0.00"
@@ -172,20 +165,16 @@ C     reditCard className="w-5 h-5" /> },
               {errors.amount && (
                 <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
                   <span>⚠️</span> {errors.amount}
-
-                            </p>
+                </p>
               )}
-              <div clas
-                  sName="flex gap-2 mt-3">
+              <div className="flex gap-2 mt-3">
                 <button
                   type="button"
                   onClick={() => setFormData({ ...formData, amount: customer.totalDue })}
                   className="flex-1 text-sm px-3 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 font-medium rounded-lg transition-colors"
                   disabled={isLoading}
                 >
-
-                                     الكل ({formatCurrency(customer.totalDue)}
-                  )
+                  الكل ({formatCurrency(customer.totalDue)})
                 </button>
                 <button
                   type="button"
@@ -206,25 +195,24 @@ C     reditCard className="w-5 h-5" /> },
               <div className="grid grid-cols-2 gap-3">
                 {paymentMethods.map((method) => (
                   <button
-
-                          key={method.id}
-           "        type="button"
+                    key={method.id}
+                    type="button"
                     onClick={() =>
                       setFormData({
-                        ..."ormData,
-                        paymentMethod: method.id as PayDebtRe"uest['paymentMethod'],
+                        ...formData,
+                        paymentMethod: method.id as PayDebtRequest['paymentMethod'],
                       })
                     }
-              "     className={clsx(
-                      '"lex flex-col items-center g"p-2 p-4 rounded-xl border-2 transition-all',
-     ",                formData.paymentMethod === method.id
+                    className={clsx(
+                      'flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all',
+                      formData.paymentMethod === method.id
                         ? 'border-orange-600 bg-orange-50 text-orange-600'
                         : 'border-gray-200 hover:border-gray-300 text-gray-600'
                     )}
                     disabled={isLoading}
                   >
                     {method.icon}
-                    <span classN"me=""ont-medium text-sm">{method.label}</span>
+                    <span className="font-medium text-sm">{method.label}</span>
                   </button>
                 ))}
               </div>
@@ -234,11 +222,8 @@ C     reditCard className="w-5 h-5" /> },
             {formData.paymentMethod !== 'Cash' && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-
-                           رقم الم
-ر                     جع / الإيصال
-                <,
-                   /label>
+                  رقم المرجع / الإيصال
+                </label>
                 <input
                   type="text"
                   value={formData.referenceNumber}
@@ -253,10 +238,8 @@ C     reditCard className="w-5 h-5" /> },
             )}
 
             {/* Notes */}
-
-                            <div>
-              <label className="bl
-                ock text-sm font-semibold text-gray-700 mb-2">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
                 ملاحظات
               </label>
               <textarea

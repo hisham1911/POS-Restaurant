@@ -639,6 +639,7 @@ const App = () => {
         console.warn("Invalid JWT format - logging out");
         localStorage.removeItem("persist:auth");
         dispatch(logoutAction());
+        dispatch(clearBranch());
         return;
       }
 
@@ -652,6 +653,7 @@ const App = () => {
           console.warn("JWT expired - logging out");
           localStorage.removeItem("persist:auth");
           dispatch(logoutAction());
+          dispatch(clearBranch());
           return;
         }
       }
@@ -660,6 +662,7 @@ const App = () => {
       console.warn("Failed to validate JWT - logging out", e);
       localStorage.removeItem("persist:auth");
       dispatch(logoutAction());
+      dispatch(clearBranch());
     }
   }, []); // Only run once on startup
 

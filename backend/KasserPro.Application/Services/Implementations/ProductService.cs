@@ -21,6 +21,8 @@ public class ProductService : IProductService
     public async Task<ApiResponse<List<ProductDto>>> GetAllAsync(int? categoryId = null, string? search = null, bool? isActive = null, bool? lowStock = null)
     {
         var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
+        
         var query = _unitOfWork.Products.Query()
             .Include(p => p.Category)
             .Where(p => p.TenantId == tenantId);
@@ -49,14 +51,21 @@ public class ProductService : IProductService
             query = query.Where(p => p.IsActive == isActive.Value);
         }
 
-        // Filter by low stock
-        if (lowStock.HasValue && lowStock.Value)
-        {
-            query = query.Where(p => p.TrackInventory && p.StockQuantity < p.LowStockThreshold);
-        }
+        var products = await query.ToListAsync();
 
-        var products = await query
-            .Select(p => new ProductDto
+        // Get BranchInventory for current branch
+        var productIds = products.Select(p => p.Id).ToList();
+        var branchInventories = await _unitOfWork.BranchInventories.Query()
+            .Where(bi => bi.TenantId == tenantId && bi.BranchId == branchId && productIds.Contains(bi.ProductId))
+            .ToDictionaryAsync(bi => bi.ProductId, bi => bi.Quantity);
+
+        var productDtos = products.Select(p =>
+        {
+            var stockQuantity = p.TrackInventory && branchInventories.ContainsKey(p.Id)
+                ? branchInventories[p.Id]
+                : (p.TrackInventory ? 0 : (int?)null);
+
+            return new ProductDto
             {
                 Id = p.Id,
                 Name = p.Name,
@@ -72,28 +81,45 @@ public class ProductService : IProductService
                 IsActive = p.IsActive,
                 Type = p.Type,
                 TrackInventory = p.TrackInventory,
-                StockQuantity = p.StockQuantity,
+                StockQuantity = stockQuantity,
                 CategoryId = p.CategoryId,
-                CategoryName = p.Category != null ? p.Category.Name : null,
-                // Sellable V1: Inventory management fields
+                CategoryName = p.Category?.Name,
                 LowStockThreshold = p.LowStockThreshold,
                 ReorderPoint = p.ReorderPoint,
                 LastStockUpdate = p.LastStockUpdate
-            })
-            .ToListAsync();
+            };
+        }).ToList();
 
-        return ApiResponse<List<ProductDto>>.Ok(products);
+        // Filter by low stock (after getting BranchInventory data)
+        if (lowStock.HasValue && lowStock.Value)
+        {
+            productDtos = productDtos
+                .Where(p => p.TrackInventory && (p.StockQuantity ?? 0) < (p.LowStockThreshold ?? 5))
+                .ToList();
+        }
+
+        return ApiResponse<List<ProductDto>>.Ok(productDtos);
     }
 
     public async Task<ApiResponse<ProductDto>> GetByIdAsync(int id)
     {
         var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
+        
         var product = await _unitOfWork.Products.Query()
             .Include(p => p.Category)
             .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
 
         if (product == null)
             return ApiResponse<ProductDto>.Fail("المنتج غير موجود");
+
+        // Get BranchInventory for current branch
+        var branchInventory = await _unitOfWork.BranchInventories.Query()
+            .FirstOrDefaultAsync(bi => bi.TenantId == tenantId && bi.BranchId == branchId && bi.ProductId == product.Id);
+
+        var stockQuantity = product.TrackInventory && branchInventory != null
+            ? branchInventory.Quantity
+            : (product.TrackInventory ? 0 : (int?)null);
 
         return ApiResponse<ProductDto>.Ok(new ProductDto
         {
@@ -111,10 +137,9 @@ public class ProductService : IProductService
             IsActive = product.IsActive,
             Type = product.Type,
             TrackInventory = product.TrackInventory,
-            StockQuantity = product.StockQuantity,
+            StockQuantity = stockQuantity,
             CategoryId = product.CategoryId,
             CategoryName = product.Category?.Name,
-            // Sellable V1: Inventory management fields
             LowStockThreshold = product.LowStockThreshold,
             ReorderPoint = product.ReorderPoint,
             LastStockUpdate = product.LastStockUpdate

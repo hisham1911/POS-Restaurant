@@ -85,6 +85,12 @@ export const SettingsPage = () => {
   const [receiptShowLogo, setReceiptShowLogo] = useState<boolean>(true);
   const [logoUrl, setLogoUrl] = useState<string>("");
 
+  // Print Routing settings state
+  const [printRoutingMode, setPrintRoutingMode] = useState<'BranchOnly' | 'BranchWithFallback' | 'AllDevices' | 'Disabled'>('BranchWithFallback');
+  const [autoPrintOnSale, setAutoPrintOnSale] = useState<boolean>(true);
+  const [autoPrintOnDebtPayment, setAutoPrintOnDebtPayment] = useState<boolean>(true);
+  const [autoPrintDailyReports, setAutoPrintDailyReports] = useState<boolean>(false);
+
   // Initialize form with tenant data
   useEffect(() => {
     if (tenant) {
@@ -109,6 +115,11 @@ export const SettingsPage = () => {
       setReceiptShowCustomerName(tenant.receiptShowCustomerName ?? true);
       setReceiptShowLogo(tenant.receiptShowLogo ?? true);
       setLogoUrl(tenant.logoUrl || "");
+      // Print Routing settings
+      setPrintRoutingMode(tenant.printRoutingMode || 'BranchWithFallback');
+      setAutoPrintOnSale(tenant.autoPrintOnSale ?? true);
+      setAutoPrintOnDebtPayment(tenant.autoPrintOnDebtPayment ?? true);
+      setAutoPrintDailyReports(tenant.autoPrintDailyReports ?? false);
     }
   }, [tenant]);
 
@@ -141,6 +152,11 @@ export const SettingsPage = () => {
         receiptPhoneNumber: receiptPhoneNumber || undefined,
         receiptShowCustomerName,
         receiptShowLogo,
+        // Print Routing settings
+        printRoutingMode,
+        autoPrintOnSale,
+        autoPrintOnDebtPayment,
+        autoPrintDailyReports,
       }).unwrap();
 
       if (result.success) {
@@ -1083,6 +1099,114 @@ export const SettingsPage = () => {
                   {receiptPhoneNumber}
                 </p>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Print Routing Settings Card */}
+        <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
+          <div className="flex items-center gap-2 text-lg font-semibold">
+            <Printer className="w-5 h-5 text-primary-600" />
+            <span>🖨️ إعدادات الطباعة التلقائية</span>
+          </div>
+
+          {/* Print Routing Mode */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-3">
+              وضع توجيه الطباعة
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {[
+                { value: 'BranchOnly', label: 'الفرع فقط', desc: 'طباعة للفرع الحالي فقط' },
+                { value: 'BranchWithFallback', label: 'الفرع + احتياطي', desc: 'الفرع + الأجهزة الافتراضية' },
+                { value: 'AllDevices', label: 'كل الأجهزة', desc: 'طباعة على جميع الطابعات' },
+                { value: 'Disabled', label: 'معطل', desc: 'لا طباعة تلقائية' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setPrintRoutingMode(option.value as any)}
+                  className={clsx(
+                    "p-4 rounded-lg border-2 text-left transition-all",
+                    printRoutingMode === option.value
+                      ? "border-primary-500 bg-primary-50"
+                      : "border-gray-200 hover:border-gray-300"
+                  )}
+                >
+                  <div className="font-medium">{option.label}</div>
+                  <div className="text-sm text-gray-500 mt-1">{option.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Auto Print Toggles */}
+          <div className="space-y-4">
+            {/* Auto Print on Sale */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div>
+                <div className="font-medium">طباعة تلقائية عند البيع</div>
+                <div className="text-sm text-gray-500">طباعة الفاتورة تلقائياً عند إتمام البيع</div>
+              </div>
+              <button
+                onClick={() => setAutoPrintOnSale(!autoPrintOnSale)}
+                className="focus:outline-none"
+              >
+                {autoPrintOnSale ? (
+                  <ToggleRight className="w-12 h-12 text-primary-600" />
+                ) : (
+                  <ToggleLeft className="w-12 h-12 text-gray-400" />
+                )}
+              </button>
+            </div>
+
+            {/* Auto Print on Debt Payment */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div>
+                <div className="font-medium">طباعة تلقائية عند دفع دين</div>
+                <div className="text-sm text-gray-500">طباعة إيصال تلقائياً عند دفع دين عميل</div>
+              </div>
+              <button
+                onClick={() => setAutoPrintOnDebtPayment(!autoPrintOnDebtPayment)}
+                className="focus:outline-none"
+              >
+                {autoPrintOnDebtPayment ? (
+                  <ToggleRight className="w-12 h-12 text-primary-600" />
+                ) : (
+                  <ToggleLeft className="w-12 h-12 text-gray-400" />
+                )}
+              </button>
+            </div>
+
+            {/* Auto Print Daily Reports */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div>
+                <div className="font-medium">طباعة تلقائية للتقارير اليومية</div>
+                <div className="text-sm text-gray-500">طباعة التقرير اليومي تلقائياً</div>
+              </div>
+              <button
+                onClick={() => setAutoPrintDailyReports(!autoPrintDailyReports)}
+                className="focus:outline-none"
+              >
+                {autoPrintDailyReports ? (
+                  <ToggleRight className="w-12 h-12 text-primary-600" />
+                ) : (
+                  <ToggleLeft className="w-12 h-12 text-gray-400" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Info Box */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <div className="flex gap-3">
+              <Wifi className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-blue-800">
+                <p className="font-medium mb-1">ملاحظة مهمة:</p>
+                <p>
+                  لتفعيل الطباعة، تأكد من تشغيل تطبيق الطابعة (Bridge App) على الجهاز المطلوب.
+                  يمكنك تحميله من صفحة الإعدادات.
+                </p>
+              </div>
             </div>
           </div>
         </div>

@@ -25,6 +25,11 @@ export interface Tenant {
   receiptPhoneNumber?: string;
   receiptShowCustomerName: boolean;
   receiptShowLogo: boolean;
+  // Print Routing Settings
+  printRoutingMode: 'BranchOnly' | 'BranchWithFallback' | 'AllDevices' | 'Disabled';
+  autoPrintOnSale: boolean;
+  autoPrintOnDebtPayment: boolean;
+  autoPrintDailyReports: boolean;
   createdAt: string;
 }
 
@@ -52,4 +57,9 @@ export interface UpdateTenantRequest {
   receiptPhoneNumber?: string;
   receiptShowCustomerName?: boolean;
   receiptShowLogo?: boolean;
+  // Print Routing Settings
+  printRoutingMode?: 'BranchOnly' | 'BranchWithFallback' | 'AllDevices' | 'Disabled';
+  autoPrintOnSale?: boolean;
+  autoPrintOnDebtPayment?: boolean;
+  autoPrintDailyReports?: boolean;
 }

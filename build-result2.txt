@@ -1,6 +1,0 @@
-﻿  Determining projects to restore...
-  Restored D:\┘à╪│╪¡\POS\backend\KasserPro.Domain\KasserPro.Domain.csproj (in 703 ms).
-  Restored D:\┘à╪│╪¡\POS\backend\KasserPro.Application\KasserPro.Application.csproj (in 4.95 sec).
-  Restored D:\┘à╪│╪¡\POS\backend\KasserPro.API\KasserPro.API.csproj (in 4.23 sec).
-  Restored D:\┘à╪│╪¡\POS\backend\KasserPro.Tests\KasserPro.Tests.csproj (in 5.37 sec).
-  Restored D:\┘à╪│╪¡\POS\backend\KasserPro.Infrastructure\KasserPro.Infrastructure.csproj (in 5.09 sec).

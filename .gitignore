@@ -110,8 +110,10 @@ backups/
 
 # Build outputs and packages
 output/
+artifacts/
 packages/
 backend/KasserPro.API/publish/
+build-result.txt
 *.zip
 *.tar.gz
 *.rar

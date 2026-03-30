@@ -36,14 +36,9 @@ public class DataValidationService
                 "Price",
                 "Product prices must be numeric"));
 
-            // Check 2: Products.StockQuantity should be numeric
-            issues.AddRange(await ValidateNumericColumnAsync(
-                connection,
-                "Products",
-                "StockQuantity",
-                "Product stock quantities must be numeric"));
+            // StockQuantity column removed - now using BranchInventory table
 
-            // Check 3: Orders.Total should be numeric
+            // Check 2: Orders.Total should be numeric
             issues.AddRange(await ValidateNumericColumnAsync(
                 connection,
                 "Orders",

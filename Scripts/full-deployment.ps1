@@ -45,7 +45,7 @@ if (-not $SkipKasserPro) {
         $scriptRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
     }
 
-    $apiPath = Join-Path $scriptRoot "backend/KasserPro.API"
+    $apiPath = Join-Path (Split-Path $scriptRoot -Parent) "backend/KasserPro.API"
 
     if (-not (Test-Path $apiPath)) {
         throw "Missing path: $apiPath"

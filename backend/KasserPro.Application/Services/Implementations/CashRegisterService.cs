@@ -517,7 +517,7 @@ public class CashRegisterService : ICashRegisterService
     private async Task<decimal> GetCurrentBalanceForBranchAsync(int branchId)
     {
         var lastTransaction = await _unitOfWork.CashRegisterTransactions.Query()
-            .Where(t => t.BranchId == branchId)
+            .Where(t => t.TenantId == _currentUserService.TenantId && t.BranchId == branchId)
             .OrderByDescending(t => t.CreatedAt)
             .FirstOrDefaultAsync();
 
@@ -527,7 +527,9 @@ public class CashRegisterService : ICashRegisterService
     private async Task<decimal> CalculateExpectedBalanceAsync(int branchId, DateTime fromDate)
     {
         var transactions = await _unitOfWork.CashRegisterTransactions.Query()
-            .Where(t => t.BranchId == branchId && t.TransactionDate >= fromDate)
+            .Where(t => t.TenantId == _currentUserService.TenantId &&
+                        t.BranchId == branchId &&
+                        t.TransactionDate >= fromDate)
             .OrderBy(t => t.TransactionDate)
             .ToListAsync();
 

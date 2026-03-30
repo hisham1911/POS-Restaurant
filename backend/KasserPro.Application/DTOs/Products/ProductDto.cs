@@ -27,7 +27,11 @@ public class ProductDto
     /// </summary>
     public bool TrackInventory { get; set; }
     
-    public int? StockQuantity { get; set; }
+    /// <summary>
+    /// Current stock quantity for the current branch (from BranchInventories table)
+    /// </summary>
+    public int? CurrentBranchStock { get; set; }
+    
     public int CategoryId { get; set; }
     public string? CategoryName { get; set; }
     
@@ -39,5 +43,5 @@ public class ProductDto
     /// <summary>
     /// Indicates if product is below low stock threshold
     /// </summary>
-    public bool IsLowStock => TrackInventory && LowStockThreshold.HasValue && StockQuantity < LowStockThreshold;
+    public bool IsLowStock => TrackInventory && LowStockThreshold.HasValue && CurrentBranchStock < LowStockThreshold;
 }

@@ -54,11 +54,13 @@ export function CashRegisterDashboard() {
   const balance = balanceResponse?.data;
   const transactions = transactionsResponse?.data?.items || [];
   const incomingTotal = transactions
-    .filter((t) => t.amount >= 0)
-    .reduce((sum, t) => sum + t.amount, 0);
+    .map((t) => t.balanceAfter - t.balanceBefore)
+    .filter((delta) => delta > 0)
+    .reduce((sum, delta) => sum + delta, 0);
   const outgoingTotal = transactions
-    .filter((t) => t.amount < 0)
-    .reduce((sum, t) => sum + Math.abs(t.amount), 0);
+    .map((t) => t.balanceAfter - t.balanceBefore)
+    .filter((delta) => delta < 0)
+    .reduce((sum, delta) => sum + Math.abs(delta), 0);
 
   const handleDeposit = async () => {
     const amount = parseFloat(depositAmount);
@@ -240,8 +242,7 @@ export function CashRegisterDashboard() {
               </h3>
               {balance?.lastTransactionDate && (
                 <p className="text-sm text-gray-500 mt-1">
-                  آخر معاملة:{" "}
-                  {formatDateTimeFull(balance.lastTransactionDate)}
+                  آخر معاملة: {formatDateTimeFull(balance.lastTransactionDate)}
                 </p>
               )}
             </div>
@@ -260,58 +261,59 @@ export function CashRegisterDashboard() {
               <p className="text-center text-gray-500 py-8">لا توجد معاملات</p>
             ) : (
               <div className="space-y-3">
-                {transactions.map((transaction) => (
-                  <div
-                    key={transaction.id}
-                    className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className={`flex items-center justify-center w-10 h-10 rounded-full ${
-                          transaction.amount >= 0
-                            ? "bg-green-100"
-                            : "bg-red-100"
-                        }`}
-                      >
-                        {transaction.amount >= 0 ? (
-                          <TrendingUp className="w-5 h-5 text-green-600" />
-                        ) : (
-                          <TrendingDown className="w-5 h-5 text-red-600" />
-                        )}
-                      </div>
-                      <div>
-                        <p
-                          className={`font-medium ${getTransactionTypeColor(
-                            transaction.type,
-                          )}`}
+                {transactions.map((transaction) => {
+                  const isIncoming =
+                    transaction.balanceAfter >= transaction.balanceBefore;
+
+                  return (
+                    <div
+                      key={transaction.id}
+                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`flex items-center justify-center w-10 h-10 rounded-full ${
+                            isIncoming ? "bg-green-100" : "bg-red-100"
+                          }`}
                         >
-                          {getTransactionTypeLabel(transaction.type)}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {transaction.description}
+                          {isIncoming ? (
+                            <TrendingUp className="w-5 h-5 text-green-600" />
+                          ) : (
+                            <TrendingDown className="w-5 h-5 text-red-600" />
+                          )}
+                        </div>
+                        <div>
+                          <p
+                            className={`font-medium ${getTransactionTypeColor(
+                              transaction.type,
+                            )}`}
+                          >
+                            {getTransactionTypeLabel(transaction.type)}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            {transaction.description}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {formatDateTimeFull(transaction.createdAt)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-left">
+                        <p
+                          className={`text-lg font-bold ${
+                            isIncoming ? "text-green-600" : "text-red-600"
+                          }`}
+                        >
+                          {isIncoming ? "+" : "-"}
+                          {transaction.amount.toFixed(2)} جنيه
                         </p>
                         <p className="text-xs text-gray-500">
-                          {formatDateTimeFull(transaction.createdAt)}
+                          الرصيد: {transaction.balanceAfter.toFixed(2)} جنيه
                         </p>
                       </div>
                     </div>
-                    <div className="text-left">
-                      <p
-                        className={`text-lg font-bold ${
-                          transaction.amount >= 0
-                            ? "text-green-600"
-                            : "text-red-600"
-                        }`}
-                      >
-                        {transaction.amount >= 0 ? "+" : ""}
-                        {transaction.amount.toFixed(2)} جنيه
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        الرصيد: {transaction.balanceAfter.toFixed(2)} جنيه
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

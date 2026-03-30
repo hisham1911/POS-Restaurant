@@ -421,17 +421,34 @@ export const ProductFormModal = ({
             </h3>
 
             {!isEditing && (
-              <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
-                <input
-                  type="checkbox"
-                  id="branchSpecific"
-                  checked={useBranchSpecificStock}
-                  onChange={(e) => setUseBranchSpecificStock(e.target.checked)}
-                  className="w-4 h-4 text-primary-600 rounded"
-                />
-                <label htmlFor="branchSpecific" className="text-sm text-gray-700 cursor-pointer">
-                  تحديد كمية مختلفة لكل فرع
-                </label>
+              <div className="space-y-3">
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                      <Package className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-semibold text-blue-900 mb-1">
+                        توزيع المخزون على الفروع
+                      </h4>
+                      <p className="text-xs text-blue-700 mb-3">
+                        الكمية المدخلة ستُضاف للفرع الحالي فقط. الفروع الأخرى ستبدأ بصفر.
+                      </p>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="branchSpecific"
+                          checked={useBranchSpecificStock}
+                          onChange={(e) => setUseBranchSpecificStock(e.target.checked)}
+                          className="w-4 h-4 text-primary-600 rounded"
+                        />
+                        <label htmlFor="branchSpecific" className="text-sm font-medium text-blue-900 cursor-pointer">
+                          تحديد كمية مخصصة لكل فرع
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             )}
 

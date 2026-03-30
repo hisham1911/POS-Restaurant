@@ -268,7 +268,6 @@ public static class RealisticDataSeeder
             TaxRate = 14,
             TaxInclusive = false,
             TrackInventory = true,
-            StockQuantity = 0, // Start with 0, will be updated by purchase invoices
             LowStockThreshold = (int)(stock * 0.1m),
             ReorderPoint = (int)(stock * 0.15m),
             IsActive = true,
@@ -814,17 +813,8 @@ public static class RealisticDataSeeder
                 subtotal += netPrice;
                 taxAmount += itemTax;
 
-                // Update product stock and average cost
-                var oldStock = product.StockQuantity ?? 0;
-                var oldAvgCost = product.AverageCost ?? product.Cost ?? 0m;
-                var newStock = oldStock + qty;
-
-                // Calculate weighted average cost
-                var totalOldValue = oldStock * oldAvgCost;
-                var totalNewValue = qty * (product.Cost ?? 0m);
-                product.AverageCost = newStock > 0 ? (totalOldValue + totalNewValue) / newStock : product.Cost;
-
-                product.StockQuantity = newStock;
+                // Stock and average cost are now managed through BranchInventory and StockMovements
+                // No need to manually update here
             }
 
             invoice.Subtotal = Math.Round(subtotal, 2);
@@ -918,21 +908,8 @@ public static class RealisticDataSeeder
             .Where(bi => bi.BranchId == branch.Id)
             .ToListAsync();
 
-        if (existingInventory.Count == 0)
-        {
-            var branchInventories = products.Select(p => new BranchInventory
-            {
-                TenantId = tenant.Id,
-                BranchId = branch.Id,
-                ProductId = p.Id,
-                Quantity = p.StockQuantity ?? 0,
-                ReorderLevel = (int)((p.StockQuantity ?? 0) * 0.15m),
-                LastUpdatedAt = DateTime.UtcNow.AddDays(-_random.Next(1, 30))
-            }).ToList();
-
-            context.Set<BranchInventory>().AddRange(branchInventories);
-            await context.SaveChangesAsync();
-        }
+        // BranchInventory is now automatically created by PurchaseInvoiceService when confirming invoices
+        // No need to manually create it here
 
         Console.WriteLine($"   ✓ تم إنشاء {invoices.Count} فاتورة شراء");
         Console.WriteLine($"   ✓ تم تحديث المخزون لـ {products.Count} منتج");

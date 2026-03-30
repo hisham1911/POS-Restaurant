@@ -27,7 +27,10 @@ public class UpdateProductRequest
     public ProductType Type { get; set; } = ProductType.Physical;
     
     // Inventory fields (only used for Physical products)
-    public int StockQuantity { get; set; } = 0;
+    /// <summary>
+    /// Stock quantity for the current branch (updates BranchInventories table)
+    /// </summary>
+    public int CurrentBranchStock { get; set; } = 0;
     public int LowStockThreshold { get; set; } = 5;
     public int? ReorderPoint { get; set; }
 }

@@ -218,18 +218,8 @@ public static class RestaurantSeeder
             .Where(o => o.TenantId == tenant.Id && o.Status == OrderStatus.Completed)
             .ToListAsync();
 
-        foreach (var order in completedOrders)
-        {
-            foreach (var item in order.Items)
-            {
-                var product = await context.Products.FindAsync(item.ProductId);
-                if (product != null && product.StockQuantity.HasValue)
-                {
-                    product.StockQuantity -= item.Quantity;
-                    product.LastStockUpdate = order.CompletedAt ?? order.CreatedAt;
-                }
-            }
-        }
+        // Stock is now managed through BranchInventory and StockMovements
+        // No need to manually update product stock here
         await context.SaveChangesAsync();
 
         // Create return orders (2-3% of completed orders)
@@ -498,16 +488,8 @@ public static class RestaurantSeeder
 
             context.Orders.Add(returnOrder);
 
-            // Restore stock for returned items
-            foreach (var item in returnOrder.Items)
-            {
-                var product = await context.Products.FindAsync(item.ProductId);
-                if (product != null && product.StockQuantity.HasValue)
-                {
-                    product.StockQuantity += Math.Abs(item.Quantity);
-                    product.LastStockUpdate = returnDate;
-                }
-            }
+            // Stock is now managed through BranchInventory and StockMovements
+            // No need to manually update product stock here
         }
 
         await context.SaveChangesAsync();

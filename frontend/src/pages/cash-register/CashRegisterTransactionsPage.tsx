@@ -39,8 +39,12 @@ export function CashRegisterTransactionsPage() {
   const transactions = response?.data?.items || [];
   const totalCount = response?.data?.totalCount || 0;
   const totalPages = response?.data?.totalPages || 1;
-  const incomingCount = transactions.filter((t) => t.amount >= 0).length;
-  const outgoingCount = transactions.filter((t) => t.amount < 0).length;
+  const incomingCount = transactions.filter(
+    (t) => t.balanceAfter >= t.balanceBefore,
+  ).length;
+  const outgoingCount = transactions.filter(
+    (t) => t.balanceAfter < t.balanceBefore,
+  ).length;
 
   const handleFilterChange = (key: keyof CashRegisterFilters, value: any) => {
     setFilters((prev) => ({ ...prev, [key]: value, pageNumber: 1 }));
@@ -259,53 +263,56 @@ export function CashRegisterTransactionsPage() {
                     </td>
                   </tr>
                 ) : (
-                  transactions.map((transaction) => (
-                    <tr key={transaction.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {formatDateTimeFull(transaction.createdAt)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-1 text-xs font-semibold rounded-full ${getTransactionTypeBadge(
-                            transaction.type,
-                          )}`}
-                        >
-                          {getTransactionTypeLabel(transaction.type)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900 max-w-sm truncate">
-                        {transaction.description}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-1">
-                          {transaction.amount >= 0 ? (
-                            <TrendingUp className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <TrendingDown className="w-4 h-4 text-red-600" />
-                          )}
+                  transactions.map((transaction) => {
+                    const isIncoming =
+                      transaction.balanceAfter >= transaction.balanceBefore;
+
+                    return (
+                      <tr key={transaction.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {formatDateTimeFull(transaction.createdAt)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
                           <span
-                            className={`text-sm font-bold ${
-                              transaction.amount >= 0
-                                ? "text-green-600"
-                                : "text-red-600"
-                            }`}
+                            className={`px-2 py-1 text-xs font-semibold rounded-full ${getTransactionTypeBadge(
+                              transaction.type,
+                            )}`}
                           >
-                            {transaction.amount >= 0 ? "+" : ""}
-                            {transaction.amount.toFixed(2)} جنيه
+                            {getTransactionTypeLabel(transaction.type)}
                           </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {transaction.balanceBefore.toFixed(2)} جنيه
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                        {transaction.balanceAfter.toFixed(2)} جنيه
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {transaction.createdByUserName}
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900 max-w-sm truncate">
+                          {transaction.description}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center gap-1">
+                            {isIncoming ? (
+                              <TrendingUp className="w-4 h-4 text-green-600" />
+                            ) : (
+                              <TrendingDown className="w-4 h-4 text-red-600" />
+                            )}
+                            <span
+                              className={`text-sm font-bold ${
+                                isIncoming ? "text-green-600" : "text-red-600"
+                              }`}
+                            >
+                              {isIncoming ? "+" : "-"}
+                              {transaction.amount.toFixed(2)} جنيه
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {transaction.balanceBefore.toFixed(2)} جنيه
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                          {transaction.balanceAfter.toFixed(2)} جنيه
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                          {transaction.createdByUserName}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

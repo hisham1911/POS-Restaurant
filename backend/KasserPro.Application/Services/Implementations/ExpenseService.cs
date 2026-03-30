@@ -44,7 +44,7 @@ public class ExpenseService : IExpenseService
         try
         {
             var query = _unitOfWork.Expenses.Query()
-                .Where(e => e.TenantId == _currentUserService.TenantId && 
+                .Where(e => e.TenantId == _currentUserService.TenantId &&
                            e.BranchId == _currentUserService.BranchId)
                 .Include(e => e.Category)
                 .Include(e => e.Shift)
@@ -95,7 +95,7 @@ public class ExpenseService : IExpenseService
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
-                .Where(e => e.Id == id && 
+                .Where(e => e.Id == id &&
                            e.TenantId == _currentUserService.TenantId &&
                            e.BranchId == _currentUserService.BranchId)
                 .Include(e => e.Category)
@@ -122,7 +122,7 @@ public class ExpenseService : IExpenseService
         {
             // Validate category exists
             var category = await _unitOfWork.ExpenseCategories.Query()
-                .FirstOrDefaultAsync(c => c.Id == request.CategoryId && 
+                .FirstOrDefaultAsync(c => c.Id == request.CategoryId &&
                                          c.TenantId == _currentUserService.TenantId &&
                                          c.IsActive);
 
@@ -188,7 +188,7 @@ public class ExpenseService : IExpenseService
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
-                .FirstOrDefaultAsync(e => e.Id == id && 
+                .FirstOrDefaultAsync(e => e.Id == id &&
                                          e.TenantId == _currentUserService.TenantId &&
                                          e.BranchId == _currentUserService.BranchId);
 
@@ -201,7 +201,7 @@ public class ExpenseService : IExpenseService
 
             // Validate category
             var category = await _unitOfWork.ExpenseCategories.Query()
-                .FirstOrDefaultAsync(c => c.Id == request.CategoryId && 
+                .FirstOrDefaultAsync(c => c.Id == request.CategoryId &&
                                          c.TenantId == _currentUserService.TenantId &&
                                          c.IsActive);
 
@@ -245,7 +245,7 @@ public class ExpenseService : IExpenseService
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
-                .FirstOrDefaultAsync(e => e.Id == id && 
+                .FirstOrDefaultAsync(e => e.Id == id &&
                                          e.TenantId == _currentUserService.TenantId &&
                                          e.BranchId == _currentUserService.BranchId);
 
@@ -276,7 +276,7 @@ public class ExpenseService : IExpenseService
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
-                .FirstOrDefaultAsync(e => e.Id == id && 
+                .FirstOrDefaultAsync(e => e.Id == id &&
                                          e.TenantId == _currentUserService.TenantId &&
                                          e.BranchId == _currentUserService.BranchId);
 
@@ -296,7 +296,7 @@ public class ExpenseService : IExpenseService
             expense.ApprovedByUserId = _currentUserService.UserId;
             expense.ApprovedByUserName = user?.Name ?? _currentUserService.Email ?? "Unknown";
             expense.ApprovedAt = DateTime.UtcNow;
-            
+
             if (!string.IsNullOrEmpty(request.Notes))
                 expense.Notes = string.IsNullOrEmpty(expense.Notes) ? request.Notes : $"{expense.Notes}\n{request.Notes}";
 
@@ -328,7 +328,7 @@ public class ExpenseService : IExpenseService
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
-                .FirstOrDefaultAsync(e => e.Id == id && 
+                .FirstOrDefaultAsync(e => e.Id == id &&
                                          e.TenantId == _currentUserService.TenantId &&
                                          e.BranchId == _currentUserService.BranchId);
 
@@ -378,7 +378,7 @@ public class ExpenseService : IExpenseService
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
-                .FirstOrDefaultAsync(e => e.Id == id && 
+                .FirstOrDefaultAsync(e => e.Id == id &&
                                          e.TenantId == _currentUserService.TenantId &&
                                          e.BranchId == _currentUserService.BranchId);
 
@@ -401,7 +401,7 @@ public class ExpenseService : IExpenseService
             expense.PaidByUserId = _currentUserService.UserId;
             expense.PaidByUserName = user?.Name ?? _currentUserService.Email ?? "Unknown";
             expense.PaidAt = DateTime.UtcNow;
-            
+
             if (!string.IsNullOrEmpty(request.Notes))
                 expense.Notes = string.IsNullOrEmpty(expense.Notes) ? request.Notes : $"{expense.Notes}\n{request.Notes}";
 
@@ -410,6 +410,19 @@ public class ExpenseService : IExpenseService
             // If payment method is Cash, update cash register
             if (request.PaymentMethod == PaymentMethod.Cash)
             {
+                var cashBalanceResponse = await _cashRegisterService.GetCurrentBalanceAsync(_currentUserService.BranchId);
+                if (!cashBalanceResponse.Success)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    return ApiResponse<ExpenseDto>.Fail(ErrorCodes.INTERNAL_ERROR);
+                }
+
+                if (cashBalanceResponse.Data!.CurrentBalance < expense.Amount)
+                {
+                    await _unitOfWork.RollbackTransactionAsync();
+                    return ApiResponse<ExpenseDto>.Fail(ErrorCodes.CASH_REGISTER_INSUFFICIENT_BALANCE);
+                }
+
                 await _cashRegisterService.RecordTransactionAsync(
                     CashRegisterTransactionType.Expense,
                     expense.Amount,
@@ -444,7 +457,7 @@ public class ExpenseService : IExpenseService
     {
         var year = DateTime.UtcNow.Year;
         var lastExpense = await _unitOfWork.Expenses.Query()
-            .Where(e => e.TenantId == _currentUserService.TenantId && 
+            .Where(e => e.TenantId == _currentUserService.TenantId &&
                        e.ExpenseDate.Year == year)
             .OrderByDescending(e => e.Id)
             .FirstOrDefaultAsync();

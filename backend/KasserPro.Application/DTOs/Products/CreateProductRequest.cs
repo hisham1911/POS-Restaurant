@@ -26,7 +26,10 @@ public class CreateProductRequest
     public ProductType Type { get; set; } = ProductType.Physical;
     
     // Inventory fields (only used for Physical products)
-    public int StockQuantity { get; set; } = 0;
+    /// <summary>
+    /// Initial stock quantity for the current branch (stored in BranchInventories)
+    /// </summary>
+    public int InitialBranchStock { get; set; } = 0;
     public int LowStockThreshold { get; set; } = 5;
     public int? ReorderPoint { get; set; }
     

@@ -332,7 +332,13 @@ public class OrderService : IOrderService
         // STOCK VALIDATION: Check if sufficient stock is available
         if (product.TrackInventory)
         {
-            var currentStock = product.StockQuantity ?? 0;
+            // Get current stock from BranchInventory
+            var branchInventory = await _unitOfWork.BranchInventories.Query()
+                .FirstOrDefaultAsync(bi => bi.TenantId == order.TenantId 
+                    && bi.BranchId == order.BranchId 
+                    && bi.ProductId == product.Id);
+            
+            var currentStock = branchInventory?.Quantity ?? 0;
             // Calculate total quantity in order for this product
             var existingQty = order.Items.Where(i => i.ProductId == product.Id).Sum(i => i.Quantity);
             var totalRequested = existingQty + request.Quantity;
@@ -979,6 +985,23 @@ public class OrderService : IOrderService
 
                 if (cashRefundAmount > 0)
                 {
+                    var cashBalanceResponse = await _cashRegisterService.GetCurrentBalanceAsync(originalOrder.BranchId);
+                    if (!cashBalanceResponse.Success)
+                    {
+                        await transaction.RollbackAsync();
+                        return ApiResponse<OrderDto>.Fail(
+                            ErrorCodes.SYSTEM_INTERNAL_ERROR,
+                            "فشل التحقق من رصيد الخزينة قبل المرتجع");
+                    }
+
+                    if (cashBalanceResponse.Data!.CurrentBalance < cashRefundAmount)
+                    {
+                        await transaction.RollbackAsync();
+                        return ApiResponse<OrderDto>.Fail(
+                            ErrorCodes.CASH_REGISTER_INSUFFICIENT_BALANCE,
+                            "رصيد الخزينة غير كافٍ لتنفيذ المرتجع النقدي");
+                    }
+
                     await _cashRegisterService.RecordTransactionAsync(
                         type: CashRegisterTransactionType.Refund,
                         amount: cashRefundAmount, // ✅ POSITIVE amount - type determines sign

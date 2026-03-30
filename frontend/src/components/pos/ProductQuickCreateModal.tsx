@@ -201,7 +201,7 @@ export const ProductQuickCreateModal = ({
             {formData.type === ProductType.Physical && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  الكمية الأولية
+                  الكمية الأولية (للفرع الحالي)
                 </label>
                 <div className="relative">
                   <Hash className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -219,6 +219,9 @@ export const ProductQuickCreateModal = ({
                     placeholder="0"
                   />
                 </div>
+                <p className="mt-1 text-xs text-gray-500">
+                  سيتم إضافة هذه الكمية للفرع الحالي فقط. الفروع الأخرى ستبدأ بصفر.
+                </p>
               </div>
             )}
 

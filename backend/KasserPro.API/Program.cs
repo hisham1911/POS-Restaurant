@@ -146,9 +146,6 @@ builder.Services.AddScoped<IEmployeeReportService, EmployeeReportService>();
 builder.Services.AddScoped<IProductReportService, ProductReportService>();
 builder.Services.AddScoped<ISupplierReportService, SupplierReportService>();
 
-// Inventory Data Migration (for one-time migration)
-builder.Services.AddScoped<InventoryDataMigration>();
-
 // Expenses and Cash Register services
 builder.Services.AddScoped<IExpenseService, ExpenseService>();
 builder.Services.AddScoped<IExpenseCategoryService, ExpenseCategoryService>();

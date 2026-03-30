@@ -31,7 +31,6 @@ public class Product : BaseEntity
     /// Physical products always track inventory, Service products never do.
     /// </summary>
     public bool TrackInventory { get; set; } = true;
-    public int? StockQuantity { get; set; }
     
     /// <summary>
     /// Alert threshold - show warning when stock falls below this level

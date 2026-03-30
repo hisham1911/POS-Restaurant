@@ -23,7 +23,8 @@ export interface Product {
   type: ProductType;
   // يتم تحديده تلقائياً بناءً على النوع
   trackInventory: boolean;
-  stockQuantity?: number;
+  // الكمية المتاحة في الفرع الحالي (من جدول BranchInventories)
+  currentBranchStock?: number;
   lowStockThreshold?: number;
   reorderPoint?: number;
   lastStockUpdate?: string;
@@ -45,7 +46,8 @@ export interface CreateProductRequest {
   categoryId: number;
   // نوع المنتج (مادي أو خدمة) - بدلاً من trackInventory
   type?: ProductType;
-  stockQuantity?: number;
+  // الكمية الأولية للفرع الحالي (تُحفظ في BranchInventories)
+  initialBranchStock?: number;
   lowStockThreshold?: number;
   reorderPoint?: number;
   branchStockQuantities?: Record<number, number>;
@@ -65,7 +67,8 @@ export interface UpdateProductRequest {
   categoryId: number;
   // نوع المنتج (مادي أو خدمة) - بدلاً من trackInventory
   type?: ProductType;
-  stockQuantity?: number;
+  // الكمية في الفرع الحالي (تُحدّث في BranchInventories)
+  currentBranchStock?: number;
   lowStockThreshold?: number;
   reorderPoint?: number;
   isActive: boolean;
@@ -84,6 +87,7 @@ export interface QuickCreateProductRequest {
   categoryId: number;
   // نوع المنتج - افتراضياً خدمة للإنشاء السريع
   type?: ProductType;
+  // الكمية الأولية (تُحفظ في BranchInventories للفرع الحالي)
   initialStock?: number;
   sku?: string;
   barcode?: string;

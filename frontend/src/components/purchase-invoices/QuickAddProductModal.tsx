@@ -190,6 +190,14 @@ export function QuickAddProductModal({
           </p>
         </div>
 
+        {productType === ProductType.Physical && (
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-xs text-blue-700">
+              💡 المنتج سيُضاف للفرع الحالي بكمية صفر. استخدم فاتورة الشراء لإضافة الكمية.
+            </p>
+          </div>
+        )}
+
         <div className="flex justify-end gap-2 pt-4">
           <Button type="button" variant="outline" onClick={handleClose}>
             إلغاء

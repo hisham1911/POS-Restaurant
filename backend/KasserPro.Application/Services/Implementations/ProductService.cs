@@ -81,7 +81,7 @@ public class ProductService : IProductService
                 IsActive = p.IsActive,
                 Type = p.Type,
                 TrackInventory = p.TrackInventory,
-                StockQuantity = stockQuantity,
+                CurrentBranchStock = stockQuantity,
                 CategoryId = p.CategoryId,
                 CategoryName = p.Category?.Name,
                 LowStockThreshold = p.LowStockThreshold,
@@ -94,7 +94,7 @@ public class ProductService : IProductService
         if (lowStock.HasValue && lowStock.Value)
         {
             productDtos = productDtos
-                .Where(p => p.TrackInventory && (p.StockQuantity ?? 0) < (p.LowStockThreshold ?? 5))
+                .Where(p => p.TrackInventory && (p.CurrentBranchStock ?? 0) < (p.LowStockThreshold ?? 5))
                 .ToList();
         }
 
@@ -137,7 +137,7 @@ public class ProductService : IProductService
             IsActive = product.IsActive,
             Type = product.Type,
             TrackInventory = product.TrackInventory,
-            StockQuantity = stockQuantity,
+            CurrentBranchStock = stockQuantity,
             CategoryId = product.CategoryId,
             CategoryName = product.Category?.Name,
             LowStockThreshold = product.LowStockThreshold,
@@ -176,7 +176,6 @@ public class ProductService : IProductService
             Type = request.Type,
             // TrackInventory is automatically set based on Type
             TrackInventory = request.Type == Domain.Enums.ProductType.Physical,
-            StockQuantity = 0, // Set to 0, actual stock will be in BranchInventory
             LowStockThreshold = request.LowStockThreshold,
             ReorderPoint = request.ReorderPoint,
             LastStockUpdate = DateTime.UtcNow
@@ -194,10 +193,18 @@ public class ProductService : IProductService
 
             foreach (var branch in branches)
             {
-                // Use branch-specific quantity if provided, otherwise use default
-                var quantity = request.BranchStockQuantities?.ContainsKey(branch.Id) == true
-                    ? request.BranchStockQuantities[branch.Id]
-                    : request.StockQuantity;
+                // If branch-specific quantities provided, use them
+                // Otherwise: current branch gets the requested quantity, other branches get 0
+                int quantity;
+                if (request.BranchStockQuantities?.ContainsKey(branch.Id) == true)
+                {
+                    quantity = request.BranchStockQuantities[branch.Id];
+                }
+                else
+                {
+                    // Only current branch gets the initial stock, others get 0
+                    quantity = branch.Id == _currentUser.BranchId ? request.InitialBranchStock : 0;
+                }
 
                 var branchInventory = new BranchInventory
                 {
@@ -227,7 +234,7 @@ public class ProductService : IProductService
             IsActive = product.IsActive,
             Type = product.Type,
             TrackInventory = product.TrackInventory,
-            StockQuantity = request.StockQuantity, // Return requested quantity for consistency
+            CurrentBranchStock = request.InitialBranchStock, // Return requested quantity for consistency
             CategoryId = product.CategoryId
         }, "تم إنشاء المنتج بنجاح");
     }
@@ -266,13 +273,21 @@ public class ProductService : IProductService
         product.Type = request.Type;
         // TrackInventory is automatically set based on Type
         product.TrackInventory = request.Type == Domain.Enums.ProductType.Physical;
-        product.StockQuantity = 0; // Keep at 0, use BranchInventory
         product.LowStockThreshold = request.LowStockThreshold;
         product.ReorderPoint = request.ReorderPoint;
         product.LastStockUpdate = DateTime.UtcNow;
 
         _unitOfWork.Products.Update(product);
         await _unitOfWork.SaveChangesAsync();
+
+        // Get current branch inventory for response
+        var branchId = _currentUser.BranchId;
+        var branchInventory = await _unitOfWork.BranchInventories.Query()
+            .FirstOrDefaultAsync(bi => bi.TenantId == tenantId && bi.BranchId == branchId && bi.ProductId == product.Id);
+        
+        var stockQuantity = product.TrackInventory && branchInventory != null
+            ? branchInventory.Quantity
+            : (product.TrackInventory ? 0 : (int?)null);
 
         return ApiResponse<ProductDto>.Ok(new ProductDto
         {
@@ -286,7 +301,7 @@ public class ProductService : IProductService
             IsActive = product.IsActive,
             Type = product.Type,
             TrackInventory = product.TrackInventory,
-            StockQuantity = product.StockQuantity,
+            CurrentBranchStock = stockQuantity,
             CategoryId = product.CategoryId
         }, "تم تحديث المنتج بنجاح");
     }
@@ -309,20 +324,33 @@ public class ProductService : IProductService
     public async Task<ApiResponse<StockAdjustResultDto>> AdjustStockAsync(int id, AdjustStockRequest request)
     {
         var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
+        
         var product = await _unitOfWork.Products.Query()
             .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
         if (product == null)
             return ApiResponse<StockAdjustResultDto>.Fail("المنتج غير موجود");
 
-        var previousBalance = product.StockQuantity ?? 0;
+        // Get or create BranchInventory
+        var branchInventory = await _unitOfWork.BranchInventories.Query()
+            .FirstOrDefaultAsync(bi => bi.ProductId == id && bi.BranchId == branchId && bi.TenantId == tenantId);
+
+        if (branchInventory == null)
+        {
+            return ApiResponse<StockAdjustResultDto>.Fail("مخزون الفرع غير موجود");
+        }
+
+        var previousBalance = branchInventory.Quantity;
         var newBalance = previousBalance + request.Quantity;
 
         if (newBalance < 0)
             return ApiResponse<StockAdjustResultDto>.Fail("لا يمكن أن يكون المخزون سالباً");
 
-        product.StockQuantity = newBalance;
+        branchInventory.Quantity = newBalance;
+        branchInventory.LastUpdatedAt = DateTime.UtcNow;
         product.LastStockUpdate = DateTime.UtcNow;
 
+        _unitOfWork.BranchInventories.Update(branchInventory);
         _unitOfWork.Products.Update(product);
         await _unitOfWork.SaveChangesAsync();
 
@@ -374,7 +402,6 @@ public class ProductService : IProductService
                 Type = request.Type,
                 // TrackInventory is automatically set based on Type
                 TrackInventory = request.Type == Domain.Enums.ProductType.Physical,
-                StockQuantity = 0,
                 LowStockThreshold = 5,
                 TaxInclusive = false, // Default to tax exclusive
                 LastStockUpdate = DateTime.UtcNow
@@ -386,18 +413,29 @@ public class ProductService : IProductService
             // Create BranchInventory records ONLY if TrackInventory is enabled (Physical products)
             if (product.TrackInventory)
             {
-                // Quick create from POS should only add stock to current branch
-                var branchInventory = new BranchInventory
-                {
-                    TenantId = _currentUser.TenantId,
-                    BranchId = _currentUser.BranchId, // Only current branch
-                    ProductId = product.Id,
-                    Quantity = request.InitialStock,
-                    ReorderLevel = 5,
-                    LastUpdatedAt = DateTime.UtcNow
-                };
+                // Create BranchInventory for all branches, but only current branch gets the initial stock
+                var branches = await _unitOfWork.Branches.Query()
+                    .Where(b => b.TenantId == _currentUser.TenantId)
+                    .ToListAsync();
 
-                await _unitOfWork.BranchInventories.AddAsync(branchInventory);
+                foreach (var branch in branches)
+                {
+                    // Only current branch gets the initial stock, others get 0
+                    var quantity = branch.Id == _currentUser.BranchId ? request.InitialStock : 0;
+
+                    var branchInventory = new BranchInventory
+                    {
+                        TenantId = _currentUser.TenantId,
+                        BranchId = branch.Id,
+                        ProductId = product.Id,
+                        Quantity = quantity,
+                        ReorderLevel = 5,
+                        LastUpdatedAt = DateTime.UtcNow
+                    };
+
+                    await _unitOfWork.BranchInventories.AddAsync(branchInventory);
+                }
+
                 await _unitOfWork.SaveChangesAsync();
             }
 
@@ -412,7 +450,7 @@ public class ProductService : IProductService
                 TrackInventory = product.TrackInventory,
                 IsActive = product.IsActive,
                 CategoryId = product.CategoryId,
-                StockQuantity = request.InitialStock
+                CurrentBranchStock = request.InitialStock
             }, "تم إنشاء المنتج بنجاح");
         }
         catch (Exception ex)

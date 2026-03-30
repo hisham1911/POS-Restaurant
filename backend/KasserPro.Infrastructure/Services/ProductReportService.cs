@@ -116,7 +116,7 @@ public class ProductReportService : IProductReportService
                 var tOut = transfersOut.Where(t => t.ProductId == product.Id).Sum(t => t.Quantity);
 
                 var branchInv = product.BranchInventories.FirstOrDefault(bi => bi.BranchId == branchId);
-                var currentStock = branchInv?.Quantity ?? product.StockQuantity ?? 0;
+                var currentStock = branchInv?.Quantity ?? 0;
 
                 if (qtySold > 0) productsSold++;
 
@@ -339,7 +339,7 @@ public class ProductReportService : IProductReportService
             foreach (var product in products)
             {
                 var branchInv = product.BranchInventories.FirstOrDefault(bi => bi.BranchId == branchId);
-                var currentStock = branchInv?.Quantity ?? product.StockQuantity ?? 0;
+                var currentStock = branchInv?.Quantity ?? 0;
                 if (currentStock <= 0) continue;
 
                 var qtySold = recentSalesDict.GetValueOrDefault(product.Id, 0);

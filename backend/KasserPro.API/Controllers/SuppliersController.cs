@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using KasserPro.Application.DTOs.Suppliers;
 using KasserPro.Application.Services.Interfaces;
+using KasserPro.Domain.Enums;
+using KasserPro.API.Middleware;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -19,6 +21,7 @@ public class SuppliersController : ControllerBase
     /// Get all suppliers for the current tenant
     /// </summary>
     [HttpGet]
+    [HasPermission(Permission.SuppliersView)]
     public async Task<IActionResult> GetAll()
     {
         var result = await _supplierService.GetAllAsync();
@@ -29,6 +32,7 @@ public class SuppliersController : ControllerBase
     /// Get supplier by ID
     /// </summary>
     [HttpGet("{id}")]
+    [HasPermission(Permission.SuppliersView)]
     public async Task<IActionResult> GetById(int id)
     {
         var result = await _supplierService.GetByIdAsync(id);
@@ -40,6 +44,7 @@ public class SuppliersController : ControllerBase
     /// </summary>
     [HttpPost]
     [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.SuppliersManage)]
     public async Task<IActionResult> Create([FromBody] CreateSupplierRequest request)
     {
         var result = await _supplierService.CreateAsync(request);
@@ -53,6 +58,7 @@ public class SuppliersController : ControllerBase
     /// </summary>
     [HttpPut("{id}")]
     [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.SuppliersManage)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateSupplierRequest request)
     {
         var result = await _supplierService.UpdateAsync(id, request);
@@ -64,6 +70,7 @@ public class SuppliersController : ControllerBase
     /// </summary>
     [HttpDelete("{id}")]
     [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.SuppliersManage)]
     public async Task<IActionResult> Delete(int id)
     {
         var result = await _supplierService.DeleteAsync(id);

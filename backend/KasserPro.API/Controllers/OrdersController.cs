@@ -346,7 +346,7 @@ public class OrdersController : ControllerBase
     /// <summary>
     /// Convert UTC time to local time based on tenant timezone (IANA or Windows ID)
     /// </summary>
-    private static DateTime ConvertToLocalTime(DateTime utcTime, string? timezone)
+    private DateTime ConvertToLocalTime(DateTime utcTime, string? timezone)
     {
         if (string.IsNullOrEmpty(timezone))
             return utcTime.ToLocalTime();
@@ -378,7 +378,10 @@ public class OrdersController : ControllerBase
                     var tz = TimeZoneInfo.FindSystemTimeZoneById(windowsId);
                     return TimeZoneInfo.ConvertTimeFromUtc(utcTime, tz);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Failed to convert timezone using {WindowsId}", windowsId);
+                }
             }
 
             // Fallback to local time

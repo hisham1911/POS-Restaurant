@@ -206,7 +206,7 @@ public class ReportsController : ControllerBase
     /// <summary>
     /// Convert UTC time to local time based on tenant timezone
     /// </summary>
-    private static DateTime ConvertToLocalTime(DateTime utcTime, string? timezone)
+    private DateTime ConvertToLocalTime(DateTime utcTime, string? timezone)
     {
         if (string.IsNullOrEmpty(timezone))
             return utcTime.ToLocalTime();
@@ -233,7 +233,10 @@ public class ReportsController : ControllerBase
                     var tz = TimeZoneInfo.FindSystemTimeZoneById(windowsId);
                     return TimeZoneInfo.ConvertTimeFromUtc(utcTime, tz);
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    _logger.LogDebug(ex, "Failed to convert timezone using {WindowsId}", windowsId);
+                }
             }
 
             return utcTime.ToLocalTime();

@@ -33,11 +33,6 @@ public class HealthController : ControllerBase
             // Check database connection
             await _context.Database.ExecuteSqlRawAsync("SELECT 1");
 
-            var dbPath = _context.Database.GetDbConnection().DataSource;
-            var dbSize = System.IO.File.Exists(dbPath) 
-                ? new System.IO.FileInfo(dbPath).Length / 1024 / 1024 
-                : 0;
-
             return Ok(new
             {
                 status = "healthy",
@@ -45,11 +40,8 @@ public class HealthController : ControllerBase
                 version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "1.0.0",
                 database = new
                 {
-                    status = "connected",
-                    sizeMB = dbSize,
-                    path = dbPath
+                    status = "connected"
                 },
-                environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Unknown",
                 uptime = TimeSpan.FromMilliseconds(Environment.TickCount64).ToString(@"dd\.hh\:mm\:ss")
             });
         }
@@ -61,7 +53,6 @@ public class HealthController : ControllerBase
             {
                 status = "unhealthy",
                 timestamp = DateTime.UtcNow,
-                error = ex.Message,
                 database = "disconnected"
             });
         }

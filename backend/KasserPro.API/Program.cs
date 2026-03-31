@@ -131,6 +131,7 @@ builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IBranchService, BranchService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<ISystemUserService, SystemUserService>();
 
 // Sellable V1: New services for inventory and customer management
 builder.Services.AddScoped<IInventoryService, KasserPro.Infrastructure.Services.InventoryService>();

@@ -345,6 +345,37 @@ public class PermissionService : IPermissionService
                 DescriptionAr = "عرض الخزينة",
                 IsDefault = false
             },
+
+            // Branches
+            new PermissionInfoDto
+            {
+                Key = Permission.BranchesView.ToString(),
+                Group = "Branches",
+                GroupAr = "الفروع",
+                Description = "View branches",
+                DescriptionAr = "عرض الفروع",
+                IsDefault = false
+            },
+
+            // Suppliers
+            new PermissionInfoDto
+            {
+                Key = Permission.SuppliersView.ToString(),
+                Group = "Suppliers",
+                GroupAr = "الموردين",
+                Description = "View suppliers",
+                DescriptionAr = "عرض الموردين",
+                IsDefault = false
+            },
+            new PermissionInfoDto
+            {
+                Key = Permission.SuppliersManage.ToString(),
+                Group = "Suppliers",
+                GroupAr = "الموردين",
+                Description = "Add/Edit/Delete suppliers",
+                DescriptionAr = "إضافة/تعديل/حذف موردين",
+                IsDefault = false
+            },
         };
     }
 }

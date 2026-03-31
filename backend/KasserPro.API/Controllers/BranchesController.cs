@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using KasserPro.Application.DTOs.Branches;
 using KasserPro.Application.Services.Interfaces;
+using KasserPro.Domain.Enums;
+using KasserPro.API.Middleware;
 
 [ApiController]
 [Route("api/[controller]")]
@@ -15,6 +17,7 @@ public class BranchesController : ControllerBase
     public BranchesController(IBranchService branchService) => _branchService = branchService;
 
     [HttpGet]
+    [HasPermission(Permission.BranchesView)]
     public async Task<IActionResult> GetAll()
     {
         var result = await _branchService.GetAllAsync();
@@ -22,6 +25,7 @@ public class BranchesController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    [HasPermission(Permission.BranchesView)]
     public async Task<IActionResult> GetById(int id)
     {
         var result = await _branchService.GetByIdAsync(id);

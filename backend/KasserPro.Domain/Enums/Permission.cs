@@ -42,4 +42,11 @@ public enum Permission
 
     // Cash Register
     CashRegisterView   = 1000,
+
+    // Branches
+    BranchesView       = 1100,
+
+    // Suppliers
+    SuppliersView      = 1200,
+    SuppliersManage    = 1201,
 }

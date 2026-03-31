@@ -81,41 +81,10 @@
           "Swashbuckle.AspNetCore.SwaggerUI": "6.6.2"
         }
       },
-      "AutoMapper": {
-        "type": "Transitive",
-        "resolved": "12.0.1",
-        "contentHash": "hvV62vl6Hp/WfQ24yzo3Co9+OPl8wH8hApwVtgWpiAynVJkUcs7xvehnSftawL8Pe8FrPffBRM3hwzLQqWDNjA==",
-        "dependencies": {
-          "Microsoft.CSharp": "4.7.0"
-        }
-      },
-      "AutoMapper.Extensions.Microsoft.DependencyInjection": {
-        "type": "Transitive",
-        "resolved": "12.0.1",
-        "contentHash": "+g/K+Vpe3gGMKGzjslMOdqNlkikScDjWfVvmWTayrDHaG/n2pPmFBMa+jKX1r/h6BDGFdkyRjAuhFE3ykW+r1g==",
-        "dependencies": {
-          "AutoMapper": "[12.0.1]",
-          "Microsoft.Extensions.Options": "6.0.0"
-        }
-      },
       "BCrypt.Net-Next": {
         "type": "Transitive",
         "resolved": "4.0.3",
         "contentHash": "W+U9WvmZQgi5cX6FS5GDtDoPzUCV4LkBLkywq/kRZhuDwcbavOzcDAr3LXJFqHUi952Yj3LEYoWW0jbEUQChsA=="
-      },
-      "FluentValidation": {
-        "type": "Transitive",
-        "resolved": "12.1.1",
-        "contentHash": "EPpkIe1yh1a0OXyC100oOA8WMbZvqUu5plwhvYcb7oSELfyUZzfxV48BLhvs3kKo4NwG7MGLNgy1RJiYtT8Dpw=="
-      },
-      "FluentValidation.DependencyInjectionExtensions": {
-        "type": "Transitive",
-        "resolved": "12.1.1",
-        "contentHash": "D0VXh4dtjjX2aQizuaa0g6R8X3U1JaVqJPfGCvLwZX9t/O2h7tkpbitbadQMfwcgSPdDbI2vDxuwRMv/Uf9dHA==",
-        "dependencies": {
-          "FluentValidation": "12.1.1",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "2.1.0"
-        }
       },
       "Humanizer.Core": {
         "type": "Transitive",
@@ -175,11 +144,6 @@
           "System.IO.Pipelines": "6.0.3",
           "System.Threading.Channels": "6.0.0"
         }
-      },
-      "Microsoft.CSharp": {
-        "type": "Transitive",
-        "resolved": "4.7.0",
-        "contentHash": "pTj+D3uJWyN3My70i2Hqo+OXixq3Os2D1nJ2x92FFo6sk8fYS1m1WLNTs0Dc1uPaViH0YvEEwvzddQ7y4rhXmA=="
       },
       "Microsoft.Data.Sqlite.Core": {
         "type": "Transitive",
@@ -839,9 +803,7 @@
       "kasserpro.application": {
         "type": "Project",
         "dependencies": {
-          "AutoMapper.Extensions.Microsoft.DependencyInjection": "[12.0.1, )",
           "BCrypt.Net-Next": "[4.0.3, )",
-          "FluentValidation.DependencyInjectionExtensions": "[12.1.1, )",
           "KasserPro.Domain": "[1.0.0, )",
           "Microsoft.EntityFrameworkCore": "[8.0.11, )",
           "Microsoft.Extensions.Configuration.Abstractions": "[8.0.0, )",

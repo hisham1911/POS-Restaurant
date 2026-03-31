@@ -10,8 +10,8 @@ public class AppDbContext : DbContext
 
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
-        _currentTenantId = 1; // Default tenant - will be set via middleware later
-        _currentBranchId = 1; // Default branch
+        _currentTenantId = 0; // Must be set via SetTenantContext before use
+        _currentBranchId = 0; // Must be set via SetTenantContext before use
     }
 
     public DbSet<Tenant> Tenants => Set<Tenant>();

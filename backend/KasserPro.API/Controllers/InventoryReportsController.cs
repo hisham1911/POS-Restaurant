@@ -4,10 +4,13 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Application.DTOs.Reports;
+using KasserPro.Domain.Enums;
+using KasserPro.API.Middleware;
 
 [Authorize]
 [ApiController]
 [Route("api/inventory-reports")]
+[HasPermission(Permission.ReportsView)]
 public class InventoryReportsController : ControllerBase
 {
     private readonly IInventoryReportService _reportService;

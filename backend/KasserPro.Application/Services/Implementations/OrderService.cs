@@ -198,7 +198,9 @@ public class OrderService : IOrderService
         var order = await _unitOfWork.Orders.Query()
             .Include(o => o.Items)
             .Include(o => o.Payments)
-            .FirstOrDefaultAsync(o => o.Id == id && o.TenantId == _currentUser.TenantId);
+            .FirstOrDefaultAsync(o => o.Id == id 
+                && o.TenantId == _currentUser.TenantId 
+                && o.BranchId == _currentUser.BranchId);
 
         if (order == null)
             return ApiResponse<OrderDto>.Fail(ErrorCodes.ORDER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.ORDER_NOT_FOUND));
@@ -277,11 +279,14 @@ public class OrderService : IOrderService
     public async Task<ApiResponse<PagedResult<OrderDto>>> GetByCustomerIdAsync(int customerId, int page = 1, int pageSize = 10)
     {
         var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
 
         var query = _unitOfWork.Orders.Query()
             .Include(o => o.Items)
             .Include(o => o.Payments)
-            .Where(o => o.TenantId == tenantId && o.CustomerId == customerId);
+            .Where(o => o.TenantId == tenantId 
+                && o.BranchId == branchId 
+                && o.CustomerId == customerId);
 
         var totalCount = await query.CountAsync();
 
@@ -309,7 +314,9 @@ public class OrderService : IOrderService
 
         var order = await _unitOfWork.Orders.Query()
             .Include(o => o.Items)
-            .FirstOrDefaultAsync(o => o.Id == orderId);
+            .FirstOrDefaultAsync(o => o.Id == orderId 
+                && o.TenantId == _currentUser.TenantId 
+                && o.BranchId == _currentUser.BranchId);
 
         if (order == null)
             return ApiResponse<OrderDto>.Fail(ErrorCodes.ORDER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.ORDER_NOT_FOUND));
@@ -464,7 +471,9 @@ public class OrderService : IOrderService
     {
         var order = await _unitOfWork.Orders.Query()
             .Include(o => o.Items)
-            .FirstOrDefaultAsync(o => o.Id == orderId);
+            .FirstOrDefaultAsync(o => o.Id == orderId 
+                && o.TenantId == _currentUser.TenantId 
+                && o.BranchId == _currentUser.BranchId);
 
         if (order == null)
             return ApiResponse<OrderDto>.Fail(ErrorCodes.ORDER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.ORDER_NOT_FOUND));

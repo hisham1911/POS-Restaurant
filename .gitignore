@@ -1,3 +1,6 @@
+# Ignore hidden directories (names starting with .)
+.*/
+**/.*!
 # =====================
 # .NET / C#
 # =====================

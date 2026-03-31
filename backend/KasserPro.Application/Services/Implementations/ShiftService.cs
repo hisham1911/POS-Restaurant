@@ -89,7 +89,7 @@ public class ShiftService : IShiftService
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_ALREADY_OPEN, "يوجد وردية مفتوحة بالفعل في هذا الفرع");
 
         // Use transaction for atomicity - Shift + Cash Register Opening
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
 
         try
         {
@@ -155,7 +155,7 @@ public class ShiftService : IShiftService
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.TENANT_NOT_FOUND, "سياق المستأجر غير صالح");
 
         // Use transaction for atomicity
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
 
         try
         {
@@ -284,7 +284,7 @@ public class ShiftService : IShiftService
         if (shift.IsForceClosed)
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_ALREADY_FORCE_CLOSED, "تم إغلاق الوردية بالقوة مسبقاً");
 
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
 
         try
         {
@@ -379,7 +379,7 @@ public class ShiftService : IShiftService
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_USER_HAS_OPEN_SHIFT,
                 "المستخدم المستلم لديه وردية مفتوحة بالفعل");
 
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
 
         try
         {

@@ -54,24 +54,6 @@ export const systemApi = baseApi.injectEndpoints({
         body,
       }),
     }),
-    // Inventory Migration
-    migrateInventory: builder.mutation<
-      ApiResponse<{
-        productsMigrated: number;
-        inventoriesCreated: number;
-        productsWithStock: number;
-        totalStockBefore: number;
-        totalStockAfter: number;
-        durationMs: number;
-        alreadyMigrated: boolean;
-      }>,
-      void
-    >({
-      query: () => ({
-        url: "/system/migrate-inventory",
-        method: "POST",
-      }),
-    }),
 
     // System Info (IP, Network, Environment)
     getSystemInfo: builder.query<
@@ -92,7 +74,6 @@ export const {
   useGetTenantsQuery,
   useCreateTenantMutation,
   useSetTenantStatusMutation,
-  useMigrateInventoryMutation,
   useGetSystemInfoQuery,
   useHealthQuery,
 } = systemApi;

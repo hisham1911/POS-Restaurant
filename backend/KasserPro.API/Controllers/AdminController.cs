@@ -33,15 +33,9 @@ public class AdminController : ControllerBase
     /// Requires: Admin or SystemOwner role
     /// </summary>
     [HttpPost("backup")]
+    [Authorize(Roles = "Admin,SystemOwner")]
     public async Task<ActionResult<BackupResult>> CreateBackup()
     {
-        var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
-
-        if (userRole != "Admin" && userRole != "SystemOwner")
-        {
-            return Forbid();
-        }
-
         var userId = User.FindFirst("userId")?.Value;
         _logger.LogInformation("Manual backup requested by user {UserId}", userId);
 
@@ -62,15 +56,9 @@ public class AdminController : ControllerBase
     /// Requires: Admin or SystemOwner role
     /// </summary>
     [HttpGet("backups")]
+    [Authorize(Roles = "Admin,SystemOwner")]
     public async Task<ActionResult<List<BackupInfo>>> ListBackups()
     {
-        var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
-
-        if (userRole != "Admin" && userRole != "SystemOwner")
-        {
-            return Forbid();
-        }
-
         var backups = await _backupService.ListBackupsAsync();
         return Ok(backups);
     }
@@ -80,16 +68,9 @@ public class AdminController : ControllerBase
     /// Requires: Admin or SystemOwner role (critical operation)
     /// </summary>
     [HttpPost("restore")]
+    [Authorize(Roles = "Admin,SystemOwner")]
     public async Task<ActionResult<RestoreResult>> RestoreBackup([FromBody] RestoreRequest request)
     {
-        var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
-
-        // Only Admin or SystemOwner can restore
-        if (userRole != "Admin" && userRole != "SystemOwner")
-        {
-            return Forbid();
-        }
-
         var userId = User.FindFirst("userId")?.Value;
         _logger.LogWarning("Database restore requested by user {UserId}, backup: {BackupFileName}",
             userId, request.BackupFileName);
@@ -111,15 +92,9 @@ public class AdminController : ControllerBase
     /// Requires: Admin or SystemOwner role
     /// </summary>
     [HttpGet("backup/{fileName}/download")]
+    [Authorize(Roles = "Admin,SystemOwner")]
     public async Task<IActionResult> DownloadBackup(string fileName)
     {
-        var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
-
-        if (userRole != "Admin" && userRole != "SystemOwner")
-        {
-            return Forbid();
-        }
-
         var filePath = await _backupService.GetBackupFilePathAsync(fileName);
 
         if (filePath == null)
@@ -136,16 +111,10 @@ public class AdminController : ControllerBase
     /// Requires: Admin or SystemOwner role (critical operation)
     /// </summary>
     [HttpPost("restore/upload")]
+    [Authorize(Roles = "Admin,SystemOwner")]
     [RequestSizeLimit(500_000_000)] // 500 MB max
     public async Task<ActionResult<RestoreResult>> RestoreFromUpload(IFormFile file)
     {
-        var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
-
-        if (userRole != "Admin" && userRole != "SystemOwner")
-        {
-            return Forbid();
-        }
-
         if (file == null || file.Length == 0)
         {
             return BadRequest(new { message = "يرجى تحديد ملف نسخة احتياطية" });

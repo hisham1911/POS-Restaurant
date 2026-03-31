@@ -7,6 +7,7 @@ using KasserPro.Application.DTOs;
 using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Enums;
+using KasserPro.Application.Common;
 
 /// <summary>
 /// Controller for managing cashier permissions.
@@ -46,7 +47,7 @@ public class PermissionsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting available permissions");
-            return StatusCode(500, ApiResponse<List<PermissionInfoDto>>.Fail("Error retrieving available permissions"));
+            return StatusCode(500, ApiResponse<List<PermissionInfoDto>>.Fail(ErrorCodes.INTERNAL_ERROR, "Error retrieving available permissions"));
         }
     }
 
@@ -65,7 +66,7 @@ public class PermissionsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting all cashier permissions");
-            return StatusCode(500, ApiResponse<List<UserPermissionsDto>>.Fail("Error retrieving cashier permissions"));
+            return StatusCode(500, ApiResponse<List<UserPermissionsDto>>.Fail(ErrorCodes.INTERNAL_ERROR, "Error retrieving cashier permissions"));
         }
     }
 
@@ -83,7 +84,7 @@ public class PermissionsController : ControllerBase
             
             if (userPermissions == null)
             {
-                return NotFound(ApiResponse<UserPermissionsDto>.Fail($"User {userId} not found"));
+                return NotFound(ApiResponse<UserPermissionsDto>.Fail(ErrorCodes.USER_NOT_FOUND, $"User {userId} not found"));
             }
 
             return Ok(ApiResponse<UserPermissionsDto>.Ok(userPermissions));
@@ -91,7 +92,7 @@ public class PermissionsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting permissions for user {UserId}", userId);
-            return StatusCode(500, ApiResponse<UserPermissionsDto>.Fail("Error retrieving user permissions"));
+            return StatusCode(500, ApiResponse<UserPermissionsDto>.Fail(ErrorCodes.INTERNAL_ERROR, "Error retrieving user permissions"));
         }
     }
 
@@ -118,7 +119,7 @@ public class PermissionsController : ControllerBase
                 }
                 else
                 {
-                    return BadRequest(ApiResponse<object>.Fail($"Invalid permission: {permissionKey}"));
+                    return BadRequest(ApiResponse<object>.Fail(ErrorCodes.VALIDATION_ERROR, $"Invalid permission: {permissionKey}"));
                 }
             }
 
@@ -134,12 +135,12 @@ public class PermissionsController : ControllerBase
         catch (InvalidOperationException ex)
         {
             _logger.LogWarning(ex, "Invalid operation when updating permissions for user {UserId}", userId);
-            return BadRequest(ApiResponse<object>.Fail(ex.Message));
+            return BadRequest(ApiResponse<object>.Fail(ErrorCodes.VALIDATION_ERROR, ex.Message));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating permissions for user {UserId}", userId);
-            return StatusCode(500, ApiResponse<object>.Fail("Error updating user permissions"));
+            return StatusCode(500, ApiResponse<object>.Fail(ErrorCodes.INTERNAL_ERROR, "Error updating user permissions"));
         }
     }
 }

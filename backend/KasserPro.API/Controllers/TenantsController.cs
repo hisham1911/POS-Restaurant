@@ -12,11 +12,13 @@ public class TenantsController : ControllerBase
 {
     private readonly ITenantService _tenantService;
     private readonly IWebHostEnvironment _env;
+    private readonly ILogger<TenantsController> _logger;
 
-    public TenantsController(ITenantService tenantService, IWebHostEnvironment env)
+    public TenantsController(ITenantService tenantService, IWebHostEnvironment env, ILogger<TenantsController> logger)
     {
         _tenantService = tenantService;
         _env = env;
+        _logger = logger;
     }
 
     [HttpGet("current")]
@@ -67,7 +69,11 @@ public class TenantsController : ControllerBase
             // Delete old logo files
             foreach (var oldFile in Directory.GetFiles(uploadsDir, "logo_*"))
             {
-                try { System.IO.File.Delete(oldFile); } catch { }
+                try { System.IO.File.Delete(oldFile); } 
+                catch (Exception ex) 
+                { 
+                    _logger.LogDebug(ex, "Failed to delete old logo file {FilePath}", oldFile); 
+                }
             }
 
             // Save file

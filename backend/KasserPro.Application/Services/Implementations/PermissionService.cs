@@ -221,6 +221,15 @@ public class PermissionService : IPermissionService
                 DescriptionAr = "عمل مرتجعات",
                 IsDefault = false
             },
+            new PermissionInfoDto
+            {
+                Key = Permission.OrdersCreate.ToString(),
+                Group = "Orders",
+                GroupAr = "الطلبات",
+                Description = "Create and update orders",
+                DescriptionAr = "إنشاء وتعديل الطلبات",
+                IsDefault = false
+            },
 
             // Products
             new PermissionInfoDto
@@ -312,6 +321,15 @@ public class PermissionService : IPermissionService
                 DescriptionAr = "إنشاء مصروف",
                 IsDefault = false
             },
+            new PermissionInfoDto
+            {
+                Key = Permission.ExpensesManage.ToString(),
+                Group = "Expenses",
+                GroupAr = "المصروفات",
+                Description = "Manage expenses",
+                DescriptionAr = "إدارة المصروفات",
+                IsDefault = false
+            },
 
             // Inventory
             new PermissionInfoDto
@@ -343,6 +361,15 @@ public class PermissionService : IPermissionService
                 GroupAr = "الخزينة",
                 Description = "View cash register",
                 DescriptionAr = "عرض الخزينة",
+                IsDefault = false
+            },
+            new PermissionInfoDto
+            {
+                Key = Permission.CashRegisterManage.ToString(),
+                Group = "Cash Register",
+                GroupAr = "الخزينة",
+                Description = "Manage cash register transactions",
+                DescriptionAr = "إدارة حركات الخزينة",
                 IsDefault = false
             },
 

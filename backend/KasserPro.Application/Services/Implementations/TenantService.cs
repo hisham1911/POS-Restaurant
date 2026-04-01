@@ -1,5 +1,6 @@
 namespace KasserPro.Application.Services.Implementations;
 
+using KasserPro.Application.Common;
 using KasserPro.Application.Common.Interfaces;
 using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Tenants;
@@ -29,7 +30,7 @@ public class TenantService : ITenantService
     {
         var tenant = await _unitOfWork.Tenants.GetByIdAsync(_currentUser.TenantId);
         if (tenant == null)
-            return ApiResponse<TenantDto>.Fail("الشركة غير موجودة");
+            return ApiResponse<TenantDto>.Fail(ErrorCodes.TENANT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.TENANT_NOT_FOUND));
 
         return ApiResponse<TenantDto>.Ok(MapToDto(tenant));
     }
@@ -38,7 +39,7 @@ public class TenantService : ITenantService
     {
         var tenant = await _unitOfWork.Tenants.GetByIdAsync(_currentUser.TenantId);
         if (tenant == null)
-            return ApiResponse<TenantDto>.Fail("الشركة غير موجودة");
+            return ApiResponse<TenantDto>.Fail(ErrorCodes.TENANT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.TENANT_NOT_FOUND));
 
         // Update basic info
         tenant.Name = dto.Name;
@@ -52,7 +53,7 @@ public class TenantService : ITenantService
         {
             // Validate tax rate (0-100)
             if (dto.TaxRate.Value < 0 || dto.TaxRate.Value > 100)
-                return ApiResponse<TenantDto>.Fail("نسبة الضريبة يجب أن تكون بين 0 و 100");
+                return ApiResponse<TenantDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
 
             tenant.TaxRate = dto.TaxRate.Value;
         }
@@ -117,7 +118,7 @@ public class TenantService : ITenantService
             _logger.LogWarning(
                 "SystemOwner tenant creation rejected due to weak password policy for AdminEmail={AdminEmail}",
                 normalizedAdminEmail);
-            return ApiResponse<CreateTenantResponse>.Fail("كلمة المرور لا تحقق متطلبات الأمان");
+            return ApiResponse<CreateTenantResponse>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
         }
 
         // Validate tenant name uniqueness
@@ -129,7 +130,7 @@ public class TenantService : ITenantService
             _logger.LogWarning(
                 "SystemOwner tenant creation rejected because tenant name already exists. TenantName={TenantName}",
                 normalizedTenantName);
-            return ApiResponse<CreateTenantResponse>.Fail("اسم الشركة مستخدم بالفعل");
+            return ApiResponse<CreateTenantResponse>.Fail(ErrorCodes.CONFLICT, ErrorMessages.Get(ErrorCodes.CONFLICT));
         }
 
         // Validate email uniqueness
@@ -141,7 +142,7 @@ public class TenantService : ITenantService
             _logger.LogWarning(
                 "SystemOwner tenant creation rejected because admin email already exists. AdminEmail={AdminEmail}",
                 normalizedAdminEmail);
-            return ApiResponse<CreateTenantResponse>.Fail("البريد الإلكتروني مستخدم بالفعل");
+            return ApiResponse<CreateTenantResponse>.Fail(ErrorCodes.CONFLICT, ErrorMessages.Get(ErrorCodes.CONFLICT));
         }
 
         // Generate unique slug from tenant name
@@ -257,7 +258,7 @@ public class TenantService : ITenantService
                 "SystemOwner tenant creation failed and rolled back for TenantName={TenantName}, AdminEmail={AdminEmail}",
                 normalizedTenantName,
                 normalizedAdminEmail);
-            return ApiResponse<CreateTenantResponse>.Fail("فشل في إنشاء الشركة. الرجاء المحاولة مرة أخرى");
+            return ApiResponse<CreateTenantResponse>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR));
         }
     }
 
@@ -295,7 +296,7 @@ public class TenantService : ITenantService
     {
         var tenant = await _unitOfWork.Tenants.GetByIdAsync(tenantId);
         if (tenant == null)
-            return ApiResponse<bool>.Fail("الشركة غير موجودة");
+            return ApiResponse<bool>.Fail(ErrorCodes.TENANT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.TENANT_NOT_FOUND));
 
         if (tenant.IsActive == isActive)
             return ApiResponse<bool>.Ok(true, isActive ? "الشركة مفعلة بالفعل" : "الشركة معطلة بالفعل");

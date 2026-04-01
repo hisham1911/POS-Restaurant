@@ -13,6 +13,7 @@ public enum Permission
     // Orders
     OrdersView         = 200,
     OrdersRefund       = 201,
+    OrdersCreate       = 202,
 
     // Products
     ProductsView       = 300,
@@ -33,6 +34,7 @@ public enum Permission
     // Expenses
     ExpensesView       = 700,
     ExpensesCreate     = 701,
+    ExpensesManage     = 702,
 
     // Inventory
     InventoryView      = 800,
@@ -42,6 +44,7 @@ public enum Permission
 
     // Cash Register
     CashRegisterView   = 1000,
+    CashRegisterManage = 1001,
 
     // Branches
     BranchesView       = 1100,

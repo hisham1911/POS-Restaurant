@@ -24,7 +24,8 @@ public static class TestHelpers
         int branchId,
         string email = "test@test.com",
         string name = "Test User",
-        string role = "Cashier")
+        string role = "Cashier",
+        IEnumerable<string>? permissions = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(JwtKey));
         var claims = new List<Claim>
@@ -36,6 +37,11 @@ public static class TestHelpers
             new(ClaimTypes.Name, name),
             new(ClaimTypes.Role, role)
         };
+
+        foreach (var permission in permissions ?? new[] { "OrdersView", "OrdersCreate" })
+        {
+            claims.Add(new Claim("permission", permission));
+        }
 
         var token = new JwtSecurityToken(
             issuer: JwtIssuer,

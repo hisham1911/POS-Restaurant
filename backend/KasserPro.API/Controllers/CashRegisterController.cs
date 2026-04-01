@@ -75,6 +75,7 @@ public class CashRegisterController : ControllerBase
     /// Create a manual deposit transaction
     /// </summary>
     [HttpPost("deposit")]
+    [HasPermission(Permission.CashRegisterManage)]
     public async Task<IActionResult> Deposit([FromBody] CreateCashRegisterTransactionRequest request)
     {
         // Force type to Deposit
@@ -92,6 +93,7 @@ public class CashRegisterController : ControllerBase
     /// Create a manual withdrawal transaction
     /// </summary>
     [HttpPost("withdraw")]
+    [HasPermission(Permission.CashRegisterManage)]
     public async Task<IActionResult> Withdraw([FromBody] CreateCashRegisterTransactionRequest request)
     {
         // Force type to Withdrawal

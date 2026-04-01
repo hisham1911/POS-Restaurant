@@ -3,6 +3,8 @@ namespace KasserPro.API.Controllers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using KasserPro.Application.Common;
+using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Orders;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.API.Hubs;
@@ -72,6 +74,7 @@ public class OrdersController : ControllerBase
     }
 
     [HttpPost]
+    [HasPermission(Permission.OrdersCreate)]
     public async Task<IActionResult> Create([FromBody] CreateOrderRequest request)
     {
         var userId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
@@ -80,6 +83,7 @@ public class OrdersController : ControllerBase
     }
 
     [HttpPost("{id}/items")]
+    [HasPermission(Permission.OrdersCreate)]
     public async Task<IActionResult> AddItem(int id, [FromBody] AddOrderItemRequest request)
     {
         var result = await _orderService.AddItemAsync(id, request);
@@ -90,6 +94,7 @@ public class OrdersController : ControllerBase
     /// Add a custom POS item (not from product catalog) to an order
     /// </summary>
     [HttpPost("{id}/items/custom")]
+    [HasPermission(Permission.OrdersCreate)]
     public async Task<IActionResult> AddCustomItem(int id, [FromBody] AddCustomItemRequest request)
     {
         var result = await _orderService.AddCustomItemAsync(id, request);
@@ -97,6 +102,7 @@ public class OrdersController : ControllerBase
     }
 
     [HttpDelete("{id}/items/{itemId}")]
+    [HasPermission(Permission.OrdersCreate)]
     public async Task<IActionResult> RemoveItem(int id, int itemId)
     {
         var result = await _orderService.RemoveItemAsync(id, itemId);
@@ -104,6 +110,7 @@ public class OrdersController : ControllerBase
     }
 
     [HttpPost("{id}/complete")]
+    [HasPermission(Permission.OrdersCreate)]
     public async Task<IActionResult> Complete(int id, [FromBody] CompleteOrderRequest request)
     {
         var result = await _orderService.CompleteAsync(id, request);
@@ -203,6 +210,7 @@ public class OrdersController : ControllerBase
     }
 
     [HttpPost("{id}/cancel")]
+    [HasPermission(Permission.OrdersCreate)]
     public async Task<IActionResult> Cancel(int id, [FromBody] CancelOrderRequest? request)
     {
         var result = await _orderService.CancelAsync(id, request?.Reason);
@@ -221,7 +229,7 @@ public class OrdersController : ControllerBase
         // For full refund (no items), reason is required
         var isPartialRefund = request?.Items != null && request.Items.Count > 0;
         if (!isPartialRefund && string.IsNullOrWhiteSpace(request?.Reason))
-            return BadRequest(new { Success = false, Message = "سبب الاسترجاع مطلوب للاسترجاع الكامل" });
+            return BadRequest(ApiResponse<object>.Fail(ErrorCodes.VALIDATION_ERROR, "سبب الاسترجاع مطلوب للاسترجاع الكامل"));
 
         var userId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
 
@@ -252,7 +260,7 @@ public class OrdersController : ControllerBase
 
         // Only print completed orders
         if (order.Status != "Completed" && order.Status != "PartiallyRefunded" && order.Status != "Refunded")
-            return BadRequest(new { Success = false, Message = "يمكن طباعة الطلبات المكتملة فقط" });
+            return BadRequest(ApiResponse<object>.Fail(ErrorCodes.ORDER_INVALID_STATE_TRANSITION, ErrorMessages.Get(ErrorCodes.ORDER_INVALID_STATE_TRANSITION)));
 
         try
         {
@@ -334,12 +342,12 @@ public class OrdersController : ControllerBase
 
             _logger.LogInformation("Print command sent for order {OrderId} to branch group {BranchId}", order.Id, branchId);
 
-            return Ok(new { Success = true, Message = "تم إرسال أمر الطباعة بنجاح" });
+            return Ok(ApiResponse<bool>.Ok(true, "تم إرسال أمر الطباعة بنجاح"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send print command for order {OrderId}", id);
-            return StatusCode(500, new { Success = false, Message = "فشل إرسال أمر الطباعة" });
+            return StatusCode(500, ApiResponse<object>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR)));
         }
     }
 

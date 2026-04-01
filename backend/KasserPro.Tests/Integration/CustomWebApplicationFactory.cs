@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using KasserPro.Infrastructure.Data;
@@ -18,6 +19,17 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.ConfigureAppConfiguration((_, configBuilder) =>
+        {
+            configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Jwt:Key"] = "YourSuperSecretKeyHere_MustBe32Characters!",
+                ["Jwt:Issuer"] = "KasserPro",
+                ["Jwt:Audience"] = "KasserPro",
+                ["Jwt:ExpiryInHours"] = "24"
+            });
+        });
+
         builder.ConfigureServices(services =>
         {
             // Remove ALL DbContext-related registrations

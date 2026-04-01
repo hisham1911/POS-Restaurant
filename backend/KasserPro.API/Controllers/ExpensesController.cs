@@ -83,6 +83,7 @@ public class ExpensesController : ControllerBase
     /// Update an expense (Draft only)
     /// </summary>
     [HttpPut("{id}")]
+    [HasPermission(Permission.ExpensesManage)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateExpenseRequest request)
     {
         var result = await _expenseService.UpdateAsync(id, request);
@@ -97,6 +98,7 @@ public class ExpensesController : ControllerBase
     /// Delete an expense (Draft only)
     /// </summary>
     [HttpDelete("{id}")]
+    [HasPermission(Permission.ExpensesManage)]
     public async Task<IActionResult> Delete(int id)
     {
         var result = await _expenseService.DeleteAsync(id);

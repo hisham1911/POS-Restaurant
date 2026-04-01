@@ -45,7 +45,7 @@ interface ApiResponse<T> {
 ```csharp
 // Success
 return Ok(ApiResponse<ProductDto>.Success(dto));
-return Ok(ApiResponse<Guid>.Success(id, "تم الإنشاء بنجاح"));
+return Ok(ApiResponse<int>.Success(id, "تم الإنشاء بنجاح"));
 
 // Fail — دايمًا ErrorCode + Message
 return BadRequest(ApiResponse<object>.Fail(ErrorCodes.PRODUCT_NOT_FOUND,
@@ -94,7 +94,7 @@ if (response.data?.success === false) { ... } // مش بالطريقة دي
 | Header | نوعه | القيمة | ملاحظة |
 |--------|------|--------|--------|
 | `Authorization` | إلزامي | `Bearer {jwt_token}` | كل endpoint ما عدا `/api/auth/login` و `/api/health` |
-| `X-Branch-Id` | إلزامي | `{branchId: Guid}` | كل endpoint ما عدا login وhealth وtenant-level endpoints |
+| `X-Branch-Id` | إلزامي | `{branchId: int}` | كل endpoint ما عدا login وhealth وtenant-level endpoints |
 | `X-Idempotency-Key` | إلزامي للـ writes | `{uuid}` | POST/PUT/DELETE على financial operations |
 | `Content-Type` | للـ body | `application/json` | POST/PUT requests |
 
@@ -215,9 +215,8 @@ if (error.message === 'المنتج غير موجود') { ... }
 | Endpoint | Method | Auth | Headers | Request Body | Response |
 |----------|--------|------|---------|--------------|----------|
 | `/api/auth/login` | POST | ❌ | - | `LoginRequest` | `ApiResponse<LoginResponse>` |
-| `/api/auth/refresh` | POST | ✅ | Bearer | `RefreshRequest` | `ApiResponse<LoginResponse>` |
-| `/api/auth/logout` | POST | ✅ | Bearer | - | `ApiResponse<bool>` |
-| `/api/auth/change-password` | POST | ✅ | Bearer + Branch | `ChangePasswordRequest` | `ApiResponse<bool>` |
+| `/api/auth/register` | POST | ✅ | Bearer | `RegisterRequest` | `ApiResponse<bool>` |
+| `/api/auth/me` | GET | ✅ | Bearer | - | `ApiResponse<UserInfo>` |
 
 ```typescript
 interface LoginRequest {
@@ -226,19 +225,25 @@ interface LoginRequest {
 }
 
 interface LoginResponse {
-  token: string;
-  refreshToken: string;
+  accessToken: string;
+  expiresAt: string; // ISO 8601 UTC
   user: {
-    id: string;
+    id: number;
     name: string;
     email: string;
     role: 'Admin' | 'Cashier' | 'SystemOwner';
-    tenantId: string;
-    branchId: string;
     permissions: string[]; // Permission enum values
   };
 }
 ```
+
+### New Permission Values
+
+| Permission | Value | Usage |
+|-----------|-------|-------|
+| `OrdersCreate` | `202` | Create/update/complete/cancel orders and open/close shifts |
+| `ExpensesManage` | `702` | Update and delete expenses |
+| `CashRegisterManage` | `1001` | Deposit and withdraw cash register transactions |
 
 ---
 
@@ -248,17 +253,17 @@ interface LoginResponse {
 |----------|--------|------------|---------|----------|
 | `/api/products` | GET | `ProductsView` | Query params | `ApiResponse<PagedResult<ProductDto>>` |
 | `/api/products/{id}` | GET | `ProductsView` | - | `ApiResponse<ProductDto>` |
-| `/api/products` | POST | `ProductsCreate` | `CreateProductDto` | `ApiResponse<Guid>` |
-| `/api/products/{id}` | PUT | `ProductsEdit` | `UpdateProductDto` | `ApiResponse<bool>` |
-| `/api/products/{id}` | DELETE | `ProductsDelete` | - | `ApiResponse<bool>` |
+| `/api/products` | POST | `ProductsManage` | `CreateProductDto` | `ApiResponse<int>` |
+| `/api/products/{id}` | PUT | `ProductsManage` | `UpdateProductDto` | `ApiResponse<bool>` |
+| `/api/products/{id}` | DELETE | `ProductsManage` | - | `ApiResponse<bool>` |
 
 ```typescript
 interface ProductDto {
-  id: string;
+  id: number;
   name: string;
   barcode?: string;
   price: number;          // NET price (بدون ضريبة)
-  categoryId: string;
+  categoryId: number;
   categoryName: string;
   isActive: boolean;
   // ❌ مفيش stockQuantity هنا — المخزن في BranchInventory
@@ -268,16 +273,15 @@ interface CreateProductDto {
   name: string;
   barcode?: string;
   price: number;          // لازم >= 0
-  categoryId: string;
+  categoryId: number;
   isActive?: boolean;     // default: true
 }
 
 // ⚠️ تنبيه للفرونت: المخزن بيجي من endpoint منفصل
 interface BranchInventoryDto {
-  productId: string;
+  productId: number;
   productName: string;
   quantity: number;       // ← هنا المخزن الحقيقي (per branch)
-  branchId: string;
   branchName: string;
 }
 ```
@@ -290,18 +294,18 @@ interface BranchInventoryDto {
 |----------|--------|------------|---------|----------|
 | `/api/orders` | GET | `OrdersView` | Filter params | `ApiResponse<PagedResult<OrderDto>>` |
 | `/api/orders/{id}` | GET | `OrdersView` | - | `ApiResponse<OrderDto>` |
-| `/api/orders` | POST | `OrdersCreate` | `CreateOrderDto` | `ApiResponse<Guid>` |
-| `/api/orders/{id}/items` | POST | `OrdersCreate` | `AddOrderItemDto` | `ApiResponse<bool>` |
-| `/api/orders/{id}/items/{itemId}` | DELETE | `OrdersCreate` | - | `ApiResponse<bool>` |
-| `/api/orders/{id}/complete` | POST | `OrdersCreate` | `CompleteOrderDto` | `ApiResponse<OrderReceiptDto>` |
-| `/api/orders/{id}/cancel` | POST | `OrdersCreate` | - | `ApiResponse<bool>` |
-| `/api/orders/{id}/refund` | POST | `OrdersRefund` | `RefundDto` | `ApiResponse<bool>` |
+| `/api/orders` | POST | `OrdersCreate` | `CreateOrderDto` | `ApiResponse<OrderDto>` |
+| `/api/orders/{id}/items` | POST | `OrdersCreate` | `AddOrderItemDto` | `ApiResponse<OrderDto>` |
+| `/api/orders/{id}/items/{itemId}` | DELETE | `OrdersCreate` | - | `ApiResponse<OrderDto>` |
+| `/api/orders/{id}/complete` | POST | `OrdersCreate` | `CompleteOrderDto` | `ApiResponse<OrderDto>` |
+| `/api/orders/{id}/cancel` | POST | `OrdersCreate` | - | `ApiResponse<OrderDto>` |
+| `/api/orders/{id}/refund` | POST | `OrdersRefund` | `RefundDto` | `ApiResponse<OrderDto>` |
 
 ```typescript
 // ⚠️ مهم: OrderType values بالظبط زي الباك-اند
-type OrderType = 'DineIn' | 'Takeaway' | 'Delivery';
-type OrderStatus = 'Draft' | 'Completed' | 'Cancelled' | 'Refunded';
-type PaymentMethod = 'Cash' | 'Card' | 'Fawry';
+type OrderType = 'DineIn' | 'Takeaway' | 'Delivery' | 'Return';
+type OrderStatus = 'Draft' | 'Pending' | 'Completed' | 'Cancelled' | 'Refunded' | 'PartiallyRefunded';
+type PaymentMethod = 'Cash' | 'Card' | 'Fawry' | 'BankTransfer';
 
 interface CreateOrderDto {
   orderType: OrderType;
@@ -311,7 +315,7 @@ interface CreateOrderDto {
 }
 
 interface AddOrderItemDto {
-  productId: string;
+  productId: number;
   quantity: number;       // لازم > 0
   notes?: string;
 }
@@ -323,7 +327,7 @@ interface CompleteOrderDto {
 }
 
 interface OrderDto {
-  id: string;
+  id: number;
   orderNumber: string;
   orderType: OrderType;
   status: OrderStatus;
@@ -352,52 +356,63 @@ interface OrderDto {
 
 | Endpoint | Method | Permission | Request | Response |
 |----------|--------|------------|---------|----------|
-| `/api/shifts` | GET | `OrdersView` | - | `ApiResponse<ShiftDto[]>` |
+| `/api/payments/order/{orderId}` | GET | `OrdersView` | - | `ApiResponse<PaymentDto[]>` |
 | `/api/shifts/current` | GET | `OrdersView` | - | `ApiResponse<ShiftDto?>` |
 | `/api/shifts/open` | POST | `OrdersCreate` | `OpenShiftDto` | `ApiResponse<ShiftDto>` |
-| `/api/shifts/{id}/close` | POST | `OrdersCreate` | `CloseShiftDto` | `ApiResponse<ShiftSummaryDto>` |
+| `/api/shifts/close` | POST | `OrdersCreate` | `CloseShiftDto` | `ApiResponse<ShiftDto>` |
+| `/api/shifts/history` | GET | `OrdersView` | - | `ApiResponse<ShiftDto[]>` |
+| `/api/shifts/{id}/handover` | POST | `ShiftsManage` | `HandoverShiftRequest` | `ApiResponse<ShiftDto>` |
+| `/api/shifts/{id}/update-activity` | POST | `OrdersView` | - | `ApiResponse<ShiftDto>` |
+| `/api/shifts/warnings` | GET | `OrdersView` | - | `ApiResponse<ShiftWarningDto>` |
 
 ```typescript
 interface ShiftDto {
-  id: string;
-  status: 'Open' | 'Closed';
-  openedAt: string;
-  closedAt?: string;
-  openedBy: string;     // userId
-  openedByName: string;
+  id: number;
   openingBalance: number;
-  currentBalance?: number;
+  closingBalance?: number;
   totalSales?: number;
+  totalCash?: number;
 }
-
-// ⚠️ قبل أي order creation — تحقق من وجود شيفت مفتوح
-// لو مفيش → error code: NO_OPEN_SHIFT → redirect للـ shifts page
 ```
 
----
 
 ### 📊 Reports Module
 
 | Endpoint | Method | Permission | Notes |
 |----------|--------|------------|-------|
+| `/api/reports/daily` | GET | `ReportsView` | Daily summary report |
 | `/api/reports/sales` | GET | `ReportsView` | Date range required |
-| `/api/reports/inventory` | GET | `ReportsView` | Per-branch |
-| `/api/reports/financial` | GET | `ReportsView` | Admin/SystemOwner only |
-| `/api/reports/*/export` | GET | `ReportsExport` | Returns file (not JSON) |
+| `/api/reports/daily/print` | POST | `ReportsView` | Sends print command |
+| `/api/inventory-reports/branch/{branchId}` | GET | `ReportsView` | Branch inventory report |
+| `/api/inventory-reports/unified` | GET | `ReportsView` + `Admin/SystemOwner` | Unified inventory across branches |
+| `/api/inventory-reports/transfer-history` | GET | `ReportsView` | Transfer history report |
+| `/api/inventory-reports/low-stock-summary` | GET | `ReportsView` | Low stock summary |
+| `/api/inventory-reports/branch/{branchId}/export` | GET | `ReportsView` | CSV export for branch inventory |
+| `/api/inventory-reports/unified/export` | GET | `ReportsView` + `Admin/SystemOwner` | CSV export for unified inventory |
+| `/api/financial-reports/profit-loss` | GET | `ReportsView` | Profit & loss report |
+| `/api/financial-reports/expenses` | GET | `ReportsView` | Expenses report |
+| `/api/customer-reports/top-customers` | GET | `ReportsView` | Top customers report |
+| `/api/customer-reports/debts` | GET | `ReportsView` | Customer debts report |
+| `/api/customer-reports/activity` | GET | `ReportsView` | Customer activity report |
+| `/api/employee-reports/cashier-performance` | GET | `ReportsView` | Cashier performance report |
+| `/api/employee-reports/shifts` | GET | `ReportsView` | Detailed shifts report |
+| `/api/employee-reports/sales` | GET | `ReportsView` | Sales by employee report |
+| `/api/product-reports/movement` | GET | `ReportsView` | Product movement report |
+| `/api/product-reports/profitability` | GET | `ReportsView` | Most profitable products |
+| `/api/product-reports/slow` | GET | `ReportsView` | Slow-moving products |
+| `/api/product-reports/cogs` | GET | `ReportsView` | Cost of goods sold report |
+| `/api/supplier-reports/purchases` | GET | `ReportsView` | Supplier purchases report |
+| `/api/supplier-reports/debts` | GET | `ReportsView` | Supplier debts report |
+| `/api/supplier-reports/performance` | GET | `ReportsView` | Supplier performance report |
 
 ```typescript
-// ⚠️ Export endpoints بيرجعوا file مش ApiResponse
-// الفرونت يستخدم window.open() أو fetch مع blob
-
-// Date range format: ISO 8601
 interface ReportFilter {
-  startDate: string;  // "2026-01-01"
-  endDate: string;    // "2026-03-31"
-  branchId?: string;  // للـ Admin فقط عشان يشوف فروع تانية
+  startDate: string;
+  endDate: string;
+  branchId?: number;
 }
 ```
 
----
 
 ### 🏢 Tenants & Branches Module
 
@@ -412,16 +427,15 @@ interface ReportFilter {
 
 ```typescript
 interface BranchDto {
-  id: string;
+  id: number;
   name: string;
   address?: string;
   phone?: string;
   isActive: boolean;
-  tenantId: string;
 }
 
 interface TenantDto {
-  id: string;
+  id: number;
   name: string;
   taxRate: number;        // مثلاً 14 (مش 0.14)
   isTaxEnabled: boolean;
@@ -432,39 +446,37 @@ interface TenantDto {
 
 ---
 
-### ⚙️ System Module (SystemOwner فقط)
+### ⚙️ System Module
 
 | Endpoint | Method | Auth | Notes |
 |----------|--------|------|-------|
-| `/api/system/backup` | POST | `SystemOwner` | Creates manual backup |
-| `/api/system/restore/{filename}` | POST | `SystemOwner` | Restore from backup |
-| `/api/system/backups` | GET | `SystemOwner` | List available backups |
-| `/api/system/maintenance` | POST | `SystemOwner` | Toggle maintenance mode |
-| `/api/health` | GET | `AllowAnonymous` | Basic health check |
+| `/api/admin/backup` | POST | `Admin/SystemOwner` | Creates manual backup |
+| `/api/admin/restore` | POST | `Admin/SystemOwner` | Restore from backup filename |
+| `/api/admin/backups` | GET | `Admin/SystemOwner` | List available backups |
+| `/api/admin/restore/upload` | POST | `Admin/SystemOwner` | Restore from uploaded `.db` backup |
+| `/api/system/info` | GET | `Admin/SystemOwner` | LAN and host information |
+| `/api/system/health` | GET | `AllowAnonymous` | Lightweight system health |
+| `/api/health` | GET | `AllowAnonymous` | Primary API health check |
 | `/api/health/deep` | GET | `Admin/SystemOwner` | Detailed health |
 
-> ⚠️ **مهم للفرونت:** `/api/system/credentials` **اتشال تمامًا** — لو في أي كود قديم بيستدعيه امسحه.
-> ⚠️ **مهم للفرونت:** `/api/system/migrate-inventory` **اتشال** — `migrateInventory` في `systemApi.ts` dead code لازم يتشال.
-
----
 
 ### 📡 Health Check Response
 
 ```typescript
-// GET /api/health — AllowAnonymous
 interface BasicHealthResponse {
-  status: 'ok' | 'degraded' | 'unhealthy';
+  status: 'healthy' | 'degraded' | 'unhealthy';
   timestamp: string;
-  // ⚠️ مش بيرجع dbPath أو environment لأسباب أمنية
+  version: string;
+  database: { status: string };
+  uptime: string;
 }
 
-// GET /api/health/deep — Admin/SystemOwner فقط
 interface DeepHealthResponse {
-  status: 'ok' | 'degraded' | 'unhealthy';
+  status: 'healthy' | 'degraded' | 'unhealthy';
   database: { status: string; responseTime: number; };
   disk: { freeGB: number; totalGB: number; };
   memory: { usedMB: number; totalMB: number; };
-  uptime: number; // seconds
+  uptime: number;
 }
 ```
 
@@ -472,13 +484,12 @@ interface DeepHealthResponse {
 
 ## 5. عقد الـ Real-time (SignalR)
 
-### DeviceHub — `/hubs/device`
+### DeviceHub — `/hubs/devices`
 
 ```typescript
-// الـ connection
 const connection = new signalR.HubConnectionBuilder()
-  .withUrl('/hubs/device', {
-    accessTokenFactory: () => getToken(), // JWT token
+  .withUrl('/hubs/devices', {
+    accessTokenFactory: () => getToken(),
   })
   .withAutomaticReconnect()
   .build();
@@ -488,24 +499,25 @@ const connection = new signalR.HubConnectionBuilder()
 
 | Event | البيانات | الموقف |
 |-------|---------|--------|
-| `ShiftWarning` | `{ shiftId, openSince, hoursOpen }` | شيفت مفتوح أكتر من المعتاد |
-| `LowStockAlert` | `{ productId, productName, quantity }` | المخزن وصل للـ threshold |
-| `MaintenanceStarted` | `{ message, estimatedMinutes }` | بدأت الصيانة |
-| `MaintenanceEnded` | `{}` | انتهت الصيانة |
+| `PrintReceipt` | `PrintCommandDto` | إرسال أمر طباعة للإيصال أو التقرير |
+| `PrintDebtPaymentReceipt` | `PrintCommandDto` | إرسال أمر طباعة لإيصال سداد مديونية عميل |
 
 ### Events من Client → Server
 
+| Event | البيانات | الموقف |
+|-------|---------|--------|
+| `PrintCompleted` | `PrintCompletedEventDto` | Bridge App يبلغ الـ API بنتيجة الطباعة |
+
 ```typescript
-// إرسال إشعار للـ device
-connection.invoke('NotifyDevice', {
-  deviceId: string,
-  message: string,
-  type: 'Info' | 'Warning' | 'Error'
+connection.invoke('PrintCompleted', {
+  commandId: string,
+  success: boolean,
+  errorMessage?: string,
+  completedAt: string
 });
 ```
 
 ---
-
 ## 6. قواعد الفرونت الإلزامية
 
 ### ❌ ممنوع تمامًا
@@ -617,7 +629,7 @@ catch { } // بيخفي bugs — على الأقل log!
 
 ```csharp
 // 1. ✅ كل endpoint = [HasPermission]
-[HasPermission(Permission.ProductsCreate)]
+[HasPermission(Permission.ProductsManage)]
 public async Task<IActionResult> Create(...)
 
 // 2. ✅ كل query = TenantId + BranchId
@@ -731,3 +743,8 @@ await _unitOfWork.SaveChangesAsync(ct);
 > **Last Updated:** March 2026  
 > **Review Trigger:** عند أي تغيير في DTOs أو Endpoints أو Error Codes  
 > **الهدف:** Zero surprises بين الباك-اند والفرونت
+
+
+
+
+

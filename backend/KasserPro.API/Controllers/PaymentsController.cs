@@ -2,34 +2,24 @@ namespace KasserPro.API.Controllers;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using KasserPro.Application.Common.Interfaces;
-using KasserPro.Application.DTOs.Common;
+using KasserPro.Application.Services.Interfaces;
+using KasserPro.Domain.Enums;
+using KasserPro.API.Middleware;
 
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
 public class PaymentsController : ControllerBase
 {
-    private readonly IUnitOfWork _unitOfWork;
+    private readonly IPaymentQueryService _paymentQueryService;
 
-    public PaymentsController(IUnitOfWork unitOfWork) => _unitOfWork = unitOfWork;
+    public PaymentsController(IPaymentQueryService paymentQueryService) => _paymentQueryService = paymentQueryService;
 
     [HttpGet("order/{orderId}")]
-    public async Task<IActionResult> GetByOrder(int orderId)
+    [HasPermission(Permission.OrdersView)]
+    public async Task<IActionResult> GetByOrder(int orderId, CancellationToken cancellationToken)
     {
-        var payments = await _unitOfWork.Payments.Query()
-            .Where(p => p.OrderId == orderId)
-            .Select(p => new
-            {
-                p.Id,
-                Method = p.Method.ToString(),
-                p.Amount,
-                p.Reference,
-                p.CreatedAt
-            })
-            .ToListAsync();
-
-        return Ok(ApiResponse<object>.Ok(payments));
+        var result = await _paymentQueryService.GetByOrderAsync(orderId, cancellationToken);
+        return Ok(result);
     }
 }

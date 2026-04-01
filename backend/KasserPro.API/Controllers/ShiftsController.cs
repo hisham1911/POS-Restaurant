@@ -1,7 +1,9 @@
-namespace KasserPro.API.Controllers;
+﻿namespace KasserPro.API.Controllers;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using KasserPro.Application.Common;
+using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Shifts;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Enums;
@@ -23,53 +25,53 @@ public class ShiftsController : ControllerBase
     }
 
     [HttpGet("current")]
+    [HasPermission(Permission.OrdersView)]
     public async Task<IActionResult> GetCurrent()
     {
         var userId = GetUserId();
         if (userId <= 0)
-            return Unauthorized(new { success = false, message = "معرف المستخدم غير صالح في التوكن" });
-        
+            return Unauthorized(ApiResponse<object>.Fail(ErrorCodes.UNAUTHORIZED, ErrorMessages.Get(ErrorCodes.UNAUTHORIZED)));
+
         var result = await _shiftService.GetCurrentAsync(userId);
-        // Always return 200 OK, even if no shift is open (data will be null)
         return Ok(result);
     }
 
     [HttpPost("open")]
+    [HasPermission(Permission.OrdersCreate)]
     public async Task<IActionResult> Open([FromBody] OpenShiftRequest request)
     {
         var userId = GetUserId();
         if (userId <= 0)
-            return Unauthorized(new { success = false, message = "معرف المستخدم غير صالح في التوكن" });
-        
+            return Unauthorized(ApiResponse<object>.Fail(ErrorCodes.UNAUTHORIZED, ErrorMessages.Get(ErrorCodes.UNAUTHORIZED)));
+
         var result = await _shiftService.OpenAsync(request, userId);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
     [HttpPost("close")]
+    [HasPermission(Permission.OrdersCreate)]
     public async Task<IActionResult> Close([FromBody] CloseShiftRequest request)
     {
         var userId = GetUserId();
         if (userId <= 0)
-            return Unauthorized(new { success = false, message = "معرف المستخدم غير صالح في التوكن" });
-        
+            return Unauthorized(ApiResponse<object>.Fail(ErrorCodes.UNAUTHORIZED, ErrorMessages.Get(ErrorCodes.UNAUTHORIZED)));
+
         var result = await _shiftService.CloseAsync(request, userId);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
     [HttpGet("history")]
+    [HasPermission(Permission.OrdersView)]
     public async Task<IActionResult> GetHistory()
     {
         var userId = GetUserId();
         if (userId <= 0)
-            return Unauthorized(new { success = false, message = "معرف المستخدم غير صالح في التوكن" });
-        
+            return Unauthorized(ApiResponse<object>.Fail(ErrorCodes.UNAUTHORIZED, ErrorMessages.Get(ErrorCodes.UNAUTHORIZED)));
+
         var result = await _shiftService.GetUserShiftsAsync(userId);
         return Ok(result);
     }
 
-    /// <summary>
-    /// Force close a shift (Admin only)
-    /// </summary>
     [HttpPost("{id}/force-close")]
     [Authorize(Roles = "Admin")]
     [HasPermission(Permission.ShiftsManage)]
@@ -79,29 +81,22 @@ public class ShiftsController : ControllerBase
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    /// <summary>
-    /// Handover shift to another user
-    /// </summary>
     [HttpPost("{id}/handover")]
+    [HasPermission(Permission.ShiftsManage)]
     public async Task<IActionResult> Handover(int id, [FromBody] HandoverShiftRequest request)
     {
         var result = await _shiftService.HandoverAsync(id, request);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    /// <summary>
-    /// Update last activity timestamp for a shift
-    /// </summary>
     [HttpPost("{id}/update-activity")]
+    [HasPermission(Permission.OrdersView)]
     public async Task<IActionResult> UpdateActivity(int id)
     {
         var result = await _shiftService.UpdateActivityAsync(id);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
-    /// <summary>
-    /// Get all active shifts in the current branch
-    /// </summary>
     [HttpGet("active")]
     [HasPermission(Permission.ShiftsManage)]
     public async Task<IActionResult> GetActiveShifts()
@@ -110,16 +105,14 @@ public class ShiftsController : ControllerBase
         return Ok(result);
     }
 
-    /// <summary>
-    /// Get shift warnings for current user's shift
-    /// </summary>
     [HttpGet("warnings")]
+    [HasPermission(Permission.OrdersView)]
     public async Task<IActionResult> GetShiftWarnings()
     {
         var userId = GetUserId();
         if (userId <= 0)
-            return Unauthorized(new { success = false, message = "معرف المستخدم غير صالح في التوكن" });
-        
+            return Unauthorized(ApiResponse<object>.Fail(ErrorCodes.UNAUTHORIZED, ErrorMessages.Get(ErrorCodes.UNAUTHORIZED)));
+
         var result = await _shiftService.GetShiftWarningsAsync(userId);
         return Ok(result);
     }

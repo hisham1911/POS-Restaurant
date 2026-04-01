@@ -1226,7 +1226,8 @@ public class OrderService : IOrderService
             Id = p.Id,
             Method = p.Method.ToString(),
             Amount = p.Amount,
-            Reference = p.Reference
+            Reference = p.Reference,
+            CreatedAt = p.CreatedAt
         }).ToList() ?? new()
     };
 }

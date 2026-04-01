@@ -1,14 +1,12 @@
-namespace KasserPro.API.Controllers;
+﻿namespace KasserPro.API.Controllers;
 
+using KasserPro.Application.Common;
 using KasserPro.Application.DTOs.Backup;
+using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Security.Claims;
 
-/// <summary>
-/// P2: Admin endpoints for backup, restore, and system management
-/// </summary>
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
@@ -28,10 +26,6 @@ public class AdminController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>
-    /// P2: Creates a manual backup
-    /// Requires: Admin or SystemOwner role
-    /// </summary>
     [HttpPost("backup")]
     [Authorize(Roles = "Admin,SystemOwner")]
     public async Task<ActionResult<BackupResult>> CreateBackup()
@@ -40,33 +34,17 @@ public class AdminController : ControllerBase
         _logger.LogInformation("Manual backup requested by user {UserId}", userId);
 
         var result = await _backupService.CreateBackupAsync("manual");
-
-        if (result.Success)
-        {
-            return Ok(result);
-        }
-        else
-        {
-            return StatusCode(500, result);
-        }
+        return result.Success ? Ok(result) : StatusCode(500, result);
     }
 
-    /// <summary>
-    /// P2: Lists all available backups
-    /// Requires: Admin or SystemOwner role
-    /// </summary>
     [HttpGet("backups")]
     [Authorize(Roles = "Admin,SystemOwner")]
     public async Task<ActionResult<List<BackupInfo>>> ListBackups()
     {
         var backups = await _backupService.ListBackupsAsync();
-        return Ok(backups);
+        return Ok(ApiResponse<List<BackupInfo>>.Ok(backups));
     }
 
-    /// <summary>
-    /// P2: Restores database from backup
-    /// Requires: Admin or SystemOwner role (critical operation)
-    /// </summary>
     [HttpPost("restore")]
     [Authorize(Roles = "Admin,SystemOwner")]
     public async Task<ActionResult<RestoreResult>> RestoreBackup([FromBody] RestoreRequest request)
@@ -76,21 +54,9 @@ public class AdminController : ControllerBase
             userId, request.BackupFileName);
 
         var result = await _restoreService.RestoreFromBackupAsync(request.BackupFileName);
-
-        if (result.Success)
-        {
-            return Ok(result);
-        }
-        else
-        {
-            return StatusCode(500, result);
-        }
+        return result.Success ? Ok(result) : StatusCode(500, result);
     }
 
-    /// <summary>
-    /// Downloads a specific backup file to the client
-    /// Requires: Admin or SystemOwner role
-    /// </summary>
     [HttpGet("backup/{fileName}/download")]
     [Authorize(Roles = "Admin,SystemOwner")]
     public async Task<IActionResult> DownloadBackup(string fileName)
@@ -98,60 +64,40 @@ public class AdminController : ControllerBase
         var filePath = await _backupService.GetBackupFilePathAsync(fileName);
 
         if (filePath == null)
-        {
-            return NotFound(new { message = "ملف النسخة الاحتياطية غير موجود" });
-        }
+            return NotFound(ApiResponse<object>.Fail(ErrorCodes.NOT_FOUND, ErrorMessages.Get(ErrorCodes.NOT_FOUND)));
 
         var fileBytes = await System.IO.File.ReadAllBytesAsync(filePath);
         return File(fileBytes, "application/octet-stream", fileName);
     }
 
-    /// <summary>
-    /// Restores database from an uploaded backup file (from any location on client machine)
-    /// Requires: Admin or SystemOwner role (critical operation)
-    /// </summary>
     [HttpPost("restore/upload")]
     [Authorize(Roles = "Admin,SystemOwner")]
-    [RequestSizeLimit(500_000_000)] // 500 MB max
+    [RequestSizeLimit(500_000_000)]
     public async Task<ActionResult<RestoreResult>> RestoreFromUpload(IFormFile file)
     {
         if (file == null || file.Length == 0)
-        {
-            return BadRequest(new { message = "يرجى تحديد ملف نسخة احتياطية" });
-        }
+            return BadRequest(ApiResponse<object>.Fail(ErrorCodes.VALIDATION_ERROR, "يرجى تحديد ملف نسخة احتياطية"));
 
         if (!file.FileName.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
-        {
-            return BadRequest(new { message = "نوع الملف غير مدعوم - يجب أن يكون ملف .db" });
-        }
+            return BadRequest(ApiResponse<object>.Fail(ErrorCodes.VALIDATION_ERROR, "نوع الملف غير مدعوم - يجب أن يكون ملف .db"));
 
         var userId = User.FindFirst("userId")?.Value;
         _logger.LogWarning("Restore from uploaded file requested by user {UserId}, file: {FileName} ({Size} bytes)",
             userId, file.FileName, file.Length);
 
-        // Save uploaded file to a temp path
         var tempPath = Path.Combine(Path.GetTempPath(), $"kp-upload-{Guid.NewGuid()}.db");
         try
         {
-            using (var stream = new FileStream(tempPath, FileMode.Create))
+            await using (var stream = new FileStream(tempPath, FileMode.Create))
             {
                 await file.CopyToAsync(stream);
             }
 
             var result = await _restoreService.RestoreFromExternalFileAsync(tempPath);
-
-            if (result.Success)
-            {
-                return Ok(result);
-            }
-            else
-            {
-                return StatusCode(500, result);
-            }
+            return result.Success ? Ok(result) : StatusCode(500, result);
         }
         finally
         {
-            // Clean up temp file
             if (System.IO.File.Exists(tempPath))
             {
                 System.IO.File.Delete(tempPath);
@@ -160,9 +106,6 @@ public class AdminController : ControllerBase
     }
 }
 
-/// <summary>
-/// P2: Request to restore from backup
-/// </summary>
 public class RestoreRequest
 {
     public string BackupFileName { get; set; } = string.Empty;

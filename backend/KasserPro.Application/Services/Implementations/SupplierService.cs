@@ -1,6 +1,7 @@
 namespace KasserPro.Application.Services.Implementations;
 
 using Microsoft.EntityFrameworkCore;
+using KasserPro.Application.Common;
 using KasserPro.Application.Common.Interfaces;
 using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Suppliers;
@@ -50,7 +51,7 @@ public class SupplierService : ISupplierService
             .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == tenantId && !s.IsDeleted);
         
         if (supplier == null)
-            return ApiResponse<SupplierDto>.Fail("المورد غير موجود");
+            return ApiResponse<SupplierDto>.Fail(ErrorCodes.SUPPLIER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.SUPPLIER_NOT_FOUND));
 
         return ApiResponse<SupplierDto>.Ok(new SupplierDto
         {
@@ -72,7 +73,7 @@ public class SupplierService : ISupplierService
     {
         // Validation
         if (string.IsNullOrWhiteSpace(request.Name))
-            return ApiResponse<SupplierDto>.Fail("اسم المورد مطلوب");
+            return ApiResponse<SupplierDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
 
         var supplier = new Supplier
         {
@@ -113,14 +114,14 @@ public class SupplierService : ISupplierService
     {
         // Validation
         if (string.IsNullOrWhiteSpace(request.Name))
-            return ApiResponse<SupplierDto>.Fail("اسم المورد مطلوب");
+            return ApiResponse<SupplierDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
 
         var tenantId = _currentUser.TenantId;
         var supplier = await _unitOfWork.Suppliers.Query()
             .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == tenantId && !s.IsDeleted);
         
         if (supplier == null)
-            return ApiResponse<SupplierDto>.Fail("المورد غير موجود");
+            return ApiResponse<SupplierDto>.Fail(ErrorCodes.SUPPLIER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.SUPPLIER_NOT_FOUND));
 
         supplier.Name = request.Name.Trim();
         supplier.NameEn = request.NameEn?.Trim();
@@ -159,7 +160,7 @@ public class SupplierService : ISupplierService
             .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == tenantId && !s.IsDeleted);
         
         if (supplier == null)
-            return ApiResponse<bool>.Fail("المورد غير موجود");
+            return ApiResponse<bool>.Fail(ErrorCodes.SUPPLIER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.SUPPLIER_NOT_FOUND));
 
         // Soft delete
         supplier.IsDeleted = true;

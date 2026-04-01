@@ -3,6 +3,8 @@ namespace KasserPro.API.Controllers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using KasserPro.Application.Common;
+using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.System;
 using KasserPro.Application.Services.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -67,32 +69,29 @@ public class SystemController : ControllerBase
     /// Get system information (IP, Network status, etc.)
     /// </summary>
     [HttpGet("info")]
-    [AllowAnonymous]
+    [Authorize(Roles = "Admin,SystemOwner")]
     public IActionResult GetSystemInfo()
     {
         try
         {
             var lanIp = GetLanIpAddress();
             var hostname = System.Net.Dns.GetHostName();
-
-            return Ok(new
+            var data = new SystemInfoDto
             {
-                success = true,
-                data = new
-                {
-                    lanIp,
-                    hostname,
-                    port = 5243,
-                    url = $"http://{lanIp}:5243",
-                    timestamp = DateTime.UtcNow,
-                    isOffline = false
-                }
-            });
+                LanIp = lanIp,
+                Hostname = hostname,
+                Port = 5243,
+                Url = $"http://{lanIp}:5243",
+                Timestamp = DateTime.UtcNow,
+                IsOffline = false
+            };
+
+            return Ok(ApiResponse<SystemInfoDto>.Ok(data));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error retrieving system info");
-            return StatusCode(500, new { success = false, message = "Failed to retrieve system information" });
+            return StatusCode(500, ApiResponse<object>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR)));
         }
     }
 
@@ -103,7 +102,11 @@ public class SystemController : ControllerBase
     [AllowAnonymous]
     public IActionResult Health()
     {
-        return Ok(new { success = true, status = "healthy", timestamp = DateTime.UtcNow });
+        return Ok(ApiResponse<object>.Ok(new
+        {
+            status = "healthy",
+            timestamp = DateTime.UtcNow
+        }));
     }
 
     /// <summary>

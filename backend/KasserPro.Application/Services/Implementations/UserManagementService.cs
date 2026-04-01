@@ -2,6 +2,7 @@ namespace KasserPro.Application.Services.Implementations;
 
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using KasserPro.Application.Common;
 using KasserPro.Application.Common.Interfaces;
 using KasserPro.Application.DTOs;
 using KasserPro.Application.DTOs.Common;
@@ -58,7 +59,7 @@ public class UserManagementService : IUserManagementService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting all users");
-            return ApiResponse<List<UserDto>>.Fail("فشل في جلب المستخدمين");
+            return ApiResponse<List<UserDto>>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR));
         }
     }
 
@@ -72,10 +73,10 @@ public class UserManagementService : IUserManagementService
                 .FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted);
 
             if (user == null)
-                return ApiResponse<UserDto>.Fail("المستخدم غير موجود");
+                return ApiResponse<UserDto>.Fail(ErrorCodes.USER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.USER_NOT_FOUND));
 
             if (user.TenantId != _currentUserService.TenantId)
-                return ApiResponse<UserDto>.Fail("غير مصرح بالوصول");
+                return ApiResponse<UserDto>.Fail(ErrorCodes.FORBIDDEN, ErrorMessages.Get(ErrorCodes.FORBIDDEN));
 
             var userDto = new UserDto
             {
@@ -96,7 +97,7 @@ public class UserManagementService : IUserManagementService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting user {UserId}", userId);
-            return ApiResponse<UserDto>.Fail("فشل في جلب بيانات المستخدم");
+            return ApiResponse<UserDto>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR));
         }
     }
 
@@ -106,7 +107,7 @@ public class UserManagementService : IUserManagementService
         {
             var exists = await _unitOfWork.Users.FindAsync(u => u.Email == request.Email);
             if (exists.Any())
-                return ApiResponse<UserDto>.Fail("البريد الإلكتروني مستخدم");
+                return ApiResponse<UserDto>.Fail(ErrorCodes.CONFLICT, ErrorMessages.Get(ErrorCodes.CONFLICT));
 
             var requestedRole = Enum.Parse<UserRole>(request.Role);
             var currentUserRole = Enum.Parse<UserRole>(_currentUserService.Role!);
@@ -114,7 +115,7 @@ public class UserManagementService : IUserManagementService
             if (currentUserRole == UserRole.Admin && requestedRole == UserRole.SystemOwner)
             {
                 _logger.LogWarning("Admin {UserId} tried to create SystemOwner", _currentUserService.UserId);
-                return ApiResponse<UserDto>.Fail("ليس لديك صلاحية إنشاء حساب مالك النظام");
+                return ApiResponse<UserDto>.Fail(ErrorCodes.FORBIDDEN, ErrorMessages.Get(ErrorCodes.FORBIDDEN));
             }
 
             // Branch assignment policy:
@@ -125,7 +126,7 @@ public class UserManagementService : IUserManagementService
             {
                 resolvedBranchId = request.BranchId ?? _currentUserService.BranchId;
                 if (!resolvedBranchId.HasValue)
-                    return ApiResponse<UserDto>.Fail("يجب تحديد فرع للمستخدم الكاشير");
+                    return ApiResponse<UserDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
             }
             else
             {
@@ -173,7 +174,7 @@ public class UserManagementService : IUserManagementService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error creating user");
-            return ApiResponse<UserDto>.Fail("فشل في إنشاء المستخدم");
+            return ApiResponse<UserDto>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR));
         }
     }
 
@@ -183,16 +184,16 @@ public class UserManagementService : IUserManagementService
         {
             var user = await _unitOfWork.Users.GetByIdAsync(userId);
             if (user == null || user.IsDeleted)
-                return ApiResponse<UserDto>.Fail("المستخدم غير موجود");
+                return ApiResponse<UserDto>.Fail(ErrorCodes.USER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.USER_NOT_FOUND));
 
             if (user.TenantId != _currentUserService.TenantId)
-                return ApiResponse<UserDto>.Fail("غير مصرح بالوصول");
+                return ApiResponse<UserDto>.Fail(ErrorCodes.FORBIDDEN, ErrorMessages.Get(ErrorCodes.FORBIDDEN));
 
             if (user.Email != request.Email)
             {
                 var emailExists = await _unitOfWork.Users.FindAsync(u => u.Email == request.Email && u.Id != userId);
                 if (emailExists.Any())
-                    return ApiResponse<UserDto>.Fail("البريد الإلكتروني مستخدم");
+                    return ApiResponse<UserDto>.Fail(ErrorCodes.CONFLICT, ErrorMessages.Get(ErrorCodes.CONFLICT));
             }
 
             var requestedRole = Enum.Parse<UserRole>(request.Role);
@@ -202,7 +203,7 @@ public class UserManagementService : IUserManagementService
             {
                 _logger.LogWarning("Admin {UserId} tried to escalate user {TargetUserId} to SystemOwner",
                     _currentUserService.UserId, userId);
-                return ApiResponse<UserDto>.Fail("ليس لديك صلاحية تعيين مالك النظام");
+                return ApiResponse<UserDto>.Fail(ErrorCodes.FORBIDDEN, ErrorMessages.Get(ErrorCodes.FORBIDDEN));
             }
 
             // Branch assignment policy:
@@ -213,7 +214,7 @@ public class UserManagementService : IUserManagementService
             {
                 resolvedBranchId = request.BranchId ?? user.BranchId ?? _currentUserService.BranchId;
                 if (!resolvedBranchId.HasValue)
-                    return ApiResponse<UserDto>.Fail("يجب تحديد فرع للمستخدم الكاشير");
+                    return ApiResponse<UserDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
             }
             else
             {
@@ -249,7 +250,7 @@ public class UserManagementService : IUserManagementService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error updating user {UserId}", userId);
-            return ApiResponse<UserDto>.Fail("فشل في تحديث المستخدم");
+            return ApiResponse<UserDto>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR));
         }
     }
 
@@ -259,13 +260,13 @@ public class UserManagementService : IUserManagementService
         {
             var user = await _unitOfWork.Users.GetByIdAsync(userId);
             if (user == null || user.IsDeleted)
-                return ApiResponse<bool>.Fail("المستخدم غير موجود");
+                return ApiResponse<bool>.Fail(ErrorCodes.USER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.USER_NOT_FOUND));
 
             if (user.TenantId != _currentUserService.TenantId)
-                return ApiResponse<bool>.Fail("غير مصرح بالوصول");
+                return ApiResponse<bool>.Fail(ErrorCodes.FORBIDDEN, ErrorMessages.Get(ErrorCodes.FORBIDDEN));
 
             if (user.Id == _currentUserService.UserId)
-                return ApiResponse<bool>.Fail("لا يمكنك حذف حسابك الخاص");
+                return ApiResponse<bool>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
 
             user.IsDeleted = true;
             user.UpdateSecurityStamp();
@@ -279,7 +280,7 @@ public class UserManagementService : IUserManagementService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error deleting user {UserId}", userId);
-            return ApiResponse<bool>.Fail("فشل في حذف المستخدم");
+            return ApiResponse<bool>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR));
         }
     }
 
@@ -289,13 +290,13 @@ public class UserManagementService : IUserManagementService
         {
             var user = await _unitOfWork.Users.GetByIdAsync(userId);
             if (user == null || user.IsDeleted)
-                return ApiResponse<bool>.Fail("المستخدم غير موجود");
+                return ApiResponse<bool>.Fail(ErrorCodes.USER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.USER_NOT_FOUND));
 
             if (user.TenantId != _currentUserService.TenantId)
-                return ApiResponse<bool>.Fail("غير مصرح بالوصول");
+                return ApiResponse<bool>.Fail(ErrorCodes.FORBIDDEN, ErrorMessages.Get(ErrorCodes.FORBIDDEN));
 
             if (user.Id == _currentUserService.UserId)
-                return ApiResponse<bool>.Fail("لا يمكنك تعطيل حسابك الخاص");
+                return ApiResponse<bool>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
 
             user.IsActive = isActive;
             if (!isActive)
@@ -312,7 +313,7 @@ public class UserManagementService : IUserManagementService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error toggling user {UserId} status", userId);
-            return ApiResponse<bool>.Fail("فشل في تغيير حالة المستخدم");
+            return ApiResponse<bool>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR));
         }
     }
 }

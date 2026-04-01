@@ -3,6 +3,8 @@ namespace KasserPro.API.Controllers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.SignalR;
+using KasserPro.Application.Common;
+using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Enums;
 using KasserPro.API.Middleware;
@@ -55,7 +57,7 @@ public class ReportsController : ControllerBase
     {
         var result = await _reportService.GetDailyReportAsync(date);
         if (!result.Success || result.Data == null)
-            return BadRequest(new { Success = false, Message = "فشل في تحميل التقرير اليومي" });
+            return BadRequest(ApiResponse<object>.Fail(ErrorCodes.INTERNAL_ERROR, "فشل في تحميل التقرير اليومي"));
 
         var report = result.Data;
 
@@ -194,12 +196,12 @@ public class ReportsController : ControllerBase
 
             _logger.LogInformation("Daily report print command sent for date {Date} to branch {BranchId}", date, branchId);
 
-            return Ok(new { Success = true, Message = "تم إرسال أمر طباعة التقرير اليومي بنجاح" });
+            return Ok(ApiResponse<bool>.Ok(true, "تم إرسال أمر طباعة التقرير اليومي بنجاح"));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send daily report print command");
-            return StatusCode(500, new { Success = false, Message = "فشل إرسال أمر الطباعة" });
+            return StatusCode(500, ApiResponse<object>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR)));
         }
     }
 

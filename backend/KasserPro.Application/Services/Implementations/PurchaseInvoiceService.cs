@@ -1,6 +1,7 @@
 ﻿namespace KasserPro.Application.Services.Implementations;
 
 using Microsoft.EntityFrameworkCore;
+using KasserPro.Application.Common;
 using KasserPro.Application.Common.Interfaces;
 using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.PurchaseInvoices;
@@ -86,7 +87,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             .FirstOrDefaultAsync(pi => pi.Id == id && pi.TenantId == tenantId && !pi.IsDeleted);
 
         if (invoice == null)
-            return ApiResponse<PurchaseInvoiceDto>.Fail("الفاتورة غير موجودة");
+            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND));
 
         var dto = new PurchaseInvoiceDto
         {
@@ -140,7 +141,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
     {
         // Validation
         if (request.Items == null || !request.Items.Any())
-            return ApiResponse<PurchaseInvoiceDto>.Fail("يجب إضافة منتج واحد على الأقل");
+            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_EMPTY, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_EMPTY));
 
         var tenantId = _currentUser.TenantId;
         var branchId = _currentUser.BranchId;
@@ -151,7 +152,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             .FirstOrDefaultAsync(s => s.Id == request.SupplierId && s.TenantId == tenantId && !s.IsDeleted);
 
         if (supplier == null)
-            return ApiResponse<PurchaseInvoiceDto>.Fail("المورد غير موجود");
+            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.SUPPLIER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.SUPPLIER_NOT_FOUND));
 
         // Get user
         var user = await _unitOfWork.Users.Query()
@@ -195,19 +196,19 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         foreach (var itemRequest in request.Items)
         {
             if (itemRequest.Quantity <= 0)
-                return ApiResponse<PurchaseInvoiceDto>.Fail("الكمية يجب أن تكون أكبر من صفر");
+                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_INVALID_QUANTITY, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_INVALID_QUANTITY));
 
             if (itemRequest.PurchasePrice < 0)
-                return ApiResponse<PurchaseInvoiceDto>.Fail("سعر الشراء يجب أن يكون صفر أو أكبر");
+                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_INVALID_PRICE, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_INVALID_PRICE));
 
             var product = await _unitOfWork.Products.Query()
                 .FirstOrDefaultAsync(p => p.Id == itemRequest.ProductId && p.TenantId == tenantId && !p.IsDeleted);
 
             if (product == null)
-                return ApiResponse<PurchaseInvoiceDto>.Fail($"المنتج غير موجود");
+                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PRODUCT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PRODUCT_NOT_FOUND));
 
             if (product.Type == ProductType.Service)
-                return ApiResponse<PurchaseInvoiceDto>.Fail($"لا يمكن إضافة منتجات خدمية ({product.Name}) في فواتير الشراء");
+                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE, ErrorMessages.Get(ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE));
 
             var itemTotal = itemRequest.Quantity * itemRequest.PurchasePrice;
             subtotal += itemTotal;
@@ -245,21 +246,21 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             .FirstOrDefaultAsync(pi => pi.Id == id && pi.TenantId == tenantId && !pi.IsDeleted);
 
         if (invoice == null)
-            return ApiResponse<PurchaseInvoiceDto>.Fail("الفاتورة غير موجودة");
+            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND));
 
         if (invoice.Status != PurchaseInvoiceStatus.Draft)
-            return ApiResponse<PurchaseInvoiceDto>.Fail("لا يمكن تعديل الفاتورة بعد التأكيد");
+            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_EDITABLE, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_EDITABLE));
 
         // Validation
         if (request.Items == null || !request.Items.Any())
-            return ApiResponse<PurchaseInvoiceDto>.Fail("يجب إضافة منتج واحد على الأقل");
+            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_EMPTY, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_EMPTY));
 
         // Get supplier
         var supplier = await _unitOfWork.Suppliers.Query()
             .FirstOrDefaultAsync(s => s.Id == request.SupplierId && s.TenantId == tenantId && !s.IsDeleted);
 
         if (supplier == null)
-            return ApiResponse<PurchaseInvoiceDto>.Fail("المورد غير موجود");
+            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.SUPPLIER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.SUPPLIER_NOT_FOUND));
 
         // Update invoice header
         invoice.SupplierId = supplier.Id;
@@ -282,19 +283,19 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         foreach (var itemRequest in request.Items)
         {
             if (itemRequest.Quantity <= 0)
-                return ApiResponse<PurchaseInvoiceDto>.Fail("الكمية يجب أن تكون أكبر من صفر");
+                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_INVALID_QUANTITY, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_INVALID_QUANTITY));
 
             if (itemRequest.PurchasePrice < 0)
-                return ApiResponse<PurchaseInvoiceDto>.Fail("سعر الشراء يجب أن يكون صفر أو أكبر");
+                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_INVALID_PRICE, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_INVALID_PRICE));
 
             var product = await _unitOfWork.Products.Query()
                 .FirstOrDefaultAsync(p => p.Id == itemRequest.ProductId && p.TenantId == tenantId && !p.IsDeleted);
 
             if (product == null)
-                return ApiResponse<PurchaseInvoiceDto>.Fail($"المنتج غير موجود");
+                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PRODUCT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PRODUCT_NOT_FOUND));
 
             if (product.Type == ProductType.Service)
-                return ApiResponse<PurchaseInvoiceDto>.Fail($"لا يمكن إضافة منتجات خدمية ({product.Name}) في فواتير الشراء");
+                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE, ErrorMessages.Get(ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE));
 
             var itemTotal = itemRequest.Quantity * itemRequest.PurchasePrice;
             subtotal += itemTotal;
@@ -331,10 +332,10 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             .FirstOrDefaultAsync(pi => pi.Id == id && pi.TenantId == tenantId && !pi.IsDeleted);
 
         if (invoice == null)
-            return ApiResponse<bool>.Fail("الفاتورة غير موجودة");
+            return ApiResponse<bool>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND));
 
         if (invoice.Status == PurchaseInvoiceStatus.Confirmed)
-            return ApiResponse<bool>.Fail("لا يمكن حذف فاتورة مؤكدة");
+            return ApiResponse<bool>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_DELETABLE, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_DELETABLE));
 
         // Soft delete
         invoice.IsDeleted = true;
@@ -356,10 +357,10 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             .FirstOrDefaultAsync(pi => pi.Id == id && pi.TenantId == tenantId && !pi.IsDeleted);
 
         if (invoice == null)
-            return ApiResponse<PurchaseInvoiceDto>.Fail("الفاتورة غير موجودة");
+            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND));
 
         if (invoice.Status != PurchaseInvoiceStatus.Draft)
-            return ApiResponse<PurchaseInvoiceDto>.Fail("الفاتورة مؤكدة مسبقاً");
+            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_ALREADY_CONFIRMED, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_ALREADY_CONFIRMED));
 
         var user = await _unitOfWork.Users.Query()
             .FirstOrDefaultAsync(u => u.Id == userId);
@@ -465,10 +466,10 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             .FirstOrDefaultAsync(pi => pi.Id == id && pi.TenantId == tenantId && !pi.IsDeleted);
 
         if (invoice == null)
-            return ApiResponse<PurchaseInvoiceDto>.Fail("الفاتورة غير موجودة");
+            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND));
 
         if (invoice.Status == PurchaseInvoiceStatus.Cancelled)
-            return ApiResponse<PurchaseInvoiceDto>.Fail("الفاتورة ملغاة مسبقاً");
+            return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_ALREADY_CANCELLED, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_ALREADY_CANCELLED));
 
         var user = await _unitOfWork.Users.Query()
             .FirstOrDefaultAsync(u => u.Id == userId);
@@ -544,16 +545,16 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             .FirstOrDefaultAsync(pi => pi.Id == invoiceId && pi.TenantId == tenantId && !pi.IsDeleted);
 
         if (invoice == null)
-            return ApiResponse<PurchaseInvoicePaymentDto>.Fail("الفاتورة غير موجودة");
+            return ApiResponse<PurchaseInvoicePaymentDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND));
 
         if (invoice.Status != PurchaseInvoiceStatus.Confirmed)
-            return ApiResponse<PurchaseInvoicePaymentDto>.Fail("يجب تأكيد الفاتورة أولاً");
+            return ApiResponse<PurchaseInvoicePaymentDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_EDITABLE, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_EDITABLE));
 
         if (request.Amount <= 0)
-            return ApiResponse<PurchaseInvoicePaymentDto>.Fail("المبلغ يجب أن يكون أكبر من صفر");
+            return ApiResponse<PurchaseInvoicePaymentDto>.Fail(ErrorCodes.PAYMENT_INVALID_AMOUNT, ErrorMessages.Get(ErrorCodes.PAYMENT_INVALID_AMOUNT));
 
         if (request.Amount > invoice.AmountDue)
-            return ApiResponse<PurchaseInvoicePaymentDto>.Fail("المبلغ أكبر من المبلغ المستحق");
+            return ApiResponse<PurchaseInvoicePaymentDto>.Fail(ErrorCodes.PAYMENT_EXCEEDS_DUE, ErrorMessages.Get(ErrorCodes.PAYMENT_EXCEEDS_DUE));
 
         var user = await _unitOfWork.Users.Query()
             .FirstOrDefaultAsync(u => u.Id == userId);
@@ -604,13 +605,13 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             .FirstOrDefaultAsync(pi => pi.Id == invoiceId && pi.TenantId == tenantId && !pi.IsDeleted);
 
         if (invoice == null)
-            return ApiResponse<bool>.Fail("الفاتورة غير موجودة");
+            return ApiResponse<bool>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND));
 
         var payment = await _unitOfWork.PurchaseInvoicePayments.Query()
             .FirstOrDefaultAsync(p => p.Id == paymentId && p.PurchaseInvoiceId == invoiceId);
 
         if (payment == null)
-            return ApiResponse<bool>.Fail("الدفعة غير موجودة");
+            return ApiResponse<bool>.Fail(ErrorCodes.PAYMENT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PAYMENT_NOT_FOUND));
 
         // Update invoice amounts
         invoice.AmountPaid -= payment.Amount;
@@ -639,3 +640,4 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         return $"{prefix}{newNumber:D4}";
     }
 }
+

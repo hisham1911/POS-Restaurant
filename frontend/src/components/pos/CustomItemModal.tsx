@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X, Plus } from "lucide-react";
 import { useAddCustomItemMutation } from "@/api/ordersApi";
 import { toast } from "sonner";
 import { AddCustomItemRequest } from "@/types/order.types";
 import { Portal } from "@/components/common/Portal";
 import { numberToDisplay, displayToNumber } from "@/hooks/useNumberInput";
+import { useAppSelector } from "@/store/hooks";
+import { selectTaxRate } from "@/store/slices/cartSlice";
+import { handleApiError } from "@/utils/errorHandler";
 
 interface CustomItemModalProps {
   orderId?: number; // Optional now
@@ -17,15 +20,20 @@ export const CustomItemModal = ({
   onClose,
   onSuccess,
 }: CustomItemModalProps) => {
+  const currentTaxRate = useAppSelector(selectTaxRate);
   const [formData, setFormData] = useState<AddCustomItemRequest>({
     name: "",
     unitPrice: 0,
     quantity: 1,
-    taxRate: 14, // الضريبة الافتراضية 14%
+    taxRate: currentTaxRate,
     notes: "",
   });
 
   const [addCustomItem, { isLoading }] = useAddCustomItemMutation();
+
+  useEffect(() => {
+    setFormData((current) => ({ ...current, taxRate: currentTaxRate }));
+  }, [currentTaxRate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,18 +56,16 @@ export const CustomItemModal = ({
     // If orderId is provided, add to existing order via API
     if (orderId) {
       try {
-        const result = await addCustomItem({
+        await addCustomItem({
           orderId,
           item: formData,
         }).unwrap();
 
-        if (result.success) {
-          toast.success(`تم إضافة: ${formData.name}`);
-          onSuccess?.(formData);
-          onClose();
-        }
-      } catch (error: any) {
-        toast.error(error?.data?.message || "فشل في إضافة المنتج المخصص");
+        toast.success(`تم إضافة: ${formData.name}`);
+        onSuccess?.(formData);
+        onClose();
+      } catch (error) {
+        toast.error(handleApiError(error));
       }
     } else {
       // Otherwise, just return the data to parent component
@@ -177,17 +183,20 @@ export const CustomItemModal = ({
                 min="0"
                 max="100"
                 value={formData.taxRate}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const nextTaxRate = parseFloat(e.target.value);
                   setFormData({
                     ...formData,
-                    taxRate: parseFloat(e.target.value) || 14,
-                  })
-                }
+                    taxRate: Number.isNaN(nextTaxRate)
+                      ? currentTaxRate
+                      : nextTaxRate,
+                  });
+                }}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                placeholder="14"
+                placeholder={currentTaxRate.toString()}
               />
               <p className="mt-1 text-xs text-gray-500">
-                الافتراضي: 14% (ضريبة القيمة المضافة)
+                الافتراضي: {currentTaxRate}% (من إعدادات المؤسسة)
               </p>
             </div>
 
@@ -251,3 +260,4 @@ export const CustomItemModal = ({
     </Portal>
   );
 };
+

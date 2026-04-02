@@ -27,7 +27,7 @@ export interface PurchaseInvoicePayment {
   id: number;
   amount: number;
   paymentDate: string;
-  method: string;
+  method: PaymentMethod;
   referenceNumber?: string;
   notes?: string;
   createdByUserName: string;
@@ -41,7 +41,7 @@ export interface PurchaseInvoice {
   supplierName: string;
   supplierPhone?: string;
   invoiceDate: string;
-  status: string;
+  status: PurchaseInvoiceStatus;
   subtotal: number;
   taxRate: number;
   taxAmount: number;

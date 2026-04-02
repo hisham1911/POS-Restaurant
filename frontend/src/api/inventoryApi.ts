@@ -32,7 +32,7 @@ export const inventoryApi = baseApi.injectEndpoints({
       BranchInventorySummary,
       number
     >({
-      query: (productId) => `/inventory/product/${productId}/branches`,
+      query: (productId) => `/inventory/product/${productId}`,
       transformResponse: (response: { data: BranchInventorySummary }) =>
         response.data,
       providesTags: (result, error, productId) => [

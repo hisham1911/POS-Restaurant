@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import clsx from "clsx";
 import { Link, Navigate } from "react-router-dom";
 import { ShiftWarningBanner } from "@/components/shifts";
+import { getProductCurrentStock } from "@/utils/productStock";
 
 export const POSPage = () => {
   const { mode } = usePOSMode();
@@ -128,7 +129,7 @@ export const POSPage = () => {
       // If product doesn't track inventory, it's always available
       if (!p.trackInventory) return true;
       // Only show products with stock > 0
-      return (p.stockQuantity ?? 0) > 0;
+      return getProductCurrentStock(p) > 0;
     });
   }
 

@@ -28,18 +28,28 @@ public class AdminController : ControllerBase
 
     [HttpPost("backup")]
     [Authorize(Roles = "Admin,SystemOwner")]
-    public async Task<ActionResult<BackupResult>> CreateBackup()
+    public async Task<ActionResult<ApiResponse<BackupResult>>> CreateBackup()
     {
         var userId = User.FindFirst("userId")?.Value;
         _logger.LogInformation("Manual backup requested by user {UserId}", userId);
 
         var result = await _backupService.CreateBackupAsync("manual");
-        return result.Success ? Ok(result) : StatusCode(500, result);
+        if (!result.Success)
+        {
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                ApiResponse<BackupResult>.Fail(
+                    ErrorCodes.BACKUP_FAILED,
+                    ErrorMessages.Get(ErrorCodes.BACKUP_FAILED),
+                    ToErrors(result.ErrorMessage)));
+        }
+
+        return Ok(ApiResponse<BackupResult>.Ok(result));
     }
 
     [HttpGet("backups")]
     [Authorize(Roles = "Admin,SystemOwner")]
-    public async Task<ActionResult<List<BackupInfo>>> ListBackups()
+    public async Task<ActionResult<ApiResponse<List<BackupInfo>>>> ListBackups()
     {
         var backups = await _backupService.ListBackupsAsync();
         return Ok(ApiResponse<List<BackupInfo>>.Ok(backups));
@@ -47,14 +57,40 @@ public class AdminController : ControllerBase
 
     [HttpPost("restore")]
     [Authorize(Roles = "Admin,SystemOwner")]
-    public async Task<ActionResult<RestoreResult>> RestoreBackup([FromBody] RestoreRequest request)
+    public async Task<ActionResult<ApiResponse<RestoreResult>>> RestoreBackup([FromBody] RestoreRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.BackupFileName))
+        {
+            return BadRequest(ApiResponse<RestoreResult>.Fail(
+                ErrorCodes.VALIDATION_ERROR,
+                ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR),
+                new List<string> { "اسم ملف النسخة الاحتياطية مطلوب" }));
+        }
+
+        var backupFilePath = await _backupService.GetBackupFilePathAsync(request.BackupFileName);
+        if (backupFilePath is null)
+        {
+            return NotFound(ApiResponse<RestoreResult>.Fail(
+                ErrorCodes.BACKUP_NOT_FOUND,
+                ErrorMessages.Get(ErrorCodes.BACKUP_NOT_FOUND)));
+        }
+
         var userId = User.FindFirst("userId")?.Value;
         _logger.LogWarning("Database restore requested by user {UserId}, backup: {BackupFileName}",
             userId, request.BackupFileName);
 
         var result = await _restoreService.RestoreFromBackupAsync(request.BackupFileName);
-        return result.Success ? Ok(result) : StatusCode(500, result);
+        if (!result.Success)
+        {
+            return StatusCode(
+                StatusCodes.Status500InternalServerError,
+                ApiResponse<RestoreResult>.Fail(
+                    ErrorCodes.RESTORE_FAILED,
+                    ErrorMessages.Get(ErrorCodes.RESTORE_FAILED),
+                    ToErrors(result.ErrorMessage)));
+        }
+
+        return Ok(ApiResponse<RestoreResult>.Ok(result));
     }
 
     [HttpGet("backup/{fileName}/download")]
@@ -64,7 +100,7 @@ public class AdminController : ControllerBase
         var filePath = await _backupService.GetBackupFilePathAsync(fileName);
 
         if (filePath == null)
-            return NotFound(ApiResponse<object>.Fail(ErrorCodes.NOT_FOUND, ErrorMessages.Get(ErrorCodes.NOT_FOUND)));
+            return NotFound(ApiResponse<object>.Fail(ErrorCodes.BACKUP_NOT_FOUND, ErrorMessages.Get(ErrorCodes.BACKUP_NOT_FOUND)));
 
         var fileBytes = await System.IO.File.ReadAllBytesAsync(filePath);
         return File(fileBytes, "application/octet-stream", fileName);
@@ -73,13 +109,23 @@ public class AdminController : ControllerBase
     [HttpPost("restore/upload")]
     [Authorize(Roles = "Admin,SystemOwner")]
     [RequestSizeLimit(500_000_000)]
-    public async Task<ActionResult<RestoreResult>> RestoreFromUpload(IFormFile file)
+    public async Task<ActionResult<ApiResponse<RestoreResult>>> RestoreFromUpload(IFormFile file)
     {
         if (file == null || file.Length == 0)
-            return BadRequest(ApiResponse<object>.Fail(ErrorCodes.VALIDATION_ERROR, "يرجى تحديد ملف نسخة احتياطية"));
+        {
+            return BadRequest(ApiResponse<RestoreResult>.Fail(
+                ErrorCodes.VALIDATION_ERROR,
+                ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR),
+                new List<string> { "يرجى تحديد ملف نسخة احتياطية" }));
+        }
 
         if (!file.FileName.EndsWith(".db", StringComparison.OrdinalIgnoreCase))
-            return BadRequest(ApiResponse<object>.Fail(ErrorCodes.VALIDATION_ERROR, "نوع الملف غير مدعوم - يجب أن يكون ملف .db"));
+        {
+            return BadRequest(ApiResponse<RestoreResult>.Fail(
+                ErrorCodes.VALIDATION_ERROR,
+                ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR),
+                new List<string> { "نوع الملف غير مدعوم - يجب أن يكون ملف .db" }));
+        }
 
         var userId = User.FindFirst("userId")?.Value;
         _logger.LogWarning("Restore from uploaded file requested by user {UserId}, file: {FileName} ({Size} bytes)",
@@ -94,7 +140,17 @@ public class AdminController : ControllerBase
             }
 
             var result = await _restoreService.RestoreFromExternalFileAsync(tempPath);
-            return result.Success ? Ok(result) : StatusCode(500, result);
+            if (!result.Success)
+            {
+                return StatusCode(
+                    StatusCodes.Status500InternalServerError,
+                    ApiResponse<RestoreResult>.Fail(
+                        ErrorCodes.RESTORE_FAILED,
+                        ErrorMessages.Get(ErrorCodes.RESTORE_FAILED),
+                        ToErrors(result.ErrorMessage)));
+            }
+
+            return Ok(ApiResponse<RestoreResult>.Ok(result));
         }
         finally
         {
@@ -104,6 +160,9 @@ public class AdminController : ControllerBase
             }
         }
     }
+
+    private static List<string>? ToErrors(string? errorMessage)
+        => string.IsNullOrWhiteSpace(errorMessage) ? null : new List<string> { errorMessage };
 }
 
 public class RestoreRequest

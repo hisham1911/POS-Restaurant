@@ -1,6 +1,3 @@
-// نسبة الضريبة (ضريبة القيمة المضافة المصرية)
-export const TAX_RATE = 14;
-
 // حالات الطلب
 export const ORDER_STATUS = {
   Draft: { label: "مسودة", color: "gray" },

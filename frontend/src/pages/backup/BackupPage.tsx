@@ -22,6 +22,7 @@ import {
 } from "@/api/backupApi";
 import clsx from "clsx";
 import { Portal } from "@/components/common/Portal";
+import { handleApiError } from "@/utils/errorHandler";
 
 export const BackupPage = () => {
   const { data: backupsData, isLoading, refetch } = useListBackupsQuery();
@@ -48,19 +49,20 @@ export const BackupPage = () => {
     useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const backups = backupsData || [];
+  const backups = backupsData?.data || [];
 
   const handleCreateBackup = async () => {
     try {
       const result = await createBackup().unwrap();
-      if (result.success) {
-        toast.success("تم إنشاء النسخة الاحتياطية بنجاح");
-        refetch();
-      } else {
-        toast.error(result.errorMessage || "فشل إنشاء النسخة الاحتياطية");
+      if (!result.data) {
+        toast.error(result.message || "فشل إنشاء النسخة الاحتياطية");
+        return;
       }
+
+      toast.success("تم إنشاء النسخة الاحتياطية بنجاح");
+      refetch();
     } catch (error) {
-      toast.error("خطأ في إنشاء النسخة الاحتياطية");
+      toast.error(handleApiError(error));
       console.error(error);
     }
   };
@@ -112,39 +114,36 @@ export const BackupPage = () => {
     formData.append("file", uploadedFile);
 
     try {
-      const result = await restoreFromUpload(formData).unwrap();
+      const response = await restoreFromUpload(formData).unwrap();
+      const result = response.data;
 
-      if (result.success) {
+      if (!result) {
+        toast.error(response.message || "فشلت عملية الاستعادة");
         setShowConfirmUploadRestore(false);
-        setUploadedFile(null);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-
-        setRestoreDetails({
-          migrationsApplied: result.migrationsApplied || 0,
-          requiresRestart: result.requiresRestart ?? true,
-          dataValidationIssuesFound: result.dataValidationIssuesFound || 0,
-        });
-        setShowRestoreSuccess(true);
-
-        if (result.migrationsApplied > 0) {
-          toast.success(
-            `تم استعادة الملف المرفوع بنجاح وتطبيق ${result.migrationsApplied} تحديث على قاعدة البيانات`,
-          );
-        } else {
-          toast.success("تم استعادة الملف المرفوع بنجاح");
-        }
-        refetch();
-      } else {
-        toast.error(
-          result.errorMessage || "فشلت عملية الاستعادة من الملف المرفوع",
-        );
-        if (result.maintenanceModeEnabled) {
-          toast.error("النظام في وضع الصيانة - يرجى إعادة تشغيل التطبيق");
-        }
-        setShowConfirmUploadRestore(false);
+        return;
       }
+
+      setShowConfirmUploadRestore(false);
+      setUploadedFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+
+      setRestoreDetails({
+        migrationsApplied: result.migrationsApplied || 0,
+        requiresRestart: result.requiresRestart ?? true,
+        dataValidationIssuesFound: result.dataValidationIssuesFound || 0,
+      });
+      setShowRestoreSuccess(true);
+
+      if (result.migrationsApplied > 0) {
+        toast.success(
+          `تم استعادة الملف المرفوع بنجاح وتطبيق ${result.migrationsApplied} تحديث على قاعدة البيانات`,
+        );
+      } else {
+        toast.success("تم استعادة الملف المرفوع بنجاح");
+      }
+      refetch();
     } catch (error) {
-      toast.error("خطأ في استعادة الملف المرفوع - يرجى إعادة تشغيل التطبيق");
+      toast.error(handleApiError(error));
       console.error(error);
       setShowConfirmUploadRestore(false);
     }
@@ -157,42 +156,39 @@ export const BackupPage = () => {
     }
 
     try {
-      const result = await restoreBackup({
+      const response = await restoreBackup({
         backupFileName: selectedBackup,
       }).unwrap();
+      const result = response.data;
 
-      if (result.success) {
+      if (!result) {
+        toast.error(response.message || "فشلت عملية الاستعادة");
         setShowConfirmRestore(false);
-        setSelectedBackup(null);
-
-        // Show detailed success modal with migration & restart info
-        setRestoreDetails({
-          migrationsApplied: result.migrationsApplied || 0,
-          requiresRestart: result.requiresRestart ?? true,
-          dataValidationIssuesFound: result.dataValidationIssuesFound || 0,
-        });
-        setShowRestoreSuccess(true);
-
-        if (result.migrationsApplied > 0) {
-          toast.success(
-            `تم استعادة النسخة الاحتياطية بنجاح وتطبيق ${result.migrationsApplied} تحديث على قاعدة البيانات`,
-          );
-        } else {
-          toast.success("تم استعادة النسخة الاحتياطية بنجاح");
-        }
-
-        refetch();
-      } else {
-        toast.error(result.errorMessage || "فشلت عملية الاستعادة");
-        if (result.maintenanceModeEnabled) {
-          toast.error("النظام في وضع الصيانة - يرجى إعادة تشغيل التطبيق");
-        }
-        setShowConfirmRestore(false);
+        return;
       }
+
+      setShowConfirmRestore(false);
+      setSelectedBackup(null);
+
+      // Show detailed success modal with migration & restart info
+      setRestoreDetails({
+        migrationsApplied: result.migrationsApplied || 0,
+        requiresRestart: result.requiresRestart ?? true,
+        dataValidationIssuesFound: result.dataValidationIssuesFound || 0,
+      });
+      setShowRestoreSuccess(true);
+
+      if (result.migrationsApplied > 0) {
+        toast.success(
+          `تم استعادة النسخة الاحتياطية بنجاح وتطبيق ${result.migrationsApplied} تحديث على قاعدة البيانات`,
+        );
+      } else {
+        toast.success("تم استعادة النسخة الاحتياطية بنجاح");
+      }
+
+      refetch();
     } catch (error) {
-      toast.error(
-        "خطأ في استعادة النسخة الاحتياطية - يرجى إعادة تشغيل التطبيق",
-      );
+      toast.error(handleApiError(error));
       console.error(error);
       setShowConfirmRestore(false);
     }

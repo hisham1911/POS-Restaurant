@@ -12,6 +12,7 @@ import { Loading } from "../../components/common/Loading";
 import { formatCurrency, formatDateOnly } from "../../utils/formatters";
 import { PurchaseInvoiceStatus } from "../../types/purchaseInvoice.types";
 import { toast } from "sonner";
+import { handleApiError } from "../../utils/errorHandler";
 
 export function PurchaseInvoicesPage() {
   const navigate = useNavigate();
@@ -41,12 +42,11 @@ export function PurchaseInvoicesPage() {
     if (!confirm(`هل أنت متأكد من حذف الفاتورة ${invoiceNumber}؟`)) return;
 
     try {
-      const result = await deletePurchaseInvoice(id).unwrap();
-      if (result.success) {
-        toast.success("تم حذف الفاتورة بنجاح");
-      }
+      await deletePurchaseInvoice(id).unwrap();
+      toast.success("تم حذف الفاتورة بنجاح");
     } catch (error) {
       console.error("Error deleting invoice:", error);
+      toast.error(handleApiError(error));
     }
   };
 

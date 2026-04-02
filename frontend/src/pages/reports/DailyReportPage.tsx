@@ -565,7 +565,7 @@ export const DailyReportPage = () => {
               <p className="text-2xl font-bold text-gray-800">
                 {formatCurrency(report?.totalTax || 0)}
               </p>
-              <p className="text-xs text-gray-400">14% VAT</p>
+              <p className="text-xs text-gray-400">إجمالي الضرائب</p>
             </div>
           </div>
         </Card>

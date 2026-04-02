@@ -40,6 +40,7 @@ import { Loading } from "@/components/common/Loading";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { usePOSMode } from "@/hooks/usePOSMode";
+import { handleApiError } from "@/utils/errorHandler";
 
 export const SettingsPage = () => {
   const dispatch = useAppDispatch();
@@ -59,7 +60,7 @@ export const SettingsPage = () => {
   const tenant = tenantData?.data;
 
   // Form state
-  const [taxRate, setTaxRate] = useState<number>(14);
+  const [taxRate, setTaxRate] = useState<number>(0);
   const [isTaxEnabled, setIsTaxEnabled] = useState<boolean>(true);
   const [name, setName] = useState<string>("");
   const [nameEn, setNameEn] = useState<string>("");
@@ -129,7 +130,6 @@ export const SettingsPage = () => {
       toast.error("نسبة الضريبة يجب أن تكون بين 0 و 100");
       return;
     }
-
     try {
       const result = await updateTenant({
         name,
@@ -152,23 +152,22 @@ export const SettingsPage = () => {
         receiptPhoneNumber: receiptPhoneNumber || undefined,
         receiptShowCustomerName,
         receiptShowLogo,
-        // Print Routing settings
         printRoutingMode,
         autoPrintOnSale,
         autoPrintOnDebtPayment,
         autoPrintDailyReports,
       }).unwrap();
 
-      if (result.success) {
-        // Update cart tax settings globally (including allowNegativeStock)
-        dispatch(setTaxSettings({ taxRate, isTaxEnabled, allowNegativeStock }));
-        toast.success("تم حفظ الإعدادات بنجاح");
-        refetch();
-      } else {
-        toast.error(result.message || "فشل في حفظ الإعدادات");
+      if (!result.data) {
+        toast.error(result.message || "Unable to save settings");
+        return;
       }
-    } catch {
-      toast.error("حدث خطأ أثناء حفظ الإعدادات");
+
+      dispatch(setTaxSettings({ taxRate, isTaxEnabled, allowNegativeStock }));
+      toast.success("Settings saved successfully");
+      refetch();
+    } catch (error) {
+      toast.error(handleApiError(error));
     }
   };
 
@@ -181,7 +180,7 @@ export const SettingsPage = () => {
     }
   };
 
-  const isOnline = !isHealthError && healthData?.success;
+  const isOnline = !isHealthError && healthData?.status === "healthy";
 
   if (isLoading) {
     return (
@@ -565,17 +564,20 @@ export const SettingsPage = () => {
                 max="100"
                 step="0.01"
                 value={taxRate}
-                onChange={(e) => setTaxRate(parseFloat(e.target.value) || 14)}
+                onChange={(e) => {
+                  const nextTaxRate = parseFloat(e.target.value);
+                  setTaxRate(Number.isNaN(nextTaxRate) ? 0 : nextTaxRate);
+                }}
                 disabled={!isTaxEnabled}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-lg"
-                placeholder="14"
+                placeholder="0"
               />
               <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
                 %
               </span>
             </div>
             <p className="mt-2 text-sm text-gray-500">
-              الضريبة المصرية الافتراضية: 14% (ضريبة القيمة المضافة)
+              حدّد نسبة الضريبة الافتراضية الخاصة بمؤسستك، أو اتركها 0 عند عدم الاستخدام.
             </p>
           </div>
 
@@ -858,15 +860,17 @@ export const SettingsPage = () => {
                       const formData = new FormData();
                       formData.append("file", file);
                       const result = await uploadLogo(formData).unwrap();
-                      if (result.success && result.data) {
-                        setLogoUrl(result.data.logoUrl);
-                        toast.success("تم رفع اللوجو بنجاح");
-                        refetch();
-                      } else {
-                        toast.error(result.message || "فشل في رفع اللوجو");
+
+                      if (!result.data) {
+                        toast.error(result.message || "Unable to upload logo");
+                        return;
                       }
-                    } catch {
-                      toast.error("حدث خطأ أثناء رفع اللوجو");
+
+                      setLogoUrl(result.data.logoUrl);
+                      toast.success("Logo uploaded successfully");
+                      refetch();
+                    } catch (error) {
+                      toast.error(handleApiError(error));
                     }
                     e.target.value = "";
                   }}

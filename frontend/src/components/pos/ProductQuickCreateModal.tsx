@@ -5,6 +5,7 @@ import { useCategories } from "@/hooks/useProducts";
 import { toast } from "sonner";
 import { QuickCreateProductRequest, ProductType } from "@/types/product.types";
 import { Portal } from "@/components/common/Portal";
+import { handleApiError } from "@/utils/errorHandler";
 
 interface ProductQuickCreateModalProps {
   onClose: () => void;
@@ -56,13 +57,16 @@ export const ProductQuickCreateModal = ({
         initialStock: Number(formData.initialStock) || 0,
       }).unwrap();
 
-      if (result.success && result.data) {
-        toast.success(`تم إضافة المنتج: ${result.data.name}`);
-        onSuccess?.(result.data.id);
-        onClose();
+      if (!result.data) {
+        toast.error(result.message || "Unable to create product");
+        return;
       }
-    } catch (error: any) {
-      toast.error(error?.data?.message || "فشل في إضافة المنتج");
+
+      toast.success(`Product added: ${result.data.name}`);
+      onSuccess?.(result.data.id);
+      onClose();
+    } catch (error) {
+      toast.error(handleApiError(error));
     }
   };
 

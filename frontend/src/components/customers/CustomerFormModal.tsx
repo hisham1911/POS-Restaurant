@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/common/Button";
 import { toast } from "sonner";
 import { Portal } from "@/components/common/Portal";
+import { handleApiError } from "@/utils/errorHandler";
 
 interface CustomerFormModalProps {
   customer?: Customer | null;
@@ -92,17 +93,13 @@ export const CustomerFormModal = ({
           rowVersion: customer.rowVersion, // Include for concurrency control
         };
 
-        const result = await updateCustomer({
+        await updateCustomer({
           id: customer.id,
           data: updateData,
         }).unwrap();
-        if (result.success) {
-          toast.success("تم تحديث بيانات العميل بنجاح");
-          onSuccess?.();
-          onClose();
-        } else {
-          toast.error(result.message || "فشل تحديث العميل");
-        }
+        toast.success("تم تحديث بيانات العميل بنجاح");
+        onSuccess?.();
+        onClose();
       } else {
         const createData: CreateCustomerRequest = {
           phone: formData.phone.trim(),
@@ -112,17 +109,13 @@ export const CustomerFormModal = ({
           notes: formData.notes || undefined,
         };
 
-        const result = await createCustomer(createData).unwrap();
-        if (result.success) {
-          toast.success("تم إضافة العميل بنجاح");
-          onSuccess?.();
-          onClose();
-        } else {
-          toast.error(result.message || "فشل إضافة العميل");
-        }
+        await createCustomer(createData).unwrap();
+        toast.success("تم إضافة العميل بنجاح");
+        onSuccess?.();
+        onClose();
       }
-    } catch {
-      toast.error(isEditing ? "فشل تحديث العميل" : "فشل إضافة العميل");
+    } catch (error) {
+      toast.error(handleApiError(error));
     }
   };
 

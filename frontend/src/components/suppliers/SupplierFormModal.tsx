@@ -9,6 +9,7 @@ import { Supplier, CreateSupplierRequest, UpdateSupplierRequest } from "../../ty
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { Input } from "../common/Input";
+import { handleApiError } from "../../utils/errorHandler";
 
 interface SupplierFormModalProps {
   supplier: Supplier | null;
@@ -63,15 +64,13 @@ export default function SupplierFormModal({
 
     try {
       if (isEditMode) {
-        const result = await updateSupplier({
+        await updateSupplier({
           id: supplier.id,
           data: formData,
         }).unwrap();
 
-        if (result.success) {
-          toast.success(result.message || "تم تحديث المورد بنجاح");
-          onClose();
-        }
+        toast.success("تم تحديث المورد بنجاح");
+        onClose();
       } else {
         const createData: CreateSupplierRequest = {
           name: formData.name,
@@ -84,15 +83,13 @@ export default function SupplierFormModal({
           notes: formData.notes || undefined,
         };
 
-        const result = await createSupplier(createData).unwrap();
+        await createSupplier(createData).unwrap();
 
-        if (result.success) {
-          toast.success(result.message || "تم إضافة المورد بنجاح");
-          onClose();
-        }
+        toast.success("تم إضافة المورد بنجاح");
+        onClose();
       }
-    } catch (error: any) {
-      toast.error(error?.data?.message || "فشلت العملية");
+    } catch (error) {
+      toast.error(handleApiError(error));
     }
   };
 

@@ -12,6 +12,7 @@ import type { Branch } from "@/types/branch.types";
 import { formatDateTime } from "@/utils/formatters";
 import { toast } from "react-hot-toast";
 import clsx from "clsx";
+import { handleApiError } from "@/utils/errorHandler";
 
 export const BranchesPage = () => {
   const [showFormModal, setShowFormModal] = useState(false);
@@ -37,12 +38,10 @@ export const BranchesPage = () => {
     }
 
     try {
-      const result = await deleteBranch(branch.id).unwrap();
-      if (result.success) {
-        toast.success("تم حذف الفرع بنجاح");
-      }
-    } catch (error: any) {
-      toast.error(error?.data?.message || "فشل في حذف الفرع");
+      await deleteBranch(branch.id).unwrap();
+      toast.success("تم حذف الفرع بنجاح");
+    } catch (error) {
+      toast.error(handleApiError(error));
     }
   };
 

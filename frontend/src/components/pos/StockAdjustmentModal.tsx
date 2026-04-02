@@ -7,6 +7,8 @@ import { Button } from "@/components/common/Button";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { Portal } from "@/components/common/Portal";
+import { handleApiError } from "@/utils/errorHandler";
+import { getProductCurrentStock } from "@/utils/productStock";
 
 interface StockAdjustmentModalProps {
   product: Product;
@@ -29,7 +31,7 @@ export const StockAdjustmentModal = ({
   onClose,
 }: StockAdjustmentModalProps) => {
   const [newQuantity, setNewQuantity] = useState<string>(
-    (product.stockQuantity ?? 0).toString(),
+    getProductCurrentStock(product).toString(),
   );
   const [adjustmentType, setAdjustmentType] =
     useState<StockAdjustmentType>("Adjustment");
@@ -37,7 +39,7 @@ export const StockAdjustmentModal = ({
 
   const [adjustStock, { isLoading }] = useAdjustProductStockMutation();
 
-  const currentStock = product.stockQuantity ?? 0;
+  const currentStock = getProductCurrentStock(product);
   const targetQuantity = parseInt(newQuantity) || 0;
   const quantityChange = targetQuantity - currentStock;
 
@@ -66,18 +68,11 @@ export const StockAdjustmentModal = ({
         },
       }).unwrap();
 
-      if (result.success) {
-        toast.success(
-          `تم تحديث المخزون: ${currentStock} → ${
-            result.data?.newBalance ?? targetQuantity
-          }`,
-        );
-        onClose();
-      } else {
-        toast.error(result.message || "فشل تعديل المخزون");
-      }
-    } catch {
-      toast.error("فشل تعديل المخزون");
+      const updatedStock = result.data?.newBalance ?? targetQuantity;
+      toast.success(`Stock updated: ${currentStock} -> ${updatedStock}`);
+      onClose();
+    } catch (error) {
+      toast.error(handleApiError(error));
     }
   };
 

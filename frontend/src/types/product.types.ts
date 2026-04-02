@@ -23,6 +23,7 @@ export interface Product {
   type: ProductType;
   // يتم تحديده تلقائياً بناءً على النوع
   trackInventory: boolean;
+  /** @deprecated Use BranchInventory endpoint instead. Will be removed next sprint. */
   // الكمية المتاحة في الفرع الحالي (من جدول BranchInventories)
   currentBranchStock?: number;
   lowStockThreshold?: number;

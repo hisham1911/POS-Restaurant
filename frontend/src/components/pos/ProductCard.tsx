@@ -6,6 +6,10 @@ import { formatCurrency } from "@/utils/formatters";
 import { useAppSelector } from "@/store/hooks";
 import { selectAllowNegativeStock } from "@/store/slices/cartSlice";
 import clsx from "clsx";
+import {
+  getProductAvailableStock,
+  getProductCurrentStock,
+} from "@/utils/productStock";
 
 // Default low stock threshold if not provided
 const DEFAULT_LOW_STOCK_THRESHOLD = 10;
@@ -32,10 +36,8 @@ export const ProductCard = ({
   const quantityInCart = cartItem?.quantity ?? 0;
 
   // Calculate available stock (stock - what's in cart)
-  const totalStock = product.stockQuantity ?? 0;
-  const availableStock = product.trackInventory
-    ? totalStock - quantityInCart
-    : Infinity;
+  const totalStock = getProductCurrentStock(product);
+  const availableStock = getProductAvailableStock(product, quantityInCart);
 
   // If allowNegativeStock is enabled, always allow adding
   const canAddMore =

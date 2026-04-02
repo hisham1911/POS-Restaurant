@@ -8,6 +8,7 @@ import {
 } from "@/api/customersApi";
 import { toast } from "react-hot-toast";
 import { Portal } from "@/components/common/Portal";
+import { handleApiError } from "@/utils/errorHandler";
 
 interface LoyaltyPointsModalProps {
   customerId: number;
@@ -52,33 +53,26 @@ export const LoyaltyPointsModal = ({
 
     try {
       if (mode === "add") {
-        const result = await addLoyaltyPoints({
+        await addLoyaltyPoints({
           customerId,
           points: pointsValue,
         }).unwrap();
 
-        if (result.success) {
-          toast.success(`تم إضافة ${pointsValue} نقطة بنجاح`);
-          onSuccess();
-          onClose();
-        }
+        toast.success(`تم إضافة ${pointsValue} نقطة بنجاح`);
+        onSuccess();
+        onClose();
       } else {
-        const result = await redeemLoyaltyPoints({
+        await redeemLoyaltyPoints({
           customerId,
           points: pointsValue,
         }).unwrap();
 
-        if (result.success) {
-          toast.success(`تم استبدال ${pointsValue} نقطة بنجاح`);
-          onSuccess();
-          onClose();
-        }
+        toast.success(`تم استبدال ${pointsValue} نقطة بنجاح`);
+        onSuccess();
+        onClose();
       }
-    } catch (error: any) {
-      const errorMessage =
-        error?.data?.message ||
-        (mode === "add" ? "فشل في إضافة النقاط" : "فشل في استبدال النقاط");
-      toast.error(errorMessage);
+    } catch (error) {
+      toast.error(handleApiError(error));
     }
   };
 

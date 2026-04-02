@@ -6,6 +6,7 @@ import { ProductType } from "../../types/product.types";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { toast } from "sonner";
+import { handleApiError } from "@/utils/errorHandler";
 
 interface QuickAddProductModalProps {
   isOpen: boolean;
@@ -58,18 +59,22 @@ export function QuickAddProductModal({
         price: numPrice,
         cost: 0, // Will be set from purchase invoice
         type: productType,
-        stockQuantity: productType === ProductType.Physical ? 0 : undefined,
+        initialBranchStock:
+          productType === ProductType.Physical ? 0 : undefined,
         lowStockThreshold: productType === ProductType.Physical ? 5 : undefined,
       }).unwrap();
 
-      if (result.success && result.data) {
-        toast.success("تم إضافة المنتج بنجاح");
-        onProductCreated(result.data.id);
-        handleClose();
+      if (!result.data) {
+        toast.error(result.message || "Unable to create product");
+        return;
       }
+
+      toast.success("Product created successfully");
+      onProductCreated(result.data.id);
+      handleClose();
     } catch (error) {
       console.error("Error creating product:", error);
-      toast.error("فشل إضافة المنتج");
+      toast.error(handleApiError(error));
     }
   };
 
@@ -210,3 +215,4 @@ export function QuickAddProductModal({
     </Modal>
   );
 }
+

@@ -4,6 +4,7 @@ import { useHandoverShiftMutation } from "../../api/shiftsApi";
 import { Shift } from "../../types/shift.types";
 import { formatDateTimeFull } from "../../utils/formatters";
 import { Portal } from "../../components/common/Portal";
+import { handleApiError } from "../../utils/errorHandler";
 
 interface HandoverShiftModalProps {
   shift: Shift;
@@ -49,7 +50,7 @@ export default function HandoverShiftModal({
     }
 
     try {
-      const result = await handoverShift({
+      await handoverShift({
         id: shift.id,
         request: {
           toUserId: Number(toUserId),
@@ -58,13 +59,11 @@ export default function HandoverShiftModal({
         },
       }).unwrap();
 
-      if (result.success) {
-        alert("تم تسليم الوردية بنجاح");
-        onSuccess?.();
-        onClose();
-      }
-    } catch (error: any) {
-      alert(error?.data?.message || "حدث خطأ أثناء تسليم الوردية");
+      alert("تم تسليم الوردية بنجاح");
+      onSuccess?.();
+      onClose();
+    } catch (error) {
+      alert(handleApiError(error));
     }
   };
 

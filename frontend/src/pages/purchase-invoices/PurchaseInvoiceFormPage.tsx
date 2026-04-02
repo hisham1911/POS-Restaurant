@@ -15,6 +15,7 @@ import { QuickAddProductModal } from '../../components/purchase-invoices/QuickAd
 import { formatCurrency } from '../../utils/formatters';
 import { toast } from 'sonner';
 import type { CreatePurchaseInvoiceItemRequest } from '../../types/purchaseInvoice.types';
+import { handleApiError } from '../../utils/errorHandler';
 
 interface InvoiceItem extends CreatePurchaseInvoiceItemRequest {
   tempId: string;
@@ -157,36 +158,27 @@ export function PurchaseInvoiceFormPage() {
 
     try {
       if (isEditMode) {
-        const result = await updateInvoice({
+        await updateInvoice({
           id: Number(id),
           data: requestData,
         }).unwrap();
 
-        if (result.success) {
-          toast.success('تم تحديث الفاتورة بنجاح');
-          navigate(`/purchase-invoices/${id}`);
-        } else {
-          toast.error(result.message || 'فشل تحديث الفاتورة');
-        }
+        toast.success('تم تحديث الفاتورة بنجاح');
+        navigate(`/purchase-invoices/${id}`);
       } else {
         const result = await createInvoice(requestData).unwrap();
 
-        if (result.success) {
-          toast.success('تم إنشاء الفاتورة بنجاح');
-          navigate(`/purchase-invoices/${result.data?.id}`);
-        } else {
-          toast.error(result.message || 'فشل إنشاء الفاتورة');
+        if (!result.data) {
+          toast.error('فشل إنشاء الفاتورة');
+          return;
         }
+
+        toast.success('تم إنشاء الفاتورة بنجاح');
+        navigate(`/purchase-invoices/${result.data.id}`);
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error saving invoice:', error);
-      if (error?.data?.message) {
-        toast.error(error.data.message);
-      } else if (error?.message) {
-        toast.error(error.message);
-      } else {
-        toast.error('حدث خطأ أثناء حفظ الفاتورة');
-      }
+      toast.error(handleApiError(error));
     }
   };
 

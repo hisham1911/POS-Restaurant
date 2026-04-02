@@ -12,6 +12,7 @@ import { clearBranch } from "../store/slices/branchSlice";
 import { useLoginMutation } from "../api/authApi";
 import { LoginRequest } from "../types/auth.types";
 import { toast } from "sonner";
+import { ApiError, getApiErrorCode, handleApiError } from "../utils/errorHandler";
 import { baseApi } from "../api/baseApi";
 
 export const useAuth = () => {
@@ -30,7 +31,7 @@ export const useAuth = () => {
     try {
       const result = await loginMutation(credentials).unwrap();
 
-      if (result.success && result.data) {
+      if (result.data) {
         // CRITICAL: Clear persisted branch state from localStorage BEFORE setting new credentials
         // This prevents redux-persist from rehydrating old branch data for the new user
         try {
@@ -56,8 +57,16 @@ export const useAuth = () => {
         toast.error(result.message || "فشل تسجيل الدخول");
       }
     } catch (error: unknown) {
-      const errorMessage = (error as any)?.data?.message || "فشل تسجيل الدخول";
-      toast.error(errorMessage);
+      const apiError = error as ApiError;
+      const errorCode = getApiErrorCode(error);
+      if (
+        !errorCode &&
+        apiError.status !== 400 &&
+        apiError.status !== 403 &&
+        apiError.status !== 409
+      ) {
+        toast.error(handleApiError(error));
+      }
     }
   };
 

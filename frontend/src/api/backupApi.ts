@@ -1,4 +1,5 @@
 import { baseApi } from "./baseApi";
+import { ApiResponse } from "../types/api.types";
 
 export interface BackupInfo {
   fileName: string;
@@ -11,11 +12,11 @@ export interface BackupInfo {
 
 export interface BackupResult {
   success: boolean;
-  fileName?: string;
-  fullPath?: string;
-  sizeBytes?: number;
-  createdAt?: string;
+  backupPath?: string;
+  backupSizeBytes: number;
+  backupTimestamp: string;
   reason?: string;
+  integrityCheckPassed: boolean;
   errorMessage?: string;
 }
 
@@ -38,7 +39,7 @@ export interface RestoreResult {
 const backupApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // Create manual backup
-    createBackup: builder.mutation<BackupResult, void>({
+    createBackup: builder.mutation<ApiResponse<BackupResult>, void>({
       query: () => ({
         url: "/admin/backup",
         method: "POST",
@@ -47,7 +48,7 @@ const backupApi = baseApi.injectEndpoints({
     }),
 
     // List all backups
-    listBackups: builder.query<BackupInfo[], void>({
+    listBackups: builder.query<ApiResponse<BackupInfo[]>, void>({
       query: () => ({
         url: "/admin/backups",
         method: "GET",
@@ -56,7 +57,7 @@ const backupApi = baseApi.injectEndpoints({
     }),
 
     // Restore from backup (existing file in server backups directory)
-    restoreBackup: builder.mutation<RestoreResult, RestoreRequest>({
+    restoreBackup: builder.mutation<ApiResponse<RestoreResult>, RestoreRequest>({
       query: (request) => ({
         url: "/admin/restore",
         method: "POST",
@@ -75,7 +76,7 @@ const backupApi = baseApi.injectEndpoints({
     }),
 
     // Restore from an uploaded backup file (from client machine)
-    restoreFromUpload: builder.mutation<RestoreResult, FormData>({
+    restoreFromUpload: builder.mutation<ApiResponse<RestoreResult>, FormData>({
       query: (formData) => ({
         url: "/admin/restore/upload",
         method: "POST",

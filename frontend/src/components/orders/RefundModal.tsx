@@ -3,11 +3,11 @@ import { X, AlertTriangle, RotateCcw, Minus, Plus } from "lucide-react";
 import { Order, OrderItem } from "@/types/order.types";
 import { useRefundOrderMutation } from "@/api/ordersApi";
 import { formatCurrency } from "@/utils/formatters";
-import { ERROR_MESSAGES } from "@/utils/constants";
 import { Button } from "@/components/common/Button";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { Portal } from "@/components/common/Portal";
+import { handleApiError } from "@/utils/errorHandler";
 
 interface RefundModalProps {
   order: Order;
@@ -146,36 +146,20 @@ export const RefundModal = ({
         }).unwrap();
       }
 
-      if (result.success) {
-        const returnOrderNumber = result.data?.orderNumber;
-        const message =
-          refundType === "full"
-            ? `تم إنشاء فاتورة المرتجع ${
-                returnOrderNumber ? `#${returnOrderNumber}` : ""
-              }`
-            : `تم إنشاء فاتورة المرتجع الجزئي ${
-                returnOrderNumber ? `#${returnOrderNumber}` : ""
-              }`;
-        toast.success(message);
-        onSuccess?.();
-        onClose();
-      } else {
-        const errorMsg =
-          (result.errorCode && ERROR_MESSAGES[result.errorCode]) ||
-          result.message ||
-          "فشل في إنشاء فاتورة المرتجع";
-        toast.error(errorMsg);
-      }
+      const returnOrderNumber = result.data?.orderNumber;
+      const message =
+        refundType === "full"
+          ? `تم إنشاء فاتورة المرتجع ${
+              returnOrderNumber ? `#${returnOrderNumber}` : ""
+            }`
+          : `تم إنشاء فاتورة المرتجع الجزئي ${
+              returnOrderNumber ? `#${returnOrderNumber}` : ""
+            }`;
+      toast.success(message);
+      onSuccess?.();
+      onClose();
     } catch (err: unknown) {
-      const apiError = err as {
-        data?: { errorCode?: string; message?: string };
-      };
-      const errorCode = apiError?.data?.errorCode;
-      const errorMsg =
-        (errorCode && ERROR_MESSAGES[errorCode]) ||
-        apiError?.data?.message ||
-        "فشل في إنشاء فاتورة المرتجع";
-      toast.error(errorMsg);
+      toast.error(handleApiError(err));
     }
   };
 

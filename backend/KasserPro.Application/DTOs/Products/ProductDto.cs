@@ -28,8 +28,10 @@ public class ProductDto
     public bool TrackInventory { get; set; }
     
     /// <summary>
-    /// Current stock quantity for the current branch (from BranchInventories table)
+    /// Current stock quantity for the current branch (from BranchInventories table).
+    /// Transitional field only until BranchInventory endpoints fully replace it in clients.
     /// </summary>
+    // TODO: Remove in next sprint - use GET /api/inventory/branch endpoint instead
     public int? CurrentBranchStock { get; set; }
     
     public int CategoryId { get; set; }

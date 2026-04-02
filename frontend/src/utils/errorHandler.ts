@@ -110,26 +110,37 @@ const STATUS_MESSAGES: Record<number, string> = {
   503: "الخدمة غير متاحة حالياً",
 };
 
-interface ApiError {
-  status?: number;
+export interface ApiError {
+  status?: number | string;
   data?: {
     message?: string;
+    errorMessage?: string;
     errorCode?: string;
     errors?: Record<string, string[]>;
   };
+  message?: string;
+  stack?: string;
+}
+export function getApiErrorCode(error: unknown): string | undefined {
+  return (error as ApiError | undefined)?.data?.errorCode;
 }
 
+function getValidationMessage(apiError: ApiError): string | undefined {
+  if (!apiError.data?.errors) {
+    return undefined;
+  }
+
+  const firstError = Object.values(apiError.data.errors)[0];
+  return firstError && firstError.length > 0 ? firstError[0] : undefined;
+}
 /**
  * Handle API errors and show user-friendly messages
  */
-export function handleApiError(error: any): string {
-  // Log error for debugging
+export function handleApiError(error: unknown): string {
   console.error("API Error:", error);
 
-  // Check if it's an API error with response
   const apiError = error as ApiError;
 
-  // Check for error code
   if (apiError.data?.errorCode) {
     const message = ERROR_MESSAGES[apiError.data.errorCode];
     if (message) {
@@ -137,43 +148,37 @@ export function handleApiError(error: any): string {
     }
   }
 
-  // Check for custom message from backend
   if (apiError.data?.message) {
     return apiError.data.message;
   }
 
-  // Check for validation errors
-  if (apiError.data?.errors) {
-    const firstError = Object.values(apiError.data.errors)[0];
-    if (firstError && firstError.length > 0) {
-      return firstError[0];
-    }
+  if (apiError.data?.errorMessage) {
+    return apiError.data.errorMessage;
   }
 
-  // Check for status code
-  if (apiError.status) {
+  const validationMessage = getValidationMessage(apiError);
+  if (validationMessage) {
+    return validationMessage;
+  }
+
+  if (typeof apiError.status === "number") {
     const message = STATUS_MESSAGES[apiError.status];
     if (message) {
       return message;
     }
   }
 
-  // Network error
-  if (
-    error.message === "Network Error" ||
-    error.message === "Failed to fetch"
-  ) {
-    return "فشل الاتصال بالخادم. يرجى التحقق من الاتصال بالإنترنت";
+  if (apiError.status === "FETCH_ERROR" || apiError.status === "TIMEOUT_ERROR") {
+    return STATUS_MESSAGES[503] ?? "Network request failed.";
   }
 
-  // Default error message
-  return "حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى";
+  return STATUS_MESSAGES[500] ?? "Unexpected error.";
 }
 
 /**
  * Show error toast with user-friendly message
  */
-export function showErrorToast(error: any) {
+export function showErrorToast(error: unknown) {
   const message = handleApiError(error);
   toast.error(message);
 }
@@ -200,3 +205,4 @@ export function logError(error: any, context?: string) {
   //   sendToErrorTracking(errorData);
   // }
 }
+

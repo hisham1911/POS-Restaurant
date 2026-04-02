@@ -85,6 +85,9 @@ public static class ErrorCodes
 
     // System Errors (1900-1999)
     public const string SYSTEM_INTERNAL_ERROR = "SYSTEM_INTERNAL_ERROR";
+    public const string BACKUP_NOT_FOUND = "BACKUP_NOT_FOUND";
+    public const string BACKUP_FAILED = "BACKUP_FAILED";
+    public const string RESTORE_FAILED = "RESTORE_FAILED";
 
     // Idempotency Errors (1900-1999)
     public const string DUPLICATE_REQUEST = "DUPLICATE_REQUEST";
@@ -232,6 +235,9 @@ public static class ErrorMessages
 
         // System
         { ErrorCodes.SYSTEM_INTERNAL_ERROR, "حدث خطأ في النظام" },
+        { ErrorCodes.BACKUP_NOT_FOUND, "ملف النسخة الاحتياطية غير موجود" },
+        { ErrorCodes.BACKUP_FAILED, "فشل إنشاء النسخة الاحتياطية" },
+        { ErrorCodes.RESTORE_FAILED, "فشلت عملية الاستعادة" },
 
         // Idempotency
         { ErrorCodes.DUPLICATE_REQUEST, "طلب مكرر" },

@@ -3,6 +3,7 @@ import { useCancelPurchaseInvoiceMutation } from '../../api/purchaseInvoiceApi';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { toast } from 'sonner';
+import { handleApiError } from '../../utils/errorHandler';
 
 interface CancelInvoiceModalProps {
   invoiceId: number;
@@ -25,7 +26,7 @@ export function CancelInvoiceModal({ invoiceId, isConfirmed, onClose }: CancelIn
     }
 
     try {
-      const result = await cancelInvoice({
+      await cancelInvoice({
         id: invoiceId,
         data: {
           reason: reason.trim(),
@@ -33,19 +34,11 @@ export function CancelInvoiceModal({ invoiceId, isConfirmed, onClose }: CancelIn
         },
       }).unwrap();
 
-      if (result.success) {
-        toast.success('تم إلغاء الفاتورة بنجاح');
-        onClose();
-      } else {
-        toast.error(result.message || 'فشل إلغاء الفاتورة');
-      }
-    } catch (error: any) {
+      toast.success('تم إلغاء الفاتورة بنجاح');
+      onClose();
+    } catch (error) {
       console.error('Error cancelling invoice:', error);
-      if (error?.data?.message) {
-        toast.error(error.data.message);
-      } else {
-        toast.error('حدث خطأ أثناء إلغاء الفاتورة');
-      }
+      toast.error(handleApiError(error));
     }
   };
 

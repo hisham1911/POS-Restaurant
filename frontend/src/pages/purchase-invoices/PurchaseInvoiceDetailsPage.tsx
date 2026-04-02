@@ -12,6 +12,7 @@ import { formatCurrency, formatDateOnly } from '../../utils/formatters';
 import { toast } from 'sonner';
 import { AddPaymentModal } from '../../components/purchase-invoices/AddPaymentModal';
 import { CancelInvoiceModal } from '../../components/purchase-invoices/CancelInvoiceModal';
+import { handleApiError } from '../../utils/errorHandler';
 
 export function PurchaseInvoiceDetailsPage() {
   const navigate = useNavigate();
@@ -29,12 +30,11 @@ export function PurchaseInvoiceDetailsPage() {
     if (!confirm('هل أنت متأكد من تأكيد الفاتورة؟ سيتم تحديث المخزون.')) return;
 
     try {
-      const result = await confirmInvoice(Number(id)).unwrap();
-      if (result.success) {
-        toast.success('تم تأكيد الفاتورة بنجاح');
-      }
+      await confirmInvoice(Number(id)).unwrap();
+      toast.success('تم تأكيد الفاتورة بنجاح');
     } catch (error) {
       console.error('Error confirming invoice:', error);
+      toast.error(handleApiError(error));
     }
   };
 
@@ -42,13 +42,12 @@ export function PurchaseInvoiceDetailsPage() {
     if (!confirm('هل أنت متأكد من حذف الفاتورة؟')) return;
 
     try {
-      const result = await deleteInvoice(Number(id)).unwrap();
-      if (result.success) {
-        toast.success('تم حذف الفاتورة بنجاح');
-        navigate('/purchase-invoices');
-      }
+      await deleteInvoice(Number(id)).unwrap();
+      toast.success('تم حذف الفاتورة بنجاح');
+      navigate('/purchase-invoices');
     } catch (error) {
       console.error('Error deleting invoice:', error);
+      toast.error(handleApiError(error));
     }
   };
 

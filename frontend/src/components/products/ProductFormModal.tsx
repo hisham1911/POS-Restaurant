@@ -51,7 +51,7 @@ export const ProductFormModal = ({
     imageUrl: product?.imageUrl || "",
     categoryId: product?.categoryId || categories[0]?.id || 0,
     type: product?.type || ProductType.Physical,
-    stockQuantity: product?.stockQuantity ?? 0,
+    branchStockQuantity: product?.currentBranchStock ?? 0,
     lowStockThreshold: product?.lowStockThreshold ?? 5,
     reorderPoint: product?.reorderPoint ?? null,
     isActive: product?.isActive ?? true,
@@ -66,11 +66,11 @@ export const ProductFormModal = ({
     if (branches?.data && !isEditing) {
       const initialStocks: Record<number, number> = {};
       branches.data.forEach(branch => {
-        initialStocks[branch.id] = formData.stockQuantity;
+        initialStocks[branch.id] = formData.branchStockQuantity;
       });
       setBranchStocks(initialStocks);
     }
-  }, [branches?.data, formData.stockQuantity, isEditing]);
+  }, [branches?.data, formData.branchStockQuantity, isEditing]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,7 +90,7 @@ export const ProductFormModal = ({
         imageUrl: formData.imageUrl,
         categoryId: formData.categoryId,
         type: formData.type,
-        stockQuantity: formData.stockQuantity,
+        currentBranchStock: formData.branchStockQuantity,
         lowStockThreshold: formData.lowStockThreshold,
         reorderPoint: formData.reorderPoint ?? undefined,
         isActive: formData.isActive,
@@ -111,7 +111,7 @@ export const ProductFormModal = ({
         imageUrl: formData.imageUrl,
         categoryId: formData.categoryId,
         type: formData.type,
-        stockQuantity: formData.stockQuantity,
+        initialBranchStock: formData.branchStockQuantity,
         lowStockThreshold: formData.lowStockThreshold,
         reorderPoint: formData.reorderPoint ?? undefined,
         branchStockQuantities: useBranchSpecificStock
@@ -353,7 +353,7 @@ export const ProductFormModal = ({
                     taxRate: e.target.value ? parseFloat(e.target.value) : null,
                   })
                 }
-                placeholder="استخدام الافتراضي (14%)"
+                placeholder="استخدام الافتراضي"
               />
               <p className="text-xs text-gray-500 mt-1">
                 اتركه فارغاً لاستخدام معدل الفرع الافتراضي
@@ -458,11 +458,11 @@ export const ProductFormModal = ({
                   label="الكمية المتاحة *"
                   type="number"
                   min="0"
-                  value={numberToDisplay(formData.stockQuantity)}
+                  value={numberToDisplay(formData.branchStockQuantity)}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      stockQuantity: displayToNumber(e.target.value),
+                      branchStockQuantity: displayToNumber(e.target.value),
                     })
                   }
                   placeholder="0"
@@ -550,3 +550,4 @@ export const ProductFormModal = ({
     </Modal>
   );
 };
+

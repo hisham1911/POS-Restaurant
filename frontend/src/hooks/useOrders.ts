@@ -10,19 +10,12 @@ import { CompleteOrderRequest, Order } from "../types/order.types";
 import { toast } from "sonner";
 import { useAppSelector } from "../store/hooks";
 import { selectCurrentBranch } from "../store/slices/branchSlice";
-
-// Error response type from API
-interface ApiErrorData {
-  message?: string;
-  errorCode?: string;
-}
+import { ApiError, getApiErrorCode, handleApiError } from "../utils/errorHandler";
 
 export const useOrders = () => {
   const { items, clearCart, discountType, discountValue } = useCart();
   const currentBranch = useAppSelector(selectCurrentBranch);
 
-  // Note: useGetOrdersQuery now returns paginated data, but we keep it for backward compatibility
-  // For the full list with filters, use useGetOrdersQuery directly in components
   const {
     data: ordersData,
     isLoading: isLoadingOrders,
@@ -37,18 +30,17 @@ export const useOrders = () => {
   const [cancelMutation, { isLoading: isCancelling }] =
     useCancelOrderMutation();
 
-  // Extract items from paginated response
   const orders = ordersData?.data?.items || [];
   const todayOrders = todayOrdersData?.data || [];
 
   const createOrder = async (customerId?: number): Promise<Order | null> => {
     if (items.length === 0) {
-      toast.error("السلة فارغة");
+      toast.error("Cart is empty");
       return null;
     }
 
     if (!currentBranch?.id) {
-      toast.error("يرجى اختيار الفرع أولاً");
+      toast.error("Select a branch first");
       return null;
     }
 
@@ -73,18 +65,22 @@ export const useOrders = () => {
         discountType,
         discountValue,
       }).unwrap();
-      if (result.success && result.data) {
-        return result.data;
+
+      if (!result.data) {
+        toast.error(result.message || "Unable to create order");
+        return null;
       }
-      // Backend returned success: false
-      toast.error(result.message || "فشل في إنشاء الطلب");
-      return null;
+
+      return result.data;
     } catch (error) {
-      // Error already handled by baseQueryWithReauth
-      // Only show generic error if not already shown
-      const apiError = error as { data?: ApiErrorData };
-      if (!apiError.data?.errorCode) {
-        toast.error("فشل في إنشاء الطلب");
+      const apiError = error as ApiError;
+      if (
+        !getApiErrorCode(error) &&
+        apiError.status !== 400 &&
+        apiError.status !== 403 &&
+        apiError.status !== 409
+      ) {
+        toast.error(handleApiError(error));
       }
       return null;
     }
@@ -96,28 +92,23 @@ export const useOrders = () => {
   ): Promise<Order | null> => {
     try {
       const result = await completeMutation({ orderId, data }).unwrap();
-      if (result.success && result.data) {
-        // ✅ مسح السلة فقط عند نجاح الدفع
-        clearCart();
-        toast.success("تم إتمام الدفع وإغلاق الطلب");
-        return result.data;
-      }
-      // Backend returned success: false
-      toast.error(result.message || "فشل في إكمال الطلب");
-      return null;
-    } catch (error) {
-      // ❌ لا نمسح السلة عند الفشل - البيانات محفوظة
-      // Error is handled by baseQueryWithReauth, but we check for specific cases
-      const apiError = error as { data?: ApiErrorData; status?: number };
 
-      // Don't show generic error if baseQueryWithReauth already showed specific error
-      // Only show generic error for unexpected cases
+      if (!result.data) {
+        toast.error(result.message || "Unable to complete order");
+        return null;
+      }
+
+      clearCart();
+      toast.success("Order completed successfully");
+      return result.data;
+    } catch (error) {
+      const apiError = error as ApiError;
       if (
-        !apiError.data?.errorCode &&
+        !getApiErrorCode(error) &&
         apiError.status !== 400 &&
         apiError.status !== 409
       ) {
-        toast.error("فشل في إكمال الطلب");
+        toast.error(handleApiError(error));
       }
       return null;
     }
@@ -129,17 +120,24 @@ export const useOrders = () => {
   ): Promise<boolean> => {
     try {
       const result = await cancelMutation({ orderId, reason }).unwrap();
-      if (result.success) {
-        toast.success("تم إلغاء الطلب");
-        refetch();
-        return true;
+
+      if (!result.data) {
+        toast.error(result.message || "Unable to cancel order");
+        return false;
       }
-      toast.error(result.message || "فشل في إلغاء الطلب");
-      return false;
+
+      toast.success("Order cancelled");
+      refetch();
+      return true;
     } catch (error) {
-      const apiError = error as { data?: ApiErrorData };
-      if (!apiError.data?.errorCode) {
-        toast.error("فشل في إلغاء الطلب");
+      const apiError = error as ApiError;
+      if (
+        !getApiErrorCode(error) &&
+        apiError.status !== 400 &&
+        apiError.status !== 403 &&
+        apiError.status !== 409
+      ) {
+        toast.error(handleApiError(error));
       }
       return false;
     }

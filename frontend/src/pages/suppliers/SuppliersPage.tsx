@@ -11,6 +11,7 @@ import { Card } from "../../components/common/Card";
 import { Loading } from "../../components/common/Loading";
 import { Input } from "../../components/common/Input";
 import SupplierFormModal from "../../components/suppliers/SupplierFormModal";
+import { handleApiError } from "../../utils/errorHandler";
 
 export default function SuppliersPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -49,12 +50,10 @@ export default function SuppliersPage() {
     }
 
     try {
-      const result = await deleteSupplier(id).unwrap();
-      if (result.success) {
-        toast.success(result.message || "تم حذف المورد بنجاح");
-      }
-    } catch (error: any) {
-      toast.error(error?.data?.message || "فشل حذف المورد");
+      await deleteSupplier(id).unwrap();
+      toast.success("تم حذف المورد بنجاح");
+    } catch (error) {
+      toast.error(handleApiError(error));
     }
   };
 

@@ -6,7 +6,7 @@ inclusion: always
 
 > **النوع:** وثيقة تعاقد رسمية بين الباك-اند والفرونت-اند  
 > **الحالة:** مبنية على الكود الفعلي (مش الـ docs القديمة)  
-> **آخر تحديث:** مارس 2026  
+> **آخر تحديث:** 2 أبريل 2026  
 > **القاعدة الذهبية:** الكود هو الحقيقة — لو في تعارض بين الوثيقة دي والكود، الكود يكسب
 
 ---
@@ -44,8 +44,8 @@ interface ApiResponse<T> {
 
 ```csharp
 // Success
-return Ok(ApiResponse<ProductDto>.Success(dto));
-return Ok(ApiResponse<int>.Success(id, "تم الإنشاء بنجاح"));
+return Ok(ApiResponse<ProductDto>.Ok(dto));
+return Ok(ApiResponse<int>.Ok(id, "تم الإنشاء بنجاح"));
 
 // Fail — دايمًا ErrorCode + Message
 return BadRequest(ApiResponse<object>.Fail(ErrorCodes.PRODUCT_NOT_FOUND,
@@ -204,6 +204,9 @@ if (error.message === 'المنتج غير موجود') { ... }
 | `MAINTENANCE_MODE` | السيستم في صيانة | 503 |
 | `VALIDATION_ERROR` | Validation فشل | 400 |
 | `CONCURRENCY_CONFLICT` | تعارض في التعديل المتزامن | 409 |
+| `BACKUP_NOT_FOUND` | ملف النسخة الاحتياطية غير موجود | 404 |
+| `BACKUP_FAILED` | فشل إنشاء النسخة الاحتياطية | 500 |
+| `RESTORE_FAILED` | فشلت عملية الاستعادة | 500 |
 | `DATABASE_ERROR` | خطأ في قاعدة البيانات | 500 |
 
 ---
@@ -266,6 +269,8 @@ interface ProductDto {
   categoryId: number;
   categoryName: string;
   isActive: boolean;
+  // currentBranchStock is transitional - will move to BranchInventory endpoint
+  currentBranchStock?: number; // @deprecated
   // ❌ مفيش stockQuantity هنا — المخزن في BranchInventory
 }
 
@@ -302,6 +307,7 @@ interface BranchInventoryDto {
 | `/api/orders/{id}/refund` | POST | `OrdersRefund` | `RefundDto` | `ApiResponse<OrderDto>` |
 
 ```typescript
+// Code-first contract: keep the extended backend enum values below.
 // ⚠️ مهم: OrderType values بالظبط زي الباك-اند
 type OrderType = 'DineIn' | 'Takeaway' | 'Delivery' | 'Return';
 type OrderStatus = 'Draft' | 'Pending' | 'Completed' | 'Cancelled' | 'Refunded' | 'PartiallyRefunded';
@@ -450,10 +456,10 @@ interface TenantDto {
 
 | Endpoint | Method | Auth | Notes |
 |----------|--------|------|-------|
-| `/api/admin/backup` | POST | `Admin/SystemOwner` | Creates manual backup |
-| `/api/admin/restore` | POST | `Admin/SystemOwner` | Restore from backup filename |
-| `/api/admin/backups` | GET | `Admin/SystemOwner` | List available backups |
-| `/api/admin/restore/upload` | POST | `Admin/SystemOwner` | Restore from uploaded `.db` backup |
+| `/api/admin/backup` | POST | `Admin/SystemOwner` | `ApiResponse<BackupResult>` - Creates manual backup |
+| `/api/admin/restore` | POST | `Admin/SystemOwner` | `ApiResponse<RestoreResult>` - Restore from backup filename |
+| `/api/admin/backups` | GET | `Admin/SystemOwner` | `ApiResponse<BackupInfo[]>` - List available backups |
+| `/api/admin/restore/upload` | POST | `Admin/SystemOwner` | `ApiResponse<RestoreResult>` - Restore from uploaded `.db` backup |
 | `/api/system/info` | GET | `Admin/SystemOwner` | LAN and host information |
 | `/api/system/health` | GET | `AllowAnonymous` | Lightweight system health |
 | `/api/health` | GET | `AllowAnonymous` | Primary API health check |
@@ -740,7 +746,7 @@ await _unitOfWork.SaveChangesAsync(ct);
 ---
 
 > **Document Owner:** Principal Software Architect  
-> **Last Updated:** March 2026  
+> **Last Updated:** April 2, 2026  
 > **Review Trigger:** عند أي تغيير في DTOs أو Endpoints أو Error Codes  
 > **الهدف:** Zero surprises بين الباك-اند والفرونت
 

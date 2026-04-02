@@ -5,6 +5,7 @@ import { Customer, PayDebtRequest } from '../../types/customer.types';
 import { toast } from 'sonner';
 import { Portal } from '@/components/common/Portal';
 import clsx from 'clsx';
+import { handleApiError } from '@/utils/errorHandler';
 
 interface DebtPaymentModalProps {
   customer: Customer;
@@ -58,16 +59,17 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
         },
       }).unwrap();
 
-      if (result.success) {
-        toast.success(result.data.message || 'تم تسديد الدين بنجاح');
-        onSuccess?.();
-        onClose();
-      } else {
+      if (!result.data) {
         toast.error(result.message || 'فشل تسديد الدين');
+        return;
       }
-    } catch (error: any) {
+
+      toast.success(result.data.message || 'تم تسديد الدين بنجاح');
+      onSuccess?.();
+      onClose();
+    } catch (error) {
       console.error('Error paying debt:', error);
-      toast.error(error?.data?.message || 'حدث خطأ أثناء تسديد الدين');
+      toast.error(handleApiError(error));
     }
   };
 

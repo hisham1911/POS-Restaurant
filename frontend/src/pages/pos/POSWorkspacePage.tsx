@@ -34,6 +34,7 @@ import {
   Package,
 } from "lucide-react";
 import clsx from "clsx";
+import { getProductCurrentStock } from "@/utils/productStock";
 
 // Import components
 import { ProductListView } from "@/components/pos/ProductListView";
@@ -302,7 +303,7 @@ export const POSWorkspacePage = () => {
   if (showAvailableOnly) {
     filteredProducts = filteredProducts.filter((p) => {
       if (!p.trackInventory) return true;
-      return (p.stockQuantity ?? 0) > 0;
+      return getProductCurrentStock(p) > 0;
     });
   }
 
@@ -1210,12 +1211,12 @@ export const POSWorkspacePage = () => {
               id: -Date.now(), // Temporary negative ID for custom items
               name: item.name,
               price: item.unitPrice,
-              taxRate: item.taxRate || 14,
+              taxRate: item.taxRate ?? taxRate,
               categoryId: 0,
               isActive: true,
               trackInventory: false,
               type: 2, // Service type
-              stockQuantity: null,
+              currentBranchStock: null,
             };
             addItem(customProduct as any, item.quantity);
             toast.success(`تم إضافة: ${item.name}`);

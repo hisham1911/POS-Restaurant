@@ -4,6 +4,7 @@ import { useCreateCustomerMutation } from "@/api/customersApi";
 import { Customer } from "@/types/customer.types";
 import toast from "react-hot-toast";
 import { Portal } from "@/components/common/Portal";
+import { handleApiError } from "@/utils/errorHandler";
 
 interface CustomerQuickCreateModalProps {
   initialPhone: string;
@@ -43,12 +44,15 @@ export const CustomerQuickCreateModal = ({
         notes: formData.notes || undefined,
       }).unwrap();
 
-      if (result.success && result.data) {
-        toast.success("تم إضافة العميل بنجاح");
-        onSuccess(result.data);
+      if (!result.data) {
+        toast.error("فشل في إضافة العميل");
+        return;
       }
-    } catch (error: any) {
-      toast.error(error?.data?.message || "فشل في إضافة العميل");
+
+      toast.success("تم إضافة العميل بنجاح");
+      onSuccess(result.data);
+    } catch (error) {
+      toast.error(handleApiError(error));
     }
   };
 

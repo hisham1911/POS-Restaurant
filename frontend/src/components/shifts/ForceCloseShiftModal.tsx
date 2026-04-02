@@ -4,6 +4,7 @@ import { useForceCloseShiftMutation } from "../../api/shiftsApi";
 import { Shift } from "../../types/shift.types";
 import { formatDateTimeFull } from "../../utils/formatters";
 import { Portal } from "../../components/common/Portal";
+import { handleApiError } from "../../utils/errorHandler";
 
 interface ForceCloseShiftModalProps {
   shift: Shift;
@@ -32,7 +33,7 @@ export default function ForceCloseShiftModal({
     }
 
     try {
-      const result = await forceCloseShift({
+      await forceCloseShift({
         id: shift.id,
         request: {
           reason: reason.trim(),
@@ -41,13 +42,11 @@ export default function ForceCloseShiftModal({
         },
       }).unwrap();
 
-      if (result.success) {
-        alert("تم إغلاق الوردية بالقوة بنجاح");
-        onSuccess?.();
-        onClose();
-      }
-    } catch (error: any) {
-      alert(error?.data?.message || "حدث خطأ أثناء إغلاق الوردية");
+      alert("تم إغلاق الوردية بالقوة بنجاح");
+      onSuccess?.();
+      onClose();
+    } catch (error) {
+      alert(handleApiError(error));
     }
   };
 

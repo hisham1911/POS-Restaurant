@@ -14,6 +14,7 @@ import { formatCurrency } from "@/utils/formatters";
 import { Product } from "@/types/product.types";
 import { toast } from "react-hot-toast";
 import clsx from "clsx";
+import { getProductCurrentStock } from "@/utils/productStock";
 
 export const ProductsPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -67,7 +68,7 @@ export const ProductsPage = () => {
       const matchesLowStock =
         !showLowStockOnly ||
         (product.trackInventory &&
-          (product.stockQuantity ?? 0) < (product.lowStockThreshold ?? 5));
+          getProductCurrentStock(product) < (product.lowStockThreshold ?? 5));
       return (
         matchesSearch && matchesCategory && matchesActive && matchesLowStock
       );
@@ -108,7 +109,8 @@ export const ProductsPage = () => {
   const activeProducts = filteredProducts.filter((p) => p.isActive).length;
   const lowStockProducts = filteredProducts.filter(
     (p) =>
-      p.trackInventory && (p.stockQuantity ?? 0) < (p.lowStockThreshold ?? 5),
+      p.trackInventory &&
+      getProductCurrentStock(p) < (p.lowStockThreshold ?? 5),
   ).length;
 
   return (
@@ -272,15 +274,15 @@ export const ProductsPage = () => {
                         <span
                           className={clsx(
                             "px-2.5 py-1 rounded-full text-xs font-medium",
-                            (product.stockQuantity ?? 0) <= 0
+                            getProductCurrentStock(product) <= 0
                               ? "bg-danger-50 text-danger-600"
-                              : (product.stockQuantity ?? 0) <=
+                              : getProductCurrentStock(product) <=
                                   (product.lowStockThreshold ?? 5)
                                 ? "bg-warning-50 text-warning-600"
                                 : "bg-gray-100 text-gray-700",
                           )}
                         >
-                          {product.stockQuantity ?? 0}
+                          {getProductCurrentStock(product)}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-600 text-sm">

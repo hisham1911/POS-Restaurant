@@ -9,6 +9,7 @@ import {
 import { Branch } from "@/types/branch.types";
 import { toast } from "react-hot-toast";
 import { Portal } from "@/components/common/Portal";
+import { handleApiError } from "@/utils/errorHandler";
 
 interface BranchFormModalProps {
   branch?: Branch;
@@ -47,33 +48,26 @@ export const BranchFormModal = ({ branch, onClose }: BranchFormModalProps) => {
 
     try {
       if (isEditMode) {
-        const result = await updateBranch({
+        await updateBranch({
           id: branch.id,
           data: formData,
         }).unwrap();
 
-        if (result.success) {
-          toast.success("تم تحديث الفرع بنجاح");
-          onClose();
-        }
+        toast.success("تم تحديث الفرع بنجاح");
+        onClose();
       } else {
-        const result = await createBranch({
+        await createBranch({
           name: formData.name,
           code: formData.code,
           address: formData.address || undefined,
           phone: formData.phone || undefined,
         }).unwrap();
 
-        if (result.success) {
-          toast.success("تم إضافة الفرع بنجاح");
-          onClose();
-        }
+        toast.success("تم إضافة الفرع بنجاح");
+        onClose();
       }
-    } catch (error: any) {
-      const errorMessage =
-        error?.data?.message ||
-        (isEditMode ? "فشل في تحديث الفرع" : "فشل في إضافة الفرع");
-      toast.error(errorMessage);
+    } catch (error) {
+      toast.error(handleApiError(error));
     }
   };
 

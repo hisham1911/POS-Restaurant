@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { Product } from "../../types/product.types";
+import { getProductCurrentStock } from "../../utils/productStock";
 
 export type DiscountType = "Percentage" | "Fixed";
 
@@ -28,7 +29,7 @@ interface CartState {
 
 const initialState: CartState = {
   items: [],
-  taxRate: 14, // Default VAT 14% (الضريبة المصرية) - will be updated from tenant
+  taxRate: 0,
   isTaxEnabled: true,
   allowNegativeStock: false, // Default: don't allow selling when stock is 0
   discountType: undefined,
@@ -51,7 +52,9 @@ const cartSlice = createSlice({
       // Check stock availability
       const currentQty = existingItem?.quantity ?? 0;
       const newQty = currentQty + quantity;
-      const availableStock = product.stockQuantity ?? Infinity;
+      const availableStock = product.trackInventory
+        ? getProductCurrentStock(product)
+        : Infinity;
 
       // If allowNegativeStock is enabled, skip stock check
       if (state.allowNegativeStock) {
@@ -111,7 +114,9 @@ const cartSlice = createSlice({
           return;
         }
         // Check stock availability
-        const availableStock = item.product.stockQuantity ?? Infinity;
+        const availableStock = item.product.trackInventory
+          ? getProductCurrentStock(item.product)
+          : Infinity;
         if (item.product.trackInventory && quantity > availableStock) {
           item.quantity = availableStock; // Limit to available stock
         } else {
@@ -358,3 +363,4 @@ export const selectTotal = (state: { cart: CartState }) => {
 };
 
 export default cartSlice.reducer;
+

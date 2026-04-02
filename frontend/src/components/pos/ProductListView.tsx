@@ -6,6 +6,10 @@ import { useAppSelector } from "@/store/hooks";
 import { selectAllowNegativeStock } from "@/store/slices/cartSlice";
 import clsx from "clsx";
 import { Package, AlertCircle, CheckCircle2, Minus } from "lucide-react";
+import {
+  getProductAvailableStock,
+  getProductCurrentStock,
+} from "@/utils/productStock";
 
 interface ProductListViewProps {
   products: Product[];
@@ -19,8 +23,8 @@ export const ProductListView = ({ products, categories }: ProductListViewProps) 
   const handleProductClick = (product: Product) => {
     const cartItem = items.find((item) => item.product.id === product.id);
     const quantityInCart = cartItem?.quantity ?? 0;
-    const totalStock = product.stockQuantity ?? 0;
-    const availableStock = product.trackInventory ? totalStock - quantityInCart : Infinity;
+    const totalStock = getProductCurrentStock(product);
+    const availableStock = getProductAvailableStock(product, quantityInCart);
     const canAddMore = allowNegativeStock || !product.trackInventory || availableStock > 0;
     const isOutOfStock = !allowNegativeStock && product.trackInventory && totalStock <= 0;
 
@@ -61,10 +65,11 @@ export const ProductListView = ({ products, categories }: ProductListViewProps) 
               {categoryProducts.map((product) => {
                 const cartItem = items.find((item) => item.product.id === product.id);
                 const quantityInCart = cartItem?.quantity ?? 0;
-                const totalStock = product.stockQuantity ?? 0;
-                const availableStock = product.trackInventory
-                  ? totalStock - quantityInCart
-                  : Infinity;
+                const totalStock = getProductCurrentStock(product);
+                const availableStock = getProductAvailableStock(
+                  product,
+                  quantityInCart,
+                );
                 const canAddMore =
                   allowNegativeStock || !product.trackInventory || availableStock > 0;
                 const isOutOfStock =

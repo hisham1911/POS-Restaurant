@@ -6,6 +6,7 @@ import { Button } from '../common/Button';
 import { formatCurrency } from '../../utils/formatters';
 import { toast } from 'sonner';
 import type { PaymentMethod } from '../../types/purchaseInvoice.types';
+import { handleApiError } from '../../utils/errorHandler';
 
 interface AddPaymentModalProps {
   invoiceId: number;
@@ -47,32 +48,16 @@ export function AddPaymentModal({ invoiceId, amountDue, onClose }: AddPaymentMod
         notes: notes.trim() || undefined,
       };
       
-      const result = await addPayment({
+      await addPayment({
         invoiceId,
         payment: paymentData,
       }).unwrap();
 
-      if (result.success) {
-        toast.success('تم إضافة الدفعة بنجاح');
-        onClose();
-      } else {
-        toast.error(result.message || 'فشل إضافة الدفعة');
-      }
-    } catch (error: any) {
+      toast.success('تم إضافة الدفعة بنجاح');
+      onClose();
+    } catch (error) {
       console.error('Error adding payment:', error);
-      console.error('Validation errors:', error?.data?.errors);
-      
-      if (error?.data?.errors) {
-        // Show validation errors
-        const errorMessages = Object.entries(error.data.errors)
-          .map(([field, messages]: [string, any]) => `${field}: ${messages.join(', ')}`)
-          .join('\n');
-        toast.error(`خطأ في التحقق:\n${errorMessages}`);
-      } else if (error?.data?.message) {
-        toast.error(error.data.message);
-      } else {
-        toast.error('حدث خطأ أثناء إضافة الدفعة');
-      }
+      toast.error(handleApiError(error));
     }
   };
 

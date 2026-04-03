@@ -31,7 +31,7 @@ public class BranchAccessMiddleware
         }
 
         var headerBranchId = context.Request.Headers["X-Branch-Id"].FirstOrDefault();
-        
+
         // If no header, continue (will use JWT branch)
         if (string.IsNullOrEmpty(headerBranchId))
         {

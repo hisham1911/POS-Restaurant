@@ -117,9 +117,14 @@ export default function UserFormModal({ user, onClose }: UserFormModalProps) {
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+          <form
+            onSubmit={handleSubmit}
+            className="p-6 space-y-4 overflow-y-auto flex-1"
+          >
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">الاسم *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                الاسم *
+              </label>
               <input
                 type="text"
                 value={name}
@@ -161,7 +166,9 @@ export default function UserFormModal({ user, onClose }: UserFormModalProps) {
             )}
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">الهاتف</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                الهاتف
+              </label>
               <input
                 type="tel"
                 value={phone}
@@ -172,7 +179,9 @@ export default function UserFormModal({ user, onClose }: UserFormModalProps) {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">الدور *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                الدور *
+              </label>
               <div className="relative">
                 <select
                   value={role}
@@ -189,7 +198,9 @@ export default function UserFormModal({ user, onClose }: UserFormModalProps) {
 
             {shouldShowBranchField && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">الفرع</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  الفرع
+                </label>
                 <div className="relative">
                   <select
                     value={branchId || ""}

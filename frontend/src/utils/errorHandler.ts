@@ -168,7 +168,10 @@ export function handleApiError(error: unknown): string {
     }
   }
 
-  if (apiError.status === "FETCH_ERROR" || apiError.status === "TIMEOUT_ERROR") {
+  if (
+    apiError.status === "FETCH_ERROR" ||
+    apiError.status === "TIMEOUT_ERROR"
+  ) {
     return STATUS_MESSAGES[503] ?? "Network request failed.";
   }
 
@@ -209,4 +212,3 @@ export function logError(error: unknown, context?: string) {
   //   sendToErrorTracking(errorData);
   // }
 }
-

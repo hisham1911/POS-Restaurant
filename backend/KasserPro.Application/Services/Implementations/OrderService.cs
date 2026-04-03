@@ -197,8 +197,8 @@ public class OrderService : IOrderService
         var order = await _unitOfWork.Orders.Query()
             .Include(o => o.Items)
             .Include(o => o.Payments)
-            .FirstOrDefaultAsync(o => o.Id == id 
-                && o.TenantId == _currentUser.TenantId 
+            .FirstOrDefaultAsync(o => o.Id == id
+                && o.TenantId == _currentUser.TenantId
                 && o.BranchId == _currentUser.BranchId);
 
         if (order == null)
@@ -283,8 +283,8 @@ public class OrderService : IOrderService
         var query = _unitOfWork.Orders.Query()
             .Include(o => o.Items)
             .Include(o => o.Payments)
-            .Where(o => o.TenantId == tenantId 
-                && o.BranchId == branchId 
+            .Where(o => o.TenantId == tenantId
+                && o.BranchId == branchId
                 && o.CustomerId == customerId);
 
         var totalCount = await query.CountAsync();
@@ -313,8 +313,8 @@ public class OrderService : IOrderService
 
         var order = await _unitOfWork.Orders.Query()
             .Include(o => o.Items)
-            .FirstOrDefaultAsync(o => o.Id == orderId 
-                && o.TenantId == _currentUser.TenantId 
+            .FirstOrDefaultAsync(o => o.Id == orderId
+                && o.TenantId == _currentUser.TenantId
                 && o.BranchId == _currentUser.BranchId);
 
         if (order == null)
@@ -340,10 +340,10 @@ public class OrderService : IOrderService
         {
             // Get current stock from BranchInventory
             var branchInventory = await _unitOfWork.BranchInventories.Query()
-                .FirstOrDefaultAsync(bi => bi.TenantId == order.TenantId 
-                    && bi.BranchId == order.BranchId 
+                .FirstOrDefaultAsync(bi => bi.TenantId == order.TenantId
+                    && bi.BranchId == order.BranchId
                     && bi.ProductId == product.Id);
-            
+
             var currentStock = branchInventory?.Quantity ?? 0;
             // Calculate total quantity in order for this product
             var existingQty = order.Items.Where(i => i.ProductId == product.Id).Sum(i => i.Quantity);
@@ -470,8 +470,8 @@ public class OrderService : IOrderService
     {
         var order = await _unitOfWork.Orders.Query()
             .Include(o => o.Items)
-            .FirstOrDefaultAsync(o => o.Id == orderId 
-                && o.TenantId == _currentUser.TenantId 
+            .FirstOrDefaultAsync(o => o.Id == orderId
+                && o.TenantId == _currentUser.TenantId
                 && o.BranchId == _currentUser.BranchId);
 
         if (order == null)

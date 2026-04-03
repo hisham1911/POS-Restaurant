@@ -1,6 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Plus, Eye, Edit, Trash2, Receipt, Wallet, ChevronDown } from "lucide-react";
+import {
+  Plus,
+  Eye,
+  Edit,
+  Trash2,
+  Receipt,
+  Wallet,
+  ChevronDown,
+} from "lucide-react";
 import {
   useGetExpensesQuery,
   useDeleteExpenseMutation,

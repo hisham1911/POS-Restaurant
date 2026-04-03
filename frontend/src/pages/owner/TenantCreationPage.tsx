@@ -389,7 +389,9 @@ export default function TenantCreationPage() {
               <select
                 value={statusFilter}
                 onChange={(e) =>
-                  setStatusFilter(e.target.value as "all" | "active" | "inactive")
+                  setStatusFilter(
+                    e.target.value as "all" | "active" | "inactive",
+                  )
                 }
                 className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
               >

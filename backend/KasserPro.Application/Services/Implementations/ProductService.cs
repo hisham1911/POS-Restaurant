@@ -31,7 +31,7 @@ public class ProductService : IProductService
         var branchId = _currentUser.BranchId;
         page = page < 1 ? 1 : page;
         pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
-        
+
         var query = _unitOfWork.Products.Query()
             .Include(p => p.Category)
             .Where(p => p.TenantId == tenantId);
@@ -121,7 +121,7 @@ public class ProductService : IProductService
     {
         var tenantId = _currentUser.TenantId;
         var branchId = _currentUser.BranchId;
-        
+
         var product = await _unitOfWork.Products.Query()
             .Include(p => p.Category)
             .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
@@ -302,7 +302,7 @@ public class ProductService : IProductService
         var branchId = _currentUser.BranchId;
         var branchInventory = await _unitOfWork.BranchInventories.Query()
             .FirstOrDefaultAsync(bi => bi.TenantId == tenantId && bi.BranchId == branchId && bi.ProductId == product.Id);
-        
+
         var stockQuantity = product.TrackInventory && branchInventory != null
             ? branchInventory.Quantity
             : (product.TrackInventory ? 0 : (int?)null);
@@ -343,7 +343,7 @@ public class ProductService : IProductService
     {
         var tenantId = _currentUser.TenantId;
         var branchId = _currentUser.BranchId;
-        
+
         var product = await _unitOfWork.Products.Query()
             .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
         if (product == null)

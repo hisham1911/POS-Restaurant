@@ -68,10 +68,10 @@ export const ShiftPage = () => {
   };
 
   const handleCloseShift = async () => {
-    await closeShift({ 
-      closingBalance: Number(closingBalance), 
+    await closeShift({
+      closingBalance: Number(closingBalance),
       notes,
-      rowVersion: currentShift?.rowVersion 
+      rowVersion: currentShift?.rowVersion,
     });
     // Clear shift persistence when closing shift
     shiftPersistence.clear();

@@ -80,7 +80,7 @@ public class ExpenseCategoryService : IExpenseCategoryService
         {
             // Check for duplicate name
             var exists = await _unitOfWork.ExpenseCategories.Query()
-                .AnyAsync(c => c.TenantId == _currentUserService.TenantId && 
+                .AnyAsync(c => c.TenantId == _currentUserService.TenantId &&
                               c.Name == request.Name);
 
             if (exists)
@@ -130,7 +130,7 @@ public class ExpenseCategoryService : IExpenseCategoryService
 
             // Check for duplicate name (excluding current category)
             var exists = await _unitOfWork.ExpenseCategories.Query()
-                .AnyAsync(c => c.TenantId == _currentUserService.TenantId && 
+                .AnyAsync(c => c.TenantId == _currentUserService.TenantId &&
                               c.Name == request.Name &&
                               c.Id != id);
 

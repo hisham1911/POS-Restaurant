@@ -56,7 +56,7 @@ public static class ErrorCodes
     public const string PAYMENT_INSUFFICIENT = "PAYMENT_INSUFFICIENT";
     public const string PAYMENT_INVALID_METHOD = "PAYMENT_INVALID_METHOD";
     public const string PAYMENT_OVERPAYMENT_LIMIT = "PAYMENT_OVERPAYMENT_LIMIT";
-    
+
     // Customer Errors (1750-1799)
     public const string CUSTOMER_NOT_FOUND = "CUSTOMER_NOT_FOUND";
     public const string CUSTOMER_NOT_ACTIVE = "CUSTOMER_NOT_ACTIVE";
@@ -92,7 +92,7 @@ public static class ErrorCodes
 
     // Idempotency Errors (1900-1999)
     public const string DUPLICATE_REQUEST = "DUPLICATE_REQUEST";
-    
+
     // Purchase Invoice Errors (5000-5099)
     public const string PURCHASE_INVOICE_NOT_FOUND = "PURCHASE_INVOICE_NOT_FOUND";
     public const string PURCHASE_INVOICE_EMPTY = "PURCHASE_INVOICE_EMPTY";
@@ -104,12 +104,12 @@ public static class ErrorCodes
     public const string PURCHASE_INVOICE_ALREADY_CANCELLED = "PURCHASE_INVOICE_ALREADY_CANCELLED";
     public const string PAYMENT_INVALID_AMOUNT = "PAYMENT_INVALID_AMOUNT";
     public const string PAYMENT_EXCEEDS_DUE = "PAYMENT_EXCEEDS_DUE";
-    
+
     // Supplier Product Errors (5100-5199)
     public const string SUPPLIER_NOT_FOUND = "SUPPLIER_NOT_FOUND";
     public const string SUPPLIER_PRODUCT_ALREADY_LINKED = "SUPPLIER_PRODUCT_ALREADY_LINKED";
     public const string SUPPLIER_PRODUCT_NOT_FOUND = "SUPPLIER_PRODUCT_NOT_FOUND";
-    
+
     // Expense Errors (5200-5299)
     public const string EXPENSE_NOT_FOUND = "EXPENSE_NOT_FOUND";
     public const string EXPENSE_CATEGORY_NOT_FOUND = "EXPENSE_CATEGORY_NOT_FOUND";
@@ -129,7 +129,7 @@ public static class ErrorCodes
     public const string EXPENSE_CATEGORY_SYSTEM = "EXPENSE_CATEGORY_SYSTEM";
     public const string EXPENSE_CATEGORY_HAS_EXPENSES = "EXPENSE_CATEGORY_HAS_EXPENSES";
     public const string EXPENSE_ALREADY_PROCESSED = "EXPENSE_ALREADY_PROCESSED";
-    
+
     // Cash Register Errors (5300-5399)
     public const string CASH_REGISTER_INSUFFICIENT_BALANCE = "CASH_REGISTER_INSUFFICIENT_BALANCE";
     public const string CASH_REGISTER_TRANSACTION_NOT_FOUND = "CASH_REGISTER_TRANSACTION_NOT_FOUND";
@@ -141,7 +141,7 @@ public static class ErrorCodes
     public const string CASH_REGISTER_INVALID_TYPE = "CASH_REGISTER_INVALID_TYPE";
     public const string CASH_REGISTER_SAME_BRANCH = "CASH_REGISTER_SAME_BRANCH";
     public const string SHIFT_NOT_OPEN = "SHIFT_NOT_OPEN";
-    
+
     // Branch Inventory Errors (7000-7099)
     public const string INVENTORY_NOT_FOUND = "INVENTORY_NOT_FOUND";
     public const string INVENTORY_INVALID_QUANTITY = "INVENTORY_INVALID_QUANTITY";
@@ -213,7 +213,7 @@ public static class ErrorMessages
         { ErrorCodes.PAYMENT_INSUFFICIENT, "المبلغ المدفوع غير كافي" },
         { ErrorCodes.PAYMENT_INVALID_METHOD, "طريقة الدفع غير صالحة" },
         { ErrorCodes.PAYMENT_OVERPAYMENT_LIMIT, "المبلغ المدفوع يتجاوز الحد المسموح" },
-        
+
         // Customer
         { ErrorCodes.CUSTOMER_NOT_FOUND, "العميل غير موجود" },
         { ErrorCodes.CUSTOMER_NOT_ACTIVE, "العميل غير نشط" },
@@ -243,7 +243,7 @@ public static class ErrorMessages
 
         // Idempotency
         { ErrorCodes.DUPLICATE_REQUEST, "طلب مكرر" },
-        
+
         // Purchase Invoice
         { ErrorCodes.PURCHASE_INVOICE_NOT_FOUND, "فاتورة الشراء غير موجودة" },
         { ErrorCodes.PURCHASE_INVOICE_EMPTY, "فاتورة الشراء فارغة" },
@@ -255,12 +255,12 @@ public static class ErrorMessages
         { ErrorCodes.PURCHASE_INVOICE_ALREADY_CANCELLED, "فاتورة الشراء ملغاة بالفعل" },
         { ErrorCodes.PAYMENT_INVALID_AMOUNT, "مبلغ الدفعة غير صحيح" },
         { ErrorCodes.PAYMENT_EXCEEDS_DUE, "مبلغ الدفعة يتجاوز المبلغ المستحق" },
-        
+
         // Supplier Product
         { ErrorCodes.SUPPLIER_NOT_FOUND, "المورد غير موجود" },
         { ErrorCodes.SUPPLIER_PRODUCT_ALREADY_LINKED, "المنتج مرتبط بالمورد بالفعل" },
         { ErrorCodes.SUPPLIER_PRODUCT_NOT_FOUND, "العلاقة بين المورد والمنتج غير موجودة" },
-        
+
         // Expense
         { ErrorCodes.EXPENSE_NOT_FOUND, "المصروف غير موجود" },
         { ErrorCodes.EXPENSE_CATEGORY_NOT_FOUND, "تصنيف المصروف غير موجود" },
@@ -280,7 +280,7 @@ public static class ErrorMessages
         { ErrorCodes.EXPENSE_CATEGORY_SYSTEM, "لا يمكن تعديل تصنيف النظام" },
         { ErrorCodes.EXPENSE_CATEGORY_HAS_EXPENSES, "لا يمكن حذف تصنيف يحتوي على مصروفات" },
         { ErrorCodes.EXPENSE_ALREADY_PROCESSED, "المصروف تمت معالجته بالفعل" },
-        
+
         // Cash Register
         { ErrorCodes.CASH_REGISTER_INSUFFICIENT_BALANCE, "رصيد الخزينة غير كافٍ" },
         { ErrorCodes.CASH_REGISTER_TRANSACTION_NOT_FOUND, "معاملة الخزينة غير موجودة" },
@@ -292,7 +292,7 @@ public static class ErrorMessages
         { ErrorCodes.CASH_REGISTER_INVALID_TYPE, "نوع المعاملة غير صحيح" },
         { ErrorCodes.CASH_REGISTER_SAME_BRANCH, "لا يمكن التحويل لنفس الفرع" },
         { ErrorCodes.SHIFT_NOT_OPEN, "الوردية غير مفتوحة" },
-        
+
         // Branch Inventory
         { ErrorCodes.INVENTORY_NOT_FOUND, "المخزون غير موجود" },
         { ErrorCodes.INVENTORY_INVALID_QUANTITY, "الكمية غير صحيحة" },

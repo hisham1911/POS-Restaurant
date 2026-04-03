@@ -23,7 +23,7 @@ public class AuthService : IAuthService
     private readonly IPermissionService _permissionService;
 
     public AuthService(
-        IUnitOfWork unitOfWork, 
+        IUnitOfWork unitOfWork,
         IConfiguration config,
         ICurrentUserService currentUserService,
         ILogger<AuthService> logger,
@@ -107,8 +107,8 @@ public class AuthService : IAuthService
             }
 
             // Admin can only create Admin or Cashier
-            if (currentUserRole == UserRole.Admin && 
-                requestedRole != UserRole.Admin && 
+            if (currentUserRole == UserRole.Admin &&
+                requestedRole != UserRole.Admin &&
                 requestedRole != UserRole.Cashier)
             {
                 _logger.LogWarning(
@@ -191,7 +191,7 @@ public class AuthService : IAuthService
         }
 
         var expiryHours = int.TryParse(_config["Jwt:ExpiryInHours"], out var hours) ? hours : 24;
-        
+
         var token = new JwtSecurityToken(
             issuer: _config["Jwt:Issuer"],
             audience: _config["Jwt:Audience"],

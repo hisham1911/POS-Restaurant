@@ -141,7 +141,9 @@ export default function InventoryTransferList() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-2xl font-bold text-gray-900">طلبات نقل المخزون</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            طلبات نقل المخزون
+          </h2>
           <p className="text-sm text-gray-600 mt-1">
             إدارة نقل المخزون بين الفروع
           </p>
@@ -165,7 +167,9 @@ export default function InventoryTransferList() {
                 onChange={(e) =>
                   setFilters({
                     ...filters,
-                    fromBranchId: e.target.value ? Number(e.target.value) : undefined,
+                    fromBranchId: e.target.value
+                      ? Number(e.target.value)
+                      : undefined,
                   })
                 }
                 className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
@@ -191,7 +195,9 @@ export default function InventoryTransferList() {
                 onChange={(e) =>
                   setFilters({
                     ...filters,
-                    toBranchId: e.target.value ? Number(e.target.value) : undefined,
+                    toBranchId: e.target.value
+                      ? Number(e.target.value)
+                      : undefined,
                   })
                 }
                 className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
@@ -217,7 +223,9 @@ export default function InventoryTransferList() {
                 onChange={(e) =>
                   setFilters({
                     ...filters,
-                    status: e.target.value ? (e.target.value as TransferStatus) : undefined,
+                    status: e.target.value
+                      ? (e.target.value as TransferStatus)
+                      : undefined,
                   })
                 }
                 className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
@@ -291,11 +299,13 @@ export default function InventoryTransferList() {
                     {/* Reason */}
                     <div className="mb-3">
                       <p className="text-sm text-gray-600">
-                        <span className="font-medium">السبب:</span> {transfer.reason}
+                        <span className="font-medium">السبب:</span>{" "}
+                        {transfer.reason}
                       </p>
                       {transfer.notes && (
                         <p className="text-sm text-gray-600 mt-1">
-                          <span className="font-medium">ملاحظات:</span> {transfer.notes}
+                          <span className="font-medium">ملاحظات:</span>{" "}
+                          {transfer.notes}
                         </p>
                       )}
                     </div>
@@ -322,7 +332,8 @@ export default function InventoryTransferList() {
                         <p className="text-red-600">
                           ألغاه {transfer.cancelledByUserName} في{" "}
                           {formatDateTimeFull(transfer.cancelledAt!)}
-                          {transfer.cancellationReason && ` - ${transfer.cancellationReason}`}
+                          {transfer.cancellationReason &&
+                            ` - ${transfer.cancellationReason}`}
                         </p>
                       )}
                     </div>
@@ -434,7 +445,9 @@ export default function InventoryTransferList() {
                 </button>
                 <button
                   onClick={() =>
-                    setPageNumber((p) => Math.min(transfersData.totalPages, p + 1))
+                    setPageNumber((p) =>
+                      Math.min(transfersData.totalPages, p + 1),
+                    )
                   }
                   disabled={pageNumber === transfersData.totalPages}
                   className="px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"

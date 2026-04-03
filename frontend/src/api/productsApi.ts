@@ -73,7 +73,7 @@ export const productsApi = baseApi.injectEndpoints({
       providesTags: (result) => {
         const items = Array.isArray(result?.data)
           ? result.data
-          : (result?.data as any)?.items ?? [];
+          : ((result?.data as any)?.items ?? []);
 
         return [
           ...items.map(({ id }: { id: number }) => ({
@@ -130,7 +130,10 @@ export const productsApi = baseApi.injectEndpoints({
     }),
 
     // إنشاء سريع من POS
-    quickCreateProduct: builder.mutation<ApiResponse<Product>, QuickCreateProductRequest>({
+    quickCreateProduct: builder.mutation<
+      ApiResponse<Product>,
+      QuickCreateProductRequest
+    >({
       query: (product) => ({
         url: "/products/quick-create",
         method: "POST",

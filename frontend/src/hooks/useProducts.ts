@@ -8,7 +8,10 @@ import {
   useDeleteProductMutation,
 } from "../api/productsApi";
 import { useGetCategoriesQuery } from "../api/categoriesApi";
-import { CreateProductRequest, UpdateProductRequest } from "../types/product.types";
+import {
+  CreateProductRequest,
+  UpdateProductRequest,
+} from "../types/product.types";
 import { toast } from "sonner";
 import { getApiErrorCode, handleApiError } from "../utils/errorHandler";
 
@@ -20,9 +23,12 @@ export const useProducts = () => {
     refetch,
   } = useGetProductsQuery();
 
-  const [createMutation, { isLoading: isCreating }] = useCreateProductMutation();
-  const [updateMutation, { isLoading: isUpdating }] = useUpdateProductMutation();
-  const [deleteMutation, { isLoading: isDeleting }] = useDeleteProductMutation();
+  const [createMutation, { isLoading: isCreating }] =
+    useCreateProductMutation();
+  const [updateMutation, { isLoading: isUpdating }] =
+    useUpdateProductMutation();
+  const [deleteMutation, { isLoading: isDeleting }] =
+    useDeleteProductMutation();
 
   const products = productsData?.data || [];
 
@@ -94,7 +100,7 @@ export const useFilteredProducts = (categoryId: number | null) => {
 
   const filteredProducts = useMemo(() => {
     if (!categoryId) return products;
-    return products.filter(p => p.categoryId === categoryId);
+    return products.filter((p) => p.categoryId === categoryId);
   }, [products, categoryId]);
 
   return {

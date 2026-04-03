@@ -1,7 +1,7 @@
 // نوع المنتج: مادي أو خدمة
 export enum ProductType {
   Physical = 1, // منتج مادي - يتتبع المخزون
-  Service = 2,  // خدمة - لا يتتبع المخزون
+  Service = 2, // خدمة - لا يتتبع المخزون
 }
 
 export interface Product {
@@ -68,8 +68,9 @@ export interface UpdateProductRequest {
   categoryId: number;
   // نوع المنتج (مادي أو خدمة) - بدلاً من trackInventory
   type?: ProductType;
+  /** @deprecated Use BranchInventory endpoint instead. Will be removed next sprint. */
   // الكمية في الفرع الحالي (تُحدّث في BranchInventories)
-  currentBranchStock?: number;
+  currentBranchStock?: number; // @deprecated
   lowStockThreshold?: number;
   reorderPoint?: number;
   isActive: boolean;
@@ -80,6 +81,8 @@ export interface ProductsQueryParams {
   search?: string;
   isActive?: boolean;
   lowStock?: boolean;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface QuickCreateProductRequest {

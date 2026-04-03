@@ -10,6 +10,7 @@ import {
 import { useGetCategoriesQuery } from "../api/categoriesApi";
 import { CreateProductRequest, UpdateProductRequest } from "../types/product.types";
 import { toast } from "sonner";
+import { getApiErrorCode, handleApiError } from "../utils/errorHandler";
 
 export const useProducts = () => {
   const {
@@ -25,12 +26,22 @@ export const useProducts = () => {
 
   const products = productsData?.data || [];
 
+  const showMutationError = (error: unknown) => {
+    const errorCode = getApiErrorCode(error);
+    if (errorCode) {
+      toast.error(handleApiError({ data: { errorCode } }));
+      return;
+    }
+
+    toast.error(handleApiError(error));
+  };
+
   const createProduct = async (data: CreateProductRequest) => {
     try {
       await createMutation(data).unwrap();
       toast.success("تم إضافة المنتج بنجاح");
-    } catch {
-      toast.error("فشل في إضافة المنتج");
+    } catch (error: unknown) {
+      showMutationError(error);
     }
   };
 
@@ -38,8 +49,8 @@ export const useProducts = () => {
     try {
       await updateMutation({ id, data }).unwrap();
       toast.success("تم تحديث المنتج بنجاح");
-    } catch {
-      toast.error("فشل في تحديث المنتج");
+    } catch (error: unknown) {
+      showMutationError(error);
     }
   };
 
@@ -47,8 +58,8 @@ export const useProducts = () => {
     try {
       await deleteMutation(id).unwrap();
       toast.success("تم حذف المنتج بنجاح");
-    } catch {
-      toast.error("فشل في حذف المنتج");
+    } catch (error: unknown) {
+      showMutationError(error);
     }
   };
 

@@ -75,7 +75,7 @@ public class ExpenseCategoryService : IExpenseCategoryService
 
     public async Task<ApiResponse<ExpenseCategoryDto>> CreateAsync(CreateExpenseCategoryRequest request)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
             // Check for duplicate name

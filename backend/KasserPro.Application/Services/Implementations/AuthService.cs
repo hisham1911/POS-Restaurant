@@ -7,6 +7,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.Extensions.Logging;
 using KasserPro.Application.Common.Interfaces;
+using KasserPro.Application.Common;
 using KasserPro.Application.DTOs.Auth;
 using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.Services.Interfaces;
@@ -41,16 +42,22 @@ public class AuthService : IAuthService
         var user = users.FirstOrDefault();
 
         if (user == null || !BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash))
-            return ApiResponse<LoginResponse>.Fail("بيانات الدخول غير صحيحة");
+            return ApiResponse<LoginResponse>.Fail(
+                ErrorCodes.INVALID_CREDENTIALS,
+                ErrorMessages.Get(ErrorCodes.INVALID_CREDENTIALS));
 
         if (!user.IsActive)
-            return ApiResponse<LoginResponse>.Fail("الحساب غير مفعل");
+            return ApiResponse<LoginResponse>.Fail(
+                ErrorCodes.USER_INACTIVE,
+                ErrorMessages.Get(ErrorCodes.USER_INACTIVE));
 
         if (user.TenantId.HasValue)
         {
             var tenant = await _unitOfWork.Tenants.GetByIdAsync(user.TenantId.Value);
             if (tenant == null || !tenant.IsActive)
-                return ApiResponse<LoginResponse>.Fail("الشركة معطلة. تواصل مع مالك النظام");
+                return ApiResponse<LoginResponse>.Fail(
+                    ErrorCodes.TENANT_INACTIVE,
+                    ErrorMessages.Get(ErrorCodes.TENANT_INACTIVE));
         }
 
         var token = await GenerateTokenAsync(user);
@@ -79,7 +86,9 @@ public class AuthService : IAuthService
     {
         var exists = await _unitOfWork.Users.FindAsync(u => u.Email == request.Email);
         if (exists.Any())
-            return ApiResponse<bool>.Fail("البريد الإلكتروني مستخدم");
+            return ApiResponse<bool>.Fail(
+                ErrorCodes.CONFLICT,
+                ErrorMessages.Get(ErrorCodes.CONFLICT));
 
         var requestedRole = Enum.Parse<UserRole>(request.Role);
 
@@ -135,7 +144,9 @@ public class AuthService : IAuthService
     {
         var user = await _unitOfWork.Users.GetByIdAsync(userId);
         if (user == null)
-            return ApiResponse<UserInfo>.Fail("المستخدم غير موجود");
+            return ApiResponse<UserInfo>.Fail(
+                ErrorCodes.USER_NOT_FOUND,
+                ErrorMessages.Get(ErrorCodes.USER_NOT_FOUND));
 
         var permissions = await _permissionService.GetUserPermissionsAsync(userId);
         var permissionStrings = permissions.Select(p => p.ToString()).ToList();

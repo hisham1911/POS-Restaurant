@@ -186,16 +186,20 @@ export function showErrorToast(error: unknown) {
 /**
  * Log error for debugging (can be sent to error tracking service)
  */
-export function logError(error: any, context?: string) {
+export function logError(error: unknown, context?: string) {
   const timestamp = new Date().toISOString();
+
+  const normalizedError =
+    error instanceof Error
+      ? { message: error.message, stack: error.stack }
+      : typeof error === "object" && error !== null
+        ? (error as Record<string, unknown>)
+        : { message: String(error) };
+
   const errorData = {
     timestamp,
     context,
-    error: {
-      message: error.message,
-      stack: error.stack,
-      ...error,
-    },
+    error: normalizedError,
   };
 
   console.error("Error Log:", errorData);

@@ -137,8 +137,10 @@ appsettings.Development.json
 appsettings.Production.json
 
 # User uploaded files
-wwwroot/uploads/
-uploads/
+# Build artifacts and static files (served by the backend)
+**/wwwroot/
+wwwroot/
+
 
 # Playwright artifacts
 playwright-report/

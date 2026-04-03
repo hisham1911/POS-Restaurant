@@ -21,6 +21,7 @@ public static class ErrorCodes
     // Branch Errors (1200-1299)
     public const string BRANCH_NOT_FOUND = "BRANCH_NOT_FOUND";
     public const string BRANCH_INACTIVE = "BRANCH_INACTIVE";
+    public const string BRANCH_ACCESS_DENIED = "BRANCH_ACCESS_DENIED";
 
     // User Errors (1300-1399)
     public const string USER_NOT_FOUND = "USER_NOT_FOUND";
@@ -177,6 +178,7 @@ public static class ErrorMessages
         // Branch
         { ErrorCodes.BRANCH_NOT_FOUND, "الفرع غير موجود" },
         { ErrorCodes.BRANCH_INACTIVE, "الفرع غير نشط" },
+        { ErrorCodes.BRANCH_ACCESS_DENIED, "ليس لديك صلاحية الوصول لهذا الفرع" },
 
         // User
         { ErrorCodes.USER_NOT_FOUND, "المستخدم غير موجود" },

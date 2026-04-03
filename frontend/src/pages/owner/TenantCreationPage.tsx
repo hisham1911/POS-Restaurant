@@ -16,6 +16,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { formatDateOnly } from "../../utils/formatters";
+import { handleApiError } from "../../utils/errorHandler";
 
 const strongPasswordRegex =
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,100}$/;
@@ -123,9 +124,9 @@ export default function TenantCreationPage() {
         adminPassword: "",
         branchName: "",
       });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Create tenant error:", err);
-      setError(err?.data?.message || err?.message || "فشل في إنشاء الشركة");
+      setError(handleApiError(err));
     }
   };
 
@@ -150,10 +151,8 @@ export default function TenantCreationPage() {
       setSuccess(result.message || "تم تحديث حالة الشركة");
       setError("");
       await refetch();
-    } catch (err: any) {
-      setError(
-        err?.data?.message || err?.message || "فشل في تحديث حالة الشركة",
-      );
+    } catch (err: unknown) {
+      setError(handleApiError(err));
       setSuccess("");
     }
   };

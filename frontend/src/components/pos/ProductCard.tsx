@@ -9,7 +9,9 @@ import clsx from "clsx";
 import {
   getProductAvailableStock,
   getProductCurrentStock,
+  type BranchInventoryStockMap,
 } from "@/utils/productStock";
+import { Loader2 } from "lucide-react";
 
 // Default low stock threshold if not provided
 const DEFAULT_LOW_STOCK_THRESHOLD = 10;
@@ -19,6 +21,9 @@ interface ProductCardProps {
   category?: Category;
   onStockAdjust?: (product: Product) => void;
   showStockAdjust?: boolean;
+  stockByProductId?: BranchInventoryStockMap;
+  hasInventorySnapshot?: boolean;
+  isInventoryLoading?: boolean;
 }
 
 export const ProductCard = ({
@@ -26,6 +31,9 @@ export const ProductCard = ({
   category,
   onStockAdjust,
   showStockAdjust,
+  stockByProductId,
+  hasInventorySnapshot = false,
+  isInventoryLoading = false,
 }: ProductCardProps) => {
   const { items, addItem } = useCart();
   const [imageError, setImageError] = useState(false);
@@ -36,16 +44,28 @@ export const ProductCard = ({
   const quantityInCart = cartItem?.quantity ?? 0;
 
   // Calculate available stock (stock - what's in cart)
-  const totalStock = getProductCurrentStock(product);
-  const availableStock = getProductAvailableStock(product, quantityInCart);
+  const totalStock = getProductCurrentStock(product, stockByProductId);
+  const availableStock = hasInventorySnapshot
+    ? getProductAvailableStock(product, quantityInCart, stockByProductId)
+    : Number.POSITIVE_INFINITY;
 
   // If allowNegativeStock is enabled, always allow adding
   const canAddMore =
-    allowNegativeStock || !product.trackInventory || availableStock > 0;
+    allowNegativeStock ||
+    !product.trackInventory ||
+    !hasInventorySnapshot ||
+    availableStock > 0;
 
   const handleClick = () => {
     if (product.isActive && canAddMore) {
-      addItem(product);
+      const productForCart = hasInventorySnapshot
+        ? ({
+            ...product,
+            branchInventoryQuantity: totalStock,
+          } as Product)
+        : product;
+
+      addItem(productForCart);
     }
   };
 
@@ -59,6 +79,22 @@ export const ProductCard = ({
   // Stock badge logic - shows available stock (accounting for cart)
   const getStockBadge = () => {
     if (!product.trackInventory) return null;
+
+    if (isInventoryLoading && !hasInventorySnapshot) {
+      return (
+        <span className="absolute top-2 left-2 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-700/70 text-white shadow-sm inline-flex items-center gap-1">
+          <Loader2 className="w-3 h-3 animate-spin" />-
+        </span>
+      );
+    }
+
+    if (!hasInventorySnapshot) {
+      return (
+        <span className="absolute top-2 left-2 px-2 py-0.5 text-xs font-medium rounded-full bg-gray-700/70 text-white shadow-sm">
+          -
+        </span>
+      );
+    }
 
     const threshold = product.lowStockThreshold ?? DEFAULT_LOW_STOCK_THRESHOLD;
 
@@ -95,7 +131,10 @@ export const ProductCard = ({
 
   // Determine if product is out of stock (only if allowNegativeStock is disabled)
   const isOutOfStock =
-    !allowNegativeStock && product.trackInventory && totalStock <= 0;
+    !allowNegativeStock &&
+    product.trackInventory &&
+    hasInventorySnapshot &&
+    totalStock <= 0;
   const isDisabled = !product.isActive || isOutOfStock;
   const isInCart = quantityInCart > 0;
 
@@ -112,7 +151,7 @@ export const ProductCard = ({
         !canAddMore && !isDisabled && "cursor-not-allowed",
         isInCart
           ? "border-primary-400 shadow-md"
-          : "border-transparent shadow hover:shadow-md"
+          : "border-transparent shadow hover:shadow-md",
       )}
       aria-label={`إضافة ${product.name} - ${formatCurrency(product.price)}`}
       aria-disabled={isDisabled}

@@ -104,11 +104,16 @@ export const OrdersPage = () => {
     }
   };
 
-  const handleFilterChange = (key: keyof OrdersQueryParams, value: any) => {
+  const handleFilterChange = <K extends keyof OrdersQueryParams>(
+    key: K,
+    value: OrdersQueryParams[K],
+  ) => {
+    const nextPage = key === "page" && typeof value === "number" ? value : 1;
+
     setFilters((prev) => ({
       ...prev,
       [key]: value,
-      page: key === "page" ? value : 1,
+      page: nextPage,
     }));
   };
 
@@ -222,7 +227,10 @@ export const OrdersPage = () => {
                   <select
                     value={filters.status || ""}
                     onChange={(e) =>
-                      handleFilterChange("status", e.target.value || undefined)
+                      handleFilterChange(
+                        "status",
+                        (e.target.value || undefined) as OrdersQueryParams["status"],
+                      )
                     }
                     className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm text-sm"
                   >

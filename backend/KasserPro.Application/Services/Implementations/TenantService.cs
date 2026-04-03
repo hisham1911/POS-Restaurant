@@ -157,7 +157,7 @@ public class TenantService : ITenantService
         }
 
         // Begin transaction
-        var transaction = await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
 
         try
         {

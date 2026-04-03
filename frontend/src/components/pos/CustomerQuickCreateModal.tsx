@@ -4,7 +4,8 @@ import { useCreateCustomerMutation } from "@/api/customersApi";
 import { Customer } from "@/types/customer.types";
 import toast from "react-hot-toast";
 import { Portal } from "@/components/common/Portal";
-import { handleApiError } from "@/utils/errorHandler";
+import { getApiErrorCode, handleApiError } from "@/utils/errorHandler";
+import { extractApiData } from "@/utils/apiResponse";
 
 interface CustomerQuickCreateModalProps {
   initialPhone: string;
@@ -36,22 +37,27 @@ export const CustomerQuickCreateModal = ({
     }
 
     try {
-      const result = await createCustomer({
+      const response = await createCustomer({
         phone: formData.phone,
         name: formData.name || undefined,
         email: formData.email || undefined,
         address: formData.address || undefined,
         notes: formData.notes || undefined,
       }).unwrap();
-
-      if (!result.data) {
-        toast.error("فشل في إضافة العميل");
-        return;
-      }
+      const createdCustomer = extractApiData(
+        response,
+        "CUSTOMER_CREATE_EMPTY_RESPONSE",
+        "فشل في إضافة العميل",
+      );
 
       toast.success("تم إضافة العميل بنجاح");
-      onSuccess(result.data);
+      onSuccess(createdCustomer);
     } catch (error) {
+      const errorCode = getApiErrorCode(error);
+      if (errorCode) {
+        toast.error(handleApiError({ data: { errorCode } }));
+        return;
+      }
       toast.error(handleApiError(error));
     }
   };
@@ -65,11 +71,11 @@ export const CustomerQuickCreateModal = ({
 
   return (
     <Portal>
-      <div 
+      <div
         className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50"
         onClick={onClose}
       >
-        <div 
+        <div
           className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
           onClick={(e) => e.stopPropagation()}
         >
@@ -79,7 +85,9 @@ export const CustomerQuickCreateModal = ({
               <div className="w-10 h-10 bg-primary-100 rounded-xl flex items-center justify-center">
                 <User className="w-5 h-5 text-primary-600" />
               </div>
-              <h2 className="text-xl font-bold text-gray-800">إضافة عميل جديد</h2>
+              <h2 className="text-xl font-bold text-gray-800">
+                إضافة عميل جديد
+              </h2>
             </div>
             <button
               onClick={onClose}
@@ -90,7 +98,10 @@ export const CustomerQuickCreateModal = ({
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto flex-1">
+          <form
+            onSubmit={handleSubmit}
+            className="p-6 space-y-4 overflow-y-auto flex-1"
+          >
             {/* Phone (Required) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">

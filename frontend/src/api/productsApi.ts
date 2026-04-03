@@ -8,6 +8,28 @@ import {
 } from "../types/product.types";
 import { ApiResponse } from "../types/api.types";
 
+interface PagedProductsResult {
+  items: Product[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+const normalizeProductsResponse = (
+  response: ApiResponse<Product[] | PagedProductsResult>,
+): ApiResponse<Product[]> => {
+  const rawData = response.data;
+  if (Array.isArray(rawData)) {
+    return response as ApiResponse<Product[]>;
+  }
+
+  return {
+    ...response,
+    data: rawData?.items ?? [],
+  };
+};
+
 export const productsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // جلب كل المنتجات مع الفلاتر
@@ -37,19 +59,31 @@ export const productsApi = baseApi.injectEndpoints({
         if (safeParams.lowStock !== undefined)
           queryParams.append("lowStock", safeParams.lowStock.toString());
 
+        if (safeParams.page !== undefined && safeParams.page !== null) {
+          queryParams.append("page", safeParams.page.toString());
+        }
+
+        if (safeParams.pageSize !== undefined && safeParams.pageSize !== null) {
+          queryParams.append("pageSize", safeParams.pageSize.toString());
+        }
+
         const queryString = queryParams.toString();
         return `/products${queryString ? `?${queryString}` : ""}`;
       },
-      providesTags: (result) =>
-        result?.data
-          ? [
-              ...result.data.map(({ id }) => ({
-                type: "Products" as const,
-                id,
-              })),
-              { type: "Products", id: "LIST" },
-            ]
-          : [{ type: "Products", id: "LIST" }],
+      providesTags: (result) => {
+        const items = Array.isArray(result?.data)
+          ? result.data
+          : (result?.data as any)?.items ?? [];
+
+        return [
+          ...items.map(({ id }: { id: number }) => ({
+            type: "Products" as const,
+            id,
+          })),
+          { type: "Products" as const, id: "LIST" },
+        ];
+      },
+      transformResponse: normalizeProductsResponse,
     }),
 
     // جلب منتج واحد

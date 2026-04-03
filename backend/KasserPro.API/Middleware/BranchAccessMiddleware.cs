@@ -1,7 +1,9 @@
 namespace KasserPro.API.Middleware;
 
 using KasserPro.Application.Common.Interfaces;
+using KasserPro.Application.Common;
 using KasserPro.Application.DTOs.Common;
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 
 /// <summary>
@@ -70,41 +72,37 @@ public class BranchAccessMiddleware
             return;
         }
 
-        // P0 SECURITY: Validate branch access
-        // Admin and SystemOwner can access any branch in their tenant
-        if (user.Role == Domain.Enums.UserRole.Admin || user.Role == Domain.Enums.UserRole.SystemOwner)
+        // Validate requested branch exists within the authenticated user's tenant.
+        if (!user.TenantId.HasValue || user.TenantId.Value <= 0)
         {
-            await _next(context);
-            return;
-        }
-
-        // Cashiers can only access their assigned branch
-        if (user.BranchId.HasValue && user.BranchId.Value != requestedBranchId)
-        {
-            _logger.LogWarning(
-                "SECURITY: Branch access denied - User {UserId} (authorized: Branch {AuthorizedBranch}) attempted to access Branch {RequestedBranch}",
-                userId, user.BranchId.Value, requestedBranchId);
-
-            context.Response.StatusCode = 403;
+            context.Response.StatusCode = 401;
             context.Response.ContentType = "application/json";
-            
-            var response = ApiResponse<object>.Fail("BRANCH_ACCESS_DENIED", "ليس لديك صلاحية الوصول لهذا الفرع");
-            await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+
+            var invalidTenantContext = ApiResponse<object>.Fail(ErrorCodes.UNAUTHORIZED, ErrorMessages.Get(ErrorCodes.UNAUTHORIZED));
+            await context.Response.WriteAsync(JsonSerializer.Serialize(invalidTenantContext));
             return;
         }
 
-        if (!user.BranchId.HasValue)
+        var tenantId = user.TenantId.Value;
+
+        var branchExistsInTenant = await unitOfWork.Branches.Query()
+            .AnyAsync(b => b.Id == requestedBranchId && b.TenantId == tenantId);
+
+        if (!branchExistsInTenant)
         {
             _logger.LogWarning(
-                "SECURITY: Branch header rejected - User {UserId} has no assigned branch but requested Branch {RequestedBranch}",
+                "SECURITY: Branch access denied - User {UserId} requested invalid Branch {RequestedBranch} for Tenant {TenantId}",
                 userId,
-                requestedBranchId);
+                requestedBranchId,
+                tenantId);
 
             context.Response.StatusCode = 403;
             context.Response.ContentType = "application/json";
 
-            var noBranchResponse = ApiResponse<object>.Fail("BRANCH_ACCESS_DENIED", "لا يوجد فرع مرتبط بالمستخدم");
-            await context.Response.WriteAsync(JsonSerializer.Serialize(noBranchResponse));
+            var response = ApiResponse<object>.Fail(
+                ErrorCodes.BRANCH_ACCESS_DENIED,
+                ErrorMessages.Get(ErrorCodes.BRANCH_ACCESS_DENIED));
+            await context.Response.WriteAsync(JsonSerializer.Serialize(response));
             return;
         }
 

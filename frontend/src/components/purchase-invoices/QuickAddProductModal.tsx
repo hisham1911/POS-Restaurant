@@ -6,7 +6,8 @@ import { ProductType } from "../../types/product.types";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { toast } from "sonner";
-import { handleApiError } from "@/utils/errorHandler";
+import { getApiErrorCode, handleApiError } from "@/utils/errorHandler";
+import { extractApiData } from "@/utils/apiResponse";
 
 interface QuickAddProductModalProps {
   isOpen: boolean;
@@ -24,7 +25,9 @@ export function QuickAddProductModal({
   const [barcode, setBarcode] = useState("");
   const [categoryId, setCategoryId] = useState<number>(0);
   const [price, setPrice] = useState<string>("");
-  const [productType, setProductType] = useState<ProductType>(ProductType.Physical);
+  const [productType, setProductType] = useState<ProductType>(
+    ProductType.Physical,
+  );
 
   const { data: categoriesResponse } = useGetCategoriesQuery();
   const [createProduct, { isLoading }] = useCreateProductMutation();
@@ -51,7 +54,7 @@ export function QuickAddProductModal({
     }
 
     try {
-      const result = await createProduct({
+      const response = await createProduct({
         name: name.trim(),
         sku: sku.trim() || undefined,
         barcode: barcode.trim() || undefined,
@@ -63,17 +66,22 @@ export function QuickAddProductModal({
           productType === ProductType.Physical ? 0 : undefined,
         lowStockThreshold: productType === ProductType.Physical ? 5 : undefined,
       }).unwrap();
-
-      if (!result.data) {
-        toast.error(result.message || "Unable to create product");
-        return;
-      }
+      const createdProduct = extractApiData(
+        response,
+        "PRODUCT_CREATE_EMPTY_RESPONSE",
+        "Unable to create product",
+      );
 
       toast.success("Product created successfully");
-      onProductCreated(result.data.id);
+      onProductCreated(createdProduct.id);
       handleClose();
     } catch (error) {
       console.error("Error creating product:", error);
+      const errorCode = getApiErrorCode(error);
+      if (errorCode) {
+        toast.error(handleApiError({ data: { errorCode } }));
+        return;
+      }
       toast.error(handleApiError(error));
     }
   };
@@ -160,18 +168,24 @@ export function QuickAddProductModal({
           <div className="relative">
             <select
               value={productType}
-              onChange={(e) => setProductType(Number(e.target.value) as ProductType)}
+              onChange={(e) =>
+                setProductType(Number(e.target.value) as ProductType)
+              }
               className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
               required
             >
-              <option value={ProductType.Physical}>منتج مادي (يتتبع المخزون)</option>
-              <option value={ProductType.Service}>خدمة (لا يتتبع المخزون)</option>
+              <option value={ProductType.Physical}>
+                منتج مادي (يتتبع المخزون)
+              </option>
+              <option value={ProductType.Service}>
+                خدمة (لا يتتبع المخزون)
+              </option>
             </select>
             <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            {productType === ProductType.Physical 
-              ? "المنتجات المادية تتتبع الكمية في المخزون" 
+            {productType === ProductType.Physical
+              ? "المنتجات المادية تتتبع الكمية في المخزون"
               : "الخدمات لا تتتبع الكمية (مثل: استشارات، صيانة)"}
           </p>
         </div>
@@ -198,7 +212,8 @@ export function QuickAddProductModal({
         {productType === ProductType.Physical && (
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-xs text-blue-700">
-              💡 المنتج سيُضاف للفرع الحالي بكمية صفر. استخدم فاتورة الشراء لإضافة الكمية.
+              💡 المنتج سيُضاف للفرع الحالي بكمية صفر. استخدم فاتورة الشراء
+              لإضافة الكمية.
             </p>
           </div>
         )}
@@ -215,4 +230,3 @@ export function QuickAddProductModal({
     </Modal>
   );
 }
-

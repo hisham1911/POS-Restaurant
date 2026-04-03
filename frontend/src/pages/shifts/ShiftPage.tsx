@@ -19,6 +19,7 @@ import { Modal } from "@/components/common/Modal";
 import { Loading } from "@/components/common/Loading";
 import { formatCurrency, formatDateTime } from "@/utils/formatters";
 import { shiftPersistence } from "@/utils/shiftPersistence";
+import type { Shift } from "@/types/shift.types";
 import {
   HandoverShiftModal,
   ActiveShiftsList,
@@ -33,7 +34,7 @@ export const ShiftPage = () => {
   const [showHandoverModal, setShowHandoverModal] = useState(false);
   const [showForceCloseModal, setShowForceCloseModal] = useState(false);
   const [selectedShiftForForceClose, setSelectedShiftForForceClose] =
-    useState<any>(null);
+    useState<Shift | null>(null);
   const [openingBalance, setOpeningBalance] = useState("");
   const [closingBalance, setClosingBalance] = useState("");
   const [notes, setNotes] = useState("");
@@ -79,7 +80,7 @@ export const ShiftPage = () => {
     setNotes("");
   };
 
-  const handleForceClose = (shift: any) => {
+  const handleForceClose = (shift: Shift) => {
     setSelectedShiftForForceClose(shift);
     setShowForceCloseModal(true);
   };

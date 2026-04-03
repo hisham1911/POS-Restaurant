@@ -22,7 +22,8 @@ import {
 } from "@/api/backupApi";
 import clsx from "clsx";
 import { Portal } from "@/components/common/Portal";
-import { handleApiError } from "@/utils/errorHandler";
+import { getApiErrorCode, handleApiError } from "@/utils/errorHandler";
+import { extractApiData } from "@/utils/apiResponse";
 
 export const BackupPage = () => {
   const { data: backupsData, isLoading, refetch } = useListBackupsQuery();
@@ -53,15 +54,21 @@ export const BackupPage = () => {
 
   const handleCreateBackup = async () => {
     try {
-      const result = await createBackup().unwrap();
-      if (!result.data) {
-        toast.error(result.message || "فشل إنشاء النسخة الاحتياطية");
-        return;
-      }
+      const response = await createBackup().unwrap();
+      extractApiData(
+        response,
+        "BACKUP_CREATE_EMPTY_RESPONSE",
+        "فشل إنشاء النسخة الاحتياطية",
+      );
 
       toast.success("تم إنشاء النسخة الاحتياطية بنجاح");
       refetch();
     } catch (error) {
+      const errorCode = getApiErrorCode(error);
+      if (errorCode) {
+        toast.error(handleApiError({ data: { errorCode } }));
+        return;
+      }
       toast.error(handleApiError(error));
       console.error(error);
     }
@@ -115,13 +122,11 @@ export const BackupPage = () => {
 
     try {
       const response = await restoreFromUpload(formData).unwrap();
-      const result = response.data;
-
-      if (!result) {
-        toast.error(response.message || "فشلت عملية الاستعادة");
-        setShowConfirmUploadRestore(false);
-        return;
-      }
+      const result = extractApiData(
+        response,
+        "BACKUP_RESTORE_UPLOAD_EMPTY_RESPONSE",
+        "فشلت عملية الاستعادة",
+      );
 
       setShowConfirmUploadRestore(false);
       setUploadedFile(null);
@@ -143,6 +148,12 @@ export const BackupPage = () => {
       }
       refetch();
     } catch (error) {
+      const errorCode = getApiErrorCode(error);
+      if (errorCode) {
+        toast.error(handleApiError({ data: { errorCode } }));
+        setShowConfirmUploadRestore(false);
+        return;
+      }
       toast.error(handleApiError(error));
       console.error(error);
       setShowConfirmUploadRestore(false);
@@ -159,13 +170,11 @@ export const BackupPage = () => {
       const response = await restoreBackup({
         backupFileName: selectedBackup,
       }).unwrap();
-      const result = response.data;
-
-      if (!result) {
-        toast.error(response.message || "فشلت عملية الاستعادة");
-        setShowConfirmRestore(false);
-        return;
-      }
+      const result = extractApiData(
+        response,
+        "BACKUP_RESTORE_EMPTY_RESPONSE",
+        "فشلت عملية الاستعادة",
+      );
 
       setShowConfirmRestore(false);
       setSelectedBackup(null);
@@ -188,6 +197,12 @@ export const BackupPage = () => {
 
       refetch();
     } catch (error) {
+      const errorCode = getApiErrorCode(error);
+      if (errorCode) {
+        toast.error(handleApiError({ data: { errorCode } }));
+        setShowConfirmRestore(false);
+        return;
+      }
       toast.error(handleApiError(error));
       console.error(error);
       setShowConfirmRestore(false);

@@ -22,7 +22,7 @@ export const authApi = baseApi.injectEndpoints({
 
     // تسجيل مستخدم جديد
     register: builder.mutation<
-      ApiResponse<User>,
+      ApiResponse<boolean>,
       { name: string; email: string; password: string; role?: string }
     >({
       query: (data) => ({

@@ -128,7 +128,7 @@ public class CashRegisterService : ICashRegisterService
 
     public async Task<ApiResponse<CashRegisterTransactionDto>> CreateTransactionAsync(CreateCashRegisterTransactionRequest request)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
             // Validate transaction type (only Deposit or Withdrawal allowed for manual transactions)

@@ -5,43 +5,79 @@ import { formatCurrency } from "@/utils/formatters";
 import { useAppSelector } from "@/store/hooks";
 import { selectAllowNegativeStock } from "@/store/slices/cartSlice";
 import clsx from "clsx";
-import { Package, AlertCircle, CheckCircle2, Minus } from "lucide-react";
+import {
+  Package,
+  AlertCircle,
+  CheckCircle2,
+  Minus,
+  Loader2,
+} from "lucide-react";
 import {
   getProductAvailableStock,
   getProductCurrentStock,
+  type BranchInventoryStockMap,
 } from "@/utils/productStock";
 
 interface ProductListViewProps {
   products: Product[];
   categories: Category[];
+  stockByProductId?: BranchInventoryStockMap;
+  hasInventorySnapshot?: boolean;
+  isInventoryLoading?: boolean;
 }
 
-export const ProductListView = ({ products, categories }: ProductListViewProps) => {
+export const ProductListView = ({
+  products,
+  categories,
+  stockByProductId,
+  hasInventorySnapshot = false,
+  isInventoryLoading = false,
+}: ProductListViewProps) => {
   const { items, addItem } = useCart();
   const allowNegativeStock = useAppSelector(selectAllowNegativeStock);
 
   const handleProductClick = (product: Product) => {
     const cartItem = items.find((item) => item.product.id === product.id);
     const quantityInCart = cartItem?.quantity ?? 0;
-    const totalStock = getProductCurrentStock(product);
-    const availableStock = getProductAvailableStock(product, quantityInCart);
-    const canAddMore = allowNegativeStock || !product.trackInventory || availableStock > 0;
-    const isOutOfStock = !allowNegativeStock && product.trackInventory && totalStock <= 0;
+    const totalStock = getProductCurrentStock(product, stockByProductId);
+    const availableStock = hasInventorySnapshot
+      ? getProductAvailableStock(product, quantityInCart, stockByProductId)
+      : Number.POSITIVE_INFINITY;
+    const canAddMore =
+      allowNegativeStock ||
+      !product.trackInventory ||
+      !hasInventorySnapshot ||
+      availableStock > 0;
+    const isOutOfStock =
+      !allowNegativeStock &&
+      product.trackInventory &&
+      hasInventorySnapshot &&
+      totalStock <= 0;
 
     if (product.isActive && canAddMore && !isOutOfStock) {
-      addItem(product);
+      const productForCart = hasInventorySnapshot
+        ? ({
+            ...product,
+            branchInventoryQuantity: totalStock,
+          } as Product)
+        : product;
+
+      addItem(productForCart);
     }
   };
 
   // Group products by category
-  const groupedProducts = products.reduce((acc, product) => {
-    const categoryId = product.categoryId || 0;
-    if (!acc[categoryId]) {
-      acc[categoryId] = [];
-    }
-    acc[categoryId].push(product);
-    return acc;
-  }, {} as Record<number, Product[]>);
+  const groupedProducts = products.reduce(
+    (acc, product) => {
+      const categoryId = product.categoryId || 0;
+      if (!acc[categoryId]) {
+        acc[categoryId] = [];
+      }
+      acc[categoryId].push(product);
+      return acc;
+    },
+    {} as Record<number, Product[]>,
+  );
 
   return (
     <div className="space-y-6">
@@ -54,7 +90,9 @@ export const ProductListView = ({ products, categories }: ProductListViewProps) 
             {/* Category Header */}
             <div className="flex items-center gap-3 pb-2 border-b-2 border-gray-200">
               <div className="w-1 h-6 bg-primary-500 rounded-full" />
-              <h3 className="text-lg font-bold text-gray-800">{categoryName}</h3>
+              <h3 className="text-lg font-bold text-gray-800">
+                {categoryName}
+              </h3>
               <span className="text-sm text-gray-500">
                 ({categoryProducts.length})
               </span>
@@ -63,19 +101,34 @@ export const ProductListView = ({ products, categories }: ProductListViewProps) 
             {/* Products List */}
             <div className="space-y-2">
               {categoryProducts.map((product) => {
-                const cartItem = items.find((item) => item.product.id === product.id);
-                const quantityInCart = cartItem?.quantity ?? 0;
-                const totalStock = getProductCurrentStock(product);
-                const availableStock = getProductAvailableStock(
-                  product,
-                  quantityInCart,
+                const cartItem = items.find(
+                  (item) => item.product.id === product.id,
                 );
+                const quantityInCart = cartItem?.quantity ?? 0;
+                const totalStock = getProductCurrentStock(
+                  product,
+                  stockByProductId,
+                );
+                const availableStock = hasInventorySnapshot
+                  ? getProductAvailableStock(
+                      product,
+                      quantityInCart,
+                      stockByProductId,
+                    )
+                  : Number.POSITIVE_INFINITY;
                 const canAddMore =
-                  allowNegativeStock || !product.trackInventory || availableStock > 0;
+                  allowNegativeStock ||
+                  !product.trackInventory ||
+                  !hasInventorySnapshot ||
+                  availableStock > 0;
                 const isOutOfStock =
-                  !allowNegativeStock && product.trackInventory && totalStock <= 0;
+                  !allowNegativeStock &&
+                  product.trackInventory &&
+                  hasInventorySnapshot &&
+                  totalStock <= 0;
                 const isLowStock =
                   product.trackInventory &&
+                  hasInventorySnapshot &&
                   totalStock > 0 &&
                   totalStock <= (product.lowStockThreshold ?? 10);
 
@@ -92,7 +145,10 @@ export const ProductListView = ({ products, categories }: ProductListViewProps) 
                         : "border-gray-200 bg-white hover:border-primary-300 hover:shadow-sm",
                       (!product.isActive || isOutOfStock || !canAddMore) &&
                         "opacity-50 cursor-not-allowed",
-                      product.isActive && canAddMore && !isOutOfStock && "active:scale-[0.98]"
+                      product.isActive &&
+                        canAddMore &&
+                        !isOutOfStock &&
+                        "active:scale-[0.98]",
                     )}
                   >
                     {/* Left: Name & Stock */}
@@ -111,10 +167,26 @@ export const ProductListView = ({ products, categories }: ProductListViewProps) 
                       {/* Stock Status */}
                       {product.trackInventory && (
                         <div className="flex items-center gap-2 text-sm">
-                          {isOutOfStock ? (
+                          {isInventoryLoading && !hasInventorySnapshot ? (
+                            <>
+                              <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
+                              <span className="text-gray-500 font-medium">
+                                -
+                              </span>
+                            </>
+                          ) : !hasInventorySnapshot ? (
+                            <>
+                              <Loader2 className="w-4 h-4 text-gray-400" />
+                              <span className="text-gray-500 font-medium">
+                                -
+                              </span>
+                            </>
+                          ) : isOutOfStock ? (
                             <>
                               <AlertCircle className="w-4 h-4 text-red-500" />
-                              <span className="text-red-600 font-medium">نفد المخزون</span>
+                              <span className="text-red-600 font-medium">
+                                نفد المخزون
+                              </span>
                             </>
                           ) : isLowStock ? (
                             <>

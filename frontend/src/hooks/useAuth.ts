@@ -12,8 +12,13 @@ import { clearBranch } from "../store/slices/branchSlice";
 import { useLoginMutation } from "../api/authApi";
 import { LoginRequest } from "../types/auth.types";
 import { toast } from "sonner";
-import { ApiError, getApiErrorCode, handleApiError } from "../utils/errorHandler";
+import {
+  ApiError,
+  getApiErrorCode,
+  handleApiError,
+} from "../utils/errorHandler";
 import { baseApi } from "../api/baseApi";
+import { extractApiData } from "@/utils/apiResponse";
 
 export const useAuth = () => {
   const navigate = useNavigate();
@@ -29,33 +34,34 @@ export const useAuth = () => {
   // Login function using RTK Query
   const login = async (credentials: LoginRequest) => {
     try {
-      const result = await loginMutation(credentials).unwrap();
+      const response = await loginMutation(credentials).unwrap();
+      const loginData = extractApiData(
+        response,
+        "AUTH_LOGIN_EMPTY_RESPONSE",
+        "فشل تسجيل الدخول",
+      );
 
-      if (result.data) {
-        // CRITICAL: Clear persisted branch state from localStorage BEFORE setting new credentials
-        // This prevents redux-persist from rehydrating old branch data for the new user
-        try {
-          localStorage.removeItem("persist:branch");
-        } catch (e) {
-          // ignore localStorage errors
-        }
-        
-        // Clear branch state in Redux
-        dispatch(clearBranch());
-        
-        dispatch(
-          setCredentials({
-            user: result.data.user,
-            token: result.data.accessToken,
-          }),
-        );
-        toast.success("تم تسجيل الدخول بنجاح");
-        navigate(
-          result.data.user.role === "SystemOwner" ? "/owner/tenants" : "/pos",
-        );
-      } else {
-        toast.error(result.message || "فشل تسجيل الدخول");
+      // CRITICAL: Clear persisted branch state from localStorage BEFORE setting new credentials
+      // This prevents redux-persist from rehydrating old branch data for the new user
+      try {
+        localStorage.removeItem("persist:branch");
+      } catch (e) {
+        // ignore localStorage errors
       }
+
+      // Clear branch state in Redux
+      dispatch(clearBranch());
+
+      dispatch(
+        setCredentials({
+          user: loginData.user,
+          token: loginData.accessToken,
+        }),
+      );
+      toast.success("تم تسجيل الدخول بنجاح");
+      navigate(
+        loginData.user.role === "SystemOwner" ? "/owner/tenants" : "/pos",
+      );
     } catch (error: unknown) {
       const apiError = error as ApiError;
       const errorCode = getApiErrorCode(error);

@@ -66,7 +66,10 @@ export function ExpenseFormPage() {
     }
   }, [expense, isEditMode]);
 
-  const handleChange = (field: keyof typeof formData, value: any) => {
+  const handleChange = <K extends keyof ExpenseFormData>(
+    field: K,
+    value: ExpenseFormData[K],
+  ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 

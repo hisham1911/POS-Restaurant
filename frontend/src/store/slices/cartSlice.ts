@@ -1,6 +1,16 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
 import { Product } from "../../types/product.types";
-import { getProductCurrentStock } from "../../utils/productStock";
+
+type ProductWithBranchInventoryQuantity = Product & {
+  branchInventoryQuantity?: number;
+};
+
+const getBranchInventoryQuantity = (product: Product): number | undefined => {
+  const quantity = (product as ProductWithBranchInventoryQuantity)
+    .branchInventoryQuantity;
+
+  return typeof quantity === "number" ? quantity : undefined;
+};
 
 export type DiscountType = "Percentage" | "Fixed";
 
@@ -52,8 +62,12 @@ const cartSlice = createSlice({
       // Check stock availability
       const currentQty = existingItem?.quantity ?? 0;
       const newQty = currentQty + quantity;
-      const availableStock = product.trackInventory
-        ? getProductCurrentStock(product)
+      const branchInventoryQuantity = product.trackInventory
+        ? getBranchInventoryQuantity(product)
+        : undefined;
+      const hasInventoryData = typeof branchInventoryQuantity === "number";
+      const availableStock = hasInventoryData
+        ? branchInventoryQuantity
         : Infinity;
 
       // If allowNegativeStock is enabled, skip stock check
@@ -67,7 +81,11 @@ const cartSlice = createSlice({
       }
 
       // Don't allow adding if track inventory and exceeds stock
-      if (product.trackInventory && newQty > availableStock) {
+      if (
+        product.trackInventory &&
+        hasInventoryData &&
+        newQty > availableStock
+      ) {
         // Limit to available stock
         const maxAddable = Math.max(0, availableStock - currentQty);
         if (maxAddable <= 0) return; // Can't add more
@@ -114,10 +132,19 @@ const cartSlice = createSlice({
           return;
         }
         // Check stock availability
-        const availableStock = item.product.trackInventory
-          ? getProductCurrentStock(item.product)
+        const branchInventoryQuantity = item.product.trackInventory
+          ? getBranchInventoryQuantity(item.product)
+          : undefined;
+        const hasInventoryData = typeof branchInventoryQuantity === "number";
+        const availableStock = hasInventoryData
+          ? branchInventoryQuantity
           : Infinity;
-        if (item.product.trackInventory && quantity > availableStock) {
+
+        if (
+          item.product.trackInventory &&
+          hasInventoryData &&
+          quantity > availableStock
+        ) {
           item.quantity = availableStock; // Limit to available stock
         } else {
           item.quantity = quantity;
@@ -363,4 +390,3 @@ export const selectTotal = (state: { cart: CartState }) => {
 };
 
 export default cartSlice.reducer;
-

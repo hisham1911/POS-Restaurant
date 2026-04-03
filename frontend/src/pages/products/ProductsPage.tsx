@@ -1,9 +1,17 @@
 import { useState, useMemo } from "react";
-import { Plus, Search, Edit2, Trash2, Package, ChevronDown } from "lucide-react";
+import {
+  Plus,
+  Search,
+  Edit2,
+  Trash2,
+  Package,
+  ChevronDown,
+} from "lucide-react";
 import {
   useGetProductsQuery,
   useDeleteProductMutation,
 } from "@/api/productsApi";
+import { useGetBranchInventoryQuery } from "@/api/inventoryApi";
 import { useCategories } from "@/hooks/useProducts";
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
@@ -14,7 +22,13 @@ import { formatCurrency } from "@/utils/formatters";
 import { Product } from "@/types/product.types";
 import { toast } from "react-hot-toast";
 import clsx from "clsx";
-import { getProductCurrentStock } from "@/utils/productStock";
+import {
+  buildBranchInventoryStockMap,
+  getProductCurrentStock,
+} from "@/utils/productStock";
+import { usePermission } from "@/hooks/usePermission";
+import { useAppSelector } from "@/store/hooks";
+import { selectCurrentBranch } from "@/store/slices/branchSlice";
 
 export const ProductsPage = () => {
   const [searchQuery, setSearchQuery] = useState("");
@@ -25,6 +39,22 @@ export const ProductsPage = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   const { categories } = useCategories();
+  const { hasPermission } = usePermission();
+  const currentBranch = useAppSelector(selectCurrentBranch);
+  const canManageProducts = hasPermission("ProductsManage");
+  const { data: branchInventory, isLoading: isInventoryLoading } =
+    useGetBranchInventoryQuery(currentBranch?.id ?? 0, {
+      skip: !currentBranch?.id,
+    });
+  const stockByProductId = useMemo(
+    () => buildBranchInventoryStockMap(branchInventory),
+    [branchInventory],
+  );
+  const hasInventorySnapshot = Array.isArray(branchInventory);
+  const getBranchStock = (product: Product) =>
+    hasInventorySnapshot
+      ? getProductCurrentStock(product, stockByProductId)
+      : 0;
 
   // Determine if we should use server-side filtering
   // For now, always use server-side filtering for better performance
@@ -67,8 +97,9 @@ export const ProductsPage = () => {
       const matchesActive = !showActiveOnly || product.isActive;
       const matchesLowStock =
         !showLowStockOnly ||
-        (product.trackInventory &&
-          getProductCurrentStock(product) < (product.lowStockThreshold ?? 5));
+        (hasInventorySnapshot &&
+          product.trackInventory &&
+          getBranchStock(product) < (product.lowStockThreshold ?? 5));
       return (
         matchesSearch && matchesCategory && matchesActive && matchesLowStock
       );
@@ -83,11 +114,21 @@ export const ProductsPage = () => {
   ]);
 
   const handleEdit = (product: Product) => {
+    if (!canManageProducts) {
+      toast.error("ليس لديك صلاحية إدارة المنتجات");
+      return;
+    }
+
     setEditingProduct(product);
     setShowForm(true);
   };
 
   const handleDelete = async (id: number) => {
+    if (!canManageProducts) {
+      toast.error("ليس لديك صلاحية إدارة المنتجات");
+      return;
+    }
+
     if (confirm("هل أنت متأكد من حذف هذا المنتج؟")) {
       try {
         await deleteMutation(id).unwrap();
@@ -109,8 +150,9 @@ export const ProductsPage = () => {
   const activeProducts = filteredProducts.filter((p) => p.isActive).length;
   const lowStockProducts = filteredProducts.filter(
     (p) =>
+      hasInventorySnapshot &&
       p.trackInventory &&
-      getProductCurrentStock(p) < (p.lowStockThreshold ?? 5),
+      getBranchStock(p) < (p.lowStockThreshold ?? 5),
   ).length;
 
   return (
@@ -132,6 +174,7 @@ export const ProductsPage = () => {
             variant="primary"
             onClick={() => setShowForm(true)}
             rightIcon={<Plus className="w-5 h-5" />}
+            disabled={!canManageProducts}
           >
             إضافة منتج
           </Button>
@@ -253,6 +296,9 @@ export const ProductsPage = () => {
                   const category = categories.find(
                     (c) => c.id === product.categoryId,
                   );
+                  const branchStock = getBranchStock(product);
+                  const shouldShowStockLoading =
+                    isInventoryLoading && !hasInventorySnapshot;
                   return (
                     <tr key={product.id} className="border-b hover:bg-gray-50">
                       <td className="px-4 py-3 text-gray-500">{index + 1}</td>
@@ -274,15 +320,17 @@ export const ProductsPage = () => {
                         <span
                           className={clsx(
                             "px-2.5 py-1 rounded-full text-xs font-medium",
-                            getProductCurrentStock(product) <= 0
-                              ? "bg-danger-50 text-danger-600"
-                              : getProductCurrentStock(product) <=
-                                  (product.lowStockThreshold ?? 5)
-                                ? "bg-warning-50 text-warning-600"
-                                : "bg-gray-100 text-gray-700",
+                            shouldShowStockLoading
+                              ? "bg-gray-100 text-gray-500"
+                              : branchStock <= 0
+                                ? "bg-danger-50 text-danger-600"
+                                : branchStock <=
+                                    (product.lowStockThreshold ?? 5)
+                                  ? "bg-warning-50 text-warning-600"
+                                  : "bg-gray-100 text-gray-700",
                           )}
                         >
-                          {getProductCurrentStock(product)}
+                          {shouldShowStockLoading ? "-" : branchStock}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-600 text-sm">
@@ -302,19 +350,27 @@ export const ProductsPage = () => {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => handleEdit(product)}
-                            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                          >
-                            <Edit2 className="w-4 h-4 text-gray-500" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(product.id)}
-                            disabled={isDeleting}
-                            className="p-2 hover:bg-danger-50 rounded-lg transition-colors"
-                          >
-                            <Trash2 className="w-4 h-4 text-danger-500" />
-                          </button>
+                          {canManageProducts ? (
+                            <>
+                              <button
+                                onClick={() => handleEdit(product)}
+                                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                              >
+                                <Edit2 className="w-4 h-4 text-gray-500" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(product.id)}
+                                disabled={isDeleting}
+                                className="p-2 hover:bg-danger-50 rounded-lg transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4 text-danger-500" />
+                              </button>
+                            </>
+                          ) : (
+                            <span className="text-xs text-gray-400">
+                              عرض فقط
+                            </span>
+                          )}
                         </div>
                       </td>
                     </tr>

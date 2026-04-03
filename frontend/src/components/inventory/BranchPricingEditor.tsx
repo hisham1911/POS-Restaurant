@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDateOnly } from "../../utils/formatters";
+import { handleApiError } from "../../utils/errorHandler";
+import type { BranchProductPrice } from "../../types/inventory.types";
 
 export default function BranchPricingEditor() {
   const isAdmin = useAppSelector(selectIsAdmin);
@@ -82,8 +84,8 @@ export default function BranchPricingEditor() {
         price: "" as string | number,
         effectiveFrom: new Date().toISOString().split("T")[0],
       });
-    } catch (error: any) {
-      toast.error(error?.data?.message || "حدث خطأ في تحديث السعر");
+    } catch (error: unknown) {
+      toast.error(handleApiError(error));
     }
   };
 
@@ -97,12 +99,12 @@ export default function BranchPricingEditor() {
         productId,
       }).unwrap();
       toast.success("تم حذف السعر المخصص");
-    } catch (error: any) {
-      toast.error(error?.data?.message || "حدث خطأ في حذف السعر");
+    } catch (error: unknown) {
+      toast.error(handleApiError(error));
     }
   };
 
-  const handleEdit = (price: any) => {
+  const handleEdit = (price: BranchProductPrice) => {
     setFormData({
       productId: price.productId,
       price: price.price,

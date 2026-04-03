@@ -21,6 +21,7 @@ import {
 import { toast } from "sonner";
 import type { TransferStatus } from "../../types/inventory.types";
 import { formatDateTimeFull } from "../../utils/formatters";
+import { handleApiError } from "../../utils/errorHandler";
 
 export default function InventoryTransferList() {
   const isAdmin = useAppSelector(selectIsAdmin);
@@ -52,8 +53,8 @@ export default function InventoryTransferList() {
     try {
       await approveTransfer(id).unwrap();
       toast.success("تمت الموافقة على طلب النقل");
-    } catch (error: any) {
-      toast.error(error?.data?.message || "حدث خطأ في الموافقة");
+    } catch (error: unknown) {
+      toast.error(handleApiError(error));
     }
   };
 
@@ -63,8 +64,8 @@ export default function InventoryTransferList() {
     try {
       await receiveTransfer(id).unwrap();
       toast.success("تم استلام المخزون بنجاح");
-    } catch (error: any) {
-      toast.error(error?.data?.message || "حدث خطأ في الاستلام");
+    } catch (error: unknown) {
+      toast.error(handleApiError(error));
     }
   };
 
@@ -79,8 +80,8 @@ export default function InventoryTransferList() {
       toast.success("تم إلغاء طلب النقل");
       setCancellingId(null);
       setCancelReason("");
-    } catch (error: any) {
-      toast.error(error?.data?.message || "حدث خطأ في الإلغاء");
+    } catch (error: unknown) {
+      toast.error(handleApiError(error));
     }
   };
 

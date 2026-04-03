@@ -61,20 +61,12 @@ public class OrderService : IOrderService
         if (user == null)
             return ApiResponse<OrderDto>.Fail(ErrorCodes.USER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.USER_NOT_FOUND));
 
-        // SHIFT VALIDATION: Check for open shift in this branch for this user
-        // Strict validation: Shift must belong to the same TenantId, BranchId, and UserId
+        // SHIFT LINKING (optional): attach an open shift if available for this branch and user.
         var currentShift = await _unitOfWork.Shifts.Query()
             .FirstOrDefaultAsync(s => s.TenantId == tenantId
                                    && s.BranchId == branchId
                                    && s.UserId == userId
                                    && !s.IsClosed);
-
-        if (currentShift == null)
-            return ApiResponse<OrderDto>.Fail(ErrorCodes.NO_OPEN_SHIFT, "يجب فتح وردية قبل إنشاء طلب");
-
-        // Additional validation: Ensure shift's branch matches current user's branch
-        if (currentShift.BranchId != branchId)
-            return ApiResponse<OrderDto>.Fail(ErrorCodes.SHIFT_BRANCH_MISMATCH, "الوردية المفتوحة لا تنتمي للفرع الحالي");
 
         // Dynamic Tax Rate from Tenant Settings
         var tenantTaxRate = tenant.IsTaxEnabled ? tenant.TaxRate : 0m;
@@ -98,8 +90,8 @@ public class OrderService : IOrderService
         {
             TenantId = tenantId,
             BranchId = branchId,
-            // SHIFT LINKING: Link order to current shift
-            ShiftId = currentShift.Id,
+            // SHIFT LINKING: Link order to current shift if found.
+            ShiftId = currentShift?.Id,
             OrderNumber = GenerateOrderNumber(),
             UserId = userId,
             // CUSTOMER LINKING: Link order to customer if provided
@@ -144,12 +136,19 @@ public class OrderService : IOrderService
             {
                 // P0-3: Read from BranchInventory (same table that gets decremented).
                 // This is a soft check (UX hint). The hard check is inside CompleteAsync.
-                var currentStock = await _inventoryService.GetAvailableQuantityAsync(
-                    product.Id, _currentUser.BranchId);
-                if (currentStock < item.Quantity && !tenant.AllowNegativeStock)
+                var hasBranchInventory = await _unitOfWork.BranchInventories.Query()
+                    .AnyAsync(bi => bi.TenantId == tenantId
+                                 && bi.BranchId == branchId
+                                 && bi.ProductId == product.Id);
+
+                if (hasBranchInventory)
                 {
-                    return ApiResponse<OrderDto>.Fail(ErrorCodes.INSUFFICIENT_STOCK,
-                        $"المخزون غير كافٍ للمنتج: {product.Name}. المتاح: {currentStock}، المطلوب: {item.Quantity}");
+                    var currentStock = await _inventoryService.GetAvailableQuantityAsync(product.Id, branchId);
+                    if (currentStock < item.Quantity && !tenant.AllowNegativeStock)
+                    {
+                        return ApiResponse<OrderDto>.Fail(ErrorCodes.INSUFFICIENT_STOCK,
+                            $"المخزون غير كافٍ للمنتج: {product.Name}. المتاح: {currentStock}، المطلوب: {item.Quantity}");
+                    }
                 }
             }
 

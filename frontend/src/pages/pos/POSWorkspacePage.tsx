@@ -1,10 +1,11 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useProducts, useCategories } from "@/hooks/useProducts";
 import { useCart } from "@/hooks/useCart";
 import { useShift } from "@/hooks/useShift";
 import { useOrders } from "@/hooks/useOrders";
 import { usePOSShortcuts } from "@/hooks/usePOSShortcuts";
 import { useGetShiftWarningsQuery } from "@/api/shiftsApi";
+import { useGetBranchInventoryQuery } from "@/api/inventoryApi";
 import { usePOSMode } from "@/hooks/usePOSMode";
 import { Customer } from "@/types/customer.types";
 import { PaymentMethod } from "@/types/order.types";
@@ -34,7 +35,10 @@ import {
   Package,
 } from "lucide-react";
 import clsx from "clsx";
-import { getProductCurrentStock } from "@/utils/productStock";
+import {
+  buildBranchInventoryStockMap,
+  getProductCurrentStock,
+} from "@/utils/productStock";
 
 // Import components
 import { ProductListView } from "@/components/pos/ProductListView";
@@ -47,6 +51,9 @@ import { Loading } from "@/components/common/Loading";
 import { Button } from "@/components/common/Button";
 import { formatCurrency } from "@/utils/formatters";
 import { useLazyGetCustomerByPhoneQuery } from "@/api/customersApi";
+import { usePermission } from "@/hooks/usePermission";
+import { useAppSelector } from "@/store/hooks";
+import { selectCurrentBranch } from "@/store/slices/branchSlice";
 
 type WorkspaceTab = "cart" | "customer" | "payment" | "summary";
 
@@ -63,19 +70,24 @@ export const POSWorkspacePage = () => {
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [showCustomItem, setShowCustomItem] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
+    null,
+  );
   const [searchInput, setSearchInput] = useState("");
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("cart");
   const [showCustomerCreateModal, setShowCustomerCreateModal] = useState(false);
   const [customerPhone, setCustomerPhone] = useState("");
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>("Cash");
+  const [selectedPaymentMethod, setSelectedPaymentMethod] =
+    useState<PaymentMethod>("Cash");
   const [amountPaid, setAmountPaid] = useState<string>("");
   const [allowPartialPayment, setAllowPartialPayment] = useState(false);
   const [showPaymentError, setShowPaymentError] = useState(false);
   const [showDiscountInput, setShowDiscountInput] = useState(false);
   const [discountInputValue, setDiscountInputValue] = useState("");
-  const [discountInputType, setDiscountInputType] = useState<"Percentage" | "Fixed">("Percentage");
-  
+  const [discountInputType, setDiscountInputType] = useState<
+    "Percentage" | "Fixed"
+  >("Percentage");
+
   const searchInputRef = useRef<HTMLInputElement>(null);
   const customerPhoneRef = useRef<HTMLInputElement>(null);
 
@@ -98,12 +110,31 @@ export const POSWorkspacePage = () => {
     applyDiscount,
     removeDiscount,
   } = useCart();
-  const { hasActiveShift, isLoading: isLoadingShift, currentShift } = useShift();
+  const {
+    hasActiveShift,
+    isLoading: isLoadingShift,
+    currentShift,
+  } = useShift();
   const { createOrder, completeOrder, isCreating, isCompleting } = useOrders();
+  const currentBranch = useAppSelector(selectCurrentBranch);
+  const { hasPermission } = usePermission();
+  const canQuickCreateProduct =
+    hasPermission("ProductsCreateFromPOS") || hasPermission("ProductsManage");
+  const { data: branchInventory, isLoading: isInventoryLoading } =
+    useGetBranchInventoryQuery(currentBranch?.id ?? 0, {
+      skip: !currentBranch?.id,
+    });
+  const stockByProductId = useMemo(
+    () => buildBranchInventoryStockMap(branchInventory),
+    [branchInventory],
+  );
+  const hasInventorySnapshot = Array.isArray(branchInventory);
 
   // Customer search
-  const [searchCustomer, { data: searchResult, isFetching: isSearchingCustomer }] =
-    useLazyGetCustomerByPhoneQuery();
+  const [
+    searchCustomer,
+    { data: searchResult, isFetching: isSearchingCustomer },
+  ] = useLazyGetCustomerByPhoneQuery();
 
   // Fetch shift warnings
   const { data: warningsData } = useGetShiftWarningsQuery(undefined, {
@@ -144,13 +175,25 @@ export const POSWorkspacePage = () => {
 
       const foundProduct = products.find(
         (p) =>
-          (p.barcode && p.barcode.toLowerCase() === trimmedValue.toLowerCase()) ||
+          (p.barcode &&
+            p.barcode.toLowerCase() === trimmedValue.toLowerCase()) ||
           (p.sku && p.sku.toLowerCase() === trimmedValue.toLowerCase()) ||
-          p.name.toLowerCase() === trimmedValue.toLowerCase()
+          p.name.toLowerCase() === trimmedValue.toLowerCase(),
       );
 
       if (foundProduct) {
-        addItem(foundProduct, 1);
+        const branchInventoryQuantity = getProductCurrentStock(
+          foundProduct,
+          stockByProductId,
+        );
+        const productForCart = hasInventorySnapshot
+          ? ({
+              ...foundProduct,
+              branchInventoryQuantity,
+            } as typeof foundProduct)
+          : foundProduct;
+
+        addItem(productForCart, 1);
         toast.success(`تمت الإضافة: ${foundProduct.name}`);
         setSearchInput("");
         searchInputRef.current?.focus();
@@ -158,7 +201,7 @@ export const POSWorkspacePage = () => {
         toast.error(`لم يتم العثور على منتج: ${trimmedValue}`);
       }
     },
-    [products, addItem]
+    [products, addItem, hasInventorySnapshot, stockByProductId],
   );
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -229,19 +272,24 @@ export const POSWorkspacePage = () => {
     }
 
     // Validate customer is active
-    if (numericAmount < total && selectedCustomer && !selectedCustomer.isActive) {
+    if (
+      numericAmount < total &&
+      selectedCustomer &&
+      !selectedCustomer.isActive
+    ) {
       toast.error("العميل غير نشط - لا يمكن البيع الآجل");
       return;
     }
 
     // Validate credit limit
     if (selectedCustomer && selectedCustomer.creditLimit > 0) {
-      const availableCredit = selectedCustomer.creditLimit - selectedCustomer.totalDue;
+      const availableCredit =
+        selectedCustomer.creditLimit - selectedCustomer.totalDue;
       const creditLimitExceeded = amountDue > availableCredit;
       if (numericAmount < total && creditLimitExceeded) {
         toast.error(
           `تجاوز حد الائتمان. المتاح: ${formatCurrency(availableCredit)} ج.م، المطلوب: ${formatCurrency(amountDue)} ج.م`,
-          { duration: 5000 }
+          { duration: 5000 },
         );
         return;
       }
@@ -263,7 +311,7 @@ export const POSWorkspacePage = () => {
           toast.success(`تم إتمام الدفع! الباقي: ${formatCurrency(change)}`);
         } else if (amountDue > 0) {
           toast.success(
-            `تم إتمام البيع الآجل! المبلغ المستحق: ${formatCurrency(amountDue)}`
+            `تم إتمام البيع الآجل! المبلغ المستحق: ${formatCurrency(amountDue)}`,
           );
         } else {
           toast.success("تم إتمام الدفع بنجاح!");
@@ -290,20 +338,21 @@ export const POSWorkspacePage = () => {
       (p) =>
         p.name.toLowerCase().includes(searchLower) ||
         (p.barcode && p.barcode.toLowerCase().includes(searchLower)) ||
-        (p.sku && p.sku.toLowerCase().includes(searchLower))
+        (p.sku && p.sku.toLowerCase().includes(searchLower)),
     );
   }
 
   if (selectedCategory) {
     filteredProducts = filteredProducts.filter(
-      (p) => p.categoryId === selectedCategory
+      (p) => p.categoryId === selectedCategory,
     );
   }
 
   if (showAvailableOnly) {
     filteredProducts = filteredProducts.filter((p) => {
       if (!p.trackInventory) return true;
-      return getProductCurrentStock(p) > 0;
+      if (!hasInventorySnapshot) return true;
+      return getProductCurrentStock(p, stockByProductId) > 0;
     });
   }
 
@@ -328,7 +377,8 @@ export const POSWorkspacePage = () => {
             لا توجد وردية مفتوحة
           </h2>
           <p className="text-gray-600 mb-6">
-            يجب فتح وردية قبل البدء في البيع. اذهب إلى صفحة الورديات لفتح وردية جديدة.
+            يجب فتح وردية قبل البدء في البيع. اذهب إلى صفحة الورديات لفتح وردية
+            جديدة.
           </p>
           <Link
             to="/shift"
@@ -354,8 +404,7 @@ export const POSWorkspacePage = () => {
   const canTakeCredit =
     selectedCustomer &&
     selectedCustomer.isActive &&
-    (selectedCustomer.creditLimit === 0 ||
-      amountDue <= availableCredit);
+    (selectedCustomer.creditLimit === 0 || amountDue <= availableCredit);
 
   const creditLimitExceeded =
     selectedCustomer &&
@@ -433,7 +482,7 @@ export const POSWorkspacePage = () => {
                 "flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 showAvailableOnly
                   ? "bg-success-600 text-white shadow-md"
-                  : "bg-white text-gray-600 border-2 border-gray-200 hover:border-success-300"
+                  : "bg-white text-gray-600 border-2 border-gray-200 hover:border-success-300",
               )}
             >
               <PackageCheck className="w-4 h-4" />
@@ -441,8 +490,25 @@ export const POSWorkspacePage = () => {
             </button>
 
             <button
-              onClick={() => setShowQuickCreate(true)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-white text-gray-700 border-2 border-gray-200 hover:border-primary-300 hover:bg-primary-50 transition-all"
+              onClick={() => {
+                if (!canQuickCreateProduct) {
+                  toast.error("ليس لديك صلاحية إضافة منتج سريع");
+                  return;
+                }
+                setShowQuickCreate(true);
+              }}
+              disabled={!canQuickCreateProduct}
+              className={clsx(
+                "flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                canQuickCreateProduct
+                  ? "bg-white text-gray-700 border-2 border-gray-200 hover:border-primary-300 hover:bg-primary-50"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed border-2 border-gray-200",
+              )}
+              title={
+                canQuickCreateProduct
+                  ? "إضافة منتج سريع"
+                  : "يتطلب صلاحية ProductsCreateFromPOS"
+              }
             >
               <PlusCircle className="w-4 h-4" />
               <span>منتج جديد</span>
@@ -455,9 +521,13 @@ export const POSWorkspacePage = () => {
                 "flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all",
                 itemsCount > 0
                   ? "bg-white text-gray-700 border-2 border-gray-200 hover:border-orange-300 hover:bg-orange-50"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed border-2 border-gray-200"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed border-2 border-gray-200",
               )}
-              title={itemsCount > 0 ? "إضافة منتج مخصص للطلب الحالي" : "ابدأ طلب أولاً"}
+              title={
+                itemsCount > 0
+                  ? "إضافة منتج مخصص للطلب الحالي"
+                  : "ابدأ طلب أولاً"
+              }
             >
               <FileText className="w-4 h-4" />
               <span>منتج مخصص</span>
@@ -466,7 +536,13 @@ export const POSWorkspacePage = () => {
 
           {/* Products List */}
           <div className="flex-1 overflow-y-auto scrollbar-thin">
-            <ProductListView products={filteredProducts} categories={categories} />
+            <ProductListView
+              products={filteredProducts}
+              categories={categories}
+              stockByProductId={stockByProductId}
+              hasInventorySnapshot={hasInventorySnapshot}
+              isInventoryLoading={isInventoryLoading}
+            />
           </div>
         </div>
 
@@ -480,7 +556,7 @@ export const POSWorkspacePage = () => {
                 "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors relative",
                 activeTab === "cart"
                   ? "text-primary-600 bg-primary-50"
-                  : "text-gray-600 hover:bg-gray-50"
+                  : "text-gray-600 hover:bg-gray-50",
               )}
             >
               <ShoppingCart className="w-4 h-4" />
@@ -501,7 +577,7 @@ export const POSWorkspacePage = () => {
                 "flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium transition-colors relative",
                 activeTab === "customer"
                   ? "text-primary-600 bg-primary-50"
-                  : "text-gray-600 hover:bg-gray-50"
+                  : "text-gray-600 hover:bg-gray-50",
               )}
             >
               <User className="w-4 h-4" />
@@ -525,7 +601,7 @@ export const POSWorkspacePage = () => {
                 activeTab === "payment"
                   ? "text-primary-600 bg-primary-50"
                   : "text-gray-600 hover:bg-gray-50",
-                items.length === 0 && "opacity-50 cursor-not-allowed"
+                items.length === 0 && "opacity-50 cursor-not-allowed",
               )}
             >
               <CreditCard className="w-4 h-4" />
@@ -543,7 +619,7 @@ export const POSWorkspacePage = () => {
                 activeTab === "summary"
                   ? "text-primary-600 bg-primary-50"
                   : "text-gray-600 hover:bg-gray-50",
-                items.length === 0 && "opacity-50 cursor-not-allowed"
+                items.length === 0 && "opacity-50 cursor-not-allowed",
               )}
             >
               <Receipt className="w-4 h-4" />
@@ -591,19 +667,21 @@ export const POSWorkspacePage = () => {
                     {/* Discount Section */}
                     <div className="pt-4 border-t space-y-3">
                       <p className="text-sm font-medium text-gray-700">الخصم</p>
-                      
+
                       {discountAmount === 0 ? (
                         showDiscountInput ? (
                           <div className="space-y-3">
                             {/* Discount Type Selector */}
                             <div className="grid grid-cols-2 gap-2">
                               <button
-                                onClick={() => setDiscountInputType("Percentage")}
+                                onClick={() =>
+                                  setDiscountInputType("Percentage")
+                                }
                                 className={clsx(
                                   "py-2 px-3 rounded-lg text-sm font-medium transition-all",
                                   discountInputType === "Percentage"
                                     ? "bg-primary-600 text-white"
-                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200",
                                 )}
                               >
                                 نسبة %
@@ -614,7 +692,7 @@ export const POSWorkspacePage = () => {
                                   "py-2 px-3 rounded-lg text-sm font-medium transition-all",
                                   discountInputType === "Fixed"
                                     ? "bg-success-600 text-white"
-                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                                    : "bg-gray-100 text-gray-700 hover:bg-gray-200",
                                 )}
                               >
                                 مبلغ ثابت
@@ -624,9 +702,19 @@ export const POSWorkspacePage = () => {
                             {/* Input */}
                             <input
                               type="number"
-                              value={discountInputValue === "0" ? "" : discountInputValue}
-                              onChange={(e) => setDiscountInputValue(e.target.value)}
-                              placeholder={discountInputType === "Percentage" ? "0-100" : "0.00"}
+                              value={
+                                discountInputValue === "0"
+                                  ? ""
+                                  : discountInputValue
+                              }
+                              onChange={(e) =>
+                                setDiscountInputValue(e.target.value)
+                              }
+                              placeholder={
+                                discountInputType === "Percentage"
+                                  ? "0-100"
+                                  : "0.00"
+                              }
                               className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-primary-500 focus:outline-none"
                               autoFocus
                             />
@@ -637,18 +725,25 @@ export const POSWorkspacePage = () => {
                                 onClick={() => {
                                   const value = parseFloat(discountInputValue);
                                   if (!isNaN(value) && value > 0) {
-                                    if (discountInputType === "Percentage" && value <= 100) {
+                                    if (
+                                      discountInputType === "Percentage" &&
+                                      value <= 100
+                                    ) {
                                       applyDiscount("Percentage", value);
                                       toast.success(`تم تطبيق خصم ${value}%`);
                                       setShowDiscountInput(false);
                                       setDiscountInputValue("");
                                     } else if (discountInputType === "Fixed") {
                                       applyDiscount("Fixed", value);
-                                      toast.success(`تم تطبيق خصم ${formatCurrency(value)}`);
+                                      toast.success(
+                                        `تم تطبيق خصم ${formatCurrency(value)}`,
+                                      );
                                       setShowDiscountInput(false);
                                       setDiscountInputValue("");
                                     } else {
-                                      toast.error("النسبة يجب أن تكون بين 0 و 100");
+                                      toast.error(
+                                        "النسبة يجب أن تكون بين 0 و 100",
+                                      );
                                     }
                                   }
                                 }}
@@ -680,7 +775,9 @@ export const POSWorkspacePage = () => {
                         <div className="p-3 bg-success-50 border border-success-200 rounded-lg">
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-success-700">
-                              {discountType === "Percentage" ? `خصم ${discountValue}%` : "خصم ثابت"}
+                              {discountType === "Percentage"
+                                ? `خصم ${discountValue}%`
+                                : "خصم ثابت"}
                             </span>
                             <button
                               onClick={() => {
@@ -762,7 +859,9 @@ export const POSWorkspacePage = () => {
 
                       {selectedCustomer.creditLimit > 0 && (
                         <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                          <span className="text-sm text-gray-700">حد الائتمان</span>
+                          <span className="text-sm text-gray-700">
+                            حد الائتمان
+                          </span>
                           <span className="font-bold text-blue-600">
                             {formatCurrency(selectedCustomer.creditLimit)}
                           </span>
@@ -778,7 +877,9 @@ export const POSWorkspacePage = () => {
                         type="text"
                         value={customerPhone}
                         onChange={(e) =>
-                          setCustomerPhone(e.target.value.replace(/[^0-9]/g, ""))
+                          setCustomerPhone(
+                            e.target.value.replace(/[^0-9]/g, ""),
+                          )
                         }
                         placeholder="🔍 ابحث برقم الهاتف..."
                         className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
@@ -796,7 +897,9 @@ export const POSWorkspacePage = () => {
                       !isSearchingCustomer &&
                       searchResult?.data && (
                         <div
-                          onClick={() => handleSelectCustomer(searchResult.data!)}
+                          onClick={() =>
+                            handleSelectCustomer(searchResult.data!)
+                          }
                           className="bg-success-50 border border-success-200 rounded-xl p-4 cursor-pointer hover:bg-success-100 transition-colors"
                         >
                           <div className="flex items-center gap-3">
@@ -872,11 +975,13 @@ export const POSWorkspacePage = () => {
                           "flex flex-col items-center gap-2 p-4 rounded-xl border-2 transition-all",
                           selectedPaymentMethod === method.id
                             ? "border-primary-600 bg-primary-50 text-primary-600"
-                            : "border-gray-200 hover:border-gray-300"
+                            : "border-gray-200 hover:border-gray-300",
                         )}
                       >
                         {method.icon}
-                        <span className="font-medium text-sm">{method.label}</span>
+                        <span className="font-medium text-sm">
+                          {method.label}
+                        </span>
                       </button>
                     ))}
                   </div>
@@ -892,7 +997,8 @@ export const POSWorkspacePage = () => {
                       <div
                         className={clsx(
                           "text-center p-4 bg-gray-50 rounded-xl transition-all",
-                          showPaymentError && "animate-shake border-2 border-danger-500"
+                          showPaymentError &&
+                            "animate-shake border-2 border-danger-500",
                         )}
                       >
                         <p className="text-3xl font-bold">
@@ -944,7 +1050,7 @@ export const POSWorkspacePage = () => {
                           onClick={() => handleNumpadClick(key)}
                           className={clsx(
                             "h-12 rounded-lg bg-gray-100 font-semibold text-lg hover:bg-gray-200 active:bg-gray-300 transition-colors",
-                            key === "0" && "col-span-2"
+                            key === "0" && "col-span-2",
                           )}
                         >
                           {key}
@@ -969,7 +1075,7 @@ export const POSWorkspacePage = () => {
                           "text-center p-4 rounded-xl border",
                           creditLimitExceeded
                             ? "bg-danger-50 border-danger-200"
-                            : "bg-orange-50 border-orange-200"
+                            : "bg-orange-50 border-orange-200",
                         )}
                       >
                         <p className="text-sm text-gray-600">المبلغ المستحق</p>
@@ -978,14 +1084,15 @@ export const POSWorkspacePage = () => {
                             "text-2xl font-bold",
                             creditLimitExceeded
                               ? "text-danger-600"
-                              : "text-orange-600"
+                              : "text-orange-600",
                           )}
                         >
                           {formatCurrency(amountDue)}
                         </p>
                         {creditLimitExceeded && (
                           <p className="text-xs text-danger-600 mt-1">
-                            تجاوز حد الائتمان - المتاح: {formatCurrency(availableCredit)}
+                            تجاوز حد الائتمان - المتاح:{" "}
+                            {formatCurrency(availableCredit)}
                           </p>
                         )}
                         {selectedCustomer && !selectedCustomer.isActive && (
@@ -999,25 +1106,32 @@ export const POSWorkspacePage = () => {
                 )}
 
                 {/* Partial Payment Option */}
-                {selectedCustomer && canTakeCredit && selectedPaymentMethod === "Cash" && (
-                  <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                    <input
-                      type="checkbox"
-                      id="partialPayment"
-                      checked={allowPartialPayment}
-                      onChange={(e) => setAllowPartialPayment(e.target.checked)}
-                      className="w-5 h-5 text-primary-600 rounded focus:ring-2 focus:ring-primary-500 mt-0.5"
-                    />
-                    <label htmlFor="partialPayment" className="flex-1 cursor-pointer">
-                      <p className="font-medium text-gray-800 text-sm">
-                        السماح بالدفع الجزئي (بيع آجل)
-                      </p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        يمكن للعميل دفع جزء من المبلغ والباقي يُسجل كدين
-                      </p>
-                    </label>
-                  </div>
-                )}
+                {selectedCustomer &&
+                  canTakeCredit &&
+                  selectedPaymentMethod === "Cash" && (
+                    <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                      <input
+                        type="checkbox"
+                        id="partialPayment"
+                        checked={allowPartialPayment}
+                        onChange={(e) =>
+                          setAllowPartialPayment(e.target.checked)
+                        }
+                        className="w-5 h-5 text-primary-600 rounded focus:ring-2 focus:ring-primary-500 mt-0.5"
+                      />
+                      <label
+                        htmlFor="partialPayment"
+                        className="flex-1 cursor-pointer"
+                      >
+                        <p className="font-medium text-gray-800 text-sm">
+                          السماح بالدفع الجزئي (بيع آجل)
+                        </p>
+                        <p className="text-xs text-gray-600 mt-1">
+                          يمكن للعميل دفع جزء من المبلغ والباقي يُسجل كدين
+                        </p>
+                      </label>
+                    </div>
+                  )}
               </div>
             )}
 
@@ -1030,7 +1144,9 @@ export const POSWorkspacePage = () => {
 
                 {/* Customer Info */}
                 <div className="p-4 bg-gray-50 rounded-xl border border-gray-200">
-                  <p className="text-xs font-medium text-gray-500 mb-2">العميل</p>
+                  <p className="text-xs font-medium text-gray-500 mb-2">
+                    العميل
+                  </p>
                   {selectedCustomer ? (
                     <div className="flex items-center gap-2">
                       <User className="w-4 h-4 text-primary-500" />
@@ -1061,7 +1177,9 @@ export const POSWorkspacePage = () => {
                           <span className="font-medium text-gray-700">
                             {item.quantity}x
                           </span>
-                          <span className="text-gray-600">{item.product.name}</span>
+                          <span className="text-gray-600">
+                            {item.product.name}
+                          </span>
                         </div>
                         <span className="font-semibold text-gray-800">
                           {formatCurrency(item.product.price * item.quantity)}
@@ -1097,7 +1215,9 @@ export const POSWorkspacePage = () => {
 
                   {isTaxEnabled && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">الضريبة ({taxRate}%)</span>
+                      <span className="text-gray-600">
+                        الضريبة ({taxRate}%)
+                      </span>
                       <span className="font-semibold text-gray-800">
                         {formatCurrency(taxAmount)}
                       </span>
@@ -1128,8 +1248,11 @@ export const POSWorkspacePage = () => {
                       <Building2 className="w-5 h-5 text-secondary-600" />
                     )}
                     <span className="font-medium text-gray-800">
-                      {paymentMethods.find((m) => m.id === selectedPaymentMethod)
-                        ?.label}
+                      {
+                        paymentMethods.find(
+                          (m) => m.id === selectedPaymentMethod,
+                        )?.label
+                      }
                     </span>
                   </div>
                 </div>
@@ -1165,10 +1288,10 @@ export const POSWorkspacePage = () => {
                 {isCreating
                   ? "جاري إنشاء الطلب..."
                   : isCompleting
-                  ? "جاري الدفع..."
-                  : numericAmount < total && allowPartialPayment
-                  ? `إتمام البيع الآجل (مستحق: ${formatCurrency(amountDue)})`
-                  : "إتمام الدفع"}
+                    ? "جاري الدفع..."
+                    : numericAmount < total && allowPartialPayment
+                      ? `إتمام البيع الآجل (مستحق: ${formatCurrency(amountDue)})`
+                      : "إتمام الدفع"}
               </Button>
             )}
 
@@ -1192,7 +1315,7 @@ export const POSWorkspacePage = () => {
       </div>
 
       {/* Modals */}
-      {showQuickCreate && (
+      {showQuickCreate && canQuickCreateProduct && (
         <ProductQuickCreateModal
           onClose={() => setShowQuickCreate(false)}
           onSuccess={() => {
@@ -1216,7 +1339,6 @@ export const POSWorkspacePage = () => {
               isActive: true,
               trackInventory: false,
               type: 2, // Service type
-              currentBranchStock: null,
             };
             addItem(customProduct as any, item.quantity);
             toast.success(`تم إضافة: ${item.name}`);

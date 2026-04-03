@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useProducts, useCategories } from "@/hooks/useProducts";
 import { ProductGrid } from "@/components/pos/ProductGrid";
 import { CategoryTabs } from "@/components/pos/CategoryTabs";
@@ -8,18 +8,32 @@ import { LowStockAlert } from "@/components/pos/LowStockAlert";
 import { ProductQuickCreateModal } from "@/components/pos/ProductQuickCreateModal";
 import { CustomItemModal } from "@/components/pos/CustomItemModal";
 import { Loading } from "@/components/common/Loading";
-import { Menu, ScanBarcode, PackageCheck, AlertCircle, PlusCircle, FileText } from "lucide-react";
+import {
+  Menu,
+  ScanBarcode,
+  PackageCheck,
+  AlertCircle,
+  PlusCircle,
+  FileText,
+} from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useShift } from "@/hooks/useShift";
 import { usePOSShortcuts } from "@/hooks/usePOSShortcuts";
 import { useGetShiftWarningsQuery } from "@/api/shiftsApi";
+import { useGetBranchInventoryQuery } from "@/api/inventoryApi";
 import { usePOSMode } from "@/hooks/usePOSMode";
 import { Customer } from "@/types/customer.types";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { Link, Navigate } from "react-router-dom";
 import { ShiftWarningBanner } from "@/components/shifts";
-import { getProductCurrentStock } from "@/utils/productStock";
+import {
+  buildBranchInventoryStockMap,
+  getProductCurrentStock,
+} from "@/utils/productStock";
+import { usePermission } from "@/hooks/usePermission";
+import { useAppSelector } from "@/store/hooks";
+import { selectCurrentBranch } from "@/store/slices/branchSlice";
 
 export const POSPage = () => {
   const { mode } = usePOSMode();
@@ -36,7 +50,7 @@ export const POSPage = () => {
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [showCustomItem, setShowCustomItem] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null
+    null,
   );
   const [searchInput, setSearchInput] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -46,6 +60,19 @@ export const POSPage = () => {
   const { categories } = useCategories();
   const { addItem, itemsCount } = useCart();
   const { hasActiveShift, isLoading: isLoadingShift } = useShift();
+  const currentBranch = useAppSelector(selectCurrentBranch);
+  const { hasPermission } = usePermission();
+  const canQuickCreateProduct =
+    hasPermission("ProductsCreateFromPOS") || hasPermission("ProductsManage");
+  const { data: branchInventory, isLoading: isInventoryLoading } =
+    useGetBranchInventoryQuery(currentBranch?.id ?? 0, {
+      skip: !currentBranch?.id,
+    });
+  const stockByProductId = useMemo(
+    () => buildBranchInventoryStockMap(branchInventory),
+    [branchInventory],
+  );
+  const hasInventorySnapshot = Array.isArray(branchInventory);
 
   // Fetch shift warnings (polls every 10 minutes in POS)
   const { data: warningsData } = useGetShiftWarningsQuery(undefined, {
@@ -82,11 +109,22 @@ export const POSPage = () => {
           (p.barcode &&
             p.barcode.toLowerCase() === trimmedValue.toLowerCase()) ||
           (p.sku && p.sku.toLowerCase() === trimmedValue.toLowerCase()) ||
-          p.name.toLowerCase() === trimmedValue.toLowerCase()
+          p.name.toLowerCase() === trimmedValue.toLowerCase(),
       );
 
       if (foundProduct) {
-        addItem(foundProduct, 1);
+        const branchInventoryQuantity = getProductCurrentStock(
+          foundProduct,
+          stockByProductId,
+        );
+        const productForCart = hasInventorySnapshot
+          ? ({
+              ...foundProduct,
+              branchInventoryQuantity,
+            } as typeof foundProduct)
+          : foundProduct;
+
+        addItem(productForCart, 1);
         toast.success(`تمت الإضافة: ${foundProduct.name}`);
         // Clear input and refocus
         setSearchInput("");
@@ -95,7 +133,7 @@ export const POSPage = () => {
         toast.error(`لم يتم العثور على منتج: ${trimmedValue}`);
       }
     },
-    [products, addItem]
+    [products, addItem, hasInventorySnapshot, stockByProductId],
   );
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -111,16 +149,19 @@ export const POSPage = () => {
   // Filter by search text
   if (searchInput.trim()) {
     const searchLower = searchInput.toLowerCase().trim();
-    filteredProducts = filteredProducts.filter((p) =>
-      p.name.toLowerCase().includes(searchLower) ||
-      (p.barcode && p.barcode.toLowerCase().includes(searchLower)) ||
-      (p.sku && p.sku.toLowerCase().includes(searchLower))
+    filteredProducts = filteredProducts.filter(
+      (p) =>
+        p.name.toLowerCase().includes(searchLower) ||
+        (p.barcode && p.barcode.toLowerCase().includes(searchLower)) ||
+        (p.sku && p.sku.toLowerCase().includes(searchLower)),
     );
   }
 
   // Filter by category
   if (selectedCategory) {
-    filteredProducts = filteredProducts.filter((p) => p.categoryId === selectedCategory);
+    filteredProducts = filteredProducts.filter(
+      (p) => p.categoryId === selectedCategory,
+    );
   }
 
   // Filter by available stock if enabled
@@ -128,8 +169,9 @@ export const POSPage = () => {
     filteredProducts = filteredProducts.filter((p) => {
       // If product doesn't track inventory, it's always available
       if (!p.trackInventory) return true;
+      if (!hasInventorySnapshot) return true;
       // Only show products with stock > 0
-      return getProductCurrentStock(p) > 0;
+      return getProductCurrentStock(p, stockByProductId) > 0;
     });
   }
 
@@ -153,7 +195,8 @@ export const POSPage = () => {
             لا توجد وردية مفتوحة
           </h2>
           <p className="text-gray-600 mb-6">
-            يجب فتح وردية قبل البدء في البيع. اذهب إلى صفحة الورديات لفتح وردية جديدة.
+            يجب فتح وردية قبل البدء في البيع. اذهب إلى صفحة الورديات لفتح وردية
+            جديدة.
           </p>
           <Link
             to="/shift"
@@ -213,7 +256,7 @@ export const POSPage = () => {
                 "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
                 showAvailableOnly
                   ? "bg-success-100 text-success-700 border border-success-300"
-                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50"
+                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50",
               )}
               title="عرض المنتجات المتاحة في المخزون فقط"
             >
@@ -223,9 +266,25 @@ export const POSPage = () => {
 
             {/* Quick Create Product */}
             <button
-              onClick={() => setShowQuickCreate(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap bg-primary-600 text-white hover:bg-primary-700"
-              title="إضافة منتج سريع"
+              onClick={() => {
+                if (!canQuickCreateProduct) {
+                  toast.error("ليس لديك صلاحية إضافة منتج سريع");
+                  return;
+                }
+                setShowQuickCreate(true);
+              }}
+              disabled={!canQuickCreateProduct}
+              className={clsx(
+                "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
+                canQuickCreateProduct
+                  ? "bg-primary-600 text-white hover:bg-primary-700"
+                  : "bg-gray-200 text-gray-400 cursor-not-allowed",
+              )}
+              title={
+                canQuickCreateProduct
+                  ? "إضافة منتج سريع"
+                  : "يتطلب صلاحية ProductsCreateFromPOS"
+              }
             >
               <PlusCircle className="w-4 h-4" />
               <span className="hidden sm:inline">منتج جديد</span>
@@ -258,7 +317,13 @@ export const POSPage = () => {
 
         {/* Products Grid */}
         <div className="flex-1 overflow-y-auto scrollbar-thin min-h-0">
-          <ProductGrid products={filteredProducts} categories={categories} />
+          <ProductGrid
+            products={filteredProducts}
+            categories={categories}
+            stockByProductId={stockByProductId}
+            hasInventorySnapshot={hasInventorySnapshot}
+            isInventoryLoading={isInventoryLoading}
+          />
         </div>
       </div>
 
@@ -301,7 +366,7 @@ export const POSPage = () => {
       )}
 
       {/* Quick Create Product Modal */}
-      {showQuickCreate && (
+      {showQuickCreate && canQuickCreateProduct && (
         <ProductQuickCreateModal
           onClose={() => setShowQuickCreate(false)}
           onSuccess={(productId) => {
@@ -313,9 +378,7 @@ export const POSPage = () => {
 
       {/* Custom Item Modal */}
       {showCustomItem && (
-        <CustomItemModal
-          onClose={() => setShowCustomItem(false)}
-        />
+        <CustomItemModal onClose={() => setShowCustomItem(false)} />
       )}
     </div>
   );

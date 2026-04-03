@@ -1,6 +1,7 @@
 namespace KasserPro.Application.Services.Implementations;
 
 using Microsoft.EntityFrameworkCore;
+using KasserPro.Application.Common;
 using KasserPro.Application.Common.Interfaces;
 using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Products;
@@ -18,10 +19,18 @@ public class ProductService : IProductService
         _currentUser = currentUser;
     }
 
-    public async Task<ApiResponse<List<ProductDto>>> GetAllAsync(int? categoryId = null, string? search = null, bool? isActive = null, bool? lowStock = null)
+    public async Task<ApiResponse<PagedResult<ProductDto>>> GetAllAsync(
+        int? categoryId = null,
+        string? search = null,
+        bool? isActive = null,
+        bool? lowStock = null,
+        int page = 1,
+        int pageSize = 20)
     {
         var tenantId = _currentUser.TenantId;
         var branchId = _currentUser.BranchId;
+        page = page < 1 ? 1 : page;
+        pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
         
         var query = _unitOfWork.Products.Query()
             .Include(p => p.Category)
@@ -98,7 +107,14 @@ public class ProductService : IProductService
                 .ToList();
         }
 
-        return ApiResponse<List<ProductDto>>.Ok(productDtos);
+        var totalCount = productDtos.Count;
+        var pagedItems = productDtos
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToList();
+
+        var pagedResult = new PagedResult<ProductDto>(pagedItems, totalCount, page, pageSize);
+        return ApiResponse<PagedResult<ProductDto>>.Ok(pagedResult);
     }
 
     public async Task<ApiResponse<ProductDto>> GetByIdAsync(int id)
@@ -111,7 +127,9 @@ public class ProductService : IProductService
             .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
 
         if (product == null)
-            return ApiResponse<ProductDto>.Fail("المنتج غير موجود");
+            return ApiResponse<ProductDto>.Fail(
+                ErrorCodes.PRODUCT_NOT_FOUND,
+                ErrorMessages.Get(ErrorCodes.PRODUCT_NOT_FOUND));
 
         // Get BranchInventory for current branch
         var branchInventory = await _unitOfWork.BranchInventories.Query()

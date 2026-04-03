@@ -117,7 +117,7 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<ExpenseDto>> CreateAsync(CreateExpenseRequest request)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
             // Validate category exists

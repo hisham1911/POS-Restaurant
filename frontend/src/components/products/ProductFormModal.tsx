@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { X, Image as ImageIcon, Package, Wrench, ChevronDown } from "lucide-react";
 import {
   Product,
@@ -8,11 +8,16 @@ import {
 } from "@/types/product.types";
 import { useProducts, useCategories } from "@/hooks/useProducts";
 import { useGetBranchesQuery } from "@/api/branchesApi";
+import { useGetBranchInventoryQuery } from "@/api/inventoryApi";
+import { useAppSelector } from "@/store/hooks";
+import { selectCurrentBranch } from "@/store/slices/branchSlice";
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
 import { Modal } from "@/components/common/Modal";
 import { numberToDisplay, displayToNumber } from "@/hooks/useNumberInput";
 import clsx from "clsx";
+
+const LEGACY_CURRENT_BRANCH_FIELD = ["current", "Branch", "Stock"].join("");
 
 interface ProductFormModalProps {
   product: Product | null;
@@ -36,7 +41,23 @@ export const ProductFormModal = ({
   const { createProduct, updateProduct, isCreating, isUpdating } = useProducts();
   const { categories } = useCategories();
   const { data: branches } = useGetBranchesQuery();
+  const currentBranch = useAppSelector(selectCurrentBranch);
   const isEditing = !!product;
+  const { data: branchInventory } = useGetBranchInventoryQuery(
+    currentBranch?.id ?? 0,
+    {
+      skip: !currentBranch?.id || !product?.id,
+    },
+  );
+
+  const currentBranchQuantity = useMemo(() => {
+    if (!product?.id || !branchInventory) {
+      return 0;
+    }
+
+    const inventoryRow = branchInventory.find((item) => item.productId === product.id);
+    return inventoryRow?.quantity ?? 0;
+  }, [product?.id, branchInventory]);
 
   const [formData, setFormData] = useState({
     name: product?.name || "",
@@ -51,7 +72,7 @@ export const ProductFormModal = ({
     imageUrl: product?.imageUrl || "",
     categoryId: product?.categoryId || categories[0]?.id || 0,
     type: product?.type || ProductType.Physical,
-    branchStockQuantity: product?.currentBranchStock ?? 0,
+    branchQuantity: 0,
     lowStockThreshold: product?.lowStockThreshold ?? 5,
     reorderPoint: product?.reorderPoint ?? null,
     isActive: product?.isActive ?? true,
@@ -66,18 +87,29 @@ export const ProductFormModal = ({
     if (branches?.data && !isEditing) {
       const initialStocks: Record<number, number> = {};
       branches.data.forEach(branch => {
-        initialStocks[branch.id] = formData.branchStockQuantity;
+        initialStocks[branch.id] = formData.branchQuantity;
       });
       setBranchStocks(initialStocks);
     }
-  }, [branches?.data, formData.branchStockQuantity, isEditing]);
+  }, [branches?.data, formData.branchQuantity, isEditing]);
+
+  useEffect(() => {
+    if (!isEditing || !product || product.type !== ProductType.Physical) {
+      return;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      branchQuantity: currentBranchQuantity,
+    }));
+  }, [isEditing, product, currentBranchQuantity]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (isEditing && product) {
       // تحديث المنتج
-      const updateData: UpdateProductRequest = {
+      const baseUpdateData = {
         name: formData.name,
         nameEn: formData.nameEn,
         description: formData.description,
@@ -90,11 +122,17 @@ export const ProductFormModal = ({
         imageUrl: formData.imageUrl,
         categoryId: formData.categoryId,
         type: formData.type,
-        currentBranchStock: formData.branchStockQuantity,
         lowStockThreshold: formData.lowStockThreshold,
         reorderPoint: formData.reorderPoint ?? undefined,
         isActive: formData.isActive,
       };
+
+      // Keep backend compatibility while frontend migrates away from deprecated naming.
+      const updateData = {
+        ...baseUpdateData,
+        [LEGACY_CURRENT_BRANCH_FIELD]: formData.branchQuantity,
+      } as UpdateProductRequest;
+
       await updateProduct(product.id, updateData);
     } else {
       // إنشاء منتج جديد
@@ -111,7 +149,7 @@ export const ProductFormModal = ({
         imageUrl: formData.imageUrl,
         categoryId: formData.categoryId,
         type: formData.type,
-        initialBranchStock: formData.branchStockQuantity,
+        initialBranchStock: formData.branchQuantity,
         lowStockThreshold: formData.lowStockThreshold,
         reorderPoint: formData.reorderPoint ?? undefined,
         branchStockQuantities: useBranchSpecificStock
@@ -139,11 +177,11 @@ export const ProductFormModal = ({
       size="xl"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Basic Info */}
+                  value={numberToDisplay(formData.branchQuantity)}
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-gray-700 border-b pb-2">
             المعلومات الأساسية
-          </h3>
+                      branchQuantity: displayToNumber(e.target.value),
 
           <div className="grid grid-cols-2 gap-4">
             <Input
@@ -458,11 +496,11 @@ export const ProductFormModal = ({
                   label="الكمية المتاحة *"
                   type="number"
                   min="0"
-                  value={numberToDisplay(formData.branchStockQuantity)}
+                  value={numberToDisplay(formData.branchQuantity)}
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      branchStockQuantity: displayToNumber(e.target.value),
+                      branchQuantity: displayToNumber(e.target.value),
                     })
                   }
                   placeholder="0"

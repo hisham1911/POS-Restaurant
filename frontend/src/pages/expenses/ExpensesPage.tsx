@@ -42,7 +42,10 @@ export function ExpensesPage() {
     (expense) => expense.status === "Draft",
   ).length;
 
-  const handleFilterChange = (key: keyof ExpenseFilters, value: any) => {
+  const handleFilterChange = <K extends keyof ExpenseFilters>(
+    key: K,
+    value: ExpenseFilters[K],
+  ) => {
     setFilters((prev) => ({ ...prev, [key]: value, pageNumber: 1 }));
   };
 
@@ -190,7 +193,10 @@ export function ExpensesPage() {
                 <select
                   value={filters.status || ""}
                   onChange={(e) =>
-                    handleFilterChange("status", e.target.value || undefined)
+                    handleFilterChange(
+                      "status",
+                      (e.target.value || undefined) as ExpenseFilters["status"],
+                    )
                   }
                   className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
                 >

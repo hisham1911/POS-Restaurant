@@ -6,15 +6,25 @@ import { StockAdjustmentModal } from "./StockAdjustmentModal";
 import { Package } from "lucide-react";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentUser } from "@/store/slices/authSlice";
+import { BranchInventoryStockMap } from "@/utils/productStock";
 
 interface ProductGridProps {
   products: Product[];
   categories?: Category[];
+  stockByProductId?: BranchInventoryStockMap;
+  hasInventorySnapshot?: boolean;
+  isInventoryLoading?: boolean;
 }
 
-export const ProductGrid = ({ products, categories }: ProductGridProps) => {
+export const ProductGrid = ({
+  products,
+  categories,
+  stockByProductId,
+  hasInventorySnapshot = false,
+  isInventoryLoading = false,
+}: ProductGridProps) => {
   const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(
-    null
+    null,
   );
   const user = useAppSelector(selectCurrentUser);
 
@@ -46,6 +56,9 @@ export const ProductGrid = ({ products, categories }: ProductGridProps) => {
             category={categories?.find((c) => c.id === product.categoryId)}
             onStockAdjust={handleStockAdjust}
             showStockAdjust={canAdjustStock && product.trackInventory}
+            stockByProductId={stockByProductId}
+            hasInventorySnapshot={hasInventorySnapshot}
+            isInventoryLoading={isInventoryLoading}
           />
         ))}
       </div>

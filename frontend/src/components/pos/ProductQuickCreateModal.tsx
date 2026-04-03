@@ -1,11 +1,20 @@
 import { useState } from "react";
-import { X, Package, DollarSign, Tag, Hash, Barcode, ChevronDown } from "lucide-react";
+import {
+  X,
+  Package,
+  DollarSign,
+  Tag,
+  Hash,
+  Barcode,
+  ChevronDown,
+} from "lucide-react";
 import { useQuickCreateProductMutation } from "@/api/productsApi";
 import { useCategories } from "@/hooks/useProducts";
 import { toast } from "sonner";
 import { QuickCreateProductRequest, ProductType } from "@/types/product.types";
 import { Portal } from "@/components/common/Portal";
-import { handleApiError } from "@/utils/errorHandler";
+import { getApiErrorCode, handleApiError } from "@/utils/errorHandler";
+import { extractApiData } from "@/utils/apiResponse";
 
 interface ProductQuickCreateModalProps {
   onClose: () => void;
@@ -18,7 +27,12 @@ export const ProductQuickCreateModal = ({
   onSuccess,
   initialName = "",
 }: ProductQuickCreateModalProps) => {
-  const [formData, setFormData] = useState<Omit<QuickCreateProductRequest, 'price' | 'initialStock'> & { price: string | number; initialStock: string | number }>({
+  const [formData, setFormData] = useState<
+    Omit<QuickCreateProductRequest, "price" | "initialStock"> & {
+      price: string | number;
+      initialStock: string | number;
+    }
+  >({
     name: initialName,
     price: "" as string | number,
     categoryId: 0,
@@ -51,21 +65,26 @@ export const ProductQuickCreateModal = ({
     }
 
     try {
-      const result = await quickCreate({
+      const response = await quickCreate({
         ...formData,
         price: numPrice,
         initialStock: Number(formData.initialStock) || 0,
       }).unwrap();
+      const createdProduct = extractApiData(
+        response,
+        "PRODUCT_QUICK_CREATE_EMPTY_RESPONSE",
+        "Unable to create product",
+      );
 
-      if (!result.data) {
-        toast.error(result.message || "Unable to create product");
-        return;
-      }
-
-      toast.success(`Product added: ${result.data.name}`);
-      onSuccess?.(result.data.id);
+      toast.success(`Product added: ${createdProduct.name}`);
+      onSuccess?.(createdProduct.id);
       onClose();
     } catch (error) {
+      const errorCode = getApiErrorCode(error);
+      if (errorCode) {
+        toast.error(handleApiError({ data: { errorCode } }));
+        return;
+      }
       toast.error(handleApiError(error));
     }
   };
@@ -224,7 +243,8 @@ export const ProductQuickCreateModal = ({
                   />
                 </div>
                 <p className="mt-1 text-xs text-gray-500">
-                  سيتم إضافة هذه الكمية للفرع الحالي فقط. الفروع الأخرى ستبدأ بصفر.
+                  سيتم إضافة هذه الكمية للفرع الحالي فقط. الفروع الأخرى ستبدأ
+                  بصفر.
                 </p>
               </div>
             )}

@@ -40,7 +40,8 @@ import { Loading } from "@/components/common/Loading";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { usePOSMode } from "@/hooks/usePOSMode";
-import { handleApiError } from "@/utils/errorHandler";
+import { getApiErrorCode, handleApiError } from "@/utils/errorHandler";
+import { extractApiData } from "@/utils/apiResponse";
 
 export const SettingsPage = () => {
   const dispatch = useAppDispatch();
@@ -87,10 +88,14 @@ export const SettingsPage = () => {
   const [logoUrl, setLogoUrl] = useState<string>("");
 
   // Print Routing settings state
-  const [printRoutingMode, setPrintRoutingMode] = useState<'BranchOnly' | 'BranchWithFallback' | 'AllDevices' | 'Disabled'>('BranchWithFallback');
+  const [printRoutingMode, setPrintRoutingMode] = useState<
+    "BranchOnly" | "BranchWithFallback" | "AllDevices" | "Disabled"
+  >("BranchWithFallback");
   const [autoPrintOnSale, setAutoPrintOnSale] = useState<boolean>(true);
-  const [autoPrintOnDebtPayment, setAutoPrintOnDebtPayment] = useState<boolean>(true);
-  const [autoPrintDailyReports, setAutoPrintDailyReports] = useState<boolean>(false);
+  const [autoPrintOnDebtPayment, setAutoPrintOnDebtPayment] =
+    useState<boolean>(true);
+  const [autoPrintDailyReports, setAutoPrintDailyReports] =
+    useState<boolean>(false);
 
   // Initialize form with tenant data
   useEffect(() => {
@@ -117,7 +122,7 @@ export const SettingsPage = () => {
       setReceiptShowLogo(tenant.receiptShowLogo ?? true);
       setLogoUrl(tenant.logoUrl || "");
       // Print Routing settings
-      setPrintRoutingMode(tenant.printRoutingMode || 'BranchWithFallback');
+      setPrintRoutingMode(tenant.printRoutingMode || "BranchWithFallback");
       setAutoPrintOnSale(tenant.autoPrintOnSale ?? true);
       setAutoPrintOnDebtPayment(tenant.autoPrintOnDebtPayment ?? true);
       setAutoPrintDailyReports(tenant.autoPrintDailyReports ?? false);
@@ -131,7 +136,7 @@ export const SettingsPage = () => {
       return;
     }
     try {
-      const result = await updateTenant({
+      const response = await updateTenant({
         name,
         nameEn: nameEn || undefined,
         logoUrl: logoUrl || undefined,
@@ -158,15 +163,21 @@ export const SettingsPage = () => {
         autoPrintDailyReports,
       }).unwrap();
 
-      if (!result.data) {
-        toast.error(result.message || "Unable to save settings");
-        return;
-      }
+      extractApiData(
+        response,
+        "TENANT_UPDATE_EMPTY_RESPONSE",
+        "Unable to save settings",
+      );
 
       dispatch(setTaxSettings({ taxRate, isTaxEnabled, allowNegativeStock }));
       toast.success("Settings saved successfully");
       refetch();
     } catch (error) {
+      const errorCode = getApiErrorCode(error);
+      if (errorCode) {
+        toast.error(handleApiError({ data: { errorCode } }));
+        return;
+      }
       toast.error(handleApiError(error));
     }
   };
@@ -577,7 +588,8 @@ export const SettingsPage = () => {
               </span>
             </div>
             <p className="mt-2 text-sm text-gray-500">
-              حدّد نسبة الضريبة الافتراضية الخاصة بمؤسستك، أو اتركها 0 عند عدم الاستخدام.
+              حدّد نسبة الضريبة الافتراضية الخاصة بمؤسستك، أو اتركها 0 عند عدم
+              الاستخدام.
             </p>
           </div>
 
@@ -859,17 +871,22 @@ export const SettingsPage = () => {
                     try {
                       const formData = new FormData();
                       formData.append("file", file);
-                      const result = await uploadLogo(formData).unwrap();
+                      const response = await uploadLogo(formData).unwrap();
+                      const logoData = extractApiData(
+                        response,
+                        "TENANT_LOGO_UPLOAD_EMPTY_RESPONSE",
+                        "Unable to upload logo",
+                      );
 
-                      if (!result.data) {
-                        toast.error(result.message || "Unable to upload logo");
-                        return;
-                      }
-
-                      setLogoUrl(result.data.logoUrl);
+                      setLogoUrl(logoData.logoUrl);
                       toast.success("Logo uploaded successfully");
                       refetch();
                     } catch (error) {
+                      const errorCode = getApiErrorCode(error);
+                      if (errorCode) {
+                        toast.error(handleApiError({ data: { errorCode } }));
+                        return;
+                      }
                       toast.error(handleApiError(error));
                     }
                     e.target.value = "";
@@ -1121,10 +1138,22 @@ export const SettingsPage = () => {
             </label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               {[
-                { value: 'BranchOnly', label: 'الفرع فقط', desc: 'طباعة للفرع الحالي فقط' },
-                { value: 'BranchWithFallback', label: 'الفرع + احتياطي', desc: 'الفرع + الأجهزة الافتراضية' },
-                { value: 'AllDevices', label: 'كل الأجهزة', desc: 'طباعة على جميع الطابعات' },
-                { value: 'Disabled', label: 'معطل', desc: 'لا طباعة تلقائية' },
+                {
+                  value: "BranchOnly",
+                  label: "الفرع فقط",
+                  desc: "طباعة للفرع الحالي فقط",
+                },
+                {
+                  value: "BranchWithFallback",
+                  label: "الفرع + احتياطي",
+                  desc: "الفرع + الأجهزة الافتراضية",
+                },
+                {
+                  value: "AllDevices",
+                  label: "كل الأجهزة",
+                  desc: "طباعة على جميع الطابعات",
+                },
+                { value: "Disabled", label: "معطل", desc: "لا طباعة تلقائية" },
               ].map((option) => (
                 <button
                   key={option.value}
@@ -1133,11 +1162,13 @@ export const SettingsPage = () => {
                     "p-4 rounded-lg border-2 text-left transition-all",
                     printRoutingMode === option.value
                       ? "border-primary-500 bg-primary-50"
-                      : "border-gray-200 hover:border-gray-300"
+                      : "border-gray-200 hover:border-gray-300",
                   )}
                 >
                   <div className="font-medium">{option.label}</div>
-                  <div className="text-sm text-gray-500 mt-1">{option.desc}</div>
+                  <div className="text-sm text-gray-500 mt-1">
+                    {option.desc}
+                  </div>
                 </button>
               ))}
             </div>
@@ -1149,7 +1180,9 @@ export const SettingsPage = () => {
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div>
                 <div className="font-medium">طباعة تلقائية عند البيع</div>
-                <div className="text-sm text-gray-500">طباعة الفاتورة تلقائياً عند إتمام البيع</div>
+                <div className="text-sm text-gray-500">
+                  طباعة الفاتورة تلقائياً عند إتمام البيع
+                </div>
               </div>
               <button
                 onClick={() => setAutoPrintOnSale(!autoPrintOnSale)}
@@ -1167,10 +1200,14 @@ export const SettingsPage = () => {
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div>
                 <div className="font-medium">طباعة تلقائية عند دفع دين</div>
-                <div className="text-sm text-gray-500">طباعة إيصال تلقائياً عند دفع دين عميل</div>
+                <div className="text-sm text-gray-500">
+                  طباعة إيصال تلقائياً عند دفع دين عميل
+                </div>
               </div>
               <button
-                onClick={() => setAutoPrintOnDebtPayment(!autoPrintOnDebtPayment)}
+                onClick={() =>
+                  setAutoPrintOnDebtPayment(!autoPrintOnDebtPayment)
+                }
                 className="focus:outline-none"
               >
                 {autoPrintOnDebtPayment ? (
@@ -1184,8 +1221,12 @@ export const SettingsPage = () => {
             {/* Auto Print Daily Reports */}
             <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
               <div>
-                <div className="font-medium">طباعة تلقائية للتقارير اليومية</div>
-                <div className="text-sm text-gray-500">طباعة التقرير اليومي تلقائياً</div>
+                <div className="font-medium">
+                  طباعة تلقائية للتقارير اليومية
+                </div>
+                <div className="text-sm text-gray-500">
+                  طباعة التقرير اليومي تلقائياً
+                </div>
               </div>
               <button
                 onClick={() => setAutoPrintDailyReports(!autoPrintDailyReports)}
@@ -1207,8 +1248,8 @@ export const SettingsPage = () => {
               <div className="text-sm text-blue-800">
                 <p className="font-medium mb-1">ملاحظة مهمة:</p>
                 <p>
-                  لتفعيل الطباعة، تأكد من تشغيل تطبيق الطابعة (Bridge App) على الجهاز المطلوب.
-                  يمكنك تحميله من صفحة الإعدادات.
+                  لتفعيل الطباعة، تأكد من تشغيل تطبيق الطابعة (Bridge App) على
+                  الجهاز المطلوب. يمكنك تحميله من صفحة الإعدادات.
                 </p>
               </div>
             </div>

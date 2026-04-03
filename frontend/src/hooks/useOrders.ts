@@ -10,7 +10,12 @@ import { CompleteOrderRequest, Order } from "../types/order.types";
 import { toast } from "sonner";
 import { useAppSelector } from "../store/hooks";
 import { selectCurrentBranch } from "../store/slices/branchSlice";
-import { ApiError, getApiErrorCode, handleApiError } from "../utils/errorHandler";
+import {
+  ApiError,
+  getApiErrorCode,
+  handleApiError,
+} from "../utils/errorHandler";
+import { extractApiData } from "@/utils/apiResponse";
 
 export const useOrders = () => {
   const { items, clearCart, discountType, discountValue } = useCart();
@@ -58,20 +63,18 @@ export const useOrders = () => {
     }));
 
     try {
-      const result = await createMutation({
+      const response = await createMutation({
         branchId: currentBranch.id,
         items: orderItems,
         customerId,
         discountType,
         discountValue,
       }).unwrap();
-
-      if (!result.data) {
-        toast.error(result.message || "Unable to create order");
-        return null;
-      }
-
-      return result.data;
+      return extractApiData(
+        response,
+        "ORDER_CREATE_EMPTY_RESPONSE",
+        "Unable to create order",
+      );
     } catch (error) {
       const apiError = error as ApiError;
       if (
@@ -91,16 +94,16 @@ export const useOrders = () => {
     data: CompleteOrderRequest,
   ): Promise<Order | null> => {
     try {
-      const result = await completeMutation({ orderId, data }).unwrap();
-
-      if (!result.data) {
-        toast.error(result.message || "Unable to complete order");
-        return null;
-      }
+      const response = await completeMutation({ orderId, data }).unwrap();
+      const order = extractApiData(
+        response,
+        "ORDER_COMPLETE_EMPTY_RESPONSE",
+        "Unable to complete order",
+      );
 
       clearCart();
       toast.success("Order completed successfully");
-      return result.data;
+      return order;
     } catch (error) {
       const apiError = error as ApiError;
       if (
@@ -119,12 +122,12 @@ export const useOrders = () => {
     reason?: string,
   ): Promise<boolean> => {
     try {
-      const result = await cancelMutation({ orderId, reason }).unwrap();
-
-      if (!result.data) {
-        toast.error(result.message || "Unable to cancel order");
-        return false;
-      }
+      const response = await cancelMutation({ orderId, reason }).unwrap();
+      extractApiData(
+        response,
+        "ORDER_CANCEL_EMPTY_RESPONSE",
+        "Unable to cancel order",
+      );
 
       toast.success("Order cancelled");
       refetch();

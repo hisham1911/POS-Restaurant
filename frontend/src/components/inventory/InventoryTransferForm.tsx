@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import type { CreateTransferRequest } from "../../types/inventory.types";
+import { handleApiError } from "../../utils/errorHandler";
 
 interface InventoryTransferFormProps {
   onSuccess?: () => void;
@@ -102,8 +103,8 @@ export default function InventoryTransferForm({
       });
 
       onSuccess?.();
-    } catch (error: any) {
-      toast.error(error?.data?.message || "حدث خطأ في إنشاء طلب النقل");
+    } catch (error: unknown) {
+      toast.error(handleApiError(error));
     }
   };
 

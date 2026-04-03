@@ -22,9 +22,11 @@ public class ProductsController : ControllerBase
         [FromQuery] int? categoryId,
         [FromQuery] string? search,
         [FromQuery] bool? isActive,
-        [FromQuery] bool? lowStock)
+        [FromQuery] bool? lowStock,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 20)
     {
-        var result = await _productService.GetAllAsync(categoryId, search, isActive, lowStock);
+        var result = await _productService.GetAllAsync(categoryId, search, isActive, lowStock, page, pageSize);
         return Ok(result);
     }
 

@@ -1,21 +1,22 @@
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { ChevronDown } from "lucide-react";
 import {
   useCreatePurchaseInvoiceMutation,
   useUpdatePurchaseInvoiceMutation,
   useGetPurchaseInvoiceByIdQuery,
-} from '../../api/purchaseInvoiceApi';
-import { useGetSuppliersQuery } from '../../api/suppliersApi';
-import { useGetProductsQuery } from '../../api/productsApi';
-import { Button } from '../../components/common/Button';
-import { Card } from '../../components/common/Card';
-import { Loading } from '../../components/common/Loading';
-import { QuickAddProductModal } from '../../components/purchase-invoices/QuickAddProductModal';
-import { formatCurrency } from '../../utils/formatters';
-import { toast } from 'sonner';
-import type { CreatePurchaseInvoiceItemRequest } from '../../types/purchaseInvoice.types';
-import { handleApiError } from '../../utils/errorHandler';
+} from "../../api/purchaseInvoiceApi";
+import { useGetSuppliersQuery } from "../../api/suppliersApi";
+import { useGetProductsQuery } from "../../api/productsApi";
+import { Button } from "../../components/common/Button";
+import { Card } from "../../components/common/Card";
+import { Loading } from "../../components/common/Loading";
+import { QuickAddProductModal } from "../../components/purchase-invoices/QuickAddProductModal";
+import { formatCurrency } from "../../utils/formatters";
+import { toast } from "sonner";
+import type { CreatePurchaseInvoiceItemRequest } from "../../types/purchaseInvoice.types";
+import { getApiErrorCode, handleApiError } from "../../utils/errorHandler";
+import { extractApiData } from "@/utils/apiResponse";
 
 interface InvoiceItem extends CreatePurchaseInvoiceItemRequest {
   tempId: string;
@@ -30,26 +31,26 @@ export function PurchaseInvoiceFormPage() {
 
   const [supplierId, setSupplierId] = useState<number>(0);
   const [invoiceDate, setInvoiceDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    new Date().toISOString().split("T")[0],
   );
-  const [notes, setNotes] = useState<string>('');
+  const [notes, setNotes] = useState<string>("");
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number>(0);
-  const [quantity, setQuantity] = useState<string>('');
-  const [purchasePrice, setPurchasePrice] = useState<string>('');
-  const [sellingPrice, setSellingPrice] = useState<string>('');
-  const [itemNotes, setItemNotes] = useState<string>('');
+  const [quantity, setQuantity] = useState<string>("");
+  const [purchasePrice, setPurchasePrice] = useState<string>("");
+  const [sellingPrice, setSellingPrice] = useState<string>("");
+  const [itemNotes, setItemNotes] = useState<string>("");
   const [showQuickAddProduct, setShowQuickAddProduct] = useState(false);
-  
+
   const { data: suppliersResponse } = useGetSuppliersQuery();
   const { data: productsResponse } = useGetProductsQuery();
-  const { data: invoiceResponse, isLoading: isLoadingInvoice } = useGetPurchaseInvoiceByIdQuery(
-    Number(id),
-    { skip: !isEditMode }
-  );
+  const { data: invoiceResponse, isLoading: isLoadingInvoice } =
+    useGetPurchaseInvoiceByIdQuery(Number(id), { skip: !isEditMode });
 
-  const [createInvoice, { isLoading: isCreating }] = useCreatePurchaseInvoiceMutation();
-  const [updateInvoice, { isLoading: isUpdating }] = useUpdatePurchaseInvoiceMutation();
+  const [createInvoice, { isLoading: isCreating }] =
+    useCreatePurchaseInvoiceMutation();
+  const [updateInvoice, { isLoading: isUpdating }] =
+    useUpdatePurchaseInvoiceMutation();
 
   const suppliers = suppliersResponse?.data || [];
   const products = productsResponse?.data || [];
@@ -59,8 +60,8 @@ export function PurchaseInvoiceFormPage() {
   useEffect(() => {
     if (invoice && isEditMode) {
       setSupplierId(invoice.supplierId);
-      setInvoiceDate(invoice.invoiceDate.split('T')[0]);
-      setNotes(invoice.notes || '');
+      setInvoiceDate(invoice.invoiceDate.split("T")[0]);
+      setNotes(invoice.notes || "");
       setItems(
         invoice.items.map((item) => ({
           tempId: `item-${item.id}`,
@@ -70,7 +71,7 @@ export function PurchaseInvoiceFormPage() {
           purchasePrice: item.purchasePrice,
           sellingPrice: item.sellingPrice,
           notes: item.notes,
-        }))
+        })),
       );
     }
   }, [invoice, isEditMode]);
@@ -81,12 +82,12 @@ export function PurchaseInvoiceFormPage() {
     const numSellingPrice = Number(sellingPrice) || 0;
 
     if (!selectedProductId || numQuantity <= 0 || numPurchasePrice <= 0) {
-      toast.error('يرجى ملء جميع بيانات المنتج');
+      toast.error("يرجى ملء جميع بيانات المنتج");
       return;
     }
 
     if (numSellingPrice <= 0) {
-      toast.error('يرجى إدخال سعر البيع');
+      toast.error("يرجى إدخال سعر البيع");
       return;
     }
 
@@ -106,10 +107,10 @@ export function PurchaseInvoiceFormPage() {
 
     setItems([...items, newItem]);
     setSelectedProductId(0);
-    setQuantity('');
-    setPurchasePrice('');
-    setSellingPrice('');
-    setItemNotes('');
+    setQuantity("");
+    setPurchasePrice("");
+    setSellingPrice("");
+    setItemNotes("");
   };
 
   const handleProductCreated = (productId: number) => {
@@ -119,7 +120,7 @@ export function PurchaseInvoiceFormPage() {
     if (product) {
       setSellingPrice(String(product.price));
     }
-    toast.success('تم إضافة المنتج. يمكنك الآن إضافته للفاتورة');
+    toast.success("تم إضافة المنتج. يمكنك الآن إضافته للفاتورة");
   };
 
   const handleRemoveItem = (tempId: string) => {
@@ -127,19 +128,22 @@ export function PurchaseInvoiceFormPage() {
   };
 
   const calculateSubtotal = () => {
-    return items.reduce((sum, item) => sum + item.quantity * item.purchasePrice, 0);
+    return items.reduce(
+      (sum, item) => sum + item.quantity * item.purchasePrice,
+      0,
+    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!supplierId) {
-      toast.error('يرجى اختيار المورد');
+      toast.error("يرجى اختيار المورد");
       return;
     }
 
     if (items.length === 0) {
-      toast.error('يرجى إضافة منتج واحد على الأقل');
+      toast.error("يرجى إضافة منتج واحد على الأقل");
       return;
     }
 
@@ -163,21 +167,26 @@ export function PurchaseInvoiceFormPage() {
           data: requestData,
         }).unwrap();
 
-        toast.success('تم تحديث الفاتورة بنجاح');
+        toast.success("تم تحديث الفاتورة بنجاح");
         navigate(`/purchase-invoices/${id}`);
       } else {
-        const result = await createInvoice(requestData).unwrap();
+        const response = await createInvoice(requestData).unwrap();
+        const createdInvoice = extractApiData(
+          response,
+          "PURCHASE_INVOICE_CREATE_EMPTY_RESPONSE",
+          "فشل إنشاء الفاتورة",
+        );
 
-        if (!result.data) {
-          toast.error('فشل إنشاء الفاتورة');
-          return;
-        }
-
-        toast.success('تم إنشاء الفاتورة بنجاح');
-        navigate(`/purchase-invoices/${result.data.id}`);
+        toast.success("تم إنشاء الفاتورة بنجاح");
+        navigate(`/purchase-invoices/${createdInvoice.id}`);
       }
     } catch (error) {
-      console.error('Error saving invoice:', error);
+      console.error("Error saving invoice:", error);
+      const errorCode = getApiErrorCode(error);
+      if (errorCode) {
+        toast.error(handleApiError({ data: { errorCode } }));
+        return;
+      }
       toast.error(handleApiError(error));
     }
   };
@@ -188,9 +197,12 @@ export function PurchaseInvoiceFormPage() {
     <div className="p-6 pb-20">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">
-          {isEditMode ? 'تعديل فاتورة الشراء' : 'إنشاء فاتورة شراء جديدة'}
+          {isEditMode ? "تعديل فاتورة الشراء" : "إنشاء فاتورة شراء جديدة"}
         </h1>
-        <Button variant="outline" onClick={() => navigate('/purchase-invoices')}>
+        <Button
+          variant="outline"
+          onClick={() => navigate("/purchase-invoices")}
+        >
           رجوع
         </Button>
       </div>
@@ -301,7 +313,9 @@ export function PurchaseInvoiceFormPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">سعر الشراء</label>
+              <label className="block text-sm font-medium mb-1">
+                سعر الشراء
+              </label>
               <input
                 type="number"
                 value={purchasePrice}
@@ -314,7 +328,9 @@ export function PurchaseInvoiceFormPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">سعر البيع</label>
+              <label className="block text-sm font-medium mb-1">
+                سعر البيع
+              </label>
               <input
                 type="number"
                 value={sellingPrice}
@@ -353,19 +369,36 @@ export function PurchaseInvoiceFormPage() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">المنتج</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الكمية</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">سعر الشراء</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">سعر البيع</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الإجمالي</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">ملاحظات</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">إجراءات</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    المنتج
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    الكمية
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    سعر الشراء
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    سعر البيع
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    الإجمالي
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    ملاحظات
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    إجراءات
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                    <td
+                      colSpan={7}
+                      className="px-4 py-8 text-center text-gray-500"
+                    >
                       لم يتم إضافة منتجات بعد
                     </td>
                   </tr>
@@ -374,12 +407,18 @@ export function PurchaseInvoiceFormPage() {
                     <tr key={item.tempId}>
                       <td className="px-4 py-3 text-sm">{item.productName}</td>
                       <td className="px-4 py-3 text-sm">{item.quantity}</td>
-                      <td className="px-4 py-3 text-sm">{formatCurrency(item.purchasePrice)}</td>
-                      <td className="px-4 py-3 text-sm font-medium text-green-600">{formatCurrency(item.sellingPrice)}</td>
+                      <td className="px-4 py-3 text-sm">
+                        {formatCurrency(item.purchasePrice)}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-medium text-green-600">
+                        {formatCurrency(item.sellingPrice)}
+                      </td>
                       <td className="px-4 py-3 text-sm font-medium">
                         {formatCurrency(item.quantity * item.purchasePrice)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-500">{item.notes || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {item.notes || "-"}
+                      </td>
                       <td className="px-4 py-3 text-sm">
                         <button
                           type="button"
@@ -403,7 +442,9 @@ export function PurchaseInvoiceFormPage() {
                 <div className="w-64">
                   <div className="flex justify-between mb-2">
                     <span className="text-sm">المجموع الفرعي:</span>
-                    <span className="text-sm font-medium">{formatCurrency(calculateSubtotal())}</span>
+                    <span className="text-sm font-medium">
+                      {formatCurrency(calculateSubtotal())}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -416,12 +457,16 @@ export function PurchaseInvoiceFormPage() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => navigate('/purchase-invoices')}
+            onClick={() => navigate("/purchase-invoices")}
           >
             إلغاء
           </Button>
           <Button type="submit" disabled={isCreating || isUpdating}>
-            {isCreating || isUpdating ? 'جاري الحفظ...' : isEditMode ? 'تحديث' : 'حفظ'}
+            {isCreating || isUpdating
+              ? "جاري الحفظ..."
+              : isEditMode
+                ? "تحديث"
+                : "حفظ"}
           </Button>
         </div>
       </form>

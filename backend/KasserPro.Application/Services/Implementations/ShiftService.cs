@@ -174,15 +174,6 @@ public class ShiftService : IShiftService
             if (shift.IsClosed)
                 return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_ALREADY_CLOSED, "الوردية مغلقة بالفعل");
 
-            // INTEGRATION: Validate reconciliation before closing
-            // Get current cash balance from cash register
-            var balanceResponse = await _cashRegisterService.GetCurrentBalanceAsync(branchId);
-            if (!balanceResponse.Success)
-                return ApiResponse<ShiftDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR,
-                    "فشل الحصول على رصيد الخزينة");
-
-            var currentCashBalance = balanceResponse.Data!.CurrentBalance;
-
             // FIX C-2/C-3/H-8: Use unified helper for 100% parity with ForceCloseAsync
             var (totalOrders, totalCash, totalCard, _, _) = CalculateShiftFinancials(shift.Orders);
             shift.TotalOrders = totalOrders;
@@ -190,7 +181,7 @@ public class ShiftService : IShiftService
             shift.TotalCard = totalCard;
 
             shift.ClosingBalance = Math.Round(request.ClosingBalance, 2);
-            shift.ExpectedBalance = Math.Round(currentCashBalance, 2); // Use cash register balance
+            shift.ExpectedBalance = Math.Round(shift.OpeningBalance + totalCash, 2);
             shift.Difference = Math.Round(shift.ClosingBalance - shift.ExpectedBalance, 2);
             shift.ClosedAt = DateTime.UtcNow;
             shift.IsClosed = true;

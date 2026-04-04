@@ -47,16 +47,6 @@ export const cashRegisterApi = baseApi.injectEndpoints({
       providesTags: ['CashRegisterTransactions'],
     }),
 
-    // Create transaction (Deposit/Withdrawal)
-    createTransaction: builder.mutation<ApiResponse<CashRegisterTransaction>, CreateCashRegisterTransactionRequest>({
-      query: (transaction) => ({
-        url: '/cash-register/transactions',
-        method: 'POST',
-        body: transaction,
-      }),
-      invalidatesTags: ['CashRegisterBalance', 'CashRegisterTransactions'],
-    }),
-
     // Deposit
     deposit: builder.mutation<ApiResponse<CashRegisterTransaction>, Omit<CreateCashRegisterTransactionRequest, 'type'>>({
       query: (request) => ({
@@ -115,7 +105,6 @@ export const cashRegisterApi = baseApi.injectEndpoints({
 export const {
   useGetCurrentBalanceQuery,
   useGetTransactionsQuery,
-  useCreateTransactionMutation,
   useDepositMutation,
   useWithdrawMutation,
   useReconcileMutation,

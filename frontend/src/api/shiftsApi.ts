@@ -23,12 +23,6 @@ export const shiftsApi = baseApi.injectEndpoints({
       providesTags: ["Shifts"],
     }),
 
-    // جلب وردية واحدة
-    getShift: builder.query<ApiResponse<Shift>, number>({
-      query: (id) => `/shifts/${id}`,
-      providesTags: (_result, _error, id) => [{ type: "Shifts", id }],
-    }),
-
     // فتح وردية
     openShift: builder.mutation<ApiResponse<Shift>, OpenShiftRequest>({
       query: (data) => ({
@@ -101,7 +95,6 @@ export const shiftsApi = baseApi.injectEndpoints({
 export const {
   useGetCurrentShiftQuery,
   useGetShiftsQuery,
-  useGetShiftQuery,
   useOpenShiftMutation,
   useCloseShiftMutation,
   useForceCloseShiftMutation,

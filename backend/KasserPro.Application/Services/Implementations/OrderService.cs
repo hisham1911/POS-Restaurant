@@ -120,7 +120,7 @@ public class OrderService : IOrderService
         {
             // VALIDATION: Quantity must be positive
             if (item.Quantity <= 0)
-                return ApiResponse<OrderDto>.Fail("الكمية يجب أن تكون أكبر من صفر");
+                return ApiResponse<OrderDto>.Fail(ErrorCodes.ORDER_INVALID_QUANTITY, ErrorMessages.Get(ErrorCodes.ORDER_INVALID_QUANTITY));
 
             var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId);
 
@@ -309,7 +309,7 @@ public class OrderService : IOrderService
     {
         // VALIDATION: Quantity must be positive
         if (request.Quantity <= 0)
-            return ApiResponse<OrderDto>.Fail("الكمية يجب أن تكون أكبر من صفر");
+            return ApiResponse<OrderDto>.Fail(ErrorCodes.ORDER_INVALID_QUANTITY, ErrorMessages.Get(ErrorCodes.ORDER_INVALID_QUANTITY));
 
         var order = await _unitOfWork.Orders.Query()
             .Include(o => o.Items)

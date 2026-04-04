@@ -56,4 +56,19 @@ public interface IExpenseService
     /// Updates cash register if payment method is Cash
     /// </summary>
     Task<ApiResponse<ExpenseDto>> PayAsync(int id, PayExpenseRequest request);
+
+    /// <summary>
+    /// Upload and attach a file to an expense (Draft only)
+    /// </summary>
+    Task<ApiResponse<ExpenseDto>> UploadAttachmentAsync(
+        int id,
+        string fileName,
+        string filePath,
+        long fileSize,
+        string fileType);
+
+    /// <summary>
+    /// Delete an attachment from an expense (Draft only)
+    /// </summary>
+    Task<ApiResponse<bool>> DeleteAttachmentAsync(int expenseId, int attachmentId);
 }

@@ -60,7 +60,7 @@ public class CategoryService : ICategoryService
         var category = await _unitOfWork.Categories.Query()
             .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId);
         if (category == null)
-            return ApiResponse<CategoryDto>.Fail("التصنيف غير موجود");
+            return ApiResponse<CategoryDto>.Fail(ErrorCodes.CATEGORY_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CATEGORY_NOT_FOUND));
 
         return ApiResponse<CategoryDto>.Ok(new CategoryDto
         {
@@ -105,7 +105,7 @@ public class CategoryService : ICategoryService
         var category = await _unitOfWork.Categories.Query()
             .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId);
         if (category == null)
-            return ApiResponse<CategoryDto>.Fail("التصنيف غير موجود");
+            return ApiResponse<CategoryDto>.Fail(ErrorCodes.CATEGORY_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CATEGORY_NOT_FOUND));
 
         category.Name = request.Name;
         category.NameEn = request.NameEn;
@@ -133,7 +133,7 @@ public class CategoryService : ICategoryService
         var category = await _unitOfWork.Categories.Query()
             .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId);
         if (category == null)
-            return ApiResponse<bool>.Fail("التصنيف غير موجود");
+            return ApiResponse<bool>.Fail(ErrorCodes.CATEGORY_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CATEGORY_NOT_FOUND));
 
         // VALIDATION: Cannot delete category with active products
         var hasProducts = await _unitOfWork.Products.Query()

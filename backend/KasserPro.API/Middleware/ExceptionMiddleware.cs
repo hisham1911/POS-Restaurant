@@ -3,8 +3,10 @@ namespace KasserPro.API.Middleware;
 using System.Net;
 using System.Text.Json;
 using KasserPro.Application.DTOs.Common;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 public class ExceptionMiddleware
 {
@@ -73,7 +75,7 @@ public class ExceptionMiddleware
             correlationId
         };
         
-        await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+        await context.Response.WriteAsync(JsonSerializer.Serialize(response, GetJsonSerializerOptions(context)));
     }
 
     /// <summary>
@@ -98,7 +100,7 @@ public class ExceptionMiddleware
             correlationId
         };
         
-        await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+        await context.Response.WriteAsync(JsonSerializer.Serialize(response, GetJsonSerializerOptions(context)));
     }
 
     /// <summary>
@@ -123,7 +125,7 @@ public class ExceptionMiddleware
             correlationId
         };
         
-        await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+        await context.Response.WriteAsync(JsonSerializer.Serialize(response, GetJsonSerializerOptions(context)));
     }
 
     private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
@@ -148,6 +150,11 @@ public class ExceptionMiddleware
             correlationId
         };
         
-        await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+        await context.Response.WriteAsync(JsonSerializer.Serialize(response, GetJsonSerializerOptions(context)));
+    }
+
+    private static JsonSerializerOptions GetJsonSerializerOptions(HttpContext context)
+    {
+        return context.RequestServices.GetRequiredService<IOptions<JsonOptions>>().Value.JsonSerializerOptions;
     }
 }

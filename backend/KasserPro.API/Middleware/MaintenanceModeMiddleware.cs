@@ -2,6 +2,8 @@ namespace KasserPro.API.Middleware;
 
 using System.Text.Json;
 using KasserPro.Application.DTOs.Common;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 
 /// <summary>
 /// P0 SECURITY: Blocks incoming requests during critical operations (restore, migration)
@@ -48,11 +50,16 @@ public class MaintenanceModeMiddleware
                 retryAfter = 60
             };
             
-            await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+            await context.Response.WriteAsync(JsonSerializer.Serialize(response, GetJsonSerializerOptions(context)));
             return;
         }
 
         await _next(context);
+    }
+
+    private static JsonSerializerOptions GetJsonSerializerOptions(HttpContext context)
+    {
+        return context.RequestServices.GetRequiredService<IOptions<JsonOptions>>().Value.JsonSerializerOptions;
     }
 }
 

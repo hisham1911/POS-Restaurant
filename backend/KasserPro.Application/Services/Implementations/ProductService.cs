@@ -70,7 +70,7 @@ public class ProductService : IProductService
 
         var productDtos = products.Select(p =>
         {
-            var stockQuantity = p.TrackInventory && branchInventories.ContainsKey(p.Id)
+            var branchQuantity = p.TrackInventory && branchInventories.ContainsKey(p.Id)
                 ? branchInventories[p.Id]
                 : (p.TrackInventory ? 0 : (int?)null);
 
@@ -90,7 +90,7 @@ public class ProductService : IProductService
                 IsActive = p.IsActive,
                 Type = p.Type,
                 TrackInventory = p.TrackInventory,
-                CurrentBranchStock = stockQuantity,
+                CurrentBranchStock = branchQuantity,
                 CategoryId = p.CategoryId,
                 CategoryName = p.Category?.Name,
                 LowStockThreshold = p.LowStockThreshold,
@@ -135,7 +135,7 @@ public class ProductService : IProductService
         var branchInventory = await _unitOfWork.BranchInventories.Query()
             .FirstOrDefaultAsync(bi => bi.TenantId == tenantId && bi.BranchId == branchId && bi.ProductId == product.Id);
 
-        var stockQuantity = product.TrackInventory && branchInventory != null
+        var branchQuantity = product.TrackInventory && branchInventory != null
             ? branchInventory.Quantity
             : (product.TrackInventory ? 0 : (int?)null);
 
@@ -155,7 +155,7 @@ public class ProductService : IProductService
             IsActive = product.IsActive,
             Type = product.Type,
             TrackInventory = product.TrackInventory,
-            CurrentBranchStock = stockQuantity,
+            CurrentBranchStock = branchQuantity,
             CategoryId = product.CategoryId,
             CategoryName = product.Category?.Name,
             LowStockThreshold = product.LowStockThreshold,
@@ -168,12 +168,12 @@ public class ProductService : IProductService
     {
         // Validation: Price must be non-negative
         if (request.Price < 0)
-            return ApiResponse<ProductDto>.Fail("سعر المنتج لا يمكن أن يكون سالباً");
+            return ApiResponse<ProductDto>.Fail(ErrorCodes.PRODUCT_INVALID_PRICE, ErrorMessages.Get(ErrorCodes.PRODUCT_INVALID_PRICE));
 
         // Validation: Category must exist
         var category = await _unitOfWork.Categories.GetByIdAsync(request.CategoryId);
         if (category == null)
-            return ApiResponse<ProductDto>.Fail("التصنيف غير موجود");
+            return ApiResponse<ProductDto>.Fail(ErrorCodes.CATEGORY_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CATEGORY_NOT_FOUND));
 
         var product = new Product
         {
@@ -261,18 +261,18 @@ public class ProductService : IProductService
     {
         // Validation: Price must be non-negative
         if (request.Price < 0)
-            return ApiResponse<ProductDto>.Fail("سعر المنتج لا يمكن أن يكون سالباً");
+            return ApiResponse<ProductDto>.Fail(ErrorCodes.PRODUCT_INVALID_PRICE, ErrorMessages.Get(ErrorCodes.PRODUCT_INVALID_PRICE));
 
         var tenantId = _currentUser.TenantId;
         var product = await _unitOfWork.Products.Query()
             .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
         if (product == null)
-            return ApiResponse<ProductDto>.Fail("المنتج غير موجود");
+            return ApiResponse<ProductDto>.Fail(ErrorCodes.PRODUCT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PRODUCT_NOT_FOUND));
 
         // Validation: Category must exist
         var category = await _unitOfWork.Categories.GetByIdAsync(request.CategoryId);
         if (category == null)
-            return ApiResponse<ProductDto>.Fail("التصنيف غير موجود");
+            return ApiResponse<ProductDto>.Fail(ErrorCodes.CATEGORY_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CATEGORY_NOT_FOUND));
 
         product.Name = request.Name;
         product.NameEn = request.NameEn;
@@ -303,7 +303,7 @@ public class ProductService : IProductService
         var branchInventory = await _unitOfWork.BranchInventories.Query()
             .FirstOrDefaultAsync(bi => bi.TenantId == tenantId && bi.BranchId == branchId && bi.ProductId == product.Id);
 
-        var stockQuantity = product.TrackInventory && branchInventory != null
+        var branchQuantity = product.TrackInventory && branchInventory != null
             ? branchInventory.Quantity
             : (product.TrackInventory ? 0 : (int?)null);
 
@@ -319,7 +319,7 @@ public class ProductService : IProductService
             IsActive = product.IsActive,
             Type = product.Type,
             TrackInventory = product.TrackInventory,
-            CurrentBranchStock = stockQuantity,
+            CurrentBranchStock = branchQuantity,
             CategoryId = product.CategoryId
         }, "تم تحديث المنتج بنجاح");
     }
@@ -330,7 +330,7 @@ public class ProductService : IProductService
         var product = await _unitOfWork.Products.Query()
             .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
         if (product == null)
-            return ApiResponse<bool>.Fail("المنتج غير موجود");
+            return ApiResponse<bool>.Fail(ErrorCodes.PRODUCT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PRODUCT_NOT_FOUND));
 
         product.IsDeleted = true;
         _unitOfWork.Products.Update(product);
@@ -347,7 +347,7 @@ public class ProductService : IProductService
         var product = await _unitOfWork.Products.Query()
             .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
         if (product == null)
-            return ApiResponse<StockAdjustResultDto>.Fail("المنتج غير موجود");
+            return ApiResponse<StockAdjustResultDto>.Fail(ErrorCodes.PRODUCT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PRODUCT_NOT_FOUND));
 
         // Get or create BranchInventory
         var branchInventory = await _unitOfWork.BranchInventories.Query()
@@ -355,14 +355,14 @@ public class ProductService : IProductService
 
         if (branchInventory == null)
         {
-            return ApiResponse<StockAdjustResultDto>.Fail("مخزون الفرع غير موجود");
+            return ApiResponse<StockAdjustResultDto>.Fail(ErrorCodes.INVENTORY_NOT_FOUND, ErrorMessages.Get(ErrorCodes.INVENTORY_NOT_FOUND));
         }
 
         var previousBalance = branchInventory.Quantity;
         var newBalance = previousBalance + request.Quantity;
 
         if (newBalance < 0)
-            return ApiResponse<StockAdjustResultDto>.Fail("لا يمكن أن يكون المخزون سالباً");
+            return ApiResponse<StockAdjustResultDto>.Fail(ErrorCodes.INVENTORY_INVALID_QUANTITY, ErrorMessages.Get(ErrorCodes.INVENTORY_INVALID_QUANTITY));
 
         branchInventory.Quantity = newBalance;
         branchInventory.LastUpdatedAt = DateTime.UtcNow;
@@ -389,23 +389,23 @@ public class ProductService : IProductService
         {
             // Validation: Name is required
             if (string.IsNullOrWhiteSpace(request.Name))
-                return ApiResponse<ProductDto>.Fail("اسم المنتج مطلوب");
+                return ApiResponse<ProductDto>.Fail(ErrorCodes.PRODUCT_NAME_REQUIRED, ErrorMessages.Get(ErrorCodes.PRODUCT_NAME_REQUIRED));
 
             if (request.Name.Length > 200)
-                return ApiResponse<ProductDto>.Fail("اسم المنتج يجب ألا يتجاوز 200 حرف");
+                return ApiResponse<ProductDto>.Fail(ErrorCodes.PRODUCT_NAME_TOO_LONG, ErrorMessages.Get(ErrorCodes.PRODUCT_NAME_TOO_LONG));
 
             // Validation: Price must be non-negative
             if (request.Price < 0)
-                return ApiResponse<ProductDto>.Fail("السعر يجب أن يكون أكبر من أو يساوي صفر");
+                return ApiResponse<ProductDto>.Fail(ErrorCodes.PRODUCT_INVALID_PRICE, ErrorMessages.Get(ErrorCodes.PRODUCT_INVALID_PRICE));
 
             // Validation: InitialStock must be non-negative
             if (request.InitialStock < 0)
-                return ApiResponse<ProductDto>.Fail("الكمية الأولية يجب أن تكون أكبر من أو تساوي صفر");
+                return ApiResponse<ProductDto>.Fail(ErrorCodes.INVENTORY_INVALID_QUANTITY, ErrorMessages.Get(ErrorCodes.INVENTORY_INVALID_QUANTITY));
 
             // Validation: Category must exist
             var category = await _unitOfWork.Categories.GetByIdAsync(request.CategoryId);
             if (category == null)
-                return ApiResponse<ProductDto>.Fail("التصنيف غير موجود");
+                return ApiResponse<ProductDto>.Fail(ErrorCodes.CATEGORY_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CATEGORY_NOT_FOUND));
 
             var product = new Product
             {

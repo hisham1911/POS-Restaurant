@@ -184,7 +184,7 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<ExpenseDto>> UpdateAsync(int id, UpdateExpenseRequest request)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
@@ -241,7 +241,7 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<bool>> DeleteAsync(int id)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
@@ -272,7 +272,7 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<ExpenseDto>> ApproveAsync(int id, ApproveExpenseRequest request)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
@@ -324,7 +324,7 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<ExpenseDto>> RejectAsync(int id, RejectExpenseRequest request)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
@@ -374,7 +374,7 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<ExpenseDto>> PayAsync(int id, PayExpenseRequest request)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
             var expense = await _unitOfWork.Expenses.Query()
@@ -450,6 +450,106 @@ public class ExpenseService : IExpenseService
             await _unitOfWork.RollbackTransactionAsync();
             _logger.LogError(ex, "Error paying expense {Id}", id);
             return ApiResponse<ExpenseDto>.Fail(ErrorCodes.INTERNAL_ERROR);
+        }
+    }
+
+    public async Task<ApiResponse<ExpenseDto>> UploadAttachmentAsync(
+        int id,
+        string fileName,
+        string filePath,
+        long fileSize,
+        string fileType)
+    {
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
+        try
+        {
+            var expense = await _unitOfWork.Expenses.Query()
+                .FirstOrDefaultAsync(e => e.Id == id
+                                         && e.TenantId == _currentUserService.TenantId
+                                         && e.BranchId == _currentUserService.BranchId);
+
+            if (expense == null)
+                return ApiResponse<ExpenseDto>.Fail(ErrorCodes.EXPENSE_NOT_FOUND, ErrorMessages.Get(ErrorCodes.EXPENSE_NOT_FOUND));
+
+            if (expense.Status != ExpenseStatus.Draft)
+                return ApiResponse<ExpenseDto>.Fail(ErrorCodes.EXPENSE_NOT_EDITABLE, ErrorMessages.Get(ErrorCodes.EXPENSE_NOT_EDITABLE));
+
+            if (fileSize > 5 * 1024 * 1024)
+                return ApiResponse<ExpenseDto>.Fail(ErrorCodes.EXPENSE_ATTACHMENT_TOO_LARGE, ErrorMessages.Get(ErrorCodes.EXPENSE_ATTACHMENT_TOO_LARGE));
+
+            var allowedTypes = new[] { "image/jpeg", "image/png", "application/pdf" };
+            if (!allowedTypes.Contains(fileType, StringComparer.OrdinalIgnoreCase))
+                return ApiResponse<ExpenseDto>.Fail(ErrorCodes.EXPENSE_ATTACHMENT_INVALID_TYPE, ErrorMessages.Get(ErrorCodes.EXPENSE_ATTACHMENT_INVALID_TYPE));
+
+            var user = await _unitOfWork.Users.Query()
+                .FirstOrDefaultAsync(u => u.Id == _currentUserService.UserId);
+
+            var attachment = new ExpenseAttachment
+            {
+                ExpenseId = expense.Id,
+                FileName = fileName,
+                FilePath = filePath,
+                FileSize = fileSize,
+                FileType = fileType,
+                UploadedByUserId = _currentUserService.UserId,
+                UploadedByUserName = user?.Name ?? _currentUserService.Email ?? "Unknown"
+            };
+
+            await _unitOfWork.ExpenseAttachments.AddAsync(attachment);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+
+            var updatedExpense = await _unitOfWork.Expenses.Query()
+                .Where(e => e.Id == id)
+                .Include(e => e.Category)
+                .Include(e => e.Shift)
+                .Include(e => e.Attachments)
+                .FirstAsync();
+
+            return ApiResponse<ExpenseDto>.Ok(MapToDto(updatedExpense));
+        }
+        catch (Exception ex)
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            _logger.LogError(ex, "Error uploading attachment for expense {Id}", id);
+            return ApiResponse<ExpenseDto>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR));
+        }
+    }
+
+    public async Task<ApiResponse<bool>> DeleteAttachmentAsync(int expenseId, int attachmentId)
+    {
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
+        try
+        {
+            var expense = await _unitOfWork.Expenses.Query()
+                .FirstOrDefaultAsync(e => e.Id == expenseId
+                                         && e.TenantId == _currentUserService.TenantId
+                                         && e.BranchId == _currentUserService.BranchId);
+
+            if (expense == null)
+                return ApiResponse<bool>.Fail(ErrorCodes.EXPENSE_NOT_FOUND, ErrorMessages.Get(ErrorCodes.EXPENSE_NOT_FOUND));
+
+            if (expense.Status != ExpenseStatus.Draft)
+                return ApiResponse<bool>.Fail(ErrorCodes.EXPENSE_NOT_EDITABLE, ErrorMessages.Get(ErrorCodes.EXPENSE_NOT_EDITABLE));
+
+            var attachment = await _unitOfWork.ExpenseAttachments.Query()
+                .FirstOrDefaultAsync(a => a.Id == attachmentId
+                                         && a.ExpenseId == expenseId);
+
+            if (attachment == null)
+                return ApiResponse<bool>.Fail(ErrorCodes.NOT_FOUND, ErrorMessages.Get(ErrorCodes.NOT_FOUND));
+
+            _unitOfWork.ExpenseAttachments.Delete(attachment);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+
+            return ApiResponse<bool>.Ok(true);
+        }
+        catch (Exception ex)
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            _logger.LogError(ex, "Error deleting attachment {AttachmentId} for expense {ExpenseId}", attachmentId, expenseId);
+            return ApiResponse<bool>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR));
         }
     }
 

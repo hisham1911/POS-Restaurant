@@ -22,6 +22,7 @@ public static class ErrorCodes
     public const string BRANCH_NOT_FOUND = "BRANCH_NOT_FOUND";
     public const string BRANCH_INACTIVE = "BRANCH_INACTIVE";
     public const string BRANCH_ACCESS_DENIED = "BRANCH_ACCESS_DENIED";
+    public const string BRANCH_CODE_ALREADY_EXISTS = "BRANCH_CODE_ALREADY_EXISTS";
 
     // User Errors (1300-1399)
     public const string USER_NOT_FOUND = "USER_NOT_FOUND";
@@ -34,6 +35,8 @@ public static class ErrorCodes
     public const string PRODUCT_INACTIVE = "PRODUCT_INACTIVE";
     public const string PRODUCT_OUT_OF_STOCK = "PRODUCT_OUT_OF_STOCK";
     public const string PRODUCT_INVALID_PRICE = "PRODUCT_INVALID_PRICE";
+    public const string PRODUCT_NAME_REQUIRED = "PRODUCT_NAME_REQUIRED";
+    public const string PRODUCT_NAME_TOO_LONG = "PRODUCT_NAME_TOO_LONG";
     public const string PRODUCT_SERVICE_NOT_PURCHASABLE = "PRODUCT_SERVICE_NOT_PURCHASABLE";
     public const string INSUFFICIENT_STOCK = "INSUFFICIENT_STOCK";
 
@@ -179,6 +182,7 @@ public static class ErrorMessages
         { ErrorCodes.BRANCH_NOT_FOUND, "الفرع غير موجود" },
         { ErrorCodes.BRANCH_INACTIVE, "الفرع غير نشط" },
         { ErrorCodes.BRANCH_ACCESS_DENIED, "ليس لديك صلاحية الوصول لهذا الفرع" },
+        { ErrorCodes.BRANCH_CODE_ALREADY_EXISTS, "كود الفرع موجود مسبقاً" },
 
         // User
         { ErrorCodes.USER_NOT_FOUND, "المستخدم غير موجود" },
@@ -191,6 +195,8 @@ public static class ErrorMessages
         { ErrorCodes.PRODUCT_INACTIVE, "المنتج غير نشط" },
         { ErrorCodes.PRODUCT_OUT_OF_STOCK, "المنتج غير متوفر" },
         { ErrorCodes.PRODUCT_INVALID_PRICE, "سعر المنتج غير صحيح" },
+        { ErrorCodes.PRODUCT_NAME_REQUIRED, "اسم المنتج مطلوب" },
+        { ErrorCodes.PRODUCT_NAME_TOO_LONG, "اسم المنتج يجب ألا يتجاوز 200 حرف" },
         { ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE, "لا يمكن إضافة منتجات خدمية في فواتير الشراء" },
         { ErrorCodes.INSUFFICIENT_STOCK, "الكمية المطلوبة غير متوفرة" },
 
@@ -206,7 +212,7 @@ public static class ErrorMessages
         { ErrorCodes.ORDER_EMPTY, "الطلب فارغ" },
         { ErrorCodes.ORDER_ITEM_NOT_FOUND, "عنصر الطلب غير موجود" },
         { ErrorCodes.ORDER_CANNOT_MODIFY, "لا يمكن تعديل الطلب" },
-        { ErrorCodes.ORDER_INVALID_QUANTITY, "الكمية غير صحيحة" },
+        { ErrorCodes.ORDER_INVALID_QUANTITY, "الكمية يجب أن تكون أكبر من صفر" },
 
         // Payment
         { ErrorCodes.PAYMENT_NOT_FOUND, "الدفعة غير موجودة" },

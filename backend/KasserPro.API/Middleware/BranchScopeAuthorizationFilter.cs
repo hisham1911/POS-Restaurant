@@ -1,7 +1,9 @@
 namespace KasserPro.API.Middleware;
 
 using System.Reflection;
+using KasserPro.Application.Common;
 using KasserPro.Application.Common.Interfaces;
+using KasserPro.Application.DTOs.Common;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
@@ -46,7 +48,9 @@ public sealed class BranchScopeAuthorizationFilter : IAsyncActionFilter
         var assignedBranchId = _currentUser.BranchId;
         if (assignedBranchId <= 0)
         {
-            context.Result = new ObjectResult(new { success = false, message = "لا يوجد فرع مرتبط بالمستخدم" })
+            context.Result = new ObjectResult(ApiResponse<object>.Fail(
+                ErrorCodes.BRANCH_ACCESS_DENIED,
+                ErrorMessages.Get(ErrorCodes.BRANCH_ACCESS_DENIED)))
             {
                 StatusCode = StatusCodes.Status403Forbidden
             };
@@ -70,7 +74,9 @@ public sealed class BranchScopeAuthorizationFilter : IAsyncActionFilter
                     assignedBranchId,
                     requestedBranchId);
 
-                context.Result = new ObjectResult(new { success = false, message = "ليس لديك صلاحية الوصول لهذا الفرع" })
+                context.Result = new ObjectResult(ApiResponse<object>.Fail(
+                    ErrorCodes.BRANCH_ACCESS_DENIED,
+                    ErrorMessages.Get(ErrorCodes.BRANCH_ACCESS_DENIED)))
                 {
                     StatusCode = StatusCodes.Status403Forbidden
                 };

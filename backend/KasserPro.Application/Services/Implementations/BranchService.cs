@@ -1,6 +1,7 @@
 namespace KasserPro.Application.Services.Implementations;
 
 using Microsoft.EntityFrameworkCore;
+using KasserPro.Application.Common;
 using KasserPro.Application.Common.Interfaces;
 using KasserPro.Application.DTOs.Branches;
 using KasserPro.Application.DTOs.Common;
@@ -63,7 +64,7 @@ public class BranchService : IBranchService
             .FirstOrDefaultAsync(b => b.Id == id && b.TenantId == tenantId);
 
         if (branch == null)
-            return ApiResponse<BranchDto>.Fail("الفرع غير موجود");
+            return ApiResponse<BranchDto>.Fail(ErrorCodes.BRANCH_NOT_FOUND, ErrorMessages.Get(ErrorCodes.BRANCH_NOT_FOUND));
 
         return ApiResponse<BranchDto>.Ok(new BranchDto
         {
@@ -90,7 +91,7 @@ public class BranchService : IBranchService
             .AnyAsync(b => b.TenantId == tenantId && b.Code == dto.Code);
 
         if (exists)
-            return ApiResponse<BranchDto>.Fail("كود الفرع موجود مسبقاً");
+            return ApiResponse<BranchDto>.Fail(ErrorCodes.BRANCH_CODE_ALREADY_EXISTS, ErrorMessages.Get(ErrorCodes.BRANCH_CODE_ALREADY_EXISTS));
 
         var branch = new Branch
         {
@@ -128,14 +129,14 @@ public class BranchService : IBranchService
             .FirstOrDefaultAsync(b => b.Id == id && b.TenantId == tenantId);
 
         if (branch == null)
-            return ApiResponse<BranchDto>.Fail("الفرع غير موجود");
+            return ApiResponse<BranchDto>.Fail(ErrorCodes.BRANCH_NOT_FOUND, ErrorMessages.Get(ErrorCodes.BRANCH_NOT_FOUND));
 
         // Check if code already exists for another branch
         var codeExists = await _unitOfWork.Branches.Query()
             .AnyAsync(b => b.TenantId == tenantId && b.Code == dto.Code && b.Id != id);
 
         if (codeExists)
-            return ApiResponse<BranchDto>.Fail("كود الفرع موجود مسبقاً");
+            return ApiResponse<BranchDto>.Fail(ErrorCodes.BRANCH_CODE_ALREADY_EXISTS, ErrorMessages.Get(ErrorCodes.BRANCH_CODE_ALREADY_EXISTS));
 
         branch.Name = dto.Name;
         branch.Code = dto.Code;
@@ -169,7 +170,7 @@ public class BranchService : IBranchService
             .FirstOrDefaultAsync(b => b.Id == id && b.TenantId == tenantId);
 
         if (branch == null)
-            return ApiResponse<bool>.Fail("الفرع غير موجود");
+            return ApiResponse<bool>.Fail(ErrorCodes.BRANCH_NOT_FOUND, ErrorMessages.Get(ErrorCodes.BRANCH_NOT_FOUND));
 
         branch.IsDeleted = true;
         _unitOfWork.Branches.Update(branch);

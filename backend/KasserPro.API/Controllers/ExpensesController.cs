@@ -1,6 +1,8 @@
 using KasserPro.Application.DTOs.Expenses;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Enums;
+using KasserPro.Application.Common;
+using KasserPro.Application.DTOs.Common;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using KasserPro.API.Middleware;
@@ -17,13 +19,16 @@ public class ExpensesController : ControllerBase
 {
     private readonly IExpenseService _expenseService;
     private readonly ILogger<ExpensesController> _logger;
+    private readonly IWebHostEnvironment _env;
 
     public ExpensesController(
         IExpenseService expenseService,
-        ILogger<ExpensesController> logger)
+        ILogger<ExpensesController> logger,
+        IWebHostEnvironment env)
     {
         _expenseService = expenseService;
         _logger = logger;
+        _env = env;
     }
 
     /// <summary>
@@ -151,6 +156,83 @@ public class ExpensesController : ControllerBase
         if (!result.Success)
             return BadRequest(result);
         
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Upload an attachment for an expense (Draft only)
+    /// </summary>
+    [HttpPost("{id}/attachments")]
+    [HasPermission(Permission.ExpensesCreate)]
+    public async Task<IActionResult> UploadAttachment(int id, IFormFile file)
+    {
+        if (file == null || file.Length <= 0)
+        {
+            return BadRequest(ApiResponse<object>.Fail(
+                ErrorCodes.VALIDATION_ERROR,
+                ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR)));
+        }
+
+        var allowedTypes = new[] { "image/jpeg", "image/png", "application/pdf" };
+        if (!allowedTypes.Contains(file.ContentType, StringComparer.OrdinalIgnoreCase))
+        {
+            return BadRequest(ApiResponse<object>.Fail(
+                ErrorCodes.EXPENSE_ATTACHMENT_INVALID_TYPE,
+                ErrorMessages.Get(ErrorCodes.EXPENSE_ATTACHMENT_INVALID_TYPE)));
+        }
+
+        if (file.Length > 5 * 1024 * 1024)
+        {
+            return BadRequest(ApiResponse<object>.Fail(
+                ErrorCodes.EXPENSE_ATTACHMENT_TOO_LARGE,
+                ErrorMessages.Get(ErrorCodes.EXPENSE_ATTACHMENT_TOO_LARGE)));
+        }
+
+        var uploadsDir = Path.Combine(_env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot"), "uploads", "expenses");
+        Directory.CreateDirectory(uploadsDir);
+
+        var extension = Path.GetExtension(file.FileName);
+        var storedName = $"expense_{id}_{Guid.NewGuid():N}{extension}";
+        var absolutePath = Path.Combine(uploadsDir, storedName);
+        var relativePath = $"/uploads/expenses/{storedName}";
+
+        await using (var stream = new FileStream(absolutePath, FileMode.Create))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        var result = await _expenseService.UploadAttachmentAsync(
+            id,
+            file.FileName,
+            relativePath,
+            file.Length,
+            file.ContentType);
+
+        if (!result.Success)
+        {
+            if (System.IO.File.Exists(absolutePath))
+            {
+                System.IO.File.Delete(absolutePath);
+            }
+
+            return BadRequest(result);
+        }
+
+        return Ok(result);
+    }
+
+    /// <summary>
+    /// Delete an attachment from an expense (Draft only)
+    /// </summary>
+    [HttpDelete("{expenseId}/attachments/{attachmentId}")]
+    [HasPermission(Permission.ExpensesManage)]
+    public async Task<IActionResult> DeleteAttachment(int expenseId, int attachmentId)
+    {
+        var result = await _expenseService.DeleteAttachmentAsync(expenseId, attachmentId);
+
+        if (!result.Success)
+            return BadRequest(result);
+
         return Ok(result);
     }
 }

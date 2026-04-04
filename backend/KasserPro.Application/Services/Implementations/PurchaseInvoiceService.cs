@@ -495,7 +495,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
 
                 if (product != null)
                 {
-                    // Update BranchInventory (not Product.StockQuantity)
+                    // Update branch-level inventory
                     var branchInventory = await _unitOfWork.BranchInventories.Query()
                         .FirstOrDefaultAsync(bi => bi.ProductId == product.Id 
                                                 && bi.BranchId == invoice.BranchId 

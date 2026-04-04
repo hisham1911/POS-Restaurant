@@ -6,7 +6,6 @@ using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Entities;
 using KasserPro.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Storage;
 using Microsoft.Extensions.Logging;
 
 namespace KasserPro.Application.Services.Implementations;
@@ -209,7 +208,7 @@ public class CashRegisterService : ICashRegisterService
 
     public async Task<ApiResponse<bool>> ReconcileAsync(int shiftId, ReconcileCashRegisterRequest request)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
             var shift = await _unitOfWork.Shifts.Query()
@@ -286,7 +285,7 @@ public class CashRegisterService : ICashRegisterService
 
     public async Task<ApiResponse<bool>> TransferCashAsync(TransferCashRequest request)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
             // Validate branches
@@ -440,12 +439,9 @@ public class CashRegisterService : ICashRegisterService
         // piggyback on it. If not, create our own to ensure read+write atomicity.
         var hasExistingTransaction = _unitOfWork.HasActiveTransaction;
         var ownsTransaction = !hasExistingTransaction;
-        IDbContextTransaction? transaction = null;
-
-        if (ownsTransaction)
-        {
-            transaction = await _unitOfWork.BeginTransactionAsync();
-        }
+        await using var transaction = ownsTransaction
+            ? await _unitOfWork.BeginTransactionAsync()
+            : null;
 
         try
         {

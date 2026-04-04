@@ -301,7 +301,7 @@ public class CustomerService : ICustomerService
 
         var tenantId = _currentUser.TenantId;
 
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
             var customer = await _unitOfWork.Customers.Query()
@@ -348,7 +348,7 @@ public class CustomerService : ICustomerService
                                    && !s.IsClosed);
 
         // BEGIN TRANSACTION - SQLite will acquire EXCLUSIVE lock on first write
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
 
         try
         {

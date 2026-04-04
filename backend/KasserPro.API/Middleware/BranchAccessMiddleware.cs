@@ -3,7 +3,9 @@ namespace KasserPro.API.Middleware;
 using KasserPro.Application.Common.Interfaces;
 using KasserPro.Application.Common;
 using KasserPro.Application.DTOs.Common;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using System.Text.Json;
 
 /// <summary>
@@ -46,7 +48,7 @@ public class BranchAccessMiddleware
             context.Response.ContentType = "application/json";
 
             var badRequestResponse = ApiResponse<object>.Fail("INVALID_BRANCH_HEADER", "قيمة X-Branch-Id غير صحيحة");
-            await context.Response.WriteAsync(JsonSerializer.Serialize(badRequestResponse));
+            await context.Response.WriteAsync(JsonSerializer.Serialize(badRequestResponse, GetJsonSerializerOptions(context)));
             return;
         }
 
@@ -57,7 +59,7 @@ public class BranchAccessMiddleware
             context.Response.ContentType = "application/json";
 
             var unauthorizedResponse = ApiResponse<object>.Fail("UNAUTHORIZED", "بيانات المستخدم غير صالحة");
-            await context.Response.WriteAsync(JsonSerializer.Serialize(unauthorizedResponse));
+            await context.Response.WriteAsync(JsonSerializer.Serialize(unauthorizedResponse, GetJsonSerializerOptions(context)));
             return;
         }
 
@@ -68,7 +70,7 @@ public class BranchAccessMiddleware
             context.Response.ContentType = "application/json";
 
             var userNotFoundResponse = ApiResponse<object>.Fail("UNAUTHORIZED", "المستخدم غير موجود أو غير مفعل");
-            await context.Response.WriteAsync(JsonSerializer.Serialize(userNotFoundResponse));
+            await context.Response.WriteAsync(JsonSerializer.Serialize(userNotFoundResponse, GetJsonSerializerOptions(context)));
             return;
         }
 
@@ -79,7 +81,7 @@ public class BranchAccessMiddleware
             context.Response.ContentType = "application/json";
 
             var invalidTenantContext = ApiResponse<object>.Fail(ErrorCodes.UNAUTHORIZED, ErrorMessages.Get(ErrorCodes.UNAUTHORIZED));
-            await context.Response.WriteAsync(JsonSerializer.Serialize(invalidTenantContext));
+            await context.Response.WriteAsync(JsonSerializer.Serialize(invalidTenantContext, GetJsonSerializerOptions(context)));
             return;
         }
 
@@ -102,10 +104,15 @@ public class BranchAccessMiddleware
             var response = ApiResponse<object>.Fail(
                 ErrorCodes.BRANCH_ACCESS_DENIED,
                 ErrorMessages.Get(ErrorCodes.BRANCH_ACCESS_DENIED));
-            await context.Response.WriteAsync(JsonSerializer.Serialize(response));
+            await context.Response.WriteAsync(JsonSerializer.Serialize(response, GetJsonSerializerOptions(context)));
             return;
         }
 
         await _next(context);
+    }
+
+    private static JsonSerializerOptions GetJsonSerializerOptions(HttpContext context)
+    {
+        return context.RequestServices.GetRequiredService<IOptions<JsonOptions>>().Value.JsonSerializerOptions;
     }
 }

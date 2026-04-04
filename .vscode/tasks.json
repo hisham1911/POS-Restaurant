@@ -502,6 +502,26 @@
 			"command": "Start-Sleep 120; Write-Host 'PROC'; Get-Process -Name dotnet,ISCC -ErrorAction SilentlyContinue | Select-Object Name,Id,CPU | Format-Table -AutoSize; Write-Host 'FILES'; Get-ChildItem 'F:\\POS\\Deployment\\Installers\\KasserPro-Setup*.exe' -ErrorAction SilentlyContinue | Sort-Object Name | ForEach-Object { Write-Host ('{0} - {1:N1} MB - {2:yyyy-MM-dd HH:mm:ss}' -f $_.Name, ($_.Length/1MB), $_.LastWriteTime) }; Write-Host 'LOGEND'; Get-Content 'F:\\POS\\build-log.txt' -Tail 30",
 			"isBackground": false,
 			"group": "build"
+		},
+		{
+			"label": "targeted-dotnet-test",
+			"type": "shell",
+			"command": "dotnet",
+			"args": [
+				"test",
+				"backend/KasserPro.Tests/",
+				"--logger",
+				"console;verbosity=minimal"
+			],
+			"isBackground": false,
+			"group": "build"
+		},
+		{
+			"label": "targeted-dotnet-test-rerun",
+			"type": "shell",
+			"command": "dotnet test backend/KasserPro.Tests/",
+			"isBackground": false,
+			"group": "build"
 		}
 	]
 }

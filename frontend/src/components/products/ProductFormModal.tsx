@@ -177,11 +177,10 @@ export const ProductFormModal = ({
       size="xl"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
-                  value={numberToDisplay(formData.branchQuantity)}
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-gray-700 border-b pb-2">
             المعلومات الأساسية
-                      branchQuantity: displayToNumber(e.target.value),
+          </h3>
 
           <div className="grid grid-cols-2 gap-4">
             <Input

@@ -28,7 +28,7 @@ public class CategoryService : ICategoryService
         // Apply search filter
         if (!string.IsNullOrWhiteSpace(search))
         {
-            query = query.Where(c => c.Name.Contains(search) || 
+            query = query.Where(c => c.Name.Contains(search) ||
                                     (c.NameEn != null && c.NameEn.Contains(search)));
         }
 

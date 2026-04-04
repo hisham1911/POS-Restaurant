@@ -26,7 +26,7 @@ public class BranchService : IBranchService
 
         // Get user to check their assigned branch
         var user = await _unitOfWork.Users.GetByIdAsync(userId);
-        
+
         var query = _unitOfWork.Branches.Query()
             .Where(b => b.TenantId == tenantId);
 
@@ -85,7 +85,7 @@ public class BranchService : IBranchService
     public async Task<ApiResponse<BranchDto>> CreateAsync(CreateBranchDto dto)
     {
         var tenantId = _currentUser.TenantId;
-        
+
         // Check if code already exists
         var exists = await _unitOfWork.Branches.Query()
             .AnyAsync(b => b.TenantId == tenantId && b.Code == dto.Code);

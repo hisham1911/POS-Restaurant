@@ -45,7 +45,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             query = query.Where(pi => pi.InvoiceDate <= toDate.Value);
 
         var totalCount = await query.CountAsync();
-        
+
         var invoices = await query
             .OrderByDescending(pi => pi.CreatedAt)
             .Skip((pageNumber - 1) * pageSize)
@@ -382,12 +382,12 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             {
                 // Update BranchInventory (the authoritative stock location)
                 var branchInventory = await _unitOfWork.BranchInventories.Query()
-                    .FirstOrDefaultAsync(bi => bi.ProductId == product.Id 
-                                            && bi.BranchId == invoice.BranchId 
+                    .FirstOrDefaultAsync(bi => bi.ProductId == product.Id
+                                            && bi.BranchId == invoice.BranchId
                                             && bi.TenantId == tenantId);
 
                 int balanceBefore;
-                
+
                 if (branchInventory == null)
                 {
                     // Create BranchInventory if it doesn't exist
@@ -433,7 +433,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                 product.LastPurchasePrice = item.PurchasePrice;
                 product.LastPurchaseDate = DateTime.UtcNow;
                 product.LastStockUpdate = DateTime.UtcNow;
-                
+
                 // Update average cost using weighted average
                 var oldStock = balanceBefore;
                 var oldAvgCost = product.AverageCost ?? product.Cost ?? 0m;
@@ -444,7 +444,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                     var totalNewValue = item.Quantity * item.PurchasePrice;
                     product.AverageCost = (totalOldValue + totalNewValue) / newStock;
                 }
-                
+
                 product.UpdatedAt = DateTime.UtcNow;
                 _unitOfWork.Products.Update(product);
             }
@@ -497,8 +497,8 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                 {
                     // Update branch-level inventory
                     var branchInventory = await _unitOfWork.BranchInventories.Query()
-                        .FirstOrDefaultAsync(bi => bi.ProductId == product.Id 
-                                                && bi.BranchId == invoice.BranchId 
+                        .FirstOrDefaultAsync(bi => bi.ProductId == product.Id
+                                                && bi.BranchId == invoice.BranchId
                                                 && bi.TenantId == tenantId);
 
                     if (branchInventory != null)

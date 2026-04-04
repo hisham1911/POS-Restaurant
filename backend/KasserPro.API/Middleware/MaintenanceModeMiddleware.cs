@@ -16,7 +16,7 @@ public class MaintenanceModeMiddleware
     private readonly string _lockFilePath;
 
     public MaintenanceModeMiddleware(
-        RequestDelegate next, 
+        RequestDelegate next,
         ILogger<MaintenanceModeMiddleware> logger,
         IWebHostEnvironment env)
     {
@@ -42,14 +42,14 @@ public class MaintenanceModeMiddleware
 
             context.Response.StatusCode = 503;
             context.Response.ContentType = "application/json";
-            
+
             var response = new
             {
                 success = false,
                 message = "النظام قيد الصيانة. يرجى المحاولة لاحقاً",
                 retryAfter = 60
             };
-            
+
             await context.Response.WriteAsync(JsonSerializer.Serialize(response, GetJsonSerializerOptions(context)));
             return;
         }

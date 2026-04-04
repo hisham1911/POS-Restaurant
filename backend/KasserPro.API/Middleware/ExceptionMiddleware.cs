@@ -66,7 +66,7 @@ public class ExceptionMiddleware
 
         context.Response.StatusCode = statusCode;
         context.Response.ContentType = "application/json";
-        
+
         var response = new
         {
             success = false,
@@ -74,7 +74,7 @@ public class ExceptionMiddleware
             message,
             correlationId
         };
-        
+
         await context.Response.WriteAsync(JsonSerializer.Serialize(response, GetJsonSerializerOptions(context)));
     }
 
@@ -91,7 +91,7 @@ public class ExceptionMiddleware
 
         context.Response.StatusCode = 507;
         context.Response.ContentType = "application/json";
-        
+
         var response = new
         {
             success = false,
@@ -99,7 +99,7 @@ public class ExceptionMiddleware
             message = "مشكلة في القرص. تحقق من المساحة المتوفرة",
             correlationId
         };
-        
+
         await context.Response.WriteAsync(JsonSerializer.Serialize(response, GetJsonSerializerOptions(context)));
     }
 
@@ -116,7 +116,7 @@ public class ExceptionMiddleware
 
         context.Response.StatusCode = 409;
         context.Response.ContentType = "application/json";
-        
+
         var response = new
         {
             success = false,
@@ -124,14 +124,14 @@ public class ExceptionMiddleware
             message = "تم تعديل البيانات من قبل مستخدم آخر. يرجى المحاولة مرة أخرى",
             correlationId
         };
-        
+
         await context.Response.WriteAsync(JsonSerializer.Serialize(response, GetJsonSerializerOptions(context)));
     }
 
     private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
     {
         var correlationId = context.Items["CorrelationId"]?.ToString() ?? Guid.NewGuid().ToString();
-        
+
         context.Response.ContentType = "application/json";
 
         var (statusCode, message) = exception switch
@@ -142,14 +142,14 @@ public class ExceptionMiddleware
         };
 
         context.Response.StatusCode = statusCode;
-        
+
         var response = new
         {
             success = false,
             message,
             correlationId
         };
-        
+
         await context.Response.WriteAsync(JsonSerializer.Serialize(response, GetJsonSerializerOptions(context)));
     }
 

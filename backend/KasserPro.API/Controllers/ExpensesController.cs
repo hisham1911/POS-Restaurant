@@ -47,10 +47,10 @@ public class ExpensesController : ControllerBase
     {
         var result = await _expenseService.GetAllAsync(
             categoryId, status, fromDate, toDate, shiftId, pageNumber, pageSize);
-        
+
         if (!result.Success)
             return BadRequest(result);
-        
+
         return Ok(result);
     }
 
@@ -62,10 +62,10 @@ public class ExpensesController : ControllerBase
     public async Task<IActionResult> GetById(int id)
     {
         var result = await _expenseService.GetByIdAsync(id);
-        
+
         if (!result.Success)
             return NotFound(result);
-        
+
         return Ok(result);
     }
 
@@ -77,10 +77,10 @@ public class ExpensesController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateExpenseRequest request)
     {
         var result = await _expenseService.CreateAsync(request);
-        
+
         if (!result.Success)
             return BadRequest(result);
-        
+
         return CreatedAtAction(nameof(GetById), new { id = result.Data!.Id }, result);
     }
 
@@ -92,10 +92,10 @@ public class ExpensesController : ControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] UpdateExpenseRequest request)
     {
         var result = await _expenseService.UpdateAsync(id, request);
-        
+
         if (!result.Success)
             return BadRequest(result);
-        
+
         return Ok(result);
     }
 
@@ -107,10 +107,10 @@ public class ExpensesController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var result = await _expenseService.DeleteAsync(id);
-        
+
         if (!result.Success)
             return BadRequest(result);
-        
+
         return Ok(result);
     }
 
@@ -122,10 +122,10 @@ public class ExpensesController : ControllerBase
     public async Task<IActionResult> Approve(int id, [FromBody] ApproveExpenseRequest request)
     {
         var result = await _expenseService.ApproveAsync(id, request);
-        
+
         if (!result.Success)
             return BadRequest(result);
-        
+
         return Ok(result);
     }
 
@@ -137,10 +137,10 @@ public class ExpensesController : ControllerBase
     public async Task<IActionResult> Reject(int id, [FromBody] RejectExpenseRequest request)
     {
         var result = await _expenseService.RejectAsync(id, request);
-        
+
         if (!result.Success)
             return BadRequest(result);
-        
+
         return Ok(result);
     }
 
@@ -152,10 +152,10 @@ public class ExpensesController : ControllerBase
     public async Task<IActionResult> Pay(int id, [FromBody] PayExpenseRequest request)
     {
         var result = await _expenseService.PayAsync(id, request);
-        
+
         if (!result.Success)
             return BadRequest(result);
-        
+
         return Ok(result);
     }
 

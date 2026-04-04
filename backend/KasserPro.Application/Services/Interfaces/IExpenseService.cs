@@ -20,37 +20,37 @@ public interface IExpenseService
         int? shiftId = null,
         int pageNumber = 1,
         int pageSize = 20);
-    
+
     /// <summary>
     /// Get expense by ID
     /// </summary>
     Task<ApiResponse<ExpenseDto>> GetByIdAsync(int id);
-    
+
     /// <summary>
     /// Create a new expense (Draft status)
     /// </summary>
     Task<ApiResponse<ExpenseDto>> CreateAsync(CreateExpenseRequest request);
-    
+
     /// <summary>
     /// Update an expense (Draft only)
     /// </summary>
     Task<ApiResponse<ExpenseDto>> UpdateAsync(int id, UpdateExpenseRequest request);
-    
+
     /// <summary>
     /// Delete an expense (Draft only)
     /// </summary>
     Task<ApiResponse<bool>> DeleteAsync(int id);
-    
+
     /// <summary>
     /// Approve an expense (Admin only, Draft → Approved)
     /// </summary>
     Task<ApiResponse<ExpenseDto>> ApproveAsync(int id, ApproveExpenseRequest request);
-    
+
     /// <summary>
     /// Reject an expense (Admin only, Draft → Rejected)
     /// </summary>
     Task<ApiResponse<ExpenseDto>> RejectAsync(int id, RejectExpenseRequest request);
-    
+
     /// <summary>
     /// Pay an expense (Admin only, Approved → Paid)
     /// Updates cash register if payment method is Cash

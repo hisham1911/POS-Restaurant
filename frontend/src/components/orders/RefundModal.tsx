@@ -61,17 +61,21 @@ export const RefundModal = ({
   );
 
   const [refundOrder, { isLoading }] = useRefundOrderMutation();
+  const remainingRefundableAmount = Math.max(
+    0,
+    order.total - (order.refundAmount || 0),
+  );
 
   // Calculate total refund amount
   const totalRefundAmount = useMemo(() => {
     if (refundType === "full") {
-      return order.total;
+      return remainingRefundableAmount;
     }
     return refundItems.reduce(
       (sum, item) => sum + item.refundQuantity * item.unitPrice,
       0,
     );
-  }, [refundType, refundItems, order.total]);
+  }, [refundType, refundItems, remainingRefundableAmount]);
 
   // Check if any items selected for partial refund
   const hasSelectedItems = refundItems.some((item) => item.refundQuantity > 0);

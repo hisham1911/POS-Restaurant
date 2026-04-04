@@ -97,7 +97,21 @@ public class CashRegisterService : ICashRegisterService
                 query = query.Where(t => t.TransactionDate >= fromDate.Value);
 
             if (toDate.HasValue)
-                query = query.Where(t => t.TransactionDate <= toDate.Value);
+            {
+                var toDateValue = toDate.Value;
+
+                // Date-only filters from the UI arrive at 00:00:00.
+                // Treat them as inclusive end-of-day for better UX.
+                if (toDateValue.TimeOfDay == TimeSpan.Zero)
+                {
+                    var exclusiveUpperBound = toDateValue.Date.AddDays(1);
+                    query = query.Where(t => t.TransactionDate < exclusiveUpperBound);
+                }
+                else
+                {
+                    query = query.Where(t => t.TransactionDate <= toDateValue);
+                }
+            }
 
             if (shiftId.HasValue)
                 query = query.Where(t => t.ShiftId == shiftId.Value);
@@ -148,7 +162,9 @@ public class CashRegisterService : ICashRegisterService
 
                 if (tenant != null && !tenant.AllowNegativeStock && currentBalance < request.Amount)
                 {
-                    return ApiResponse<CashRegisterTransactionDto>.Fail(ErrorCodes.CASH_REGISTER_INSUFFICIENT_BALANCE);
+                    return ApiResponse<CashRegisterTransactionDto>.Fail(
+                        ErrorCodes.CASH_REGISTER_INSUFFICIENT_BALANCE,
+                        ErrorMessages.Get(ErrorCodes.CASH_REGISTER_INSUFFICIENT_BALANCE));
                 }
             }
 
@@ -304,7 +320,9 @@ public class CashRegisterService : ICashRegisterService
             // Check source balance
             var sourceBalance = await GetCurrentBalanceForBranchAsync(request.SourceBranchId);
             if (sourceBalance < request.Amount)
-                return ApiResponse<bool>.Fail(ErrorCodes.CASH_REGISTER_INSUFFICIENT_BALANCE);
+                return ApiResponse<bool>.Fail(
+                    ErrorCodes.CASH_REGISTER_INSUFFICIENT_BALANCE,
+                    ErrorMessages.Get(ErrorCodes.CASH_REGISTER_INSUFFICIENT_BALANCE));
 
             // Get user name
             var user = await _unitOfWork.Users.Query()

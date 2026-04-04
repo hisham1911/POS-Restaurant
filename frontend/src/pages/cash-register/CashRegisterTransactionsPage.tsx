@@ -315,7 +315,9 @@ export function CashRegisterTransactionsPage() {
                           {transaction.balanceAfter.toFixed(2)} جنيه
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {transaction.createdByUserName}
+                          {transaction.userName ||
+                            transaction.createdByUserName ||
+                            "غير معروف"}
                         </td>
                       </tr>
                     );

@@ -420,7 +420,9 @@ public class ExpenseService : IExpenseService
                 if (cashBalanceResponse.Data!.CurrentBalance < expense.Amount)
                 {
                     await _unitOfWork.RollbackTransactionAsync();
-                    return ApiResponse<ExpenseDto>.Fail(ErrorCodes.CASH_REGISTER_INSUFFICIENT_BALANCE);
+                    return ApiResponse<ExpenseDto>.Fail(
+                        ErrorCodes.CASH_REGISTER_INSUFFICIENT_BALANCE,
+                        ErrorMessages.Get(ErrorCodes.CASH_REGISTER_INSUFFICIENT_BALANCE));
                 }
 
                 await _cashRegisterService.RecordTransactionAsync(

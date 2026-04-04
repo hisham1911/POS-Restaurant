@@ -69,10 +69,10 @@ export function QuickAddProductModal({
       const createdProduct = extractApiData(
         response,
         "PRODUCT_CREATE_EMPTY_RESPONSE",
-        "Unable to create product",
+        "تعذر إنشاء المنتج",
       );
 
-      toast.success("Product created successfully");
+      toast.success("تم إنشاء المنتج بنجاح");
       onProductCreated(createdProduct.id);
       handleClose();
     } catch (error) {
@@ -123,7 +123,7 @@ export function QuickAddProductModal({
               value={sku}
               onChange={(e) => setSku(e.target.value)}
               className="w-full px-3 py-2 border rounded-lg"
-              placeholder="ELEC001"
+              placeholder="مثال: ELEC001"
             />
           </div>
 

@@ -36,10 +36,16 @@ export function CashRegisterDashboard() {
     data: balanceResponse,
     isLoading: isLoadingBalance,
     refetch: refetchBalance,
+    isFetching: isFetchingBalance,
   } = useGetCurrentBalanceQuery(currentBranch?.id, {
     skip: !currentBranch?.id,
   });
-  const { data: transactionsResponse, isLoading: isLoadingTransactions } =
+  const {
+    data: transactionsResponse,
+    isLoading: isLoadingTransactions,
+    refetch: refetchTransactions,
+    isFetching: isFetchingTransactions,
+  } =
     useGetTransactionsQuery(
       {
         branchId: currentBranch?.id,
@@ -61,6 +67,13 @@ export function CashRegisterDashboard() {
     .map((t) => t.balanceAfter - t.balanceBefore)
     .filter((delta) => delta < 0)
     .reduce((sum, delta) => sum + Math.abs(delta), 0);
+
+  const isRefreshing = isFetchingBalance || isFetchingTransactions;
+
+  const handleRefresh = () => {
+    void refetchBalance();
+    void refetchTransactions();
+  };
 
   const handleDeposit = async () => {
     const amount = parseFloat(depositAmount);
@@ -187,8 +200,12 @@ export function CashRegisterDashboard() {
               <ArrowDownCircle className="w-4 h-4" />
               سحب
             </Button>
-            <Button variant="outline" onClick={() => refetchBalance()}>
-              <RefreshCw className="w-4 h-4" />
+            <Button
+              variant="outline"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
               تحديث
             </Button>
           </div>

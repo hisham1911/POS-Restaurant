@@ -131,7 +131,7 @@ export default function SupplierFormModal({
             name="nameEn"
             value={formData.nameEn}
             onChange={handleChange}
-            placeholder="Supplier Name in English"
+            placeholder="اسم المورد بالإنجليزية"
           />
         </div>
 
@@ -159,7 +159,7 @@ export default function SupplierFormModal({
             name="email"
             value={formData.email}
             onChange={handleChange}
-            placeholder="supplier@example.com"
+            placeholder="مثال: supplier@example.com"
           />
         </div>
 

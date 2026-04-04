@@ -6,6 +6,7 @@ import {
 } from "@reduxjs/toolkit/query/react";
 import type { RootState } from "../store";
 import { toast } from "sonner";
+import { ERROR_MESSAGES } from "../utils/constants";
 
 // Dynamic API URL: In production, use the same origin so network devices work correctly
 // In development (Vite dev server), use relative URL and let Vite proxy handle it
@@ -15,7 +16,7 @@ const getApiUrl = (): string => {
   if (import.meta.env.DEV) {
     return "/api";
   }
-  
+
   // In production, use the current page's origin
   // This ensures network clients connect to the actual server, not localhost
   return `${window.location.origin}/api`;
@@ -29,6 +30,25 @@ interface ApiErrorResponse {
   message?: string;
   errorCode?: string;
 }
+
+const getLocalizedErrorMessage = (
+  errorData: ApiErrorResponse | undefined,
+  fallbackMessage = "حدث خطأ في الطلب",
+): string => {
+  if (!errorData) {
+    return fallbackMessage;
+  }
+
+  if (errorData.errorCode && ERROR_MESSAGES[errorData.errorCode]) {
+    return ERROR_MESSAGES[errorData.errorCode];
+  }
+
+  if (errorData.message) {
+    return ERROR_MESSAGES[errorData.message] ?? errorData.message;
+  }
+
+  return fallbackMessage;
+};
 
 // Base query with auth header and branch header
 const baseQuery = fetchBaseQuery({
@@ -76,11 +96,15 @@ const baseQueryWithReauth = retry(
           toast.error(
             "حدث خطأ في الخادم. لا تكرر العملية — تحقق من البيانات أولاً.",
           );
-        } else if (error.status === 400 || error.status === 403 || error.status === 409) {
+        } else if (
+          error.status === 400 ||
+          error.status === 403 ||
+          error.status === 409
+        ) {
           // Handle 400/403/409 errors for mutations
           const errorData = error.data as ApiErrorResponse | undefined;
-          const message = errorData?.message || "حدث خطأ في الطلب";
-          
+          const message = getLocalizedErrorMessage(errorData);
+
           if (errorData?.errorCode === "NO_OPEN_SHIFT") {
             toast.error("يجب فتح وردية قبل إنشاء طلب");
           } else if (errorData?.errorCode === "SHIFT_CONCURRENCY_CONFLICT") {
@@ -91,7 +115,9 @@ const baseQueryWithReauth = retry(
           } else if (errorData?.errorCode === "INSUFFICIENT_STOCK") {
             toast.error(message, { duration: 5000 });
             api.dispatch({ type: "api/invalidateTags", payload: ["Products"] });
-          } else if (errorData?.errorCode === "CUSTOMER_CREDIT_LIMIT_EXCEEDED") {
+          } else if (
+            errorData?.errorCode === "CUSTOMER_CREDIT_LIMIT_EXCEEDED"
+          ) {
             toast.error(message, { duration: 6000 });
           } else if (errorData?.errorCode === "CUSTOMER_NOT_ACTIVE") {
             toast.error(message);
@@ -100,8 +126,13 @@ const baseQueryWithReauth = retry(
           } else if (errorData?.errorCode === "PAYMENT_EXCEEDS_DUE") {
             toast.error(message);
           } else if (error.status === 409) {
-            toast.error(message || "تم تعديل البيانات من مستخدم آخر - يرجى تحديث الصفحة");
-            api.dispatch({ type: "api/invalidateTags", payload: ["Orders", "Customers", "Shifts"] });
+            toast.error(
+              message || "تم تعديل البيانات من مستخدم آخر - يرجى تحديث الصفحة",
+            );
+            api.dispatch({
+              type: "api/invalidateTags",
+              payload: ["Orders", "Customers", "Shifts"],
+            });
           } else {
             toast.error(message);
           }
@@ -149,7 +180,7 @@ const baseQueryWithReauth = retry(
         error.status === 409
       ) {
         const errorData = error.data as ApiErrorResponse | undefined;
-        const message = errorData?.message || "حدث خطأ في الطلب";
+        const message = getLocalizedErrorMessage(errorData);
 
         // Handle specific error codes
         if (errorData?.errorCode === "NO_OPEN_SHIFT") {
@@ -173,9 +204,14 @@ const baseQueryWithReauth = retry(
           toast.error(message);
         } else if (error.status === 409) {
           // Concurrency conflict - show message and invalidate cache
-          toast.error(message || "تم تعديل البيانات من مستخدم آخر - يرجى تحديث الصفحة");
+          toast.error(
+            message || "تم تعديل البيانات من مستخدم آخر - يرجى تحديث الصفحة",
+          );
           // Invalidate all caches to force refetch
-          api.dispatch({ type: "api/invalidateTags", payload: ["Orders", "Customers", "Shifts"] });
+          api.dispatch({
+            type: "api/invalidateTags",
+            payload: ["Orders", "Customers", "Shifts"],
+          });
         } else {
           toast.error(message);
         }

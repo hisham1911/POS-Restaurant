@@ -14,6 +14,21 @@ import { Card } from "@/components/common/Card";
 import { formatCurrency, formatDateOnly } from "@/utils/formatters";
 import { useGetExpensesReportQuery } from "@/api/financialReportsApi";
 
+const getPaymentMethodLabel = (method?: string) => {
+  switch (method) {
+    case "Cash":
+      return "نقدي";
+    case "Card":
+      return "بطاقة";
+    case "BankTransfer":
+      return "تحويل بنكي";
+    case "Fawry":
+      return "فوري";
+    default:
+      return method || "-";
+  }
+};
+
 export const ExpensesReportPage = () => {
   const [fromDate, setFromDate] = useState(
     new Date(new Date().setDate(1)).toISOString().split("T")[0],
@@ -256,7 +271,7 @@ export const ExpensesReportPage = () => {
                       {expense.recipientName || "-"}
                     </td>
                     <td className="px-4 py-3 text-sm text-gray-600">
-                      {expense.paymentMethod}
+                      {getPaymentMethodLabel(expense.paymentMethod)}
                     </td>
                     <td className="px-4 py-3 font-semibold text-red-600">
                       {formatCurrency(expense.amount)}

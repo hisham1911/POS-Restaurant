@@ -728,15 +728,28 @@ public class OrderService : IOrderService
             var originalOrder = await _unitOfWork.Orders.Query()
                 .Include(o => o.Items)
                 .Include(o => o.Payments)
-                .FirstOrDefaultAsync(o => o.Id == orderId && o.TenantId == _currentUser.TenantId);
+                .FirstOrDefaultAsync(o => o.Id == orderId
+                    && o.TenantId == _currentUser.TenantId
+                    && o.BranchId == _currentUser.BranchId);
 
             if (originalOrder == null)
                 return ApiResponse<OrderDto>.Fail(ErrorCodes.ORDER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.ORDER_NOT_FOUND));
+
+            if (originalOrder.OrderType == OrderType.Return)
+                return ApiResponse<OrderDto>.Fail(
+                    ErrorCodes.ORDER_INVALID_STATE_TRANSITION,
+                    "لا يمكن استرجاع طلب مرتجع");
 
             // Validate: Order must be Completed or PartiallyRefunded
             if (originalOrder.Status != OrderStatus.Completed && originalOrder.Status != OrderStatus.PartiallyRefunded)
                 return ApiResponse<OrderDto>.Fail(ErrorCodes.ORDER_INVALID_STATE_TRANSITION,
                     "يمكن استرجاع الطلبات المكتملة أو المستردة جزئياً فقط");
+
+            var remainingRefundableAmount = Math.Round(originalOrder.Total - originalOrder.RefundAmount, 2);
+            if (remainingRefundableAmount <= 0)
+                return ApiResponse<OrderDto>.Fail(
+                    ErrorCodes.ORDER_INVALID_STATE_TRANSITION,
+                    "هذا الطلب مسترجع بالكامل بالفعل");
 
             // Get user for snapshot
             var refundUser = await _unitOfWork.Users.GetByIdAsync(userId);
@@ -770,6 +783,7 @@ public class OrderService : IOrderService
                 CustomerPhone = originalOrder.CustomerPhone,
                 // Return order type
                 OrderType = OrderType.Return,
+                OriginalOrderId = originalOrder.Id,
                 Status = OrderStatus.Completed,
                 // Branch Snapshot from original order
                 BranchName = originalOrder.BranchName,
@@ -797,9 +811,15 @@ public class OrderService : IOrderService
                         return ApiResponse<OrderDto>.Fail(ErrorCodes.VALIDATION_ERROR,
                             "كمية الاسترجاع يجب أن تكون أكبر من صفر");
 
-                    if (refundItem.Quantity > orderItem.Quantity)
+                    var availableForRefund = Math.Max(0, orderItem.Quantity - orderItem.RefundedQuantity);
+
+                    if (availableForRefund <= 0)
                         return ApiResponse<OrderDto>.Fail(ErrorCodes.VALIDATION_ERROR,
-                            $"كمية الاسترجاع ({refundItem.Quantity}) أكبر من الكمية المتاحة ({orderItem.Quantity}) للمنتج {orderItem.ProductName}");
+                            $"المنتج {orderItem.ProductName} مسترجع بالكامل بالفعل");
+
+                    if (refundItem.Quantity > availableForRefund)
+                        return ApiResponse<OrderDto>.Fail(ErrorCodes.VALIDATION_ERROR,
+                            $"كمية الاسترجاع ({refundItem.Quantity}) أكبر من الكمية المتاحة ({availableForRefund}) للمنتج {orderItem.ProductName}");
 
                     // Calculate refund amount for this item (proportional)
                     var unitPriceWithTax = orderItem.Total / orderItem.Quantity;
@@ -851,6 +871,8 @@ public class OrderService : IOrderService
                         }
                     }
 
+                    orderItem.RefundedQuantity += refundItem.Quantity;
+
                     // Build combined reason
                     if (!string.IsNullOrWhiteSpace(refundItem.Reason))
                     {
@@ -859,15 +881,45 @@ public class OrderService : IOrderService
                     }
                 }
 
+                totalRefundAmount = Math.Round(totalRefundAmount, 2);
+                if (totalRefundAmount <= 0)
+                    return ApiResponse<OrderDto>.Fail(
+                        ErrorCodes.VALIDATION_ERROR,
+                        "لا توجد عناصر صالحة للاسترجاع");
+
+                if (totalRefundAmount > remainingRefundableAmount)
+                    return ApiResponse<OrderDto>.Fail(
+                        ErrorCodes.VALIDATION_ERROR,
+                        "قيمة الاسترجاع تتجاوز المتبقي من الطلب");
+
                 // Update original order for partial refund
-                originalOrder.RefundAmount += totalRefundAmount;
-                originalOrder.Status = OrderStatus.PartiallyRefunded;
+                originalOrder.RefundAmount = Math.Round(originalOrder.RefundAmount + totalRefundAmount, 2);
+                if (originalOrder.RefundAmount > originalOrder.Total)
+                    originalOrder.RefundAmount = originalOrder.Total;
+
+                var isFullyRefundedAfterPartial = originalOrder.Items
+                    .All(i => i.RefundedQuantity >= i.Quantity);
+
+                originalOrder.Status = isFullyRefundedAfterPartial
+                    ? OrderStatus.Refunded
+                    : OrderStatus.PartiallyRefunded;
             }
             else
             {
                 // FULL REFUND - All items
                 foreach (var item in originalOrder.Items)
                 {
+                    if (item.Quantity <= 0)
+                        continue;
+
+                    var remainingQuantity = Math.Max(0, item.Quantity - item.RefundedQuantity);
+                    if (remainingQuantity <= 0)
+                        continue;
+
+                    var quantityRatio = (decimal)remainingQuantity / item.Quantity;
+                    var itemRefundAmount = Math.Round(item.Total * quantityRatio, 2);
+                    totalRefundAmount += itemRefundAmount;
+
                     // Add NEGATIVE item to return order
                     var returnItem = new OrderItem
                     {
@@ -879,42 +931,57 @@ public class OrderService : IOrderService
                         UnitPrice = -item.UnitPrice,
                         UnitCost = item.UnitCost,
                         OriginalPrice = item.OriginalPrice,
-                        Quantity = item.Quantity,
+                        Quantity = remainingQuantity,
                         TaxRate = item.TaxRate,
                         TaxInclusive = item.TaxInclusive,
                         DiscountType = item.DiscountType,
                         DiscountValue = item.DiscountValue,
-                        DiscountAmount = -item.DiscountAmount,
-                        TaxAmount = -item.TaxAmount,
-                        Subtotal = -item.Subtotal,
-                        Total = -item.Total,
+                        DiscountAmount = -Math.Round(item.DiscountAmount * quantityRatio, 2),
+                        TaxAmount = -Math.Round(item.TaxAmount * quantityRatio, 2),
+                        Subtotal = -Math.Round(item.Subtotal * quantityRatio, 2),
+                        Total = -itemRefundAmount,
                         Notes = refundReason
                     };
                     returnOrder.Items.Add(returnItem);
 
                     // Restore stock ONLY if product tracks inventory (skip custom items)
-                    if (item.ProductId.HasValue && !item.IsCustomItem && item.Quantity > 0)
+                    if (item.ProductId.HasValue && !item.IsCustomItem)
                     {
                         var product = await _unitOfWork.Products.GetByIdAsync(item.ProductId.Value);
                         if (product != null && product.TrackInventory)
                         {
                             var currentStock = await _inventoryService.GetCurrentStockAsync(item.ProductId.Value);
-                            var newStock = await _inventoryService.IncrementStockAsync(item.ProductId.Value, item.Quantity, originalOrder.Id);
+                            var newStock = await _inventoryService.IncrementStockAsync(item.ProductId.Value, remainingQuantity, originalOrder.Id);
 
                             stockChanges.Add(new
                             {
                                 ProductId = item.ProductId.Value,
                                 ProductName = item.ProductName,
-                                Quantity = item.Quantity,
+                                Quantity = remainingQuantity,
                                 BalanceBefore = currentStock,
                                 BalanceAfter = newStock
                             });
                         }
                     }
+
+                    item.RefundedQuantity += remainingQuantity;
                 }
 
-                totalRefundAmount = originalOrder.Total;
-                originalOrder.RefundAmount = totalRefundAmount;
+                totalRefundAmount = Math.Round(totalRefundAmount, 2);
+
+                if (totalRefundAmount <= 0)
+                    return ApiResponse<OrderDto>.Fail(
+                        ErrorCodes.ORDER_INVALID_STATE_TRANSITION,
+                        "هذا الطلب مسترجع بالكامل بالفعل");
+
+                if (totalRefundAmount > remainingRefundableAmount)
+                    return ApiResponse<OrderDto>.Fail(
+                        ErrorCodes.VALIDATION_ERROR,
+                        "قيمة الاسترجاع تتجاوز المتبقي من الطلب");
+
+                originalOrder.RefundAmount = Math.Round(originalOrder.RefundAmount + totalRefundAmount, 2);
+                if (originalOrder.RefundAmount > originalOrder.Total)
+                    originalOrder.RefundAmount = originalOrder.Total;
                 originalOrder.Status = OrderStatus.Refunded;
             }
 
@@ -938,18 +1005,39 @@ public class OrderService : IOrderService
             // Save the return order
             await _unitOfWork.Orders.AddAsync(returnOrder);
 
-            // Create RefundLog entry for audit trail
-            var refundLog = new RefundLog
+            // Create or update RefundLog entry for audit trail (OrderId is unique)
+            var stockChangesJson = System.Text.Json.JsonSerializer.Serialize(stockChanges);
+            var existingRefundLog = await _unitOfWork.RefundLogs.Query()
+                .FirstOrDefaultAsync(rl => rl.OrderId == originalOrder.Id);
+
+            if (existingRefundLog == null)
             {
-                TenantId = _currentUser.TenantId,
-                BranchId = _currentUser.BranchId,
-                OrderId = originalOrder.Id,
-                UserId = userId,
-                RefundAmount = totalRefundAmount,
-                Reason = refundReason,
-                StockChangesJson = System.Text.Json.JsonSerializer.Serialize(stockChanges)
-            };
-            await _unitOfWork.RefundLogs.AddAsync(refundLog);
+                var refundLog = new RefundLog
+                {
+                    TenantId = _currentUser.TenantId,
+                    BranchId = _currentUser.BranchId,
+                    OrderId = originalOrder.Id,
+                    UserId = userId,
+                    RefundAmount = originalOrder.RefundAmount,
+                    Reason = refundReason,
+                    StockChangesJson = stockChangesJson
+                };
+                await _unitOfWork.RefundLogs.AddAsync(refundLog);
+            }
+            else
+            {
+                existingRefundLog.UserId = userId;
+                existingRefundLog.RefundAmount = originalOrder.RefundAmount;
+                existingRefundLog.Reason = string.IsNullOrWhiteSpace(existingRefundLog.Reason)
+                    ? refundReason
+                    : string.IsNullOrWhiteSpace(refundReason)
+                        ? existingRefundLog.Reason
+                        : existingRefundLog.Reason + " | " + refundReason;
+
+                existingRefundLog.StockChangesJson = MergeStockChangesJson(
+                    existingRefundLog.StockChangesJson,
+                    stockChangesJson);
+            }
 
             // Deduct loyalty points for refunded amount
             if (originalOrder.CustomerId.HasValue)
@@ -1053,6 +1141,40 @@ public class OrderService : IOrderService
             return ApiResponse<bool>.Fail($"لا يمكن تغيير حالة الطلب من {currentStatus} إلى {newStatus}");
 
         return ApiResponse<bool>.Ok(true);
+    }
+
+    private static string MergeStockChangesJson(string? existingJson, string newJson)
+    {
+        var mergedEntries = new List<System.Text.Json.JsonElement>();
+
+        if (!string.IsNullOrWhiteSpace(existingJson))
+        {
+            try
+            {
+                using var existingDoc = System.Text.Json.JsonDocument.Parse(existingJson);
+                if (existingDoc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+                {
+                    foreach (var item in existingDoc.RootElement.EnumerateArray())
+                        mergedEntries.Add(item.Clone());
+                }
+            }
+            catch
+            {
+                // Keep new entries only if existing payload is malformed.
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(newJson))
+        {
+            using var newDoc = System.Text.Json.JsonDocument.Parse(newJson);
+            if (newDoc.RootElement.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                foreach (var item in newDoc.RootElement.EnumerateArray())
+                    mergedEntries.Add(item.Clone());
+            }
+        }
+
+        return System.Text.Json.JsonSerializer.Serialize(mergedEntries);
     }
 
     /// <summary>
@@ -1192,6 +1314,7 @@ public class OrderService : IOrderService
         RefundAmount = order.RefundAmount,
         RefundedByUserId = order.RefundedByUserId,
         RefundedByUserName = order.RefundedByUserName,
+        OriginalOrderId = order.OriginalOrderId,
         Items = order.Items.Select(i => new OrderItemDto
         {
             Id = i.Id,
@@ -1209,6 +1332,7 @@ public class OrderService : IOrderService
             UnitPrice = i.UnitPrice,
             OriginalPrice = i.OriginalPrice,
             Quantity = i.Quantity,
+            RefundedQuantity = i.RefundedQuantity,
             DiscountType = i.DiscountType,
             DiscountValue = i.DiscountValue,
             DiscountAmount = i.DiscountAmount,

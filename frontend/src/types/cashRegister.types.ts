@@ -23,8 +23,12 @@ export interface CashRegisterTransaction {
   shiftId?: number;
   branchId: number;
   branchName: string;
-  createdByUserId: number;
-  createdByUserName: string;
+  // Backend currently returns userId/userName for cash register transactions.
+  userId?: number;
+  userName?: string;
+  // Keep backward compatibility with older payloads.
+  createdByUserId?: number;
+  createdByUserName?: string;
   createdAt: string;
 }
 

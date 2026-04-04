@@ -24,10 +24,12 @@ export const OrderDetailsModal = ({
   const [showRefundModal, setShowRefundModal] = useState(false);
   const user = useAppSelector(selectCurrentUser);
   const [printReceipt, { isLoading: isPrinting }] = usePrintReceiptMutation();
+  const isReturnOrder = order.orderType === "Return";
 
   // Only Admin or SystemOwner can refund - can also do additional partial refund on PartiallyRefunded orders
   const canRefund =
     (user?.role === "Admin" || user?.role === "SystemOwner") &&
+    !isReturnOrder &&
     (order.status === "Completed" || order.status === "PartiallyRefunded");
 
   const isFullyRefunded = order.status === "Refunded";

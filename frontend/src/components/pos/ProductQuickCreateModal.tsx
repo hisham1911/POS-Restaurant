@@ -73,10 +73,10 @@ export const ProductQuickCreateModal = ({
       const createdProduct = extractApiData(
         response,
         "PRODUCT_QUICK_CREATE_EMPTY_RESPONSE",
-        "Unable to create product",
+        "تعذر إنشاء المنتج",
       );
 
-      toast.success(`Product added: ${createdProduct.name}`);
+      toast.success(`تمت إضافة المنتج: ${createdProduct.name}`);
       onSuccess?.(createdProduct.id);
       onClose();
     } catch (error) {

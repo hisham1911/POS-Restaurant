@@ -166,11 +166,11 @@ export const SettingsPage = () => {
       extractApiData(
         response,
         "TENANT_UPDATE_EMPTY_RESPONSE",
-        "Unable to save settings",
+        "تعذر حفظ الإعدادات",
       );
 
       dispatch(setTaxSettings({ taxRate, isTaxEnabled, allowNegativeStock }));
-      toast.success("Settings saved successfully");
+      toast.success("تم حفظ الإعدادات بنجاح");
       refetch();
     } catch (error) {
       const errorCode = getApiErrorCode(error);
@@ -483,7 +483,7 @@ export const SettingsPage = () => {
                 value={nameEn}
                 onChange={(e) => setNameEn(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
-                placeholder="Company Name"
+                placeholder="اسم الشركة بالإنجليزية"
                 dir="ltr"
               />
             </div>
@@ -875,11 +875,11 @@ export const SettingsPage = () => {
                       const logoData = extractApiData(
                         response,
                         "TENANT_LOGO_UPLOAD_EMPTY_RESPONSE",
-                        "Unable to upload logo",
+                        "تعذر رفع الشعار",
                       );
 
                       setLogoUrl(logoData.logoUrl);
-                      toast.success("Logo uploaded successfully");
+                      toast.success("تم رفع الشعار بنجاح");
                       refetch();
                     } catch (error) {
                       const errorCode = getApiErrorCode(error);

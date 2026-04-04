@@ -41,10 +41,10 @@ export const useShift = () => {
       const shift = extractApiData(
         response,
         "SHIFT_OPEN_EMPTY_RESPONSE",
-        "Unable to open shift",
+        "تعذر فتح الوردية",
       );
 
-      toast.success("Shift opened successfully");
+      toast.success("تم فتح الوردية بنجاح");
       refetch();
       return shift;
     } catch (error) {
@@ -67,10 +67,10 @@ export const useShift = () => {
       const shift = extractApiData(
         response,
         "SHIFT_CLOSE_EMPTY_RESPONSE",
-        "Unable to close shift",
+        "تعذر إغلاق الوردية",
       );
 
-      toast.success("Shift closed successfully");
+      toast.success("تم إغلاق الوردية بنجاح");
       refetch();
       return shift;
     } catch (error) {

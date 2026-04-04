@@ -1,19 +1,45 @@
-import { useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
-import { ArrowRight, Check, X, DollarSign, FileText, Download, Trash2, ChevronDown } from 'lucide-react';
+import { useState } from "react";
+import { useParams, useNavigate, Link } from "react-router-dom";
+import {
+  ArrowRight,
+  Check,
+  X,
+  DollarSign,
+  FileText,
+  Download,
+  Trash2,
+  ChevronDown,
+} from "lucide-react";
+import { toast } from "sonner";
 import {
   useGetExpenseByIdQuery,
   useApproveExpenseMutation,
   useRejectExpenseMutation,
   usePayExpenseMutation,
   useDeleteAttachmentMutation,
-} from '../../api/expensesApi';
-import { Button } from '../../components/common/Button';
-import { Card } from '../../components/common/Card';
-import { Loading } from '../../components/common/Loading';
-import { Modal } from '../../components/common/Modal';
-import { formatDateOnly, formatDateTimeFull } from '../../utils/formatters';
-import type { ExpenseStatus } from '../../types/expense.types';
+} from "../../api/expensesApi";
+import { Button } from "../../components/common/Button";
+import { Card } from "../../components/common/Card";
+import { Loading } from "../../components/common/Loading";
+import { Modal } from "../../components/common/Modal";
+import { formatDateOnly, formatDateTimeFull } from "../../utils/formatters";
+import { handleApiError } from "../../utils/errorHandler";
+import type { ExpenseStatus } from "../../types/expense.types";
+
+const getPaymentMethodLabel = (method?: string) => {
+  switch (method) {
+    case "Cash":
+      return "نقدي";
+    case "Card":
+      return "بطاقة";
+    case "BankTransfer":
+      return "تحويل بنكي";
+    case "Fawry":
+      return "فوري";
+    default:
+      return method || "غير محدد";
+  }
+};
 
 export function ExpenseDetailsPage() {
   const { id } = useParams<{ id: string }>();
@@ -21,18 +47,36 @@ export function ExpenseDetailsPage() {
   const [showApproveModal, setShowApproveModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
-  const [rejectReason, setRejectReason] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('Cash');
-  const [paymentNotes, setPaymentNotes] = useState('');
-  const [approveNotes, setApproveNotes] = useState('');
+  const [rejectReason, setRejectReason] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const [paymentNotes, setPaymentNotes] = useState("");
+  const [approveNotes, setApproveNotes] = useState("");
 
-  const { data: response, isLoading, error } = useGetExpenseByIdQuery(Number(id));
-  const [approveExpense, { isLoading: isApproving }] = useApproveExpenseMutation();
-  const [rejectExpense, { isLoading: isRejecting }] = useRejectExpenseMutation();
+  const {
+    data: response,
+    isLoading,
+    error,
+  } = useGetExpenseByIdQuery(Number(id));
+  const [approveExpense, { isLoading: isApproving }] =
+    useApproveExpenseMutation();
+  const [rejectExpense, { isLoading: isRejecting }] =
+    useRejectExpenseMutation();
   const [payExpense, { isLoading: isPaying }] = usePayExpenseMutation();
   const [deleteAttachment] = useDeleteAttachmentMutation();
 
   const expense = response?.data;
+
+  const openPayModal = () => {
+    setPaymentMethod("Cash");
+    setPaymentNotes("");
+    setShowPayModal(true);
+  };
+
+  const closePayModal = () => {
+    setShowPayModal(false);
+    setPaymentMethod("Cash");
+    setPaymentNotes("");
+  };
 
   const handleApprove = async () => {
     try {
@@ -41,15 +85,15 @@ export function ExpenseDetailsPage() {
         request: { notes: approveNotes || undefined },
       }).unwrap();
       setShowApproveModal(false);
-      setApproveNotes('');
+      setApproveNotes("");
     } catch (error) {
-      console.error('Failed to approve expense:', error);
+      console.error("Failed to approve expense:", error);
     }
   };
 
   const handleReject = async () => {
     if (!rejectReason.trim()) {
-      alert('يرجى إدخال سبب الرفض');
+      alert("يرجى إدخال سبب الرفض");
       return;
     }
     try {
@@ -58,9 +102,9 @@ export function ExpenseDetailsPage() {
         request: { reason: rejectReason },
       }).unwrap();
       setShowRejectModal(false);
-      setRejectReason('');
+      setRejectReason("");
     } catch (error) {
-      console.error('Failed to reject expense:', error);
+      console.error("Failed to reject expense:", error);
     }
   };
 
@@ -73,45 +117,61 @@ export function ExpenseDetailsPage() {
           notes: paymentNotes || undefined,
         },
       }).unwrap();
-      setShowPayModal(false);
-      setPaymentNotes('');
+
+      const methodLabel = getPaymentMethodLabel(paymentMethod);
+      if (paymentMethod === "Cash") {
+        toast.success("تم تسجيل الدفع النقدي وخصم المبلغ من الخزينة");
+      } else {
+        toast.success(
+          `تم تسجيل الدفع بطريقة ${methodLabel} (لا يؤثر على الخزينة)`,
+        );
+      }
+
+      closePayModal();
     } catch (error) {
-      console.error('Failed to pay expense:', error);
+      toast.error(handleApiError(error));
+      console.error("Failed to pay expense:", error);
     }
   };
 
   const handleDeleteAttachment = async (attachmentId: number) => {
-    if (window.confirm('هل أنت متأكد من حذف هذا المرفق؟')) {
+    if (window.confirm("هل أنت متأكد من حذف هذا المرفق؟")) {
       try {
-        await deleteAttachment({ expenseId: Number(id), attachmentId }).unwrap();
+        await deleteAttachment({
+          expenseId: Number(id),
+          attachmentId,
+        }).unwrap();
       } catch (error) {
-        console.error('Failed to delete attachment:', error);
+        console.error("Failed to delete attachment:", error);
       }
     }
   };
 
   const getStatusBadge = (status: ExpenseStatus) => {
     const badges = {
-      Draft: 'bg-gray-100 text-gray-800',
-      Approved: 'bg-blue-100 text-blue-800',
-      Paid: 'bg-green-100 text-green-800',
-      Rejected: 'bg-red-100 text-red-800',
+      Draft: "bg-gray-100 text-gray-800",
+      Approved: "bg-blue-100 text-blue-800",
+      Paid: "bg-green-100 text-green-800",
+      Rejected: "bg-red-100 text-red-800",
     };
     const labels = {
-      Draft: 'مسودة',
-      Approved: 'معتمد',
-      Paid: 'مدفوع',
-      Rejected: 'مرفوض',
+      Draft: "مسودة",
+      Approved: "معتمد",
+      Paid: "مدفوع",
+      Rejected: "مرفوض",
     };
     return (
-      <span className={`px-3 py-1 text-sm font-semibold rounded-full ${badges[status]}`}>
+      <span
+        className={`px-3 py-1 text-sm font-semibold rounded-full ${badges[status]}`}
+      >
         {labels[status]}
       </span>
     );
   };
 
   if (isLoading) return <Loading />;
-  if (error || !expense) return <div className="text-red-600">حدث خطأ في تحميل المصروف</div>;
+  if (error || !expense)
+    return <div className="text-red-600">حدث خطأ في تحميل المصروف</div>;
 
   return (
     <div className="space-y-6">
@@ -130,9 +190,12 @@ export function ExpenseDetailsPage() {
           </div>
         </div>
         <div className="flex gap-2">
-          {expense.status === 'Draft' && (
+          {expense.status === "Draft" && (
             <>
-              <Button variant="success" onClick={() => setShowApproveModal(true)}>
+              <Button
+                variant="success"
+                onClick={() => setShowApproveModal(true)}
+              >
                 <Check className="w-4 h-4 ml-2" />
                 اعتماد
               </Button>
@@ -142,8 +205,8 @@ export function ExpenseDetailsPage() {
               </Button>
             </>
           )}
-          {expense.status === 'Approved' && (
-            <Button onClick={() => setShowPayModal(true)}>
+          {expense.status === "Approved" && (
+            <Button onClick={openPayModal}>
               <DollarSign className="w-4 h-4 ml-2" />
               دفع
             </Button>
@@ -155,7 +218,9 @@ export function ExpenseDetailsPage() {
       <Card>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">المعلومات الأساسية</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              المعلومات الأساسية
+            </h3>
             <div className="space-y-3">
               <div>
                 <span className="text-sm text-gray-600">رقم المصروف:</span>
@@ -167,11 +232,15 @@ export function ExpenseDetailsPage() {
               </div>
               <div>
                 <span className="text-sm text-gray-600">المبلغ:</span>
-                <p className="text-xl font-bold text-gray-900">{expense.amount.toFixed(2)} جنيه</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {expense.amount.toFixed(2)} جنيه
+                </p>
               </div>
               <div>
                 <span className="text-sm text-gray-600">تاريخ المصروف:</span>
-                <p className="font-medium">{formatDateOnly(expense.expenseDate)}</p>
+                <p className="font-medium">
+                  {formatDateOnly(expense.expenseDate)}
+                </p>
               </div>
               <div>
                 <span className="text-sm text-gray-600">الحالة:</span>
@@ -181,7 +250,9 @@ export function ExpenseDetailsPage() {
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">تفاصيل إضافية</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              تفاصيل إضافية
+            </h3>
             <div className="space-y-3">
               <div>
                 <span className="text-sm text-gray-600">الوصف:</span>
@@ -215,39 +286,51 @@ export function ExpenseDetailsPage() {
       </Card>
 
       {/* Approval/Rejection Info */}
-      {(expense.status === 'Approved' || expense.status === 'Paid' || expense.status === 'Rejected') && (
+      {(expense.status === "Approved" ||
+        expense.status === "Paid" ||
+        expense.status === "Rejected") && (
         <Card>
           <h3 className="text-lg font-semibold text-gray-900 mb-4">
-            {expense.status === 'Rejected' ? 'معلومات الرفض' : 'معلومات الاعتماد'}
+            {expense.status === "Rejected"
+              ? "معلومات الرفض"
+              : "معلومات الاعتماد"}
           </h3>
           <div className="space-y-3">
-            {expense.status === 'Rejected' ? (
+            {expense.status === "Rejected" ? (
               <>
                 <div>
                   <span className="text-sm text-gray-600">سبب الرفض:</span>
-                  <p className="font-medium text-red-600">{expense.rejectionReason}</p>
+                  <p className="font-medium text-red-600">
+                    {expense.rejectionReason}
+                  </p>
                 </div>
                 <div>
-                  <span className="text-sm text-gray-600">تم الرفض بواسطة:</span>
+                  <span className="text-sm text-gray-600">
+                    تم الرفض بواسطة:
+                  </span>
                   <p className="font-medium">{expense.rejectedByUserName}</p>
                 </div>
                 <div>
                   <span className="text-sm text-gray-600">تاريخ الرفض:</span>
                   <p className="font-medium">
-                    {expense.rejectedAt && formatDateTimeFull(expense.rejectedAt)}
+                    {expense.rejectedAt &&
+                      formatDateTimeFull(expense.rejectedAt)}
                   </p>
                 </div>
               </>
             ) : (
               <>
                 <div>
-                  <span className="text-sm text-gray-600">تم الاعتماد بواسطة:</span>
+                  <span className="text-sm text-gray-600">
+                    تم الاعتماد بواسطة:
+                  </span>
                   <p className="font-medium">{expense.approvedByUserName}</p>
                 </div>
                 <div>
                   <span className="text-sm text-gray-600">تاريخ الاعتماد:</span>
                   <p className="font-medium">
-                    {expense.approvedAt && formatDateTimeFull(expense.approvedAt)}
+                    {expense.approvedAt &&
+                      formatDateTimeFull(expense.approvedAt)}
                   </p>
                 </div>
               </>
@@ -257,13 +340,17 @@ export function ExpenseDetailsPage() {
       )}
 
       {/* Payment Info */}
-      {expense.status === 'Paid' && (
+      {expense.status === "Paid" && (
         <Card>
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">معلومات الدفع</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">
+            معلومات الدفع
+          </h3>
           <div className="space-y-3">
             <div>
               <span className="text-sm text-gray-600">طريقة الدفع:</span>
-              <p className="font-medium">{expense.paymentMethod}</p>
+              <p className="font-medium">
+                {getPaymentMethodLabel(expense.paymentMethod)}
+              </p>
             </div>
             <div>
               <span className="text-sm text-gray-600">تم الدفع بواسطة:</span>
@@ -285,24 +372,34 @@ export function ExpenseDetailsPage() {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">المرفقات</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {expense.attachments.map((attachment) => (
-              <div key={attachment.id} className="border border-gray-200 rounded-lg p-4">
+              <div
+                key={attachment.id}
+                className="border border-gray-200 rounded-lg p-4"
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2">
                     <FileText className="w-5 h-5 text-gray-400" />
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{attachment.fileName}</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {attachment.fileName}
+                      </p>
                       <p className="text-xs text-gray-500">
                         {(attachment.fileSize / 1024).toFixed(2)} KB
                       </p>
                     </div>
                   </div>
                   <div className="flex gap-1">
-                    <a href={attachment.fileUrl} download target="_blank" rel="noopener noreferrer">
+                    <a
+                      href={attachment.fileUrl}
+                      download
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
                       <button className="text-blue-600 hover:text-blue-900">
                         <Download className="w-4 h-4" />
                       </button>
                     </a>
-                    {expense.status === 'Draft' && (
+                    {expense.status === "Draft" && (
                       <button
                         onClick={() => handleDeleteAttachment(attachment.id)}
                         className="text-red-600 hover:text-red-900"
@@ -319,11 +416,17 @@ export function ExpenseDetailsPage() {
       )}
 
       {/* Approve Modal */}
-      <Modal isOpen={showApproveModal} onClose={() => setShowApproveModal(false)} title="اعتماد المصروف">
+      <Modal
+        isOpen={showApproveModal}
+        onClose={() => setShowApproveModal(false)}
+        title="اعتماد المصروف"
+      >
         <div className="space-y-4">
           <p className="text-gray-600">هل أنت متأكد من اعتماد هذا المصروف؟</p>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ملاحظات (اختياري)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              ملاحظات (اختياري)
+            </label>
             <textarea
               value={approveNotes}
               onChange={(e) => setApproveNotes(e.target.value)}
@@ -333,18 +436,29 @@ export function ExpenseDetailsPage() {
             />
           </div>
           <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setShowApproveModal(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowApproveModal(false)}
+            >
               إلغاء
             </Button>
-            <Button variant="success" onClick={handleApprove} disabled={isApproving}>
-              {isApproving ? 'جاري الاعتماد...' : 'اعتماد'}
+            <Button
+              variant="success"
+              onClick={handleApprove}
+              disabled={isApproving}
+            >
+              {isApproving ? "جاري الاعتماد..." : "اعتماد"}
             </Button>
           </div>
         </div>
       </Modal>
 
       {/* Reject Modal */}
-      <Modal isOpen={showRejectModal} onClose={() => setShowRejectModal(false)} title="رفض المصروف">
+      <Modal
+        isOpen={showRejectModal}
+        onClose={() => setShowRejectModal(false)}
+        title="رفض المصروف"
+      >
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -363,15 +477,19 @@ export function ExpenseDetailsPage() {
             <Button variant="outline" onClick={() => setShowRejectModal(false)}>
               إلغاء
             </Button>
-            <Button variant="danger" onClick={handleReject} disabled={isRejecting}>
-              {isRejecting ? 'جاري الرفض...' : 'رفض'}
+            <Button
+              variant="danger"
+              onClick={handleReject}
+              disabled={isRejecting}
+            >
+              {isRejecting ? "جاري الرفض..." : "رفض"}
             </Button>
           </div>
         </div>
       </Modal>
 
       {/* Pay Modal */}
-      <Modal isOpen={showPayModal} onClose={() => setShowPayModal(false)} title="دفع المصروف">
+      <Modal isOpen={showPayModal} onClose={closePayModal} title="دفع المصروف">
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -391,7 +509,9 @@ export function ExpenseDetailsPage() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ملاحظات (اختياري)</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              ملاحظات (اختياري)
+            </label>
             <textarea
               value={paymentNotes}
               onChange={(e) => setPaymentNotes(e.target.value)}
@@ -402,15 +522,21 @@ export function ExpenseDetailsPage() {
           </div>
           <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
             <p className="text-sm text-blue-800">
-              <strong>المبلغ المطلوب دفعه:</strong> {expense.amount.toFixed(2)} جنيه
+              <strong>المبلغ المطلوب دفعه:</strong> {expense.amount.toFixed(2)}{" "}
+              جنيه
             </p>
+            {paymentMethod !== "Cash" && (
+              <p className="text-sm text-blue-800 mt-1">
+                الدفعات غير النقدية لا تُسجل في معاملات الخزينة.
+              </p>
+            )}
           </div>
           <div className="flex gap-2 justify-end">
-            <Button variant="outline" onClick={() => setShowPayModal(false)}>
+            <Button variant="outline" onClick={closePayModal}>
               إلغاء
             </Button>
             <Button onClick={handlePay} disabled={isPaying}>
-              {isPaying ? 'جاري الدفع...' : 'تأكيد الدفع'}
+              {isPaying ? "جاري الدفع..." : "تأكيد الدفع"}
             </Button>
           </div>
         </div>

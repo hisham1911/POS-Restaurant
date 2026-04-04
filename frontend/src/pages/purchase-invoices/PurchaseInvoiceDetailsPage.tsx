@@ -14,6 +14,17 @@ import { AddPaymentModal } from '../../components/purchase-invoices/AddPaymentMo
 import { CancelInvoiceModal } from '../../components/purchase-invoices/CancelInvoiceModal';
 import { handleApiError } from '../../utils/errorHandler';
 
+const getPaymentMethodLabel = (method: string) => {
+  const labels: Record<string, string> = {
+    Cash: 'نقدي',
+    Card: 'بطاقة',
+    Fawry: 'فوري',
+    BankTransfer: 'تحويل بنكي',
+  };
+
+  return labels[method] || method;
+};
+
 export function PurchaseInvoiceDetailsPage() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -239,7 +250,7 @@ export function PurchaseInvoiceDetailsPage() {
                   <tr key={payment.id}>
                     <td className="px-4 py-3 text-sm">{formatDateOnly(payment.paymentDate)}</td>
                     <td className="px-4 py-3 text-sm font-medium">{formatCurrency(payment.amount)}</td>
-                    <td className="px-4 py-3 text-sm">{payment.method}</td>
+                    <td className="px-4 py-3 text-sm">{getPaymentMethodLabel(payment.method)}</td>
                     <td className="px-4 py-3 text-sm">{payment.referenceNumber || '-'}</td>
                     <td className="px-4 py-3 text-sm">{payment.createdByUserName}</td>
                   </tr>

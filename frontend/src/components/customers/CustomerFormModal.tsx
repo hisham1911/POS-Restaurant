@@ -121,11 +121,11 @@ export const CustomerFormModal = ({
 
   return (
     <Portal>
-      <div 
+      <div
         className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/50"
         onClick={onClose}
       >
-        <div 
+        <div
           className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-scale-in"
           onClick={(e) => e.stopPropagation()}
         >
@@ -202,7 +202,7 @@ export const CustomerFormModal = ({
                 onChange={(e) =>
                   setFormData({ ...formData, email: e.target.value })
                 }
-                placeholder="email@example.com"
+                placeholder="مثال: user@example.com"
                 className={`w-full px-4 py-2.5 border rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 ${
                   errors.email ? "border-danger-500" : "border-gray-300"
                 }`}

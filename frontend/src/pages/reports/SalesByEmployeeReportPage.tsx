@@ -14,6 +14,16 @@ import { Card } from "@/components/common/Card";
 import { formatCurrency } from "@/utils/formatters";
 import { useGetSalesByEmployeeReportQuery } from "@/api/employeeReportsApi";
 
+const getRoleLabel = (role: string) => {
+  const labels: Record<string, string> = {
+    Admin: "مدير",
+    Cashier: "كاشير",
+    SystemOwner: "مالك النظام",
+  };
+
+  return labels[role] || role;
+};
+
 export const SalesByEmployeeReportPage = () => {
   const [fromDate, setFromDate] = useState(
     new Date(new Date().setDate(1)).toISOString().split("T")[0],
@@ -172,7 +182,7 @@ export const SalesByEmployeeReportPage = () => {
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{emp.role}</td>
+                    <td className="px-4 py-3 text-gray-600">{getRoleLabel(emp.role)}</td>
                     <td className="px-4 py-3 font-medium text-gray-800">
                       {emp.totalOrders}
                     </td>

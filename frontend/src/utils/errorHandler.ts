@@ -172,10 +172,10 @@ export function handleApiError(error: unknown): string {
     apiError.status === "FETCH_ERROR" ||
     apiError.status === "TIMEOUT_ERROR"
   ) {
-    return STATUS_MESSAGES[503] ?? "Network request failed.";
+    return STATUS_MESSAGES[503] ?? "فشل الاتصال بالشبكة.";
   }
 
-  return STATUS_MESSAGES[500] ?? "Unexpected error.";
+  return STATUS_MESSAGES[500] ?? "حدث خطأ غير متوقع.";
 }
 
 /**

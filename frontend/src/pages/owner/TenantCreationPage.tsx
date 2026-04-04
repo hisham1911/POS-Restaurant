@@ -168,7 +168,7 @@ export default function TenantCreationPage() {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
             إنشاء شركة جديدة
           </h1>
-          <p className="text-gray-600">لوحة إدارة الشركات (System Owner)</p>
+          <p className="text-gray-600">لوحة إدارة الشركات (مالك النظام)</p>
         </div>
 
         {/* Dashboard Cards */}
@@ -299,7 +299,7 @@ export default function TenantCreationPage() {
                   setFormData({ ...formData, adminEmail: e.target.value })
                 }
                 required
-                placeholder="admin@example.com"
+                placeholder="مثال: admin@example.com"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
             </div>

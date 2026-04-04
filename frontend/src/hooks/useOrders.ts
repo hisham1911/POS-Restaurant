@@ -40,12 +40,12 @@ export const useOrders = () => {
 
   const createOrder = async (customerId?: number): Promise<Order | null> => {
     if (items.length === 0) {
-      toast.error("Cart is empty");
+      toast.error("السلة فارغة");
       return null;
     }
 
     if (!currentBranch?.id) {
-      toast.error("Select a branch first");
+      toast.error("اختر فرعًا أولاً");
       return null;
     }
 
@@ -73,7 +73,7 @@ export const useOrders = () => {
       return extractApiData(
         response,
         "ORDER_CREATE_EMPTY_RESPONSE",
-        "Unable to create order",
+        "تعذر إنشاء الطلب",
       );
     } catch (error) {
       const apiError = error as ApiError;
@@ -98,11 +98,11 @@ export const useOrders = () => {
       const order = extractApiData(
         response,
         "ORDER_COMPLETE_EMPTY_RESPONSE",
-        "Unable to complete order",
+        "تعذر إكمال الطلب",
       );
 
       clearCart();
-      toast.success("Order completed successfully");
+      toast.success("تم إكمال الطلب بنجاح");
       return order;
     } catch (error) {
       const apiError = error as ApiError;
@@ -126,10 +126,10 @@ export const useOrders = () => {
       extractApiData(
         response,
         "ORDER_CANCEL_EMPTY_RESPONSE",
-        "Unable to cancel order",
+        "تعذر إلغاء الطلب",
       );
 
-      toast.success("Order cancelled");
+      toast.success("تم إلغاء الطلب");
       refetch();
       return true;
     } catch (error) {

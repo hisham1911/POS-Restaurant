@@ -69,7 +69,7 @@ export const StockAdjustmentModal = ({
       }).unwrap();
 
       const updatedStock = result.data?.newBalance ?? targetQuantity;
-      toast.success(`Stock updated: ${currentStock} -> ${updatedStock}`);
+      toast.success(`تم تحديث المخزون: ${currentStock} -> ${updatedStock}`);
       onClose();
     } catch (error) {
       toast.error(handleApiError(error));
@@ -78,11 +78,11 @@ export const StockAdjustmentModal = ({
 
   return (
     <Portal>
-      <div 
+      <div
         className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50"
         onClick={onClose}
       >
-        <div 
+        <div
           className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden animate-scale-in"
           onClick={(e) => e.stopPropagation()}
         >
@@ -93,7 +93,9 @@ export const StockAdjustmentModal = ({
                 <Package className="w-5 h-5 text-primary-600" />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-gray-800">تعديل المخزون</h2>
+                <h2 className="text-xl font-bold text-gray-800">
+                  تعديل المخزون
+                </h2>
                 <p className="text-sm text-gray-500">{product.name}</p>
               </div>
             </div>

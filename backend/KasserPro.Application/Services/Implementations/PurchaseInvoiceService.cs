@@ -164,13 +164,8 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
 
         var taxRate = tenant?.TaxRate ?? 14m;
 
-        // Generate invoice number
-        var lastInvoice = await _unitOfWork.PurchaseInvoices.Query()
-            .Where(pi => pi.TenantId == tenantId)
-            .OrderByDescending(pi => pi.Id)
-            .FirstOrDefaultAsync();
-
-        var invoiceNumber = GenerateInvoiceNumber(lastInvoice?.InvoiceNumber);
+        // Generate invoice number per-tenant for the current year.
+        var invoiceNumber = await GenerateInvoiceNumberAsync(tenantId);
 
         // Create invoice
         var invoice = new PurchaseInvoice
@@ -625,19 +620,37 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         return ApiResponse<bool>.Ok(true, "تم حذف الدفعة بنجاح");
     }
 
-    private string GenerateInvoiceNumber(string? lastInvoiceNumber)
+    private async Task<string> GenerateInvoiceNumberAsync(int tenantId)
     {
         var year = DateTime.UtcNow.Year;
         var prefix = $"PI-{year}-";
 
-        if (string.IsNullOrEmpty(lastInvoiceNumber) || !lastInvoiceNumber.StartsWith(prefix))
+        var existingNumbers = await _unitOfWork.PurchaseInvoices.Query()
+            .Where(pi => pi.TenantId == tenantId && pi.InvoiceNumber.StartsWith(prefix))
+            .Select(pi => pi.InvoiceNumber)
+            .ToListAsync();
+
+        if (existingNumbers.Count == 0)
         {
             return $"{prefix}0001";
         }
 
-        var lastNumber = int.Parse(lastInvoiceNumber.Substring(prefix.Length));
-        var newNumber = lastNumber + 1;
-        return $"{prefix}{newNumber:D4}";
+        var maxSequence = 0;
+        foreach (var invoiceNumber in existingNumbers)
+        {
+            if (invoiceNumber.Length <= prefix.Length)
+            {
+                continue;
+            }
+
+            var suffix = invoiceNumber.Substring(prefix.Length);
+            if (int.TryParse(suffix, out var sequence) && sequence > maxSequence)
+            {
+                maxSequence = sequence;
+            }
+        }
+
+        return $"{prefix}{maxSequence + 1:D4}";
     }
 }
 

@@ -265,7 +265,7 @@ export const CategoriesPage = () => {
               onChange={(e) =>
                 setFormData({ ...formData, nameEn: e.target.value })
               }
-              placeholder="Example: Beverages"
+              placeholder="مثال بالإنجليزية: Beverages"
             />
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">

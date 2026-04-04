@@ -34,7 +34,7 @@ export const LoginPage = () => {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin@kasserpro.com"
+            placeholder="مثال: admin@kasserpro.com"
             required
           />
 

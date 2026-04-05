@@ -77,5 +77,19 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
 
         builder.Property(t => t.ReceiptShowLogo)
             .HasDefaultValue(true);
+
+        // Print Routing Settings
+        builder.Property(t => t.PrintRoutingMode)
+            .HasMaxLength(30)
+            .HasDefaultValue("BranchWithFallback");
+
+        builder.Property(t => t.AutoPrintOnSale)
+            .HasDefaultValue(true);
+
+        builder.Property(t => t.AutoPrintOnDebtPayment)
+            .HasDefaultValue(true);
+
+        builder.Property(t => t.AutoPrintDailyReports)
+            .HasDefaultValue(false);
     }
 }

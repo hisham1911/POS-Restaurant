@@ -18,7 +18,6 @@ export interface SystemInfo {
 }
 
 export interface HealthCheck {
-  success: boolean;
   status: string;
   timestamp: string;
 }
@@ -56,15 +55,12 @@ export const systemApi = baseApi.injectEndpoints({
     }),
 
     // System Info (IP, Network, Environment)
-    getSystemInfo: builder.query<
-      { success: boolean; data: SystemInfo },
-      void
-    >({
+    getSystemInfo: builder.query<{ success: boolean; data: SystemInfo }, void>({
       query: () => "/system/info",
     }),
 
     // Health Check (for network status monitoring)
-    health: builder.query<HealthCheck, void>({
+    health: builder.query<ApiResponse<HealthCheck>, void>({
       query: () => "/system/health",
     }),
   }),

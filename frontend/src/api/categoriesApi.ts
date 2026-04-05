@@ -5,16 +5,19 @@ import { ApiResponse } from "../types/api.types";
 export const categoriesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // جلب كل التصنيفات
-    getCategories: builder.query<ApiResponse<Category[]>, { search?: string; page?: number; pageSize?: number } | void>({
+    getCategories: builder.query<
+      ApiResponse<Category[]>,
+      { search?: string; page?: number; pageSize?: number } | void
+    >({
       query: (params) => {
         const queryParams: Record<string, any> = {};
-        
+
         if (params) {
           if (params.search) queryParams.search = params.search;
           if (params.page) queryParams.page = params.page;
           if (params.pageSize) queryParams.pageSize = params.pageSize;
         }
-        
+
         return {
           url: "/categories",
           params: Object.keys(queryParams).length > 0 ? queryParams : undefined,
@@ -41,7 +44,13 @@ export const categoriesApi = baseApi.injectEndpoints({
     // إضافة تصنيف
     createCategory: builder.mutation<
       ApiResponse<Category>,
-      { name: string; nameEn?: string; description?: string }
+      {
+        name: string;
+        nameEn?: string;
+        description?: string;
+        imageUrl?: string;
+        sortOrder?: number;
+      }
     >({
       query: (category) => ({
         url: "/categories",

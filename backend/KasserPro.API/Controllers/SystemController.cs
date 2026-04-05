@@ -8,6 +8,9 @@ using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.System;
 using KasserPro.Application.Services.Interfaces;
 using Microsoft.Extensions.Logging;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 
 [ApiController]
 [Route("api/system")]
@@ -75,13 +78,15 @@ public class SystemController : ControllerBase
         try
         {
             var lanIp = GetLanIpAddress();
+            var localPort = HttpContext.Connection.LocalPort;
+            var port = localPort > 0 ? localPort : 5243;
             var hostname = System.Net.Dns.GetHostName();
             var data = new SystemInfoDto
             {
                 LanIp = lanIp,
                 Hostname = hostname,
-                Port = 5243,
-                Url = $"http://{lanIp}:5243",
+                Port = port,
+                Url = $"http://{lanIp}:{port}",
                 Timestamp = DateTime.UtcNow,
                 IsOffline = false
             };
@@ -155,24 +160,141 @@ public class SystemController : ControllerBase
     }
 
     /// <summary>
-    /// Helper: Get LAN IP address
+    /// Helper: Get best LAN IPv4 address, preferring physical NICs over virtual/VPN adapters.
     /// </summary>
     private static string GetLanIpAddress()
     {
         try
         {
-            var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
-            foreach (var ip in host.AddressList)
+            var candidates = new List<(IPAddress Address, int Score)>();
+
+            foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces())
             {
-                if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
-                    return ip.ToString();
+                if (networkInterface.OperationalStatus != OperationalStatus.Up)
+                    continue;
+
+                if (networkInterface.NetworkInterfaceType is NetworkInterfaceType.Loopback
+                    or NetworkInterfaceType.Tunnel
+                    or NetworkInterfaceType.Ppp)
+                    continue;
+
+                var ipProperties = networkInterface.GetIPProperties();
+                var hasIpv4Gateway = ipProperties.GatewayAddresses.Any(g =>
+                    g.Address.AddressFamily == AddressFamily.InterNetwork
+                    && !g.Address.Equals(IPAddress.Any)
+                    && !g.Address.Equals(IPAddress.None));
+
+                foreach (var unicastAddress in ipProperties.UnicastAddresses)
+                {
+                    var address = unicastAddress.Address;
+                    if (address.AddressFamily != AddressFamily.InterNetwork)
+                        continue;
+
+                    if (IPAddress.IsLoopback(address) || IsApipa(address) || !IsPrivateIpv4(address))
+                        continue;
+
+                    var score = 0;
+
+                    if (hasIpv4Gateway)
+                        score += 100;
+
+                    score += networkInterface.NetworkInterfaceType switch
+                    {
+                        NetworkInterfaceType.Wireless80211 => 80,
+                        NetworkInterfaceType.Ethernet => 70,
+                        NetworkInterfaceType.GigabitEthernet => 70,
+                        NetworkInterfaceType.FastEthernetT => 60,
+                        NetworkInterfaceType.FastEthernetFx => 60,
+                        _ => 20
+                    };
+
+                    if (IsLikelyVirtualInterface(networkInterface))
+                        score -= 250;
+
+                    if (IsLikelyVpnInterface(networkInterface))
+                        score -= 150;
+
+                    candidates.Add((address, score));
+                }
             }
+
+            if (candidates.Count > 0)
+            {
+                return candidates
+                    .OrderByDescending(candidate => candidate.Score)
+                    .Select(candidate => candidate.Address.ToString())
+                    .First();
+            }
+
+            // Fallback to hostname enumeration if interface scoring didn't yield a candidate.
+            var host = Dns.GetHostEntry(Dns.GetHostName());
+            var fallback = host.AddressList.FirstOrDefault(ip =>
+                ip.AddressFamily == AddressFamily.InterNetwork
+                && !IPAddress.IsLoopback(ip)
+                && !IsApipa(ip)
+                && IsPrivateIpv4(ip));
+
+            if (fallback != null)
+                return fallback.ToString();
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"Failed to get LAN IP: {ex.Message}");
         }
         return "127.0.0.1";
+    }
+
+    private static bool IsPrivateIpv4(IPAddress address)
+    {
+        var bytes = address.GetAddressBytes();
+        if (bytes.Length != 4)
+            return false;
+
+        return bytes[0] == 10
+               || (bytes[0] == 172 && bytes[1] >= 16 && bytes[1] <= 31)
+               || (bytes[0] == 192 && bytes[1] == 168);
+    }
+
+    private static bool IsApipa(IPAddress address)
+    {
+        var bytes = address.GetAddressBytes();
+        return bytes.Length == 4 && bytes[0] == 169 && bytes[1] == 254;
+    }
+
+    private static bool IsLikelyVirtualInterface(NetworkInterface networkInterface)
+    {
+        var text = $"{networkInterface.Name} {networkInterface.Description}".ToLowerInvariant();
+        var virtualKeywords = new[]
+        {
+            "virtual",
+            "vmware",
+            "vbox",
+            "hyper-v",
+            "vethernet",
+            "docker",
+            "wsl",
+            "loopback",
+            "npcap"
+        };
+
+        return virtualKeywords.Any(keyword => text.Contains(keyword, StringComparison.Ordinal));
+    }
+
+    private static bool IsLikelyVpnInterface(NetworkInterface networkInterface)
+    {
+        var text = $"{networkInterface.Name} {networkInterface.Description}".ToLowerInvariant();
+        var vpnKeywords = new[]
+        {
+            "vpn",
+            "wireguard",
+            "zerotier",
+            "hamachi",
+            "tailscale",
+            "tap",
+            "tun"
+        };
+
+        return vpnKeywords.Any(keyword => text.Contains(keyword, StringComparison.Ordinal));
     }
 }
 

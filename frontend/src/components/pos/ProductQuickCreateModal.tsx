@@ -6,6 +6,7 @@ import {
   Tag,
   Hash,
   Barcode,
+  Image as ImageIcon,
   ChevronDown,
 } from "lucide-react";
 import { useQuickCreateProductMutation } from "@/api/productsApi";
@@ -36,6 +37,7 @@ export const ProductQuickCreateModal = ({
     name: initialName,
     price: "" as string | number,
     categoryId: 0,
+    imageUrl: "",
     type: ProductType.Service, // افتراضياً خدمة للإنشاء السريع
     initialStock: "" as string | number,
     sku: "",
@@ -155,6 +157,25 @@ export const ProductQuickCreateModal = ({
                   className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                   placeholder="0.00"
                   required
+                />
+              </div>
+            </div>
+
+            {/* Icon */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                أيقونة المنتج (اختياري)
+              </label>
+              <div className="relative">
+                <ImageIcon className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={formData.imageUrl || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, imageUrl: e.target.value })
+                  }
+                  className="w-full pr-10 pl-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                  placeholder="مثال: ☕ أو https://example.com/icon.png"
                 />
               </div>
             </div>

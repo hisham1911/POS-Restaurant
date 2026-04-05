@@ -15,6 +15,36 @@ import type { Category } from "@/types/category.types";
 import { toast } from "sonner";
 import clsx from "clsx";
 
+const CATEGORY_ICONS = [
+  "🛒",
+  "🥤",
+  "🍞",
+  "🥩",
+  "🥦",
+  "🍫",
+  "🧴",
+  "🧼",
+  "🧻",
+  "🧃",
+  "🥫",
+  "🍚",
+  "🧂",
+  "☕",
+  "🍗",
+  "🍟",
+  "🧀",
+  "🥛",
+  "🍎",
+  "🧺",
+];
+
+const isImageSource = (value?: string): boolean => {
+  if (!value) return false;
+  const normalized = value.trim();
+  if (!normalized) return false;
+  return /^(https?:\/\/|\/|data:image\/|blob:)/i.test(normalized);
+};
+
 export const CategoriesPage = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -22,7 +52,9 @@ export const CategoriesPage = () => {
     name: "",
     nameEn: "",
     description: "",
+    imageUrl: "",
   });
+  const [showIconPicker, setShowIconPicker] = useState(false);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
@@ -46,6 +78,7 @@ export const CategoriesPage = () => {
       name: category.name,
       nameEn: category.nameEn || "",
       description: category.description || "",
+      imageUrl: category.imageUrl || "",
     });
     setShowForm(true);
   };
@@ -85,7 +118,8 @@ export const CategoriesPage = () => {
   const handleCloseForm = () => {
     setShowForm(false);
     setEditingCategory(null);
-    setFormData({ name: "", nameEn: "", description: "" });
+    setFormData({ name: "", nameEn: "", description: "", imageUrl: "" });
+    setShowIconPicker(false);
   };
 
   if (isLoading) return <Loading />;
@@ -166,7 +200,19 @@ export const CategoriesPage = () => {
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
-                    <FolderOpen className="w-6 h-6 text-primary-600" />
+                    {category.imageUrl ? (
+                      isImageSource(category.imageUrl) ? (
+                        <img
+                          src={category.imageUrl}
+                          alt={category.name}
+                          className="w-8 h-8 rounded object-cover"
+                        />
+                      ) : (
+                        <span className="text-2xl">{category.imageUrl}</span>
+                      )
+                    ) : (
+                      <FolderOpen className="w-6 h-6 text-primary-600" />
+                    )}
                   </div>
                   <div>
                     <h3 className="font-semibold text-gray-800">
@@ -279,6 +325,76 @@ export const CategoriesPage = () => {
                 placeholder="وصف اختياري للتصنيف..."
                 rows={3}
                 className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                أيقونة التصنيف
+              </label>
+
+              <div className="flex gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setShowIconPicker((prev) => !prev)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+                >
+                  {formData.imageUrl ? (
+                    isImageSource(formData.imageUrl) ? (
+                      <img
+                        src={formData.imageUrl}
+                        alt="category-icon"
+                        className="w-7 h-7 rounded object-cover"
+                      />
+                    ) : (
+                      <span className="text-2xl">{formData.imageUrl}</span>
+                    )
+                  ) : (
+                    <FolderOpen className="w-5 h-5 text-gray-400" />
+                  )}
+                  <span className="text-sm">اختر أيقونة</span>
+                </button>
+
+                {formData.imageUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setFormData({ ...formData, imageUrl: "" })}
+                    className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+
+              {showIconPicker && (
+                <div className="mb-3 p-3 border border-gray-200 rounded-lg bg-gray-50 grid grid-cols-10 gap-2 max-h-44 overflow-y-auto">
+                  {CATEGORY_ICONS.map((icon) => (
+                    <button
+                      key={icon}
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...formData, imageUrl: icon });
+                        setShowIconPicker(false);
+                      }}
+                      className={clsx(
+                        "text-2xl p-2 rounded hover:bg-white transition-colors",
+                        formData.imageUrl === icon &&
+                          "bg-primary-100 ring-2 ring-primary-500",
+                      )}
+                    >
+                      {icon}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <Input
+                label="أيقونة مخصصة (إيموجي أو رابط صورة)"
+                value={formData.imageUrl}
+                onChange={(e) =>
+                  setFormData({ ...formData, imageUrl: e.target.value })
+                }
+                placeholder="مثال: 🥤 أو https://example.com/icon.png"
               />
             </div>
             <div className="flex gap-3 pt-4">

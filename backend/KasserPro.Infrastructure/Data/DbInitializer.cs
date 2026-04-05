@@ -293,9 +293,7 @@ public static class DbInitializer
                 for (int i = 0; i < orderCount; i++)
                 {
                     var orderTime = shift.OpenedAt.AddMinutes(random.Next(30, 700));
-                    var status = day == 0 && i >= orderCount - 2
-                        ? (i == orderCount - 1 ? OrderStatus.Draft : OrderStatus.Pending)
-                        : OrderStatus.Completed;
+                    var status = OrderStatus.Completed;
 
                     // Assign customer to some orders
                     Customer? customer = random.Next(3) == 0 ? customers[random.Next(customers.Count)] : null;

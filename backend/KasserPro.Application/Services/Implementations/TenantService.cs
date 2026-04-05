@@ -15,6 +15,14 @@ using System.Text.RegularExpressions;
 
 public class TenantService : ITenantService
 {
+    private static readonly HashSet<string> AllowedPrintRoutingModes = new(StringComparer.Ordinal)
+    {
+        "BranchOnly",
+        "BranchWithFallback",
+        "AllDevices",
+        "Disabled"
+    };
+
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
     private readonly ILogger<TenantService> _logger;
@@ -94,6 +102,21 @@ public class TenantService : ITenantService
             tenant.ReceiptShowCustomerName = dto.ReceiptShowCustomerName.Value;
         if (dto.ReceiptShowLogo.HasValue)
             tenant.ReceiptShowLogo = dto.ReceiptShowLogo.Value;
+
+        // Update print routing settings if provided
+        if (dto.PrintRoutingMode != null)
+        {
+            if (!AllowedPrintRoutingModes.Contains(dto.PrintRoutingMode))
+                return ApiResponse<TenantDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
+
+            tenant.PrintRoutingMode = dto.PrintRoutingMode;
+        }
+        if (dto.AutoPrintOnSale.HasValue)
+            tenant.AutoPrintOnSale = dto.AutoPrintOnSale.Value;
+        if (dto.AutoPrintOnDebtPayment.HasValue)
+            tenant.AutoPrintOnDebtPayment = dto.AutoPrintOnDebtPayment.Value;
+        if (dto.AutoPrintDailyReports.HasValue)
+            tenant.AutoPrintDailyReports = dto.AutoPrintDailyReports.Value;
 
         _unitOfWork.Tenants.Update(tenant);
         await _unitOfWork.SaveChangesAsync();
@@ -363,6 +386,10 @@ public class TenantService : ITenantService
         ReceiptPhoneNumber = tenant.ReceiptPhoneNumber,
         ReceiptShowCustomerName = tenant.ReceiptShowCustomerName,
         ReceiptShowLogo = tenant.ReceiptShowLogo,
+        PrintRoutingMode = tenant.PrintRoutingMode,
+        AutoPrintOnSale = tenant.AutoPrintOnSale,
+        AutoPrintOnDebtPayment = tenant.AutoPrintOnDebtPayment,
+        AutoPrintDailyReports = tenant.AutoPrintDailyReports,
         CreatedAt = tenant.CreatedAt
     };
 }

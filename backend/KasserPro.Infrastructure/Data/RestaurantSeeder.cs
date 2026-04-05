@@ -28,7 +28,7 @@ public static class RestaurantSeeder
 
         var branch = await context.Branches.FirstAsync(b => b.TenantId == tenant.Id);
         var admin = await context.Users.FirstAsync(u => u.TenantId == tenant.Id && u.Role == UserRole.Admin);
-        
+
         // Add Cashiers and Waiters
         var cashiers = await SeedCashiersAsync(context, tenant, branch);
         var allUsers = new List<User> { admin };
@@ -36,7 +36,7 @@ public static class RestaurantSeeder
 
         var categories = await context.Categories.Where(c => c.TenantId == tenant.Id).ToListAsync();
         var products = await context.Products.Where(p => p.TenantId == tenant.Id).ToListAsync();
-        
+
         var customers = await SeedCustomersAsync(context, tenant);
         await SeedExpenseCategoriesAsync(context, tenant);
         await SeedShiftsAndOrdersAsync(context, tenant, branch, allUsers, products, customers);
@@ -85,18 +85,18 @@ public static class RestaurantSeeder
             new() { TenantId = tenant.Id, Name = "حسام الدين محمد", Phone = "01001234567", Email = "hossam@email.com", Address = "المعادي، القاهرة", LoyaltyPoints = 650, TotalOrders = 95, TotalSpent = 18500, LastOrderAt = DateTime.UtcNow.AddHours(-4), IsActive = true },
             new() { TenantId = tenant.Id, Name = "وليد أحمد", Phone = "01112345678", Email = "walid@email.com", Address = "الزمالك، القاهرة", LoyaltyPoints = 580, TotalOrders = 82, TotalSpent = 16200, LastOrderAt = DateTime.UtcNow.AddDays(-1), IsActive = true },
             new() { TenantId = tenant.Id, Name = "طارق سعيد", Phone = "01223456789", Email = "tarek.s@email.com", Address = "مدينة نصر، القاهرة", LoyaltyPoints = 520, TotalOrders = 75, TotalSpent = 14800, LastOrderAt = DateTime.UtcNow.AddDays(-2), IsActive = true },
-            
+
             // عملاء منتظمين
             new() { TenantId = tenant.Id, Name = "كريم عبدالله", Phone = "01098765432", Email = "karim@email.com", Address = "المهندسين، الجيزة", LoyaltyPoints = 380, TotalOrders = 52, TotalSpent = 9800, LastOrderAt = DateTime.UtcNow.AddDays(-3), IsActive = true },
             new() { TenantId = tenant.Id, Name = "ياسر محمود", Phone = "01198765432", Email = "yasser@email.com", Address = "حلوان، القاهرة", LoyaltyPoints = 320, TotalOrders = 45, TotalSpent = 8200, LastOrderAt = DateTime.UtcNow.AddDays(-4), IsActive = true },
             new() { TenantId = tenant.Id, Name = "سامي حسن", Phone = "01287654321", Email = "samy@email.com", Address = "الدقي، الجيزة", LoyaltyPoints = 280, TotalOrders = 38, TotalSpent = 7100, LastOrderAt = DateTime.UtcNow.AddDays(-5), IsActive = true },
             new() { TenantId = tenant.Id, Name = "عادل علي", Phone = "01156789012", Email = "adel@email.com", Address = "العباسية، القاهرة", LoyaltyPoints = 240, TotalOrders = 32, TotalSpent = 6200, LastOrderAt = DateTime.UtcNow.AddDays(-6), IsActive = true },
             new() { TenantId = tenant.Id, Name = "مصطفى محمد", Phone = "01267890123", Email = "mostafa@email.com", Address = "الهرم، الجيزة", LoyaltyPoints = 210, TotalOrders = 28, TotalSpent = 5400, LastOrderAt = DateTime.UtcNow.AddDays(-7), IsActive = true },
-            
+
             // عملاء جدد
             new() { TenantId = tenant.Id, Name = "بلال أحمد", Phone = "01078901234", Email = null, Address = "شبرا، القاهرة", LoyaltyPoints = 55, TotalOrders = 6, TotalSpent = 1200, LastOrderAt = DateTime.UtcNow.AddDays(-8), IsActive = true },
             new() { TenantId = tenant.Id, Name = "فادي سعيد", Phone = "01189012345", Email = null, Address = "المطرية، القاهرة", LoyaltyPoints = 40, TotalOrders = 4, TotalSpent = 850, LastOrderAt = DateTime.UtcNow.AddDays(-10), IsActive = true },
-            
+
             // عملاء شركات (طلبات جماعية)
             new() { TenantId = tenant.Id, Name = "شركة النور - قسم المشتريات", Phone = "01090123456", Email = "alnour.company@email.com", Address = "وسط البلد، القاهرة", LoyaltyPoints = 920, TotalOrders = 65, TotalSpent = 28500, LastOrderAt = DateTime.UtcNow.AddHours(-10), IsActive = true },
             new() { TenantId = tenant.Id, Name = "مكتب الأمل - إدارة", Phone = "01201234567", Email = "alamal.office@email.com", Address = "مصر الجديدة، القاهرة", LoyaltyPoints = 780, TotalOrders = 52, TotalSpent = 22800, LastOrderAt = DateTime.UtcNow.AddDays(-1), IsActive = true }
@@ -170,9 +170,7 @@ public static class RestaurantSeeder
             for (int i = 0; i < orderCount; i++)
             {
                 var orderTime = shift.OpenedAt.AddMinutes(_random.Next(60, 750));
-                var status = day == 0 && i >= orderCount - 2
-                    ? (i == orderCount - 1 ? OrderStatus.Draft : OrderStatus.Pending)
-                    : OrderStatus.Completed;
+                var status = OrderStatus.Completed;
 
                 var customer = _random.Next(4) == 0 ? customers[_random.Next(customers.Count)] : null;
 
@@ -232,8 +230,8 @@ public static class RestaurantSeeder
         OrderStatus status, Branch branch)
     {
         // Restaurant orders have variety: 50% DineIn, 30% Takeaway, 20% Delivery
-        var orderTypes = new[] { OrderType.DineIn, OrderType.DineIn, OrderType.DineIn, OrderType.DineIn, OrderType.DineIn, 
-                                 OrderType.Takeaway, OrderType.Takeaway, OrderType.Takeaway, 
+        var orderTypes = new[] { OrderType.DineIn, OrderType.DineIn, OrderType.DineIn, OrderType.DineIn, OrderType.DineIn,
+                                 OrderType.Takeaway, OrderType.Takeaway, OrderType.Takeaway,
                                  OrderType.Delivery, OrderType.Delivery };
         var orderType = orderTypes[_random.Next(orderTypes.Length)];
 
@@ -402,7 +400,7 @@ public static class RestaurantSeeder
 
             // Get shift for return date
             var shift = await context.Shifts
-                .Where(s => s.TenantId == tenant.Id 
+                .Where(s => s.TenantId == tenant.Id
                          && s.BranchId == branch.Id
                          && s.OpenedAt.Date == returnDate.Date)
                 .FirstOrDefaultAsync();
@@ -414,6 +412,7 @@ public static class RestaurantSeeder
                 TenantId = tenant.Id,
                 BranchId = branch.Id,
                 ShiftId = shift.Id,
+                OriginalOrderId = originalOrder.Id,
                 OrderNumber = $"RET-{returnDate:yyyyMMdd}-{_random.Next(1000, 9999)}",
                 UserId = cashier.Id,
                 UserName = cashier.Name,
@@ -467,6 +466,10 @@ public static class RestaurantSeeder
                 returnOrder.Items.Add(returnItem);
                 subtotal -= netPrice;
                 taxAmount -= itemTax;
+
+                originalItem.RefundedQuantity = Math.Min(
+                    originalItem.Quantity,
+                    originalItem.RefundedQuantity + Math.Abs(returnQty));
             }
 
             returnOrder.Subtotal = Math.Round(subtotal, 2);
@@ -487,6 +490,18 @@ public static class RestaurantSeeder
             });
 
             context.Orders.Add(returnOrder);
+
+            var refundedAmount = Math.Abs(returnOrder.Total);
+            originalOrder.RefundAmount = Math.Min(
+                Math.Abs(originalOrder.Total),
+                originalOrder.RefundAmount + refundedAmount);
+            originalOrder.RefundedAt = returnDate;
+            originalOrder.RefundReason = "استرجاع من بيانات السييد";
+            originalOrder.RefundedByUserId = cashier.Id;
+            originalOrder.RefundedByUserName = cashier.Name;
+            originalOrder.Status = originalOrder.RefundAmount >= Math.Abs(originalOrder.Total) - 0.01m
+                ? OrderStatus.Refunded
+                : OrderStatus.PartiallyRefunded;
 
             // Stock is now managed through BranchInventory and StockMovements
             // No need to manually update product stock here

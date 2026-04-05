@@ -171,7 +171,25 @@ public class CustomersController : ControllerBase
     {
         var userId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
         var result = await _customerService.PayDebtAsync(id, request, userId);
-        return result.Success ? Ok(result) : BadRequest(result);
+        if (!result.Success)
+        {
+            return BadRequest(result);
+        }
+
+        var paymentId = result.Data?.PaymentId ?? 0;
+        if (paymentId > 0)
+        {
+            try
+            {
+                await TrySendDebtPaymentReceiptAsync(paymentId, isAutomatic: true);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Debt payment recorded but automatic print failed for payment {PaymentId}", paymentId);
+            }
+        }
+
+        return Ok(result);
     }
 
     [HttpGet("{id}/debt-history")]
@@ -196,67 +214,14 @@ public class CustomersController : ControllerBase
     {
         try
         {
-            var tenantId = int.Parse(User.FindFirst("tenantId")?.Value ?? "0");
-            var payment = await _customerService.GetDebtPaymentByIdAsync(paymentId, tenantId);
-
-            if (payment == null)
+            var (sent, paymentFound) = await TrySendDebtPaymentReceiptAsync(paymentId, isAutomatic: false);
+            if (!paymentFound)
                 return NotFound(ApiResponse<object>.Fail(ErrorCodes.PAYMENT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PAYMENT_NOT_FOUND)));
 
-            var userName = User.FindFirst("name")?.Value ?? "Cashier";
-            var branchId = User.FindFirst("branchId")?.Value ?? "default";
-
-            var tenantResult = await _tenantService.GetCurrentTenantAsync();
-            var tenant = tenantResult.Data;
-
-            var printCommand = new PrintCommandDto
+            if (!sent)
             {
-                CommandId = Guid.NewGuid().ToString(),
-                Receipt = new ReceiptDto
-                {
-                    ReceiptNumber = $"PAY-{payment.Id}",
-                    BranchName = tenant?.Name ?? "KasserPro Store",
-                    Date = DateTime.Now,
-                    CustomerName = payment.CustomerName ?? string.Empty,
-                    PaymentMethod = payment.PaymentMethod.ToString(),
-                    CashierName = payment.RecordedByUserName ?? userName,
-                    NetTotal = payment.BalanceBefore,
-                    TaxAmount = 0,
-                    TotalAmount = payment.BalanceBefore,
-                    AmountPaid = payment.Amount,
-                    ChangeAmount = 0,
-                    AmountDue = payment.BalanceAfter,
-                    Items = new List<ReceiptItemDto>()
-                },
-                Settings = new ReceiptPrintSettings
-                {
-                    PaperSize = tenant?.ReceiptPaperSize ?? "80mm",
-                    CustomWidth = tenant?.ReceiptCustomWidth,
-                    HeaderFontSize = tenant?.ReceiptHeaderFontSize ?? 12,
-                    BodyFontSize = tenant?.ReceiptBodyFontSize ?? 9,
-                    TotalFontSize = tenant?.ReceiptTotalFontSize ?? 11,
-                    ShowBranchName = tenant?.ReceiptShowBranchName ?? true,
-                    ShowCashier = tenant?.ReceiptShowCashier ?? true,
-                    ShowThankYou = tenant?.ReceiptShowThankYou ?? true,
-                    ShowCustomerName = tenant?.ReceiptShowCustomerName ?? true,
-                    ShowLogo = tenant?.ReceiptShowLogo ?? true,
-                    FooterMessage = tenant?.ReceiptFooterMessage,
-                    PhoneNumber = tenant?.ReceiptPhoneNumber,
-                    LogoUrl = tenant?.LogoUrl
-                }
-            };
-
-            var branchGroup = $"branch-{branchId}";
-
-            await _hubContext.Clients.Group(branchGroup)
-                .SendAsync("PrintReceipt", printCommand);
-
-            if (branchGroup != "branch-default")
-            {
-                await _hubContext.Clients.Group("branch-default")
-                    .SendAsync("PrintReceipt", printCommand);
+                return StatusCode(500, ApiResponse<object>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR)));
             }
-
-            _logger.LogInformation("Print command sent for debt payment {PaymentId} to branch group {BranchId}", paymentId, branchId);
 
             return Ok(ApiResponse<bool>.Ok(true, "تم إرسال أمر الطباعة بنجاح"));
         }
@@ -264,6 +229,122 @@ public class CustomersController : ControllerBase
         {
             _logger.LogError(ex, "Failed to send print command for debt payment {PaymentId}", paymentId);
             return StatusCode(500, ApiResponse<object>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR)));
+        }
+    }
+
+    private async Task<(bool Sent, bool PaymentFound)> TrySendDebtPaymentReceiptAsync(int paymentId, bool isAutomatic)
+    {
+        var tenantId = int.Parse(User.FindFirst("tenantId")?.Value ?? "0");
+        var payment = await _customerService.GetDebtPaymentByIdAsync(paymentId, tenantId);
+        if (payment == null)
+        {
+            _logger.LogWarning("Debt payment {PaymentId} not found for tenant {TenantId}", paymentId, tenantId);
+            return (false, false);
+        }
+
+        var userName = User.FindFirst("name")?.Value ?? "Cashier";
+        var branchId = User.FindFirst("branchId")?.Value ?? "default";
+
+        var tenantResult = await _tenantService.GetCurrentTenantAsync();
+        var tenant = tenantResult.Data;
+        var printRoutingMode = tenant?.PrintRoutingMode ?? "BranchWithFallback";
+
+        if (isAutomatic && (tenant?.AutoPrintOnDebtPayment == false || printRoutingMode == "Disabled"))
+        {
+            _logger.LogInformation(
+                "Automatic debt-payment print skipped for payment {PaymentId}. AutoPrintOnDebtPayment={AutoPrintOnDebtPayment}, RoutingMode={RoutingMode}",
+                paymentId,
+                tenant?.AutoPrintOnDebtPayment,
+                printRoutingMode);
+            return (false, true);
+        }
+
+        var printCommand = new PrintCommandDto
+        {
+            CommandId = Guid.NewGuid().ToString(),
+            Receipt = new ReceiptDto
+            {
+                ReceiptNumber = $"PAY-{payment.Id}",
+                BranchName = tenant?.Name ?? "KasserPro Store",
+                Date = DateTime.Now,
+                CustomerName = payment.CustomerName ?? string.Empty,
+                PaymentMethod = payment.PaymentMethod.ToString(),
+                CashierName = payment.RecordedByUserName ?? userName,
+                NetTotal = payment.BalanceBefore,
+                TaxAmount = 0,
+                TotalAmount = payment.BalanceBefore,
+                AmountPaid = payment.Amount,
+                ChangeAmount = 0,
+                AmountDue = payment.BalanceAfter,
+                Items = new List<ReceiptItemDto>()
+            },
+            Settings = new ReceiptPrintSettings
+            {
+                PaperSize = tenant?.ReceiptPaperSize ?? "80mm",
+                CustomWidth = tenant?.ReceiptCustomWidth,
+                HeaderFontSize = tenant?.ReceiptHeaderFontSize ?? 12,
+                BodyFontSize = tenant?.ReceiptBodyFontSize ?? 9,
+                TotalFontSize = tenant?.ReceiptTotalFontSize ?? 11,
+                ShowBranchName = tenant?.ReceiptShowBranchName ?? true,
+                ShowCashier = tenant?.ReceiptShowCashier ?? true,
+                ShowThankYou = tenant?.ReceiptShowThankYou ?? true,
+                ShowCustomerName = tenant?.ReceiptShowCustomerName ?? true,
+                ShowLogo = tenant?.ReceiptShowLogo ?? true,
+                FooterMessage = tenant?.ReceiptFooterMessage,
+                PhoneNumber = tenant?.ReceiptPhoneNumber,
+                LogoUrl = tenant?.LogoUrl
+            }
+        };
+
+        var branchGroup = $"branch-{branchId}";
+        await SendPrintCommandByRoutingAsync(
+            printCommand,
+            branchGroup,
+            printRoutingMode,
+            isAutomatic,
+            "PrintDebtPaymentReceipt");
+
+        _logger.LogInformation("Print command sent for debt payment {PaymentId} to branch group {BranchId}", paymentId, branchId);
+        return (true, true);
+    }
+
+    private async Task SendPrintCommandByRoutingAsync(
+        object printCommand,
+        string branchGroup,
+        string? routingMode,
+        bool isAutomatic,
+        string hubMethod)
+    {
+        var mode = string.IsNullOrWhiteSpace(routingMode) ? "BranchWithFallback" : routingMode;
+
+        // Manual print endpoint should keep working even if auto-routing is disabled.
+        if (!isAutomatic && string.Equals(mode, "Disabled", StringComparison.Ordinal))
+        {
+            mode = "BranchWithFallback";
+        }
+
+        if (string.Equals(mode, "BranchOnly", StringComparison.Ordinal))
+        {
+            await _hubContext.Clients.Group(branchGroup).SendAsync(hubMethod, printCommand);
+            return;
+        }
+
+        if (string.Equals(mode, "AllDevices", StringComparison.Ordinal))
+        {
+            await _hubContext.Clients.All.SendAsync(hubMethod, printCommand);
+            return;
+        }
+
+        if (string.Equals(mode, "Disabled", StringComparison.Ordinal))
+        {
+            _logger.LogInformation("Skipping automatic print command because routing mode is Disabled");
+            return;
+        }
+
+        await _hubContext.Clients.Group(branchGroup).SendAsync(hubMethod, printCommand);
+        if (branchGroup != "branch-default")
+        {
+            await _hubContext.Clients.Group("branch-default").SendAsync(hubMethod, printCommand);
         }
     }
 }

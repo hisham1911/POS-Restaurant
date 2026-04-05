@@ -55,6 +55,16 @@ public class Tenant : BaseEntity
     /// <summary>إظهار لوجو الشركة في الفاتورة</summary>
     public bool ReceiptShowLogo { get; set; } = true;
 
+    // Print Routing Settings - إعدادات الطباعة التلقائية
+    /// <summary>وضع توجيه الطباعة: BranchOnly | BranchWithFallback | AllDevices | Disabled</summary>
+    public string PrintRoutingMode { get; set; } = "BranchWithFallback";
+    /// <summary>طباعة الفاتورة تلقائياً عند إتمام البيع</summary>
+    public bool AutoPrintOnSale { get; set; } = true;
+    /// <summary>طباعة إيصال سداد الدين تلقائياً</summary>
+    public bool AutoPrintOnDebtPayment { get; set; } = true;
+    /// <summary>طباعة التقرير اليومي تلقائياً</summary>
+    public bool AutoPrintDailyReports { get; set; } = false;
+
     // Navigation
     public ICollection<Branch> Branches { get; set; } = new List<Branch>();
     public ICollection<User> Users { get; set; } = new List<User>();

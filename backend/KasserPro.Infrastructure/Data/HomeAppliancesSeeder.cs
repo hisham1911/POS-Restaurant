@@ -28,7 +28,7 @@ public static class HomeAppliancesSeeder
 
         var branch = await context.Branches.FirstAsync(b => b.TenantId == tenant.Id);
         var admin = await context.Users.FirstAsync(u => u.TenantId == tenant.Id && u.Role == UserRole.Admin);
-        
+
         // Add Cashiers
         var cashiers = await SeedCashiersAsync(context, tenant, branch);
         var allUsers = new List<User> { admin };
@@ -36,7 +36,7 @@ public static class HomeAppliancesSeeder
 
         var categories = await context.Categories.Where(c => c.TenantId == tenant.Id).ToListAsync();
         var products = await context.Products.Where(p => p.TenantId == tenant.Id).ToListAsync();
-        
+
         var customers = await SeedCustomersAsync(context, tenant);
         await SeedExpenseCategoriesAsync(context, tenant);
         await SeedShiftsAndOrdersAsync(context, tenant, branch, allUsers, products, customers);
@@ -84,16 +84,16 @@ public static class HomeAppliancesSeeder
             // عملاء VIP
             new() { TenantId = tenant.Id, Name = "منى أحمد", Phone = "01001111111", Email = "mona@email.com", Address = "المعادي، القاهرة", LoyaltyPoints = 380, TotalOrders = 28, TotalSpent = 8500, LastOrderAt = DateTime.UtcNow.AddDays(-1), IsActive = true },
             new() { TenantId = tenant.Id, Name = "سارة محمود", Phone = "01112222222", Email = "sara@email.com", Address = "الزمالك، القاهرة", LoyaltyPoints = 420, TotalOrders = 32, TotalSpent = 9800, LastOrderAt = DateTime.UtcNow.AddHours(-8), IsActive = true },
-            
+
             // عملاء منتظمين
             new() { TenantId = tenant.Id, Name = "ليلى حسن", Phone = "01223333333", Email = "laila@email.com", Address = "مدينة نصر، القاهرة", LoyaltyPoints = 220, TotalOrders = 18, TotalSpent = 5200, LastOrderAt = DateTime.UtcNow.AddDays(-3), IsActive = true },
             new() { TenantId = tenant.Id, Name = "نادية سعيد", Phone = "01098888888", Email = "nadia@email.com", Address = "المهندسين، الجيزة", LoyaltyPoints = 180, TotalOrders = 14, TotalSpent = 4100, LastOrderAt = DateTime.UtcNow.AddDays(-5), IsActive = true },
             new() { TenantId = tenant.Id, Name = "هالة علي", Phone = "01187777777", Email = "hala@email.com", Address = "الدقي، الجيزة", LoyaltyPoints = 150, TotalOrders = 11, TotalSpent = 3400, LastOrderAt = DateTime.UtcNow.AddDays(-7), IsActive = true },
-            
+
             // عملاء جدد
             new() { TenantId = tenant.Id, Name = "رانيا محمد", Phone = "01276666666", Email = null, Address = "حلوان، القاهرة", LoyaltyPoints = 35, TotalOrders = 2, TotalSpent = 850, LastOrderAt = DateTime.UtcNow.AddDays(-10), IsActive = true },
             new() { TenantId = tenant.Id, Name = "دينا أحمد", Phone = "01055555555", Email = null, Address = "العباسية، القاهرة", LoyaltyPoints = 25, TotalOrders = 1, TotalSpent = 450, LastOrderAt = DateTime.UtcNow.AddDays(-12), IsActive = true },
-            
+
             // عملاء محلات (جملة)
             new() { TenantId = tenant.Id, Name = "محل الأمل - أحمد صلاح", Phone = "01144444444", Email = "alamal.shop@email.com", Address = "شبرا، القاهرة", LoyaltyPoints = 650, TotalOrders = 45, TotalSpent = 18500, LastOrderAt = DateTime.UtcNow.AddHours(-10), IsActive = true },
             new() { TenantId = tenant.Id, Name = "سوبر ماركت النور - محمد حسن", Phone = "01233333333", Email = "alnour.market@email.com", Address = "فيصل، الجيزة", LoyaltyPoints = 520, TotalOrders = 38, TotalSpent = 14200, LastOrderAt = DateTime.UtcNow.AddDays(-2), IsActive = true }
@@ -167,9 +167,7 @@ public static class HomeAppliancesSeeder
             for (int i = 0; i < orderCount; i++)
             {
                 var orderTime = shift.OpenedAt.AddMinutes(_random.Next(30, 700));
-                var status = day == 0 && i >= orderCount - 1
-                    ? OrderStatus.Draft
-                    : OrderStatus.Completed;
+                var status = OrderStatus.Completed;
 
                 var customer = _random.Next(4) == 0 ? customers[_random.Next(customers.Count)] : null;
 

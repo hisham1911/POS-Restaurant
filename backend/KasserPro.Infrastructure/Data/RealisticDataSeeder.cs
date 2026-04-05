@@ -279,142 +279,312 @@ public static class RealisticDataSeeder
         AppDbContext context, Tenant tenant, Branch branch, User admin,
         List<Product> products, List<Customer> customers)
     {
-        var shifts = new List<Shift>();
-        var orders = new List<Order>();
         int orderNumber = 10000;
+        int shiftCount = 0;
 
         // Create a pool of returning customers (30% of customers will be frequent buyers)
         var returningCustomers = customers.Take((int)(customers.Count * 0.3)).ToList();
 
-        // Generate shifts for 120 days (1 shift per day for simplicity)
-        for (int day = 120; day >= 0; day--)
+        // Temporarily disable auto-detect changes while constructing a large object graph.
+        var originalAutoDetect = context.ChangeTracker.AutoDetectChangesEnabled;
+        context.ChangeTracker.AutoDetectChangesEnabled = false;
+        try
         {
-            var shiftDate = StartDate.AddDays(day);
-            var isWeekend = shiftDate.DayOfWeek == DayOfWeek.Friday || shiftDate.DayOfWeek == DayOfWeek.Saturday;
+            // Generate shifts for 120 days (1 shift per day for simplicity)
+            for (int day = 120; day >= 0; day--)
+            {
+                var shiftDate = StartDate.AddDays(day);
+                var isWeekend = shiftDate.DayOfWeek == DayOfWeek.Friday || shiftDate.DayOfWeek == DayOfWeek.Saturday;
 
-            var shift = new Shift
+                var shift = new Shift
+                {
+                    TenantId = tenant.Id,
+                    BranchId = branch.Id,
+                    UserId = admin.Id,
+                    OpeningBalance = 2000,
+                    OpenedAt = shiftDate.AddHours(8),
+                    LastActivityAt = shiftDate.AddHours(8),
+                    IsClosed = true, // All historical shifts are closed
+                    IsForceClosed = false,
+                    IsHandedOver = false,
+                    HandoverBalance = 0,
+                    ClosedAt = shiftDate.AddHours(22)
+                };
+
+                shift.LastActivityAt = shift.ClosedAt.Value;
+
+                context.Shifts.Add(shift);
+                shiftCount++;
+
+                // Generate orders for this shift
+                var orderCount = isWeekend ? _random.Next(15, 25) : _random.Next(10, 18);
+
+                decimal totalCash = 0;
+                decimal totalCard = 0;
+                int completedCount = 0;
+
+                for (int i = 0; i < orderCount; i++)
+                {
+                    var orderTime = shiftDate.AddMinutes(_random.Next(480, 840)); // 8am to 10pm
+                    var status = OrderStatus.Completed;
+
+                    // 60% chance of returning customer, 30% new customer, 10% no customer
+                    Customer? customer = null;
+                    var customerRoll = _random.Next(100);
+                    if (customerRoll < 60 && returningCustomers.Count > 0)
+                    {
+                        customer = returningCustomers[_random.Next(returningCustomers.Count)];
+                    }
+                    else if (customerRoll < 90 && customers.Count > 0)
+                    {
+                        customer = customers[_random.Next(customers.Count)];
+                    }
+
+                    var order = CreateOrder(
+                        tenant.Id, branch.Id, admin.Id, shift, admin.Name,
+                        products, customer, orderTime, orderNumber++, status, branch
+                    );
+
+                    context.Orders.Add(order);
+
+                    if (status == OrderStatus.Completed)
+                    {
+                        completedCount++;
+                        var payment = order.Payments.FirstOrDefault();
+                        if (payment != null)
+                        {
+                            if (payment.Method == PaymentMethod.Cash)
+                                totalCash += payment.Amount;
+                            else
+                                totalCard += payment.Amount;
+                        }
+                    }
+                }
+
+                // Update shift totals
+                shift.TotalOrders = completedCount;
+                shift.TotalCash = totalCash;
+                shift.TotalCard = totalCard;
+                shift.ExpectedBalance = shift.OpeningBalance + totalCash;
+                shift.ClosingBalance = shift.ExpectedBalance + _random.Next(-100, 150);
+                shift.Difference = shift.ClosingBalance - shift.ExpectedBalance;
+            }
+
+            // Create TODAY's open shift
+            var todayShift = new Shift
             {
                 TenantId = tenant.Id,
                 BranchId = branch.Id,
                 UserId = admin.Id,
                 OpeningBalance = 2000,
-                OpenedAt = shiftDate.AddHours(8),
-                LastActivityAt = shiftDate.AddHours(8),
-                IsClosed = true, // All historical shifts are closed
+                OpenedAt = DateTime.UtcNow.Date.AddHours(8),
+                LastActivityAt = DateTime.UtcNow,
+                IsClosed = false,
                 IsForceClosed = false,
                 IsHandedOver = false,
-                HandoverBalance = 0,
-                ClosedAt = shiftDate.AddHours(22)
+                HandoverBalance = 0
             };
+            context.Shifts.Add(todayShift);
+            shiftCount++;
 
-            shift.LastActivityAt = shift.ClosedAt.Value;
-
-            context.Shifts.Add(shift);
-            await context.SaveChangesAsync();
-
-            // Generate orders for this shift
-            var orderCount = isWeekend ? _random.Next(15, 25) : _random.Next(10, 18);
-
-            decimal totalCash = 0;
-            decimal totalCard = 0;
-            int completedCount = 0;
-
-            for (int i = 0; i < orderCount; i++)
+            // Add 2-3 orders for today (some draft/pending)
+            for (int i = 0; i < 3; i++)
             {
-                var orderTime = shiftDate.AddMinutes(_random.Next(480, 840)); // 8am to 10pm
+                var orderTime = DateTime.UtcNow.AddHours(-_random.Next(1, 4));
+                var status = OrderStatus.Completed;
 
-                // All historical orders are completed (85%), cancelled (10%), or refunded (5%)
-                OrderStatus status;
-                var statusRoll = _random.Next(100);
-                if (statusRoll < 85) status = OrderStatus.Completed;
-                else if (statusRoll < 95) status = OrderStatus.Cancelled;
-                else status = OrderStatus.Refunded;
-
-                // 60% chance of returning customer, 30% new customer, 10% no customer
                 Customer? customer = null;
-                var customerRoll = _random.Next(100);
-                if (customerRoll < 60 && returningCustomers.Count > 0)
-                {
-                    customer = returningCustomers[_random.Next(returningCustomers.Count)];
-                }
-                else if (customerRoll < 90 && customers.Count > 0)
+                if (customers.Count > 0 && _random.Next(100) < 50)
                 {
                     customer = customers[_random.Next(customers.Count)];
                 }
 
                 var order = CreateOrder(
-                    tenant.Id, branch.Id, admin.Id, shift.Id, admin.Name,
+                    tenant.Id, branch.Id, admin.Id, todayShift, admin.Name,
                     products, customer, orderTime, orderNumber++, status, branch
                 );
 
                 context.Orders.Add(order);
-
-                if (status == OrderStatus.Completed)
-                {
-                    completedCount++;
-                    var payment = order.Payments.FirstOrDefault();
-                    if (payment != null)
-                    {
-                        if (payment.Method == PaymentMethod.Cash)
-                            totalCash += payment.Amount;
-                        else
-                            totalCard += payment.Amount;
-                    }
-                }
             }
-
-            await context.SaveChangesAsync();
-
-            // Update shift totals
-            shift.TotalOrders = completedCount;
-            shift.TotalCash = totalCash;
-            shift.TotalCard = totalCard;
-            shift.ExpectedBalance = shift.OpeningBalance + totalCash;
-            shift.ClosingBalance = shift.ExpectedBalance + _random.Next(-100, 150);
-            shift.Difference = shift.ClosingBalance - shift.ExpectedBalance;
-            await context.SaveChangesAsync();
+        }
+        finally
+        {
+            context.ChangeTracker.AutoDetectChangesEnabled = originalAutoDetect;
         }
 
-        // Create TODAY's open shift
-        var todayShift = new Shift
-        {
-            TenantId = tenant.Id,
-            BranchId = branch.Id,
-            UserId = admin.Id,
-            OpeningBalance = 2000,
-            OpenedAt = DateTime.UtcNow.Date.AddHours(8),
-            LastActivityAt = DateTime.UtcNow,
-            IsClosed = false,
-            IsForceClosed = false,
-            IsHandedOver = false,
-            HandoverBalance = 0
-        };
-        context.Shifts.Add(todayShift);
         await context.SaveChangesAsync();
 
-        // Add 2-3 orders for today (some draft/pending)
-        for (int i = 0; i < 3; i++)
-        {
-            var orderTime = DateTime.UtcNow.AddHours(-_random.Next(1, 4));
-            OrderStatus status = i == 0 ? OrderStatus.Draft : (i == 1 ? OrderStatus.Pending : OrderStatus.Completed);
+        var completedOrders = await context.Orders
+            .Include(o => o.Items)
+            .Include(o => o.Payments)
+            .Where(o => o.TenantId == tenant.Id
+                && o.Status == OrderStatus.Completed
+                && o.OrderType != OrderType.Return)
+            .ToListAsync();
 
-            Customer? customer = null;
-            if (customers.Count > 0 && _random.Next(100) < 50)
-            {
-                customer = customers[_random.Next(customers.Count)];
-            }
+        await CreateReturnOrdersAsync(context, tenant, branch, admin, completedOrders);
 
-            var order = CreateOrder(
-                tenant.Id, branch.Id, admin.Id, todayShift.Id, admin.Name,
-                products, customer, orderTime, orderNumber++, status, branch
-            );
-
-            context.Orders.Add(order);
-        }
-        await context.SaveChangesAsync();
-
-        Console.WriteLine($"   ✓ تم إنشاء {shifts.Count} وردية");
+        Console.WriteLine($"   ✓ تم إنشاء {shiftCount} وردية");
         Console.WriteLine($"   ✓ تم إنشاء ~{orderNumber - 10000} طلب");
+    }
+
+    private static async Task CreateReturnOrdersAsync(
+        AppDbContext context, Tenant tenant, Branch branch, User admin, List<Order> completedOrders)
+    {
+        if (completedOrders.Count == 0)
+        {
+            return;
+        }
+
+        var shiftsByDate = (await context.Shifts
+                .AsNoTracking()
+                .Where(s => s.TenantId == tenant.Id && s.BranchId == branch.Id)
+                .OrderByDescending(s => s.OpenedAt)
+                .ToListAsync())
+            .GroupBy(s => s.OpenedAt.Date)
+            .ToDictionary(g => g.Key, g => g.First());
+
+        // Keep a realistic ratio of returns without introducing Draft/Pending states.
+        var returnCount = Math.Max(3, (int)(completedOrders.Count * 0.06));
+        var ordersToReturn = completedOrders
+            .OrderBy(_ => Guid.NewGuid())
+            .Take(returnCount)
+            .ToList();
+
+        foreach (var originalOrder in ordersToReturn)
+        {
+            if (originalOrder.CompletedAt == null)
+            {
+                continue;
+            }
+
+            var sourceItems = originalOrder.Items
+                .Where(i => i.Quantity > 0)
+                .ToList();
+
+            if (sourceItems.Count == 0)
+            {
+                continue;
+            }
+
+            var returnDate = originalOrder.CompletedAt.Value.AddHours(_random.Next(2, 72));
+            if (!shiftsByDate.TryGetValue(returnDate.Date, out var shift))
+            {
+                continue;
+            }
+
+            var fullRefund = _random.Next(100) < 35;
+            var itemsToReturn = fullRefund
+                ? sourceItems
+                : sourceItems
+                    .OrderBy(_ => Guid.NewGuid())
+                    .Take(_random.Next(1, Math.Min(4, sourceItems.Count + 1)))
+                    .ToList();
+
+            var returnOrder = new Order
+            {
+                TenantId = tenant.Id,
+                BranchId = branch.Id,
+                ShiftId = shift.Id,
+                OriginalOrderId = originalOrder.Id,
+                OrderNumber = $"RET-{returnDate:yyyyMMdd}-{originalOrder.Id:D5}",
+                UserId = admin.Id,
+                UserName = admin.Name,
+                Status = OrderStatus.Completed,
+                OrderType = OrderType.Return,
+                CreatedAt = returnDate,
+                CompletedAt = returnDate.AddMinutes(3),
+                CompletedByUserId = admin.Id,
+                BranchName = branch.Name,
+                BranchAddress = branch.Address,
+                BranchPhone = branch.Phone,
+                CurrencyCode = "EGP",
+                TaxRate = 14,
+                CustomerId = originalOrder.CustomerId,
+                CustomerName = originalOrder.CustomerName,
+                CustomerPhone = originalOrder.CustomerPhone
+            };
+
+            decimal subtotal = 0;
+            decimal taxAmount = 0;
+
+            foreach (var originalItem in itemsToReturn)
+            {
+                var maxQty = Math.Abs(originalItem.Quantity);
+                if (maxQty <= 0)
+                {
+                    continue;
+                }
+
+                var refundQty = fullRefund ? maxQty : _random.Next(1, maxQty + 1);
+                var returnQty = -refundQty;
+                var netPrice = originalItem.UnitPrice * refundQty;
+                var itemTax = netPrice * (14m / 100m);
+
+                returnOrder.Items.Add(new OrderItem
+                {
+                    ProductId = originalItem.ProductId,
+                    ProductName = originalItem.ProductName,
+                    ProductNameEn = originalItem.ProductNameEn,
+                    ProductSku = originalItem.ProductSku,
+                    ProductBarcode = originalItem.ProductBarcode,
+                    UnitPrice = originalItem.UnitPrice,
+                    UnitCost = originalItem.UnitCost,
+                    OriginalPrice = originalItem.OriginalPrice,
+                    Quantity = returnQty,
+                    TaxRate = 14,
+                    TaxInclusive = false,
+                    TaxAmount = -Math.Round(itemTax, 2),
+                    Subtotal = -Math.Round(netPrice, 2),
+                    Total = -Math.Round(netPrice + itemTax, 2)
+                });
+
+                originalItem.RefundedQuantity = Math.Min(
+                    originalItem.Quantity,
+                    originalItem.RefundedQuantity + refundQty);
+
+                subtotal -= netPrice;
+                taxAmount -= itemTax;
+            }
+
+            if (returnOrder.Items.Count == 0)
+            {
+                continue;
+            }
+
+            returnOrder.Subtotal = Math.Round(subtotal, 2);
+            returnOrder.TaxAmount = Math.Round(taxAmount, 2);
+            returnOrder.Total = Math.Round(subtotal + taxAmount, 2);
+            returnOrder.AmountPaid = returnOrder.Total;
+            returnOrder.AmountDue = 0;
+
+            var refundMethod = originalOrder.Payments.FirstOrDefault()?.Method ?? PaymentMethod.Cash;
+            returnOrder.Payments.Add(new Payment
+            {
+                TenantId = tenant.Id,
+                BranchId = branch.Id,
+                Method = refundMethod,
+                Amount = returnOrder.Total,
+                CreatedAt = returnDate.AddMinutes(3)
+            });
+
+            var refundedAmount = Math.Abs(returnOrder.Total);
+            originalOrder.RefundAmount = Math.Min(
+                Math.Abs(originalOrder.Total),
+                originalOrder.RefundAmount + refundedAmount);
+            originalOrder.RefundedAt = returnDate;
+            originalOrder.RefundReason = fullRefund ? "استرجاع كامل (Seed)" : "استرجاع جزئي (Seed)";
+            originalOrder.RefundedByUserId = admin.Id;
+            originalOrder.RefundedByUserName = admin.Name;
+            originalOrder.Status = originalOrder.RefundAmount >= Math.Abs(originalOrder.Total) - 0.01m
+                ? OrderStatus.Refunded
+                : OrderStatus.PartiallyRefunded;
+
+            context.Orders.Add(returnOrder);
+        }
+
+        await context.SaveChangesAsync();
+        Console.WriteLine("   ✓ تم إنشاء طلبات مسترجعة/مسترجعة جزئياً للبيانات الواقعية");
     }
 
     private static async Task GenerateBranchTransfersAsync(
@@ -480,7 +650,7 @@ public static class RealisticDataSeeder
     }
 
     private static Order CreateOrder(
-        int tenantId, int branchId, int userId, int shiftId, string userName,
+        int tenantId, int branchId, int userId, Shift shift, string userName,
         List<Product> products, Customer? customer, DateTime orderTime, int orderNum,
         OrderStatus status, Branch branch)
     {
@@ -488,7 +658,7 @@ public static class RealisticDataSeeder
         {
             TenantId = tenantId,
             BranchId = branchId,
-            ShiftId = shiftId,
+            Shift = shift,
             OrderNumber = $"ORD-{orderTime:yyyyMMdd}-{orderNum:D5}",
             UserId = userId,
             UserName = userName,

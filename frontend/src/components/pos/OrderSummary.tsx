@@ -16,54 +16,56 @@ export const OrderSummary = () => {
   } = useCart();
 
   return (
-    <div className="border-t pt-4 space-y-2">
-      <div className="flex justify-between text-gray-600">
-        <span>المجموع الفرعي</span>
-        <span>{formatCurrency(subtotal)}</span>
+    <div className="space-y-2.5">
+      {/* Subtotal */}
+      <div className="flex justify-between items-center">
+        <span className="text-sm text-gray-600">المجموع الفرعي</span>
+        <span className="text-sm font-semibold text-gray-900">{formatCurrency(subtotal)}</span>
       </div>
 
-      {/* إظهار خصومات المنتجات */}
+      {/* Item Discounts */}
       {itemDiscountsTotal > 0 && (
-        <div className="flex justify-between text-success-600">
-          <span className="flex items-center gap-1">
-            <Tag className="w-4 h-4" />
+        <div className="flex justify-between items-center px-2.5 py-2 bg-emerald-50 rounded-md border border-emerald-100">
+          <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-700">
+            <Tag className="w-3.5 h-3.5" strokeWidth={2} />
             <span>خصومات المنتجات</span>
           </span>
-          <span>- {formatCurrency(itemDiscountsTotal)}</span>
+          <span className="text-sm font-bold text-emerald-700">- {formatCurrency(itemDiscountsTotal)}</span>
         </div>
       )}
 
-      {/* إظهار الخصم على الطلب إذا كان موجود */}
+      {/* Order Discount */}
       {discountAmount > 0 && (
-        <div className="flex justify-between text-success-600">
-          <span className="flex items-center gap-1">
+        <div className="flex justify-between items-center px-2.5 py-2 bg-emerald-50 rounded-md border border-emerald-100">
+          <span className="flex items-center gap-1.5 text-sm font-medium text-emerald-700">
             {discountType === "Percentage" ? (
-              <Percent className="w-4 h-4" />
+              <Percent className="w-3.5 h-3.5" strokeWidth={2} />
             ) : (
-              <DollarSign className="w-4 h-4" />
+              <DollarSign className="w-3.5 h-3.5" strokeWidth={2} />
             )}
             <span>
               خصم الطلب
-              {discountType === "Percentage" &&
-                discountValue &&
-                ` (${discountValue}%)`}
+              {discountType === "Percentage" && discountValue && ` (${discountValue}%)`}
             </span>
           </span>
-          <span>- {formatCurrency(discountAmount)}</span>
+          <span className="text-sm font-bold text-emerald-700">- {formatCurrency(discountAmount)}</span>
         </div>
       )}
 
-      {/* إظهار الضريبة فقط إذا كانت مفعلة */}
+      {/* Tax */}
       {isTaxEnabled && (
-        <div className="flex justify-between text-gray-600">
-          <span>الضريبة ({taxRate}%)</span>
-          <span>{formatCurrency(taxAmount)}</span>
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">الضريبة ({taxRate}%)</span>
+          <span className="text-sm font-semibold text-gray-900">{formatCurrency(taxAmount)}</span>
         </div>
       )}
 
-      <div className="flex justify-between text-xl font-bold pt-2 border-t">
-        <span>الإجمالي</span>
-        <span className="text-primary-600">{formatCurrency(total)}</span>
+      {/* Total */}
+      <div className="flex justify-between items-center pt-2.5 border-t-2 border-gray-200">
+        <span className="text-base font-bold text-gray-900">الإجمالي</span>
+        <span className="text-2xl font-bold text-blue-600">
+          {formatCurrency(total)}
+        </span>
       </div>
     </div>
   );

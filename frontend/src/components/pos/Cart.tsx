@@ -1,4 +1,4 @@
-import { ShoppingCart, Trash2, Tag } from "lucide-react";
+import { ShoppingCart, Trash2, Tag, X } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { CartItemComponent } from "./CartItem";
 import { OrderSummary } from "./OrderSummary";
@@ -25,79 +25,83 @@ export const Cart = ({
 
   if (items.length === 0) {
     return (
-      <div className="h-full flex flex-col">
-        {/* Customer Search - Always visible */}
-        <CustomerSearch
-          selectedCustomer={selectedCustomer}
-          onCustomerSelect={onCustomerSelect}
-        />
+      <div className="h-full flex flex-col bg-white">
+        {/* Customer Search */}
+        <div className="p-3 lg:p-4 border-b border-gray-100">
+          <CustomerSearch
+            selectedCustomer={selectedCustomer}
+            onCustomerSelect={onCustomerSelect}
+          />
+        </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
-          <div className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-            <ShoppingCart className="w-10 h-10" />
+        <div className="flex-1 flex flex-col items-center justify-center px-4">
+          <div className="w-24 h-24 rounded-full bg-gray-50 flex items-center justify-center mb-4">
+            <ShoppingCart className="w-12 h-12 text-gray-300" strokeWidth={1.5} />
           </div>
-          <p className="text-lg font-medium">السلة فارغة</p>
-          <p className="text-sm">اضغط على المنتجات لإضافتها</p>
+          <p className="text-lg font-semibold text-gray-900 mb-1">السلة فارغة</p>
+          <p className="text-sm text-gray-500">ابدأ بإضافة المنتجات</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col bg-white">
       {/* Customer Search */}
-      <CustomerSearch
-        selectedCustomer={selectedCustomer}
-        onCustomerSelect={onCustomerSelect}
-      />
+      <div className="p-3 lg:p-4 border-b border-gray-100">
+        <CustomerSearch
+          selectedCustomer={selectedCustomer}
+          onCustomerSelect={onCustomerSelect}
+        />
+      </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between pb-4 border-b">
+      <div className="flex items-center justify-between px-3 lg:px-4 py-3 border-b border-gray-100">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-bold text-gray-800">الطلب الحالي</h2>
-          <span className="bg-primary-600 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+          <span className="text-base lg:text-lg font-bold text-gray-900">الطلب</span>
+          <span className="min-w-[24px] h-6 px-2 bg-blue-600 text-white text-xs font-bold rounded-md flex items-center justify-center">
             {itemsCount}
           </span>
         </div>
         <button
           onClick={clearCart}
-          className="flex items-center gap-1 text-danger-500 text-sm hover:underline"
+          className="flex items-center gap-1.5 text-red-600 text-sm font-medium hover:bg-red-50 px-2.5 py-1.5 rounded-md transition-colors"
         >
-          <Trash2 className="w-4 h-4" />
-          إفراغ
+          <Trash2 className="w-4 h-4" strokeWidth={2} />
+          <span className="hidden sm:inline">إفراغ</span>
         </button>
       </div>
 
       {/* Items */}
-      <div className="flex-1 overflow-y-auto py-4 space-y-3 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto px-3 lg:px-4 py-3 space-y-2">
         {items.map((item) => (
           <CartItemComponent key={item.product.id} item={item} />
         ))}
       </div>
 
       {/* Summary */}
-      <OrderSummary />
+      <div className="border-t border-gray-100 px-3 lg:px-4 py-3 bg-gray-50">
+        <OrderSummary />
+      </div>
 
-      {/* Discount Button */}
-      <Button
-        variant="outline"
-        size="lg"
-        className="w-full mt-3"
-        onClick={() => setShowDiscountModal(true)}
-        leftIcon={<Tag className="w-5 h-5" />}
-      >
-        {discountAmount > 0 ? "تعديل الخصم" : "إضافة خصم"}
-      </Button>
+      {/* Actions */}
+      <div className="p-3 lg:p-4 space-y-2 border-t border-gray-100">
+        <button
+          onClick={() => setShowDiscountModal(true)}
+          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 border-2 border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:border-gray-300 hover:bg-gray-50 transition-colors"
+        >
+          <Tag className="w-4 h-4" strokeWidth={2} />
+          {discountAmount > 0 ? "تعديل الخصم" : "إضافة خصم"}
+        </button>
 
-      {/* Checkout Button */}
-      <Button
-        variant="success"
-        size="xl"
-        className="w-full mt-2"
-        onClick={onCheckout}
-      >
-        💳 الدفع {formatCurrency(total)}
-      </Button>
+        <button
+          onClick={onCheckout}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3.5 bg-green-600 text-white rounded-lg text-base font-bold hover:bg-green-700 active:scale-[0.98] transition-all shadow-sm"
+        >
+          <span>الدفع</span>
+          <span className="text-lg">{formatCurrency(total)}</span>
+        </button>
+      </div>
 
       {/* Discount Modal */}
       {showDiscountModal && (

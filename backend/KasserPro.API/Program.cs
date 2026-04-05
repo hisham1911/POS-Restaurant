@@ -368,6 +368,48 @@ if (!app.Environment.IsEnvironment("Testing"))
         {
             Log.Warning(seedEx, "Realistic data seeding failed; continuing startup");
         }
+
+        // Ensure seeded catalog data always has descriptive icons for categories/products.
+        try
+        {
+            await SeedCatalogIconSynchronizer.SynchronizeAsync(context);
+        }
+        catch (Exception iconEx)
+        {
+            Log.Warning(iconEx, "Seed icon synchronization failed after seeding");
+        }
+
+        // Seeders insert entities directly; reconcile inventory when rows are missing
+        // or when all quantities are zero (fresh/partially seeded state).
+        var expectedInventoryRows = await (
+            from product in context.Products.AsNoTracking()
+            join branch in context.Branches.AsNoTracking() on product.TenantId equals branch.TenantId
+            where product.IsActive && product.TrackInventory && branch.IsActive
+            select 1
+        ).CountAsync();
+
+        var existingInventoryRows = await context.BranchInventories
+            .AsNoTracking()
+            .CountAsync();
+
+        var hasPositiveInventory = await context.BranchInventories
+            .AsNoTracking()
+            .AnyAsync(i => i.Quantity > 0);
+
+        var shouldSynchronizeSeedInventory = expectedInventoryRows > 0
+            && (existingInventoryRows < expectedInventoryRows || !hasPositiveInventory);
+
+        if (shouldSynchronizeSeedInventory)
+        {
+            try
+            {
+                await SeedInventorySynchronizer.SynchronizeAsync(context);
+            }
+            catch (Exception syncEx)
+            {
+                Log.Warning(syncEx, "Branch inventory synchronization failed after seeding");
+            }
+        }
     }
 }
 

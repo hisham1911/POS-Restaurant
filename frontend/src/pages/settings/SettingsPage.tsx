@@ -20,13 +20,10 @@ import {
   WifiOff,
   Copy,
   Check,
-  Shield,
-  ChevronLeft,
   ShoppingCart,
   Sparkles,
   ChevronDown,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 import {
   useGetCurrentTenantQuery,
   useUpdateCurrentTenantMutation,
@@ -43,8 +40,66 @@ import { usePOSMode } from "@/hooks/usePOSMode";
 import { getApiErrorCode, handleApiError } from "@/utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
 
+const isPrivateIpv4Host = (host: string): boolean => {
+  const parts = host.split(".");
+  if (parts.length !== 4) {
+    return false;
+  }
+
+  const octets = parts.map((part) => Number(part));
+  if (octets.some((octet) => Number.isNaN(octet) || octet < 0 || octet > 255)) {
+    return false;
+  }
+
+  const [first, second] = octets;
+  return (
+    first === 10 ||
+    first === 127 ||
+    (first === 192 && second === 168) ||
+    (first === 172 && second >= 16 && second <= 31)
+  );
+};
+
+const isLocalNetworkHost = (host: string): boolean => {
+  if (!host) {
+    return false;
+  }
+
+  const normalized = host.toLowerCase();
+
+  if (
+    normalized === "localhost" ||
+    normalized === "::1" ||
+    normalized === "0.0.0.0"
+  ) {
+    return true;
+  }
+
+  if (normalized.endsWith(".local")) {
+    return true;
+  }
+
+  if (normalized.includes(":")) {
+    return (
+      normalized.startsWith("fe80:") ||
+      normalized.startsWith("fc") ||
+      normalized.startsWith("fd")
+    );
+  }
+
+  if (isPrivateIpv4Host(normalized)) {
+    return true;
+  }
+
+  // Hostnames without dots are usually local machine names inside LAN.
+  return !normalized.includes(".");
+};
+
 export const SettingsPage = () => {
   const dispatch = useAppDispatch();
+  const browserHost =
+    typeof window !== "undefined" ? window.location.hostname : "";
+  const isLanRuntime = isLocalNetworkHost(browserHost);
   const { data: tenantData, isLoading, refetch } = useGetCurrentTenantQuery();
   const [updateTenant, { isLoading: isUpdating }] =
     useUpdateCurrentTenantMutation();
@@ -54,8 +109,17 @@ export const SettingsPage = () => {
   const { mode, setMode } = usePOSMode();
 
   // System Info & Network Status
-  const { data: systemData } = useGetSystemInfoQuery();
-  const { data: healthData, isError: isHealthError } = useHealthQuery();
+  const { data: systemData } = useGetSystemInfoQuery(undefined, {
+    skip: !isLanRuntime,
+  });
+  const {
+    data: healthData,
+    isError: isHealthError,
+    isLoading: isHealthLoading,
+    isFetching: isHealthFetching,
+  } = useHealthQuery(undefined, {
+    skip: !isLanRuntime,
+  });
   const [urlCopied, setUrlCopied] = useState(false);
 
   const tenant = tenantData?.data;
@@ -191,7 +255,14 @@ export const SettingsPage = () => {
     }
   };
 
-  const isOnline = !isHealthError && healthData?.status === "healthy";
+  const healthStatus = healthData?.data?.status?.toLowerCase();
+  const networkStatus: "checking" | "online" | "offline" =
+    isHealthLoading || isHealthFetching
+      ? "checking"
+      : !isHealthError && healthStatus === "healthy"
+        ? "online"
+        : "offline";
+  const isOnline = networkStatus === "online";
 
   if (isLoading) {
     return (
@@ -218,12 +289,14 @@ export const SettingsPage = () => {
         </div>
 
         {/* System Network Info Card */}
-        {systemData?.data && (
+        {isLanRuntime && systemData?.data && (
           <div className="bg-white rounded-xl shadow-sm border p-6 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-lg font-semibold">
-                {isOnline ? (
+                {networkStatus === "online" ? (
                   <Wifi className="w-5 h-5 text-green-500" />
+                ) : networkStatus === "checking" ? (
+                  <Wifi className="w-5 h-5 text-yellow-500" />
                 ) : (
                   <WifiOff className="w-5 h-5 text-red-500" />
                 )}
@@ -232,12 +305,18 @@ export const SettingsPage = () => {
               <div
                 className={clsx(
                   "px-3 py-1 rounded-full text-sm font-medium",
-                  isOnline
+                  networkStatus === "online"
                     ? "bg-green-100 text-green-700"
-                    : "bg-red-100 text-red-700",
+                    : networkStatus === "checking"
+                      ? "bg-yellow-100 text-yellow-700"
+                      : "bg-red-100 text-red-700",
                 )}
               >
-                {isOnline ? "متصل" : "غير متصل"}
+                {networkStatus === "online"
+                  ? "متصل"
+                  : networkStatus === "checking"
+                    ? "جاري التحقق..."
+                    : "غير متصل"}
               </div>
             </div>
 
@@ -286,7 +365,7 @@ export const SettingsPage = () => {
                 </div>
               </div>
 
-              {!isOnline && (
+              {networkStatus === "offline" && (
                 <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                   <div className="text-sm text-yellow-700">
                     ⚠️ التطبيق يعمل في وضع عدم الاتصال. البيانات محلية ومتاحة.
@@ -296,26 +375,6 @@ export const SettingsPage = () => {
             </div>
           </div>
         )}
-
-        {/* Permissions Management Card */}
-        <Link to="/settings/permissions">
-          <div className="bg-white rounded-xl shadow-sm border p-6 hover:shadow-md transition-shadow cursor-pointer">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                <Shield className="w-6 h-6 text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <h3 className="text-lg font-semibold">
-                  إدارة صلاحيات الكاشيرين
-                </h3>
-                <p className="text-sm text-gray-500">
-                  تحكم في صلاحيات كل كاشير بشكل منفصل
-                </p>
-              </div>
-              <ChevronLeft className="w-5 h-5 text-gray-400" />
-            </div>
-          </div>
-        </Link>
 
         {/* POS Mode Settings Card */}
         <div className="bg-white rounded-xl shadow-sm border p-6 space-y-4">

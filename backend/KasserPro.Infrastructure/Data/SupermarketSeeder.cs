@@ -28,7 +28,7 @@ public static class SupermarketSeeder
 
         var branch = await context.Branches.FirstAsync(b => b.TenantId == tenant.Id);
         var admin = await context.Users.FirstAsync(u => u.TenantId == tenant.Id && u.Role == UserRole.Admin);
-        
+
         // Add Cashiers
         var cashiers = await SeedCashiersAsync(context, tenant, branch);
         var allUsers = new List<User> { admin };
@@ -36,7 +36,7 @@ public static class SupermarketSeeder
 
         var categories = await context.Categories.Where(c => c.TenantId == tenant.Id).ToListAsync();
         var products = await context.Products.Where(p => p.TenantId == tenant.Id).ToListAsync();
-        
+
         var customers = await SeedCustomersAsync(context, tenant);
         await SeedExpenseCategoriesAsync(context, tenant);
         await SeedShiftsAndOrdersAsync(context, tenant, branch, allUsers, products, customers);
@@ -95,18 +95,18 @@ public static class SupermarketSeeder
             new() { TenantId = tenant.Id, Name = "عائلة أحمد محمود", Phone = "01001234567", Email = "ahmed.family@email.com", Address = "المعادي، القاهرة", LoyaltyPoints = 520, TotalOrders = 85, TotalSpent = 15800, LastOrderAt = DateTime.UtcNow.AddHours(-6), IsActive = true },
             new() { TenantId = tenant.Id, Name = "عائلة محمد حسن", Phone = "01112345678", Email = "mohamed.family@email.com", Address = "الزمالك، القاهرة", LoyaltyPoints = 480, TotalOrders = 78, TotalSpent = 14200, LastOrderAt = DateTime.UtcNow.AddDays(-1), IsActive = true },
             new() { TenantId = tenant.Id, Name = "عائلة خالد سعيد", Phone = "01223456789", Email = "khaled.family@email.com", Address = "مدينة نصر، القاهرة", LoyaltyPoints = 420, TotalOrders = 68, TotalSpent = 12500, LastOrderAt = DateTime.UtcNow.AddDays(-2), IsActive = true },
-            
+
             // عملاء منتظمين
             new() { TenantId = tenant.Id, Name = "إيمان علي", Phone = "01098765432", Email = "eman@email.com", Address = "المهندسين، الجيزة", LoyaltyPoints = 280, TotalOrders = 45, TotalSpent = 8200, LastOrderAt = DateTime.UtcNow.AddDays(-3), IsActive = true },
             new() { TenantId = tenant.Id, Name = "سمية محمد", Phone = "01198765432", Email = "somaya@email.com", Address = "حلوان، القاهرة", LoyaltyPoints = 240, TotalOrders = 38, TotalSpent = 6900, LastOrderAt = DateTime.UtcNow.AddDays(-4), IsActive = true },
             new() { TenantId = tenant.Id, Name = "نهى حسن", Phone = "01287654321", Email = "noha@email.com", Address = "الدقي، الجيزة", LoyaltyPoints = 210, TotalOrders = 32, TotalSpent = 5800, LastOrderAt = DateTime.UtcNow.AddDays(-5), IsActive = true },
             new() { TenantId = tenant.Id, Name = "أمل سعيد", Phone = "01156789012", Email = "amal@email.com", Address = "العباسية، القاهرة", LoyaltyPoints = 180, TotalOrders = 28, TotalSpent = 4900, LastOrderAt = DateTime.UtcNow.AddDays(-6), IsActive = true },
             new() { TenantId = tenant.Id, Name = "رشا أحمد", Phone = "01267890123", Email = "rasha@email.com", Address = "الهرم، الجيزة", LoyaltyPoints = 150, TotalOrders = 22, TotalSpent = 3800, LastOrderAt = DateTime.UtcNow.AddDays(-7), IsActive = true },
-            
+
             // عملاء جدد
             new() { TenantId = tenant.Id, Name = "غادة محمود", Phone = "01078901234", Email = null, Address = "شبرا، القاهرة", LoyaltyPoints = 45, TotalOrders = 5, TotalSpent = 980, LastOrderAt = DateTime.UtcNow.AddDays(-8), IsActive = true },
             new() { TenantId = tenant.Id, Name = "ياسمين علي", Phone = "01189012345", Email = null, Address = "المطرية، القاهرة", LoyaltyPoints = 30, TotalOrders = 3, TotalSpent = 650, LastOrderAt = DateTime.UtcNow.AddDays(-10), IsActive = true },
-            
+
             // عملاء محلات صغيرة (جملة)
             new() { TenantId = tenant.Id, Name = "بقالة الأمل - سامي حسن", Phone = "01090123456", Email = "alamal.grocery@email.com", Address = "وسط البلد، القاهرة", LoyaltyPoints = 850, TotalOrders = 120, TotalSpent = 32500, LastOrderAt = DateTime.UtcNow.AddHours(-12), IsActive = true },
             new() { TenantId = tenant.Id, Name = "كافتيريا النور - أحمد محمد", Phone = "01201234567", Email = "alnour.cafe@email.com", Address = "مصر الجديدة، القاهرة", LoyaltyPoints = 720, TotalOrders = 95, TotalSpent = 28800, LastOrderAt = DateTime.UtcNow.AddDays(-1), IsActive = true },
@@ -181,9 +181,7 @@ public static class SupermarketSeeder
             for (int i = 0; i < orderCount; i++)
             {
                 var orderTime = shift.OpenedAt.AddMinutes(_random.Next(30, 800));
-                var status = day == 0 && i >= orderCount - 2
-                    ? (i == orderCount - 1 ? OrderStatus.Draft : OrderStatus.Pending)
-                    : OrderStatus.Completed;
+                var status = OrderStatus.Completed;
 
                 var customer = _random.Next(5) == 0 ? customers[_random.Next(customers.Count)] : null;
 
@@ -407,7 +405,7 @@ public static class SupermarketSeeder
 
             // Get shift for return date
             var shift = await context.Shifts
-                .Where(s => s.TenantId == tenant.Id 
+                .Where(s => s.TenantId == tenant.Id
                          && s.BranchId == branch.Id
                          && s.OpenedAt.Date == returnDate.Date)
                 .FirstOrDefaultAsync();
@@ -419,6 +417,7 @@ public static class SupermarketSeeder
                 TenantId = tenant.Id,
                 BranchId = branch.Id,
                 ShiftId = shift.Id,
+                OriginalOrderId = originalOrder.Id,
                 OrderNumber = $"RET-{returnDate:yyyyMMdd}-{_random.Next(1000, 9999)}",
                 UserId = cashier.Id,
                 UserName = cashier.Name,
@@ -472,6 +471,10 @@ public static class SupermarketSeeder
                 returnOrder.Items.Add(returnItem);
                 subtotal -= netPrice;
                 taxAmount -= itemTax;
+
+                originalItem.RefundedQuantity = Math.Min(
+                    originalItem.Quantity,
+                    originalItem.RefundedQuantity + Math.Abs(returnQty));
             }
 
             returnOrder.Subtotal = Math.Round(subtotal, 2);
@@ -492,6 +495,18 @@ public static class SupermarketSeeder
             });
 
             context.Orders.Add(returnOrder);
+
+            var refundedAmount = Math.Abs(returnOrder.Total);
+            originalOrder.RefundAmount = Math.Min(
+                Math.Abs(originalOrder.Total),
+                originalOrder.RefundAmount + refundedAmount);
+            originalOrder.RefundedAt = returnDate;
+            originalOrder.RefundReason = "استرجاع من بيانات السييد";
+            originalOrder.RefundedByUserId = cashier.Id;
+            originalOrder.RefundedByUserName = cashier.Name;
+            originalOrder.Status = originalOrder.RefundAmount >= Math.Abs(originalOrder.Total) - 0.01m
+                ? OrderStatus.Refunded
+                : OrderStatus.PartiallyRefunded;
 
             // Restore stock for returned items
             // Stock is now managed through BranchInventory and StockMovements

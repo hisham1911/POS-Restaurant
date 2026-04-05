@@ -89,6 +89,7 @@ export interface QuickCreateProductRequest {
   name: string;
   price: number;
   categoryId: number;
+  imageUrl?: string;
   // نوع المنتج - افتراضياً خدمة للإنشاء السريع
   type?: ProductType;
   // الكمية الأولية (تُحفظ في BranchInventories للفرع الحالي)

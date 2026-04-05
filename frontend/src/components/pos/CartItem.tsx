@@ -26,22 +26,24 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
 
   return (
     <>
-      <div className="flex gap-3 p-3 bg-gray-50 rounded-xl">
-        {/* Image */}
-        <div className="w-16 h-16 bg-white rounded-lg flex items-center justify-center shrink-0">
+      <div className="flex gap-3 p-4 bg-gray-50 rounded-xl border-2 border-gray-200 hover:border-primary-200 transition-colors">
+        {/* Image - with subtle border */}
+        <div className="w-14 h-14 bg-gray-100 rounded-lg flex items-center justify-center shrink-0 border border-gray-200">
           <span className="text-2xl">{product.imageUrl || "📦"}</span>
         </div>
 
         {/* Details */}
         <div className="flex-1 min-w-0">
-          <h4 className="font-medium text-gray-800 truncate">{product.name}</h4>
-          <p className="text-sm text-gray-500">
-            {formatCurrency(product.price)}
+          <h4 className="font-bold text-gray-900 truncate text-base">
+            {product.name}
+          </h4>
+          <p className="text-sm text-gray-500 font-medium">
+            {formatCurrency(product.price)} × {quantity}
           </p>
 
-          {/* Item Discount Badge */}
+          {/* Item Discount Badge - with success color */}
           {discount && (
-            <span className="inline-flex items-center gap-1 text-xs bg-success-100 text-success-700 px-2 py-0.5 rounded-full mt-1">
+            <span className="inline-flex items-center gap-1 text-xs bg-green-100 text-green-700 px-2.5 py-1 rounded-lg font-medium mt-1 border border-green-200">
               <Tag className="w-3 h-3" />
               {discount.type === "percentage"
                 ? `${discount.value}%`
@@ -50,11 +52,11 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
             </span>
           )}
 
-          {/* Quantity Controls */}
-          <div className="flex items-center gap-2 mt-2">
+          {/* Quantity Controls - with brand colors */}
+          <div className="flex items-center gap-2 mt-3">
             <button
               onClick={() => updateQuantity(product.id, quantity - 1)}
-              className="w-11 h-11 flex items-center justify-center bg-white rounded-lg border hover:bg-gray-100 active:scale-95 transition-transform"
+              className="w-10 h-10 flex items-center justify-center bg-white rounded-lg border-2 border-gray-300 hover:border-red-400 hover:bg-red-50 hover:text-red-500"
               aria-label={
                 quantity === 1
                   ? `حذف ${product.name}`
@@ -62,29 +64,29 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
               }
             >
               {quantity === 1 ? (
-                <Trash2 className="w-5 h-5 text-danger-500" />
+                <Trash2 className="w-5 h-5 text-red-500" />
               ) : (
-                <Minus className="w-5 h-5" />
+                <Minus className="w-5 h-5 text-gray-600" />
               )}
             </button>
 
-            <span className="w-8 text-center font-bold">{quantity}</span>
+            <span className="w-10 text-center font-bold text-lg text-gray-900">{quantity}</span>
 
             <button
               onClick={() => updateQuantity(product.id, quantity + 1)}
-              className="w-11 h-11 flex items-center justify-center bg-primary-600 text-white rounded-lg hover:bg-primary-700 active:scale-95 transition-transform"
+              className="w-10 h-10 flex items-center justify-center bg-primary-600 text-white rounded-lg hover:bg-primary-700"
               aria-label={`زيادة كمية ${product.name}`}
             >
               <Plus className="w-5 h-5" />
             </button>
 
-            {/* Item Discount Button */}
+            {/* Item Discount Button - with secondary accent */}
             <button
               onClick={() => setShowDiscountModal(true)}
-              className={`w-11 h-11 flex items-center justify-center rounded-lg border active:scale-95 transition-all ${
+              className={`w-10 h-10 flex items-center justify-center rounded-lg border-2 ${
                 discount
-                  ? "bg-success-100 border-success-300 text-success-600 hover:bg-success-200"
-                  : "bg-white hover:bg-gray-100"
+                  ? "bg-green-100 border-green-400 text-green-600"
+                  : "bg-white border-gray-300 hover:border-secondary-400 hover:bg-secondary-50 text-gray-600"
               }`}
               aria-label={`خصم على ${product.name}`}
             >
@@ -93,25 +95,27 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
           </div>
         </div>
 
-        {/* Total */}
-        <div className="text-start shrink-0">
-          {discountAmount > 0 ? (
-            <>
-              <p className="text-sm text-gray-400 line-through">
+        {/* Total - with brand color */}
+        <div className="text-start shrink-0 flex flex-col justify-between">
+          <div>
+            {discountAmount > 0 ? (
+              <>
+                <p className="text-sm text-gray-400 line-through">
+                  {formatCurrency(total)}
+                </p>
+                <p className="font-bold text-green-600 text-lg">
+                  {formatCurrency(total - discountAmount)}
+                </p>
+              </>
+            ) : (
+              <p className="font-bold text-primary-600 text-lg">
                 {formatCurrency(total)}
               </p>
-              <p className="font-bold text-success-600">
-                {formatCurrency(total - discountAmount)}
-              </p>
-            </>
-          ) : (
-            <p className="font-bold text-primary-600">
-              {formatCurrency(total)}
-            </p>
-          )}
+            )}
+          </div>
           <button
             onClick={() => removeItem(product.id)}
-            className="text-danger-500 text-sm hover:underline mt-1"
+            className="text-red-500 text-sm font-medium hover:text-red-600"
           >
             حذف
           </button>

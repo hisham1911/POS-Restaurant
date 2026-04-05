@@ -21,7 +21,7 @@ export const useProducts = () => {
     isLoading,
     isError,
     refetch,
-  } = useGetProductsQuery();
+  } = useGetProductsQuery({ page: 1, pageSize: 1000 });
 
   const [createMutation, { isLoading: isCreating }] =
     useCreateProductMutation();
@@ -84,7 +84,14 @@ export const useProducts = () => {
 };
 
 export const useCategories = () => {
-  const { data: categoriesData, isLoading, isError } = useGetCategoriesQuery();
+  const {
+    data: categoriesData,
+    isLoading,
+    isError,
+  } = useGetCategoriesQuery({
+    page: 1,
+    pageSize: 200,
+  });
 
   const categories = categoriesData?.data || [];
 

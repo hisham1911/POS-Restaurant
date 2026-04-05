@@ -126,6 +126,17 @@ public class OrdersController : ControllerBase
                 // Get tenant settings for receipt configuration
                 var tenantResult = await _tenantService.GetCurrentTenantAsync();
                 var tenant = tenantResult.Data;
+                var printRoutingMode = tenant?.PrintRoutingMode ?? "BranchWithFallback";
+
+                if (tenant?.AutoPrintOnSale == false || printRoutingMode == "Disabled")
+                {
+                    _logger.LogInformation(
+                        "Auto print skipped for order {OrderId}. AutoPrintOnSale={AutoPrintOnSale}, RoutingMode={RoutingMode}",
+                        order.Id,
+                        tenant?.AutoPrintOnSale,
+                        printRoutingMode);
+                    return Ok(result);
+                }
 
                 var printCommand = new
                 {
@@ -186,16 +197,11 @@ public class OrdersController : ControllerBase
                 var branchId = User.FindFirst("branchId")?.Value ?? "default";
                 var branchGroup = $"branch-{branchId}";
 
-                // Send to specific branch group
-                await _hubContext.Clients.Group(branchGroup)
-                    .SendAsync("PrintReceipt", printCommand);
-
-                // Also send to default group as fallback (for devices without branch config)
-                if (branchGroup != "branch-default")
-                {
-                    await _hubContext.Clients.Group("branch-default")
-                        .SendAsync("PrintReceipt", printCommand);
-                }
+                await SendPrintCommandByRoutingAsync(
+                    printCommand,
+                    branchGroup,
+                    printRoutingMode,
+                    isAutomatic: true);
 
                 _logger.LogInformation("Print command sent for order {OrderId} to branch group {BranchId}", order.Id, branchId);
             }
@@ -329,16 +335,11 @@ public class OrdersController : ControllerBase
             var branchId = User.FindFirst("branchId")?.Value ?? "default";
             var branchGroup = $"branch-{branchId}";
 
-            // Send to specific branch group
-            await _hubContext.Clients.Group(branchGroup)
-                .SendAsync("PrintReceipt", printCommand);
-
-            // Also send to default group as fallback (for devices without branch config)
-            if (branchGroup != "branch-default")
-            {
-                await _hubContext.Clients.Group("branch-default")
-                    .SendAsync("PrintReceipt", printCommand);
-            }
+            await SendPrintCommandByRoutingAsync(
+                printCommand,
+                branchGroup,
+                tenant?.PrintRoutingMode ?? "BranchWithFallback",
+                isAutomatic: false);
 
             _logger.LogInformation("Print command sent for order {OrderId} to branch group {BranchId}", order.Id, branchId);
 
@@ -394,6 +395,45 @@ public class OrdersController : ControllerBase
 
             // Fallback to local time
             return utcTime.ToLocalTime();
+        }
+    }
+
+    private async Task SendPrintCommandByRoutingAsync(
+        object printCommand,
+        string branchGroup,
+        string? routingMode,
+        bool isAutomatic)
+    {
+        var mode = string.IsNullOrWhiteSpace(routingMode) ? "BranchWithFallback" : routingMode;
+
+        // Manual print endpoint should keep working even if auto-routing is disabled.
+        if (!isAutomatic && string.Equals(mode, "Disabled", StringComparison.Ordinal))
+        {
+            mode = "BranchWithFallback";
+        }
+
+        if (string.Equals(mode, "BranchOnly", StringComparison.Ordinal))
+        {
+            await _hubContext.Clients.Group(branchGroup).SendAsync("PrintReceipt", printCommand);
+            return;
+        }
+
+        if (string.Equals(mode, "AllDevices", StringComparison.Ordinal))
+        {
+            await _hubContext.Clients.All.SendAsync("PrintReceipt", printCommand);
+            return;
+        }
+
+        if (string.Equals(mode, "Disabled", StringComparison.Ordinal))
+        {
+            _logger.LogInformation("Skipping automatic print command because routing mode is Disabled");
+            return;
+        }
+
+        await _hubContext.Clients.Group(branchGroup).SendAsync("PrintReceipt", printCommand);
+        if (branchGroup != "branch-default")
+        {
+            await _hubContext.Clients.Group("branch-default").SendAsync("PrintReceipt", printCommand);
         }
     }
 }

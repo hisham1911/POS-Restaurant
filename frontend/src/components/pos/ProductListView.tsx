@@ -80,26 +80,26 @@ export const ProductListView = ({
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       {Object.entries(groupedProducts).map(([categoryId, categoryProducts]) => {
         const category = categories.find((c) => c.id === Number(categoryId));
         const categoryName = category?.name || "غير مصنف";
 
         return (
-          <div key={categoryId} className="space-y-3">
+          <div key={categoryId} className="space-y-2.5">
             {/* Category Header */}
-            <div className="flex items-center gap-3 pb-2 border-b-2 border-gray-200">
-              <div className="w-1 h-6 bg-primary-500 rounded-full" />
-              <h3 className="text-lg font-bold text-gray-800">
+            <div className="flex items-center gap-2.5 pb-2">
+              <div className="w-1 h-5 bg-blue-600 rounded-full" />
+              <h3 className="text-base font-bold text-gray-900">
                 {categoryName}
               </h3>
-              <span className="text-sm text-gray-500">
-                ({categoryProducts.length})
+              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+                {categoryProducts.length}
               </span>
             </div>
 
             {/* Products List */}
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {categoryProducts.map((product) => {
                 const cartItem = items.find(
                   (item) => item.product.id === product.id,
@@ -138,27 +138,28 @@ export const ProductListView = ({
                     onClick={() => handleProductClick(product)}
                     disabled={!product.isActive || isOutOfStock || !canAddMore}
                     className={clsx(
-                      "w-full flex items-center justify-between p-4 rounded-xl transition-all duration-200",
-                      "border-2 text-right",
+                      "w-full flex items-center justify-between min-h-[56px]",
+                      "px-3 py-2.5 rounded-lg transition-all duration-150",
+                      "border-2 text-start",
                       quantityInCart > 0
-                        ? "border-primary-400 bg-primary-50 shadow-md"
-                        : "border-gray-200 bg-white hover:border-primary-300 hover:shadow-sm",
+                        ? "border-blue-500 bg-blue-50"
+                        : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50",
                       (!product.isActive || isOutOfStock || !canAddMore) &&
                         "opacity-50 cursor-not-allowed",
                       product.isActive &&
                         canAddMore &&
                         !isOutOfStock &&
-                        "active:scale-[0.98]",
+                        "active:scale-[0.99]",
                     )}
                   >
                     {/* Left: Name & Stock */}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 pe-3">
                       <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-semibold text-gray-800 truncate">
+                        <h4 className="text-sm font-semibold text-gray-900 truncate">
                           {product.name}
                         </h4>
                         {quantityInCart > 0 && (
-                          <span className="px-2 py-0.5 bg-primary-600 text-white text-xs font-bold rounded-full">
+                          <span className="shrink-0 min-w-[20px] h-5 px-1.5 bg-blue-600 text-white text-xs font-bold rounded flex items-center justify-center">
                             {quantityInCart}
                           </span>
                         )}
@@ -166,39 +167,33 @@ export const ProductListView = ({
 
                       {/* Stock Status */}
                       {product.trackInventory && (
-                        <div className="flex items-center gap-2 text-sm">
+                        <div className="flex items-center gap-1.5 text-xs">
                           {isInventoryLoading && !hasInventorySnapshot ? (
                             <>
-                              <Loader2 className="w-4 h-4 text-gray-400 animate-spin" />
-                              <span className="text-gray-500 font-medium">
-                                -
-                              </span>
+                              <Loader2 className="w-3.5 h-3.5 text-gray-400 animate-spin shrink-0" />
+                              <span className="text-gray-500 font-medium">-</span>
                             </>
                           ) : !hasInventorySnapshot ? (
                             <>
-                              <Loader2 className="w-4 h-4 text-gray-400" />
-                              <span className="text-gray-500 font-medium">
-                                -
-                              </span>
+                              <Loader2 className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                              <span className="text-gray-500 font-medium">-</span>
                             </>
                           ) : isOutOfStock ? (
                             <>
-                              <AlertCircle className="w-4 h-4 text-red-500" />
-                              <span className="text-red-600 font-medium">
-                                نفد المخزون
-                              </span>
+                              <AlertCircle className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                              <span className="text-red-600 font-semibold">نفد المخزون</span>
                             </>
                           ) : isLowStock ? (
                             <>
-                              <Minus className="w-4 h-4 text-amber-500" />
-                              <span className="text-amber-600 font-medium">
+                              <Minus className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                              <span className="text-amber-600 font-semibold">
                                 متبقي {availableStock}
                               </span>
                             </>
                           ) : (
                             <>
-                              <CheckCircle2 className="w-4 h-4 text-success-500" />
-                              <span className="text-success-600 font-medium">
+                              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="text-emerald-600 font-semibold">
                                 متاح {availableStock}
                               </span>
                             </>
@@ -207,20 +202,20 @@ export const ProductListView = ({
                       )}
 
                       {!product.isActive && (
-                        <div className="flex items-center gap-2 text-sm">
-                          <Package className="w-4 h-4 text-gray-400" />
-                          <span className="text-gray-500">غير متوفر</span>
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <Package className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                          <span className="text-gray-500 font-medium">غير متوفر</span>
                         </div>
                       )}
                     </div>
 
                     {/* Right: Price */}
-                    <div className="text-left shrink-0 ml-4">
-                      <div className="text-xl font-bold text-primary-600">
+                    <div className="text-end shrink-0">
+                      <div className="text-lg font-bold text-gray-900">
                         {formatCurrency(product.price)}
                       </div>
                       {product.sku && (
-                        <div className="text-xs text-gray-400 font-mono">
+                        <div className="text-[10px] text-gray-400 font-mono mt-0.5">
                           {product.sku}
                         </div>
                       )}
@@ -235,9 +230,9 @@ export const ProductListView = ({
 
       {products.length === 0 && (
         <div className="text-center py-12 text-gray-400">
-          <Package className="w-16 h-16 mx-auto mb-4 opacity-50" />
-          <p className="text-lg font-medium">لا توجد منتجات</p>
-          <p className="text-sm">جرب تغيير البحث أو الفلتر</p>
+          <Package className="w-16 h-16 mx-auto mb-4 opacity-30" strokeWidth={1.5} />
+          <p className="text-base font-semibold text-gray-600 mb-1">لا توجد منتجات</p>
+          <p className="text-sm text-gray-500">جرب تغيير البحث أو الفلتر</p>
         </div>
       )}
     </div>

@@ -41,6 +41,12 @@ public class TenantDto
     public bool ReceiptShowCustomerName { get; set; } = true;
     public bool ReceiptShowLogo { get; set; } = true;
 
+    // Print Routing Settings
+    public string PrintRoutingMode { get; set; } = "BranchWithFallback";
+    public bool AutoPrintOnSale { get; set; } = true;
+    public bool AutoPrintOnDebtPayment { get; set; } = true;
+    public bool AutoPrintDailyReports { get; set; } = false;
+
     public DateTime CreatedAt { get; set; }
 }
 
@@ -81,4 +87,10 @@ public class UpdateTenantDto
     public string? ReceiptPhoneNumber { get; set; }
     public bool? ReceiptShowCustomerName { get; set; }
     public bool? ReceiptShowLogo { get; set; }
+
+    // Print Routing Settings
+    public string? PrintRoutingMode { get; set; }
+    public bool? AutoPrintOnSale { get; set; }
+    public bool? AutoPrintOnDebtPayment { get; set; }
+    public bool? AutoPrintDailyReports { get; set; }
 }

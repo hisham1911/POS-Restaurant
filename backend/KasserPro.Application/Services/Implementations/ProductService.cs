@@ -30,7 +30,7 @@ public class ProductService : IProductService
         var tenantId = _currentUser.TenantId;
         var branchId = _currentUser.BranchId;
         page = page < 1 ? 1 : page;
-        pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 100);
+        pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 1000);
 
         var query = _unitOfWork.Products.Query()
             .Include(p => p.Category)
@@ -414,6 +414,7 @@ public class ProductService : IProductService
                 Sku = request.Sku,
                 Barcode = request.Barcode,
                 Price = request.Price,
+                ImageUrl = request.ImageUrl,
                 CategoryId = request.CategoryId,
                 // Quick create defaults
                 IsActive = true,
@@ -464,6 +465,7 @@ public class ProductService : IProductService
                 Id = product.Id,
                 Name = product.Name,
                 Price = product.Price,
+                ImageUrl = product.ImageUrl,
                 Type = product.Type,
                 TrackInventory = product.TrackInventory,
                 IsActive = product.IsActive,

@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Card, Loading } from "../../components/common";
 import { Users, Shield } from "lucide-react";
 import UserManagementCard from "./components/UserManagementCard";
 import PermissionsManagementCard from "./components/PermissionsManagementCard";
 
 export default function UserManagementPage() {
-  const [activeCard, setActiveCard] = useState<"users" | "permissions">("users");
+  const [activeCard, setActiveCard] = useState<"users" | "permissions">(
+    "users",
+  );
 
   return (
     <div className="container mx-auto p-6" dir="rtl">

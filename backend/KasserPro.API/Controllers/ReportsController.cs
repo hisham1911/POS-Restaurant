@@ -183,16 +183,14 @@ public class ReportsController : ControllerBase
 
             var branchId = User.FindFirst("branchId")?.Value ?? "default";
             var branchGroup = $"branch-{branchId}";
+            var printRoutingMode = tenant?.PrintRoutingMode ?? "BranchWithFallback";
 
             // Send via the existing PrintReceipt handler so BridgeApp processes it correctly
-            await _hubContext.Clients.Group(branchGroup)
-                .SendAsync("PrintReceipt", printCommand);
-
-            if (branchGroup != "branch-default")
-            {
-                await _hubContext.Clients.Group("branch-default")
-                    .SendAsync("PrintReceipt", printCommand);
-            }
+            await SendPrintCommandByRoutingAsync(
+                printCommand,
+                branchGroup,
+                printRoutingMode,
+                isAutomatic: false);
 
             _logger.LogInformation("Daily report print command sent for date {Date} to branch {BranchId}", date, branchId);
 
@@ -242,6 +240,45 @@ public class ReportsController : ControllerBase
             }
 
             return utcTime.ToLocalTime();
+        }
+    }
+
+    private async Task SendPrintCommandByRoutingAsync(
+        object printCommand,
+        string branchGroup,
+        string? routingMode,
+        bool isAutomatic)
+    {
+        var mode = string.IsNullOrWhiteSpace(routingMode) ? "BranchWithFallback" : routingMode;
+
+        // Manual print endpoint should keep working even if auto-routing is disabled.
+        if (!isAutomatic && string.Equals(mode, "Disabled", StringComparison.Ordinal))
+        {
+            mode = "BranchWithFallback";
+        }
+
+        if (string.Equals(mode, "BranchOnly", StringComparison.Ordinal))
+        {
+            await _hubContext.Clients.Group(branchGroup).SendAsync("PrintReceipt", printCommand);
+            return;
+        }
+
+        if (string.Equals(mode, "AllDevices", StringComparison.Ordinal))
+        {
+            await _hubContext.Clients.All.SendAsync("PrintReceipt", printCommand);
+            return;
+        }
+
+        if (string.Equals(mode, "Disabled", StringComparison.Ordinal))
+        {
+            _logger.LogInformation("Skipping automatic print command because routing mode is Disabled");
+            return;
+        }
+
+        await _hubContext.Clients.Group(branchGroup).SendAsync("PrintReceipt", printCommand);
+        if (branchGroup != "branch-default")
+        {
+            await _hubContext.Clients.Group("branch-default").SendAsync("PrintReceipt", printCommand);
         }
     }
 }

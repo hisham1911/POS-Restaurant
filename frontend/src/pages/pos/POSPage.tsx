@@ -210,9 +210,9 @@ export const POSPage = () => {
   }
 
   return (
-    <div className="h-full flex overflow-hidden">
+    <div className="h-full flex overflow-hidden bg-gray-50">
       {/* Products Section */}
-      <div className="flex-1 flex flex-col bg-gray-50 p-4 min-w-0">
+      <div className="flex-1 flex flex-col p-4 min-w-0">
         {/* Shift Warning Banner */}
         {shiftWarning && shiftWarning.shouldWarn && (
           <div className="mb-4">
@@ -220,50 +220,172 @@ export const POSPage = () => {
           </div>
         )}
 
-        {/* Low Stock Alert - Admin/Manager only */}
+        {/* Low Stock Alert */}
         <LowStockAlert />
 
         {/* Search Input */}
-        <div className="mb-4">
+        <div className="mb-3">
           <div className="relative">
-            <ScanBarcode className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <ScanBarcode className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-400" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={handleSearchKeyDown}
-              placeholder="🔍 بحث بالاسم، الباركود أو SKU (اضغط Enter للإضافة)"
-              className="w-full pl-4 pr-10 py-2.5 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+              placeholder="🔍 بحث (اضغط Enter للإضافة)"
+              className="w-full pl-3 pr-11 py-3 border-2 border-gray-200 rounded-xl bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none text-base"
               autoComplete="off"
             />
           </div>
         </div>
 
-        {/* Categories and Filters */}
-        <div className="flex items-center justify-between mb-4 gap-2">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <CategoryTabs
-              categories={categories}
-              selectedId={selectedCategory}
-              onSelect={setSelectedCategory}
-            />
+        {/* Desktop: Categories and Action Buttons - Icon Only with Tooltips */}
+        <div className="hidden lg:flex items-center gap-2 mb-4 flex-wrap">
+          {/* All Categories */}
+          <button
+            onClick={() => setSelectedCategory(null)}
+            className={clsx(
+              "relative group p-2.5 rounded-lg text-xl border-2 transition-all",
+              selectedCategory === null
+                ? "bg-primary-600 text-white border-primary-500"
+                : "bg-white text-gray-700 border-gray-300 hover:border-primary-400 hover:bg-primary-50"
+            )}
+            title="الكل"
+          >
+            🏪
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              الكل
+            </span>
+          </button>
 
-            {/* Available Stock Filter */}
+          {/* Categories */}
+          {categories.map((category) => (
+            <button
+              key={category.id}
+              onClick={() => setSelectedCategory(category.id)}
+              className={clsx(
+                "relative group p-2.5 rounded-lg text-xl border-2 transition-all",
+                selectedCategory === category.id
+                  ? "bg-primary-600 text-white border-primary-500"
+                  : "bg-white text-gray-700 border-gray-300 hover:border-primary-400 hover:bg-primary-50"
+              )}
+              title={category.name}
+            >
+              {category.imageUrl || "📁"}
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                {category.name}
+              </span>
+            </button>
+          ))}
+
+          {/* Divider */}
+          <div className="w-px h-8 bg-gray-300 mx-1" />
+
+          {/* Available Stock Filter */}
+          <button
+            onClick={() => setShowAvailableOnly(!showAvailableOnly)}
+            className={clsx(
+              "relative group p-2.5 rounded-lg border-2 transition-all",
+              showAvailableOnly
+                ? "bg-green-100 text-green-700 border-green-400"
+                : "bg-white text-gray-700 border-gray-300 hover:border-green-400 hover:bg-green-50",
+            )}
+            title="المتاح فقط"
+          >
+            <PackageCheck className="w-5 h-5" />
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+              المتاح فقط
+            </span>
+          </button>
+
+          {/* Quick Create Product */}
+          <button
+            onClick={() => {
+              if (!canQuickCreateProduct) {
+                toast.error("ليس لديك صلاحية إضافة منتج سريع");
+                return;
+              }
+              setShowQuickCreate(true);
+            }}
+            disabled={!canQuickCreateProduct}
+            className={clsx(
+              "relative group p-2.5 rounded-lg border-2 transition-all",
+              canQuickCreateProduct
+                ? "bg-primary-600 text-white border-primary-500 hover:bg-primary-700"
+                : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed",
+            )}
+            title="منتج جديد"
+          >
+            <PlusCircle className="w-5 h-5" />
+            {canQuickCreateProduct && (
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                منتج جديد
+              </span>
+            )}
+          </button>
+
+          {/* Custom Item */}
+          <button
+            onClick={() => setShowCustomItem(true)}
+            className="relative group p-2.5 rounded-lg border-2 bg-secondary-600 text-white border-secondary-500 hover:bg-secondary-700 transition-all"
+            title="منتج مخصص"
+          >
+            <FileText className="w-5 h-5" />
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+              منتج مخصص
+            </span>
+          </button>
+        </div>
+
+        {/* Mobile: Compact Filter Bar */}
+        <div className="lg:hidden space-y-2 mb-3">
+          {/* Row 1: Main Filters */}
+          <div className="flex items-center gap-2">
+            {/* Category Selector - Compact */}
+            <select
+              value={selectedCategory ?? ""}
+              onChange={(e) => setSelectedCategory(e.target.value ? Number(e.target.value) : null)}
+              className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm font-medium text-gray-700 focus:border-primary-500 focus:outline-none"
+            >
+              <option value="">🏪 الكل</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.imageUrl || "📁"} {category.name}
+                </option>
+              ))}
+            </select>
+
+            {/* Available Stock Toggle - Compact */}
             <button
               onClick={() => setShowAvailableOnly(!showAvailableOnly)}
               className={clsx(
-                "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
+                "p-2 rounded-lg border-2 transition-all shrink-0",
                 showAvailableOnly
-                  ? "bg-success-100 text-success-700 border border-success-300"
-                  : "bg-white text-gray-600 border border-gray-200 hover:bg-gray-50",
+                  ? "bg-green-100 text-green-700 border-green-400"
+                  : "bg-white text-gray-700 border-gray-300",
               )}
-              title="عرض المنتجات المتاحة في المخزون فقط"
+              title="المتاح فقط"
             >
-              <PackageCheck className="w-4 h-4" />
-              <span className="hidden sm:inline">المتاح فقط</span>
+              <PackageCheck className="w-5 h-5" />
             </button>
 
+            {/* Mobile cart toggle */}
+            <button
+              onClick={() => setShowMobileCart(!showMobileCart)}
+              className="relative p-2 border-2 border-gray-300 rounded-lg hover:bg-primary-50 hover:border-primary-400 shrink-0"
+            >
+              <Menu className="w-5 h-5" />
+              {itemsCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-primary-600 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                  {itemsCount}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Row 2: Quick Actions */}
+          <div className="flex items-center gap-2">
             {/* Quick Create Product */}
             <button
               onClick={() => {
@@ -275,44 +397,25 @@ export const POSPage = () => {
               }}
               disabled={!canQuickCreateProduct}
               className={clsx(
-                "flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap",
+                "flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border-2 transition-all",
                 canQuickCreateProduct
-                  ? "bg-primary-600 text-white hover:bg-primary-700"
-                  : "bg-gray-200 text-gray-400 cursor-not-allowed",
+                  ? "bg-primary-600 text-white border-primary-500"
+                  : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed",
               )}
-              title={
-                canQuickCreateProduct
-                  ? "إضافة منتج سريع"
-                  : "يتطلب صلاحية ProductsCreateFromPOS"
-              }
             >
               <PlusCircle className="w-4 h-4" />
-              <span className="hidden sm:inline">منتج جديد</span>
+              <span>منتج جديد</span>
             </button>
 
             {/* Custom Item */}
             <button
               onClick={() => setShowCustomItem(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap bg-secondary-600 text-white hover:bg-secondary-700"
-              title="إضافة منتج مخصص للطلب الحالي"
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border-2 bg-secondary-600 text-white border-secondary-500"
             >
               <FileText className="w-4 h-4" />
-              <span className="hidden sm:inline">منتج مخصص</span>
+              <span>منتج مخصص</span>
             </button>
           </div>
-
-          {/* Mobile cart toggle */}
-          <button
-            onClick={() => setShowMobileCart(!showMobileCart)}
-            className="lg:hidden relative p-2 border border-gray-200 rounded-lg hover:bg-gray-100 shrink-0"
-          >
-            <Menu className="w-5 h-5" />
-            {itemsCount > 0 && (
-              <span className="absolute -top-2 -right-2 bg-primary-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
-                {itemsCount}
-              </span>
-            )}
-          </button>
         </div>
 
         {/* Products Grid */}
@@ -328,7 +431,7 @@ export const POSPage = () => {
       </div>
 
       {/* Cart Section - Desktop */}
-      <div className="hidden lg:flex w-96 bg-white border-l border-gray-200 p-4 flex-col shrink-0">
+      <div className="hidden lg:flex w-[400px] bg-white border-l-2 border-gray-100 p-5 flex-col shrink-0">
         <Cart
           onCheckout={() => setShowPayment(true)}
           selectedCustomer={selectedCustomer}
@@ -336,14 +439,14 @@ export const POSPage = () => {
         />
       </div>
 
-      {/* Cart Section - Mobile Slide-in */}
+      {/* Cart Section - Mobile */}
       {showMobileCart && (
         <div className="lg:hidden fixed inset-0 z-40">
           <div
             className="absolute inset-0 bg-black/50"
             onClick={() => setShowMobileCart(false)}
           />
-          <div className="absolute right-0 top-0 bottom-0 w-80 bg-white p-4 animate-slide-in-right shadow-2xl flex flex-col">
+          <div className="absolute right-0 top-0 bottom-0 w-[85%] max-w-md bg-white p-5 animate-slide-in-right flex flex-col">
             <Cart
               onCheckout={() => {
                 setShowMobileCart(false);
@@ -371,7 +474,6 @@ export const POSPage = () => {
           onClose={() => setShowQuickCreate(false)}
           onSuccess={(productId) => {
             toast.success("تم إضافة المنتج بنجاح");
-            // Optionally add to cart immediately
           }}
         />
       )}

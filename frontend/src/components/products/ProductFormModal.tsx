@@ -1,5 +1,11 @@
 import { useState, useEffect, useMemo } from "react";
-import { X, Image as ImageIcon, Package, Wrench, ChevronDown } from "lucide-react";
+import {
+  X,
+  Image as ImageIcon,
+  Package,
+  Wrench,
+  ChevronDown,
+} from "lucide-react";
 import {
   Product,
   CreateProductRequest,
@@ -26,19 +32,81 @@ interface ProductFormModalProps {
 
 // Emoji icons for products
 const PRODUCT_ICONS = [
-  "☕", "🍕", "🍔", "🍟", "🌭", "🥪", "🌮", "🌯", "🥙", "🍗",
-  "🍖", "🥩", "🍤", "🍱", "🍛", "🍜", "🍝", "🍠", "🍢", "🍣",
-  "🍰", "🎂", "🧁", "🍪", "🍩", "🍨", "🍦", "🥤", "🧃", "🧋",
-  "🍺", "🍻", "🥂", "🍷", "🥃", "🍸", "🍹", "🧉", "🍶", "🥛",
-  "🍎", "🍊", "🍋", "🍌", "🍉", "🍇", "🍓", "🫐", "🍈", "🍒",
-  "🥗", "🥘", "🍲", "🥫", "🧂", "🧈", "🥖", "🥐", "🥯", "🍞"
+  "☕",
+  "🍕",
+  "🍔",
+  "🍟",
+  "🌭",
+  "🥪",
+  "🌮",
+  "🌯",
+  "🥙",
+  "🍗",
+  "🍖",
+  "🥩",
+  "🍤",
+  "🍱",
+  "🍛",
+  "🍜",
+  "🍝",
+  "🍠",
+  "🍢",
+  "🍣",
+  "🍰",
+  "🎂",
+  "🧁",
+  "🍪",
+  "🍩",
+  "🍨",
+  "🍦",
+  "🥤",
+  "🧃",
+  "🧋",
+  "🍺",
+  "🍻",
+  "🥂",
+  "🍷",
+  "🥃",
+  "🍸",
+  "🍹",
+  "🧉",
+  "🍶",
+  "🥛",
+  "🍎",
+  "🍊",
+  "🍋",
+  "🍌",
+  "🍉",
+  "🍇",
+  "🍓",
+  "🫐",
+  "🍈",
+  "🍒",
+  "🥗",
+  "🥘",
+  "🍲",
+  "🥫",
+  "🧂",
+  "🧈",
+  "🥖",
+  "🥐",
+  "🥯",
+  "🍞",
 ];
+
+const isImageSource = (value?: string): boolean => {
+  if (!value) return false;
+  const normalized = value.trim();
+  if (!normalized) return false;
+  return /^(https?:\/\/|\/|data:image\/|blob:)/i.test(normalized);
+};
 
 export const ProductFormModal = ({
   product,
   onClose,
 }: ProductFormModalProps) => {
-  const { createProduct, updateProduct, isCreating, isUpdating } = useProducts();
+  const { createProduct, updateProduct, isCreating, isUpdating } =
+    useProducts();
   const { categories } = useCategories();
   const { data: branches } = useGetBranchesQuery();
   const currentBranch = useAppSelector(selectCurrentBranch);
@@ -55,7 +123,9 @@ export const ProductFormModal = ({
       return 0;
     }
 
-    const inventoryRow = branchInventory.find((item) => item.productId === product.id);
+    const inventoryRow = branchInventory.find(
+      (item) => item.productId === product.id,
+    );
     return inventoryRow?.quantity ?? 0;
   }, [product?.id, branchInventory]);
 
@@ -79,14 +149,16 @@ export const ProductFormModal = ({
   });
 
   const [showIconPicker, setShowIconPicker] = useState(false);
-  const [branchStocks, setBranchStocks] = useState<Record<number, number | string>>({});
+  const [branchStocks, setBranchStocks] = useState<
+    Record<number, number | string>
+  >({});
   const [useBranchSpecificStock, setUseBranchSpecificStock] = useState(false);
 
   // Initialize branch stocks with default quantity
   useEffect(() => {
     if (branches?.data && !isEditing) {
       const initialStocks: Record<number, number> = {};
-      branches.data.forEach(branch => {
+      branches.data.forEach((branch) => {
         initialStocks[branch.id] = formData.branchQuantity;
       });
       setBranchStocks(initialStocks);
@@ -156,8 +228,8 @@ export const ProductFormModal = ({
           ? Object.fromEntries(
               Object.entries(branchStocks).map(([key, value]) => [
                 key,
-                typeof value === 'string' ? parseInt(value) || 0 : value
-              ])
+                typeof value === "string" ? parseInt(value) || 0 : value,
+              ]),
             )
           : undefined,
       };
@@ -186,13 +258,17 @@ export const ProductFormModal = ({
             <Input
               label="اسم المنتج (عربي) *"
               value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, name: e.target.value })
+              }
               required
             />
             <Input
               label="اسم المنتج (إنجليزي)"
               value={formData.nameEn}
-              onChange={(e) => setFormData({ ...formData, nameEn: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, nameEn: e.target.value })
+              }
             />
           </div>
 
@@ -202,7 +278,9 @@ export const ProductFormModal = ({
             </label>
             <textarea
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, description: e.target.value })
+              }
               className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               rows={2}
               placeholder="وصف المنتج (اختياري)"
@@ -217,7 +295,10 @@ export const ProductFormModal = ({
               <select
                 value={formData.categoryId}
                 onChange={(e) =>
-                  setFormData({ ...formData, categoryId: Number(e.target.value) })
+                  setFormData({
+                    ...formData,
+                    categoryId: Number(e.target.value),
+                  })
                 }
                 className="appearance-none w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm"
                 required
@@ -240,12 +321,14 @@ export const ProductFormModal = ({
             <div className="grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => setFormData({ ...formData, type: ProductType.Physical })}
+                onClick={() =>
+                  setFormData({ ...formData, type: ProductType.Physical })
+                }
                 className={clsx(
                   "flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all",
                   formData.type === ProductType.Physical
                     ? "border-primary-500 bg-primary-50 text-primary-700"
-                    : "border-gray-200 hover:border-gray-300 text-gray-700"
+                    : "border-gray-200 hover:border-gray-300 text-gray-700",
                 )}
               >
                 <Package className="w-5 h-5" />
@@ -257,12 +340,14 @@ export const ProductFormModal = ({
 
               <button
                 type="button"
-                onClick={() => setFormData({ ...formData, type: ProductType.Service })}
+                onClick={() =>
+                  setFormData({ ...formData, type: ProductType.Service })
+                }
                 className={clsx(
                   "flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all",
                   formData.type === ProductType.Service
                     ? "border-secondary-500 bg-secondary-50 text-secondary-700"
-                    : "border-gray-200 hover:border-gray-300 text-gray-700"
+                    : "border-gray-200 hover:border-gray-300 text-gray-700",
                 )}
               >
                 <Wrench className="w-5 h-5" />
@@ -297,7 +382,15 @@ export const ProductFormModal = ({
                 className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
               >
                 {formData.imageUrl ? (
-                  <span className="text-2xl">{formData.imageUrl}</span>
+                  isImageSource(formData.imageUrl) ? (
+                    <img
+                      src={formData.imageUrl}
+                      alt="product-icon"
+                      className="w-7 h-7 rounded object-cover"
+                    />
+                  ) : (
+                    <span className="text-2xl">{formData.imageUrl}</span>
+                  )
                 ) : (
                   <ImageIcon className="w-5 h-5 text-gray-400" />
                 )}
@@ -326,7 +419,8 @@ export const ProductFormModal = ({
                     }}
                     className={clsx(
                       "text-2xl p-2 rounded hover:bg-white transition-colors",
-                      formData.imageUrl === icon && "bg-primary-100 ring-2 ring-primary-500"
+                      formData.imageUrl === icon &&
+                        "bg-primary-100 ring-2 ring-primary-500",
                     )}
                   >
                     {icon}
@@ -334,6 +428,15 @@ export const ProductFormModal = ({
                 ))}
               </div>
             )}
+
+            <Input
+              label="أيقونة مخصصة (إيموجي أو رابط صورة)"
+              value={formData.imageUrl}
+              onChange={(e) =>
+                setFormData({ ...formData, imageUrl: e.target.value })
+              }
+              placeholder="مثال: 🧃 أو https://example.com/icon.png"
+            />
           </div>
         </div>
 
@@ -406,7 +509,9 @@ export const ProductFormModal = ({
                   <input
                     type="radio"
                     checked={formData.taxInclusive}
-                    onChange={() => setFormData({ ...formData, taxInclusive: true })}
+                    onChange={() =>
+                      setFormData({ ...formData, taxInclusive: true })
+                    }
                     className="w-4 h-4 text-primary-600"
                   />
                   <span className="text-sm">نعم (شامل)</span>
@@ -415,7 +520,9 @@ export const ProductFormModal = ({
                   <input
                     type="radio"
                     checked={!formData.taxInclusive}
-                    onChange={() => setFormData({ ...formData, taxInclusive: false })}
+                    onChange={() =>
+                      setFormData({ ...formData, taxInclusive: false })
+                    }
                     className="w-4 h-4 text-primary-600"
                   />
                   <span className="text-sm">لا (غير شامل)</span>
@@ -435,7 +542,9 @@ export const ProductFormModal = ({
             <Input
               label="SKU"
               value={formData.sku}
-              onChange={(e) => setFormData({ ...formData, sku: e.target.value })}
+              onChange={(e) =>
+                setFormData({ ...formData, sku: e.target.value })
+              }
               placeholder="كود المنتج"
             />
             <Input
@@ -469,17 +578,23 @@ export const ProductFormModal = ({
                         توزيع المخزون على الفروع
                       </h4>
                       <p className="text-xs text-blue-700 mb-3">
-                        الكمية المدخلة ستُضاف للفرع الحالي فقط. الفروع الأخرى ستبدأ بصفر.
+                        الكمية المدخلة ستُضاف للفرع الحالي فقط. الفروع الأخرى
+                        ستبدأ بصفر.
                       </p>
                       <div className="flex items-center gap-2">
                         <input
                           type="checkbox"
                           id="branchSpecific"
                           checked={useBranchSpecificStock}
-                          onChange={(e) => setUseBranchSpecificStock(e.target.checked)}
+                          onChange={(e) =>
+                            setUseBranchSpecificStock(e.target.checked)
+                          }
                           className="w-4 h-4 text-primary-600 rounded"
                         />
-                        <label htmlFor="branchSpecific" className="text-sm font-medium text-blue-900 cursor-pointer">
+                        <label
+                          htmlFor="branchSpecific"
+                          className="text-sm font-medium text-blue-900 cursor-pointer"
+                        >
                           تحديد كمية مخصصة لكل فرع
                         </label>
                       </div>
@@ -526,7 +641,9 @@ export const ProductFormModal = ({
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      reorderPoint: e.target.value ? parseInt(e.target.value) : null,
+                      reorderPoint: e.target.value
+                        ? parseInt(e.target.value)
+                        : null,
                     })
                   }
                   placeholder="اختياري"
@@ -587,4 +704,3 @@ export const ProductFormModal = ({
     </Modal>
   );
 };
-

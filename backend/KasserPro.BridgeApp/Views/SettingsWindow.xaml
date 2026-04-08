@@ -159,7 +159,7 @@
                                 <TextBox x:Name="ApiKeyTextBox"
                                          Height="40"
                                          Style="{StaticResource ModernTextBox}"/>
-                                <TextBlock Text="للاختبار: test-api-key-123"
+                                <TextBlock Text="اختياري: اتركه فارغًا وسيتم توليده تلقائيًا"
                                            Foreground="#6C757D"
                                            FontSize="11"
                                            Margin="5,5,0,0"/>

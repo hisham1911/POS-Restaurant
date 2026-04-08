@@ -18,15 +18,21 @@ import {
   Receipt,
   Printer,
 } from "lucide-react";
-import { Customer } from "@/types/customer.types";
+import { Customer, DebtPaymentDto } from "@/types/customer.types";
 import { useGetCustomerOrdersQuery } from "@/api/ordersApi";
-import { useGetCustomerQuery, useGetDebtHistoryQuery, usePrintDebtPaymentReceiptMutation } from "@/api/customersApi";
+import {
+  useGetCustomerQuery,
+  useGetDebtHistoryQuery,
+  usePrintDebtPaymentReceiptMutation,
+} from "@/api/customersApi";
+import { useGetCurrentTenantQuery } from "@/api/branchesApi";
 import { Button } from "@/components/common/Button";
 import { Loading } from "@/components/common/Loading";
 import { formatDateTime, formatCurrency } from "@/utils/formatters";
 import { CustomerFormModal } from "./CustomerFormModal";
 import { LoyaltyPointsModal } from "./LoyaltyPointsModal";
 import { DebtPaymentModal } from "./DebtPaymentModal";
+import { printDebtPaymentReceiptFallback } from "@/utils/browserReceiptPrinter";
 import clsx from "clsx";
 import { Portal } from "@/components/common/Portal";
 import { toast } from "sonner";
@@ -48,6 +54,7 @@ export const CustomerDetailsModal = ({
   const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
   const [showDebtPaymentModal, setShowDebtPaymentModal] = useState(false);
   const [loyaltyMode, setLoyaltyMode] = useState<"add" | "redeem">("add");
+  const { data: tenantData } = useGetCurrentTenantQuery();
 
   // Fetch customer data to get latest loyalty points
   const { data: customerData, refetch: refetchCustomer } = useGetCustomerQuery(
@@ -389,7 +396,8 @@ export const CustomerDetailsModal = ({
                   <div className="flex justify-center py-8">
                     <Loading />
                   </div>
-                ) : !debtHistoryData?.data || debtHistoryData.data.length === 0 ? (
+                ) : !debtHistoryData?.data ||
+                  debtHistoryData.data.length === 0 ? (
                   <div className="text-center py-12 text-gray-500">
                     <Receipt className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                     <p>لا توجد دفعات لهذا العميل</p>
@@ -418,10 +426,32 @@ export const CustomerDetailsModal = ({
                           <button
                             onClick={async () => {
                               try {
-                                await printDebtPaymentReceipt(payment.id).unwrap();
+                                await printDebtPaymentReceipt(
+                                  payment.id,
+                                ).unwrap();
                                 toast.success("تم إرسال أمر الطباعة بنجاح");
                               } catch (error) {
-                                toast.error("فشل إرسال أمر الطباعة");
+                                toast.info(
+                                  "تعذر الوصول لبرنامج الطابعة. سيتم فتح الطباعة من المتصفح",
+                                );
+                                const isPrintWindowOpened =
+                                  printDebtPaymentReceiptFallback(payment, {
+                                    customerName: customer.name || "",
+                                    cashierName: payment.recordedByUserName,
+                                    branchName: tenantData?.data?.name,
+                                    tenant: tenantData?.data,
+                                  });
+
+                                if (!isPrintWindowOpened) {
+                                  toast.error(
+                                    "تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة",
+                                  );
+                                }
+
+                                console.error(
+                                  "Debt payment print error:",
+                                  error,
+                                );
                               }
                             }}
                             disabled={isPrinting}
@@ -436,29 +466,36 @@ export const CustomerDetailsModal = ({
                           <div>
                             <p className="text-gray-500">طريقة الدفع</p>
                             <p className="font-medium">
-                              {payment.paymentMethod === 'Cash' && '💵 نقدي'}
-                              {payment.paymentMethod === 'Card' && '💳 بطاقة'}
-                              {payment.paymentMethod === 'BankTransfer' && '🏦 تحويل بنكي'}
-                              {payment.paymentMethod === 'Fawry' && '📱 فوري'}
+                              {payment.paymentMethod === "Cash" && "💵 نقدي"}
+                              {payment.paymentMethod === "Card" && "💳 بطاقة"}
+                              {payment.paymentMethod === "BankTransfer" &&
+                                "🏦 تحويل بنكي"}
+                              {payment.paymentMethod === "Fawry" && "📱 فوري"}
                             </p>
                           </div>
                           <div>
                             <p className="text-gray-500">المسجل بواسطة</p>
-                            <p className="font-medium">{payment.recordedByUserName || 'غير معروف'}</p>
+                            <p className="font-medium">
+                              {payment.recordedByUserName || "غير معروف"}
+                            </p>
                           </div>
                         </div>
 
                         {payment.referenceNumber && (
                           <div className="mt-3 pt-3 border-t">
                             <p className="text-xs text-gray-500">رقم المرجع</p>
-                            <p className="text-sm font-mono">{payment.referenceNumber}</p>
+                            <p className="text-sm font-mono">
+                              {payment.referenceNumber}
+                            </p>
                           </div>
                         )}
 
                         {payment.notes && (
                           <div className="mt-3 pt-3 border-t">
                             <p className="text-xs text-gray-500">ملاحظات</p>
-                            <p className="text-sm text-gray-700">{payment.notes}</p>
+                            <p className="text-sm text-gray-700">
+                              {payment.notes}
+                            </p>
                           </div>
                         )}
 
@@ -623,7 +660,7 @@ export const CustomerDetailsModal = ({
                         </>
                       )}
                     </div>
-                    
+
                     {/* Pay Debt Button */}
                     {customer.totalDue > 0 && (
                       <div className="mt-4 pt-4 border-t border-orange-200">

@@ -114,6 +114,8 @@ public class OrdersController : ControllerBase
     public async Task<IActionResult> Complete(int id, [FromBody] CompleteOrderRequest request)
     {
         var result = await _orderService.CompleteAsync(id, request);
+        var printAttempted = false;
+        var printDelivered = false;
 
         if (result.Success && result.Data != null)
         {
@@ -135,75 +137,90 @@ public class OrdersController : ControllerBase
                         order.Id,
                         tenant?.AutoPrintOnSale,
                         printRoutingMode);
-                    return Ok(result);
                 }
-
-                var printCommand = new
+                else
                 {
-                    CommandId = Guid.NewGuid().ToString(),
-                    Receipt = new
+                    printAttempted = true;
+
+                    var printCommand = new
                     {
-                        ReceiptNumber = order.OrderNumber,
-                        BranchName = order.BranchName ?? "KasserPro Store",
-                        Date = ConvertToLocalTime(order.CompletedAt ?? DateTime.UtcNow, tenant?.Timezone),
-                        Items = order.Items.Select(item => new
+                        CommandId = Guid.NewGuid().ToString(),
+                        Receipt = new
                         {
-                            Name = item.ProductName,
-                            Quantity = item.Quantity,
-                            UnitPrice = item.UnitPrice,
-                            TotalPrice = item.Total,
-                            DiscountType = item.DiscountType,
-                            DiscountValue = item.DiscountValue,
-                            DiscountAmount = item.DiscountAmount,
-                            DiscountReason = item.DiscountReason
-                        }).ToList(),
-                        ItemDiscountsTotal = order.Items.Sum(i => i.DiscountAmount),
-                        DiscountType = order.DiscountType,
-                        DiscountValue = order.DiscountValue,
-                        DiscountAmount = order.DiscountAmount,
-                        NetTotal = order.Subtotal,
-                        TaxAmount = order.TaxAmount,
-                        TotalAmount = order.Total,
-                        AmountPaid = order.AmountPaid,
-                        ChangeAmount = order.ChangeAmount,
-                        AmountDue = order.AmountDue,
-                        PaymentMethod = order.Payments.FirstOrDefault()?.Method ?? "Cash",
-                        CashierName = order.UserName ?? userName,
-                        CustomerName = order.CustomerName ?? "",
-                        IsRefund = false,
-                        RefundReason = (string?)null
-                    },
-                    Settings = tenant != null ? new
+                            ReceiptNumber = order.OrderNumber,
+                            BranchName = order.BranchName ?? "KasserPro Store",
+                            Date = ConvertToLocalTime(order.CompletedAt ?? DateTime.UtcNow, tenant?.Timezone),
+                            Items = order.Items.Select(item => new
+                            {
+                                Name = item.ProductName,
+                                Quantity = item.Quantity,
+                                UnitPrice = item.UnitPrice,
+                                TotalPrice = item.Total,
+                                DiscountType = item.DiscountType,
+                                DiscountValue = item.DiscountValue,
+                                DiscountAmount = item.DiscountAmount,
+                                DiscountReason = item.DiscountReason
+                            }).ToList(),
+                            ItemDiscountsTotal = order.Items.Sum(i => i.DiscountAmount),
+                            DiscountType = order.DiscountType,
+                            DiscountValue = order.DiscountValue,
+                            DiscountAmount = order.DiscountAmount,
+                            NetTotal = order.Subtotal,
+                            TaxAmount = order.TaxAmount,
+                            TotalAmount = order.Total,
+                            AmountPaid = order.AmountPaid,
+                            ChangeAmount = order.ChangeAmount,
+                            AmountDue = order.AmountDue,
+                            PaymentMethod = order.Payments.FirstOrDefault()?.Method ?? "Cash",
+                            CashierName = order.UserName ?? userName,
+                            CustomerName = order.CustomerName ?? "",
+                            IsRefund = false,
+                            RefundReason = (string?)null
+                        },
+                        Settings = tenant != null ? new
+                        {
+                            PaperSize = tenant.ReceiptPaperSize,
+                            CustomWidth = tenant.ReceiptCustomWidth,
+                            HeaderFontSize = tenant.ReceiptHeaderFontSize,
+                            BodyFontSize = tenant.ReceiptBodyFontSize,
+                            TotalFontSize = tenant.ReceiptTotalFontSize,
+                            ShowBranchName = tenant.ReceiptShowBranchName,
+                            ShowCashier = tenant.ReceiptShowCashier,
+                            ShowThankYou = tenant.ReceiptShowThankYou,
+                            ShowCustomerName = tenant.ReceiptShowCustomerName,
+                            ShowLogo = tenant.ReceiptShowLogo,
+                            FooterMessage = tenant.ReceiptFooterMessage,
+                            PhoneNumber = tenant.ReceiptPhoneNumber,
+                            LogoUrl = tenant.LogoUrl,
+                            TaxRate = tenant.TaxRate,
+                            IsTaxEnabled = tenant.IsTaxEnabled
+                        } : (object?)null
+                    };
+
+                    // Send receipt to branch group AND default group to ensure delivery
+                    var branchId = User.FindFirst("branchId")?.Value ?? "default";
+                    var branchGroup = $"branch-{branchId}";
+
+                    printDelivered = await SendPrintCommandByRoutingAsync(
+                        printCommand,
+                        branchGroup,
+                        printRoutingMode,
+                        isAutomatic: true);
+
+                    if (!printDelivered)
                     {
-                        PaperSize = tenant.ReceiptPaperSize,
-                        CustomWidth = tenant.ReceiptCustomWidth,
-                        HeaderFontSize = tenant.ReceiptHeaderFontSize,
-                        BodyFontSize = tenant.ReceiptBodyFontSize,
-                        TotalFontSize = tenant.ReceiptTotalFontSize,
-                        ShowBranchName = tenant.ReceiptShowBranchName,
-                        ShowCashier = tenant.ReceiptShowCashier,
-                        ShowThankYou = tenant.ReceiptShowThankYou,
-                        ShowCustomerName = tenant.ReceiptShowCustomerName,
-                        ShowLogo = tenant.ReceiptShowLogo,
-                        FooterMessage = tenant.ReceiptFooterMessage,
-                        PhoneNumber = tenant.ReceiptPhoneNumber,
-                        LogoUrl = tenant.LogoUrl,
-                        TaxRate = tenant.TaxRate,
-                        IsTaxEnabled = tenant.IsTaxEnabled
-                    } : (object?)null
-                };
-
-                // Send receipt to branch group AND default group to ensure delivery
-                var branchId = User.FindFirst("branchId")?.Value ?? "default";
-                var branchGroup = $"branch-{branchId}";
-
-                await SendPrintCommandByRoutingAsync(
-                    printCommand,
-                    branchGroup,
-                    printRoutingMode,
-                    isAutomatic: true);
-
-                _logger.LogInformation("Print command sent for order {OrderId} to branch group {BranchId}", order.Id, branchId);
+                        _logger.LogWarning(
+                            "Auto print could not be delivered for order {OrderId}; no connected printer device",
+                            order.Id);
+                    }
+                    else
+                    {
+                        _logger.LogInformation(
+                            "Auto print delivered for order {OrderId} to branch group {BranchId}",
+                            order.Id,
+                            branchId);
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -212,7 +229,14 @@ public class OrdersController : ControllerBase
             }
         }
 
-        return result.Success ? Ok(result) : BadRequest(result);
+        if (result.Success)
+        {
+            Response.Headers["X-Print-Attempted"] = printAttempted ? "1" : "0";
+            Response.Headers["X-Print-Delivered"] = printDelivered ? "1" : "0";
+            return Ok(result);
+        }
+
+        return BadRequest(result);
     }
 
     [HttpPost("{id}/cancel")]
@@ -335,11 +359,19 @@ public class OrdersController : ControllerBase
             var branchId = User.FindFirst("branchId")?.Value ?? "default";
             var branchGroup = $"branch-{branchId}";
 
-            await SendPrintCommandByRoutingAsync(
+            var printSent = await SendPrintCommandByRoutingAsync(
                 printCommand,
                 branchGroup,
                 tenant?.PrintRoutingMode ?? "BranchWithFallback",
                 isAutomatic: false);
+
+            if (!printSent)
+            {
+                _logger.LogWarning(
+                    "Manual print request for order {OrderId} failed because no printer device is connected",
+                    order.Id);
+                return StatusCode(503, ApiResponse<object>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR)));
+            }
 
             _logger.LogInformation("Print command sent for order {OrderId} to branch group {BranchId}", order.Id, branchId);
 
@@ -398,7 +430,7 @@ public class OrdersController : ControllerBase
         }
     }
 
-    private async Task SendPrintCommandByRoutingAsync(
+    private async Task<bool> SendPrintCommandByRoutingAsync(
         object printCommand,
         string branchGroup,
         string? routingMode,
@@ -414,27 +446,60 @@ public class OrdersController : ControllerBase
 
         if (string.Equals(mode, "BranchOnly", StringComparison.Ordinal))
         {
-            await _hubContext.Clients.Group(branchGroup).SendAsync("PrintReceipt", printCommand);
-            return;
+            var sentToBranchOnly = await SendToPreferredDeviceAsync(branchGroup, "PrintReceipt", printCommand);
+            if (!sentToBranchOnly)
+            {
+                _logger.LogWarning("No connected printer device found for group {BranchGroup}", branchGroup);
+            }
+
+            return sentToBranchOnly;
         }
 
         if (string.Equals(mode, "AllDevices", StringComparison.Ordinal))
         {
             await _hubContext.Clients.All.SendAsync("PrintReceipt", printCommand);
-            return;
+            return DeviceHub.GetConnectedDeviceCount() > 0;
         }
 
         if (string.Equals(mode, "Disabled", StringComparison.Ordinal))
         {
             _logger.LogInformation("Skipping automatic print command because routing mode is Disabled");
-            return;
+            return false;
         }
 
-        await _hubContext.Clients.Group(branchGroup).SendAsync("PrintReceipt", printCommand);
-        if (branchGroup != "branch-default")
+        if (await SendToPreferredDeviceAsync(branchGroup, "PrintReceipt", printCommand))
         {
-            await _hubContext.Clients.Group("branch-default").SendAsync("PrintReceipt", printCommand);
+            return true;
         }
+
+        if (branchGroup != "branch-default"
+            && await SendToPreferredDeviceAsync("branch-default", "PrintReceipt", printCommand))
+        {
+            return true;
+        }
+
+        _logger.LogWarning(
+            "No connected printer device found for primary group {BranchGroup} or fallback group branch-default",
+            branchGroup);
+
+        return false;
+    }
+
+    private async Task<bool> SendToPreferredDeviceAsync(string groupName, string hubMethod, object printCommand)
+    {
+        var connectionId = DeviceHub.GetPreferredConnectionId(groupName);
+        if (string.IsNullOrWhiteSpace(connectionId))
+        {
+            return false;
+        }
+
+        await _hubContext.Clients.Client(connectionId).SendAsync(hubMethod, printCommand);
+        _logger.LogInformation(
+            "Print command routed to device connection {ConnectionId} in group {GroupName}",
+            connectionId,
+            groupName);
+
+        return true;
     }
 }
 

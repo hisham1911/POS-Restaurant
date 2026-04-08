@@ -80,20 +80,19 @@ export const ProductListView = ({
   );
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {Object.entries(groupedProducts).map(([categoryId, categoryProducts]) => {
         const category = categories.find((c) => c.id === Number(categoryId));
         const categoryName = category?.name || "غير مصنف";
 
         return (
-          <div key={categoryId} className="space-y-2.5">
+          <div key={categoryId} className="space-y-2">
             {/* Category Header */}
-            <div className="flex items-center gap-2.5 pb-2">
-              <div className="w-1 h-5 bg-blue-600 rounded-full" />
-              <h3 className="text-base font-bold text-gray-900">
+            <div className="flex items-center gap-2 pb-1">
+              <h3 className="text-sm font-bold text-gray-900">
                 {categoryName}
               </h3>
-              <span className="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">
+              <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
                 {categoryProducts.length}
               </span>
             </div>
@@ -138,11 +137,11 @@ export const ProductListView = ({
                     onClick={() => handleProductClick(product)}
                     disabled={!product.isActive || isOutOfStock || !canAddMore}
                     className={clsx(
-                      "w-full flex items-center justify-between min-h-[56px]",
-                      "px-3 py-2.5 rounded-lg transition-all duration-150",
-                      "border-2 text-start",
+                      "w-full flex items-center justify-between min-h-[60px]",
+                      "px-3 py-2.5 rounded-xl transition-all duration-150",
+                      "border text-start",
                       quantityInCart > 0
-                        ? "border-blue-500 bg-blue-50"
+                        ? "border-primary-500 bg-primary-50"
                         : "border-gray-200 bg-white hover:border-gray-300 hover:bg-gray-50",
                       (!product.isActive || isOutOfStock || !canAddMore) &&
                         "opacity-50 cursor-not-allowed",
@@ -159,7 +158,7 @@ export const ProductListView = ({
                           {product.name}
                         </h4>
                         {quantityInCart > 0 && (
-                          <span className="shrink-0 min-w-[20px] h-5 px-1.5 bg-blue-600 text-white text-xs font-bold rounded flex items-center justify-center">
+                          <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-md bg-primary-600 px-1.5 text-xs font-bold text-white">
                             {quantityInCart}
                           </span>
                         )}
@@ -211,7 +210,7 @@ export const ProductListView = ({
 
                     {/* Right: Price */}
                     <div className="text-end shrink-0">
-                      <div className="text-lg font-bold text-gray-900">
+                      <div className="text-base font-bold text-gray-900">
                         {formatCurrency(product.price)}
                       </div>
                       {product.sku && (

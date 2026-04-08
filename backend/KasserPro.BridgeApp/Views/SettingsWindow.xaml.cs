@@ -123,17 +123,6 @@ public partial class SettingsWindow : Window
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(ApiKeyTextBox.Text))
-            {
-                MessageBox.Show(
-                    "مفتاح API مطلوب\n\nAPI Key is required",
-                    "خطأ في التحقق - Validation Error",
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Warning
-                );
-                return;
-            }
-
             // Validate URL format
             if (!Uri.TryCreate(BackendUrlTextBox.Text, UriKind.Absolute, out _))
             {
@@ -146,9 +135,19 @@ public partial class SettingsWindow : Window
                 return;
             }
 
+            var apiKey = ApiKeyTextBox.Text.Trim();
+            if (string.IsNullOrWhiteSpace(apiKey))
+            {
+                apiKey = !string.IsNullOrWhiteSpace(_currentSettings?.ApiKey)
+                    ? _currentSettings.ApiKey
+                    : Guid.NewGuid().ToString("N");
+
+                ApiKeyTextBox.Text = apiKey;
+            }
+
             // Update settings
             _currentSettings!.BackendUrl = BackendUrlTextBox.Text.TrimEnd('/');
-            _currentSettings.ApiKey = ApiKeyTextBox.Text.Trim();
+            _currentSettings.ApiKey = apiKey;
             _currentSettings.DefaultPrinterName = PrinterComboBox.SelectedItem?.ToString() ?? "";
 
             // Save settings (only connection + printer)

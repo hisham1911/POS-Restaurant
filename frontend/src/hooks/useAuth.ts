@@ -59,9 +59,7 @@ export const useAuth = () => {
         }),
       );
       toast.success("تم تسجيل الدخول بنجاح");
-      navigate(
-        loginData.user.role === "SystemOwner" ? "/owner/tenants" : "/pos",
-      );
+      navigate("/home");
     } catch (error: unknown) {
       const apiError = error as ApiError;
       const errorCode = getApiErrorCode(error);

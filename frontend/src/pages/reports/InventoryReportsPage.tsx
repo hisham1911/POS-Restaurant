@@ -15,6 +15,7 @@ import { formatCurrency, formatDate } from "@/utils/formatters";
 import { useGetBranchInventoryReportQuery } from "@/api/inventoryReportsApi";
 import { useGetBranchesQuery } from "@/api/branchesApi";
 import { useGetCategoriesQuery } from "@/api/categoriesApi";
+import { handleApiError } from "@/utils/errorHandler";
 
 export const InventoryReportsPage = () => {
   const { data: branchesData } = useGetBranchesQuery();
@@ -62,7 +63,7 @@ export const InventoryReportsPage = () => {
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <p className="text-red-600">فشل في تحميل التقرير</p>
           <p className="text-gray-500 text-sm mt-2">
-            {(error as any)?.data?.message || "حدث خطأ غير متوقع"}
+            {handleApiError(error)}
           </p>
         </div>
       </div>

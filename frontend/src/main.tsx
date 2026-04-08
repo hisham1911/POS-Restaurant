@@ -6,6 +6,7 @@ import { Toaster } from "sonner";
 
 import { store, persistor } from "./store";
 import App from "./App";
+import { BranchStateSync } from "./components/common/BranchStateSync";
 import { TaxSettingsSync } from "./components/common/TaxSettingsSync";
 
 // Import Cairo font from @fontsource (Windows 7 compatible)
@@ -20,6 +21,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <Provider store={store}>
       <PersistGate loading={null} persistor={persistor}>
+        <BranchStateSync />
         <TaxSettingsSync />
         <App />
         <Toaster

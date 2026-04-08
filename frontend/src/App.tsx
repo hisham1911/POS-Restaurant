@@ -1,9 +1,8 @@
 import type React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import { useAppSelector, useAppDispatch } from "./store/hooks";
 import {
-  selectCurrentUser,
   selectIsAuthenticated,
   selectIsAdmin,
   selectIsSystemOwner,
@@ -11,13 +10,12 @@ import {
   logout as logoutAction,
 } from "./store/slices/authSlice";
 import { clearBranch } from "./store/slices/branchSlice";
-import { useGetCurrentShiftQuery } from "./api/shiftsApi";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { MainLayout } from "./components/layout/MainLayout";
-import { ShiftRecoveryModal } from "./components/shifts";
 import { shiftPersistence } from "./utils/shiftPersistence";
 import { usePermission } from "./hooks/usePermission";
 import LoginPage from "./pages/auth/LoginPage";
+import HomePage from "./pages/home/HomePage";
 import POSPage from "./pages/pos/POSPage";
 import POSWorkspacePage from "./pages/pos/POSWorkspacePage";
 import ProductsPage from "./pages/products/ProductsPage";
@@ -74,7 +72,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const AdminRoute = ({ children }: { children: React.ReactNode }) => {
   const isAdmin = useAppSelector(selectIsAdmin);
-  if (!isAdmin) return <Navigate to="/pos" replace />;
+  if (!isAdmin) return <Navigate to="/home" replace />;
   return <>{children}</>;
 };
 
@@ -86,33 +84,27 @@ const PermissionRoute = ({
   permission: string;
 }) => {
   const { hasPermission } = usePermission();
-  if (!hasPermission(permission)) return <Navigate to="/pos" replace />;
+  if (!hasPermission(permission)) return <Navigate to="/home" replace />;
   return <>{children}</>;
 };
 
 const SystemOwnerRoute = ({ children }: { children: React.ReactNode }) => {
   const isSystemOwner = useAppSelector(selectIsSystemOwner);
-  if (!isSystemOwner) return <Navigate to="/pos" replace />;
+  if (!isSystemOwner) return <Navigate to="/home" replace />;
   return <>{children}</>;
 };
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
-  const user = useAppSelector(selectCurrentUser);
   if (isAuthenticated) {
-    return (
-      <Navigate
-        to={user?.role === "SystemOwner" ? "/owner/tenants" : "/pos"}
-        replace
-      />
-    );
+    return <Navigate to="/home" replace />;
   }
   return <>{children}</>;
 };
 
 const NonSystemOwnerRoute = ({ children }: { children: React.ReactNode }) => {
   const isSystemOwner = useAppSelector(selectIsSystemOwner);
-  if (isSystemOwner) return <Navigate to="/owner/tenants" replace />;
+  if (isSystemOwner) return <Navigate to="/home" replace />;
   return <>{children}</>;
 };
 
@@ -132,6 +124,14 @@ const AppRoutes = () => (
         <PublicRoute>
           <LoginPage />
         </PublicRoute>
+      }
+    />
+    <Route
+      path="/home"
+      element={
+        <ProtectedRoute>
+          <HomePage />
+        </ProtectedRoute>
       }
     />
     <Route
@@ -614,72 +614,56 @@ const AppRoutes = () => (
   </Routes>
 );
 
+const decodeJwtPayload = (token: string): { exp?: number } | null => {
+  const parts = token.split(".");
+
+  if (parts.length !== 3) {
+    return null;
+  }
+
+  try {
+    const base64 = parts[1]
+      .replace(/-/g, "+")
+      .replace(/_/g, "/")
+      .padEnd(Math.ceil(parts[1].length / 4) * 4, "=");
+
+    return JSON.parse(window.atob(base64)) as { exp?: number };
+  } catch {
+    return null;
+  }
+};
+
 const App = () => {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const token = useAppSelector(selectToken);
   const dispatch = useAppDispatch();
-  const { data: currentShiftData, isLoading: isLoadingShift } =
-    useGetCurrentShiftQuery(undefined, {
-      skip: !isAuthenticated,
-    });
-  const [showRecovery, setShowRecovery] = useState(false);
-  const [recoveredShift, setRecoveredShift] = useState<any>(null);
-  const [savedAt, setSavedAt] = useState<string>("");
 
   // Validate JWT token on app startup - prevents login/pos redirect loop
   // If token is expired or invalid, clear auth state immediately before any API call
   useEffect(() => {
     if (!isAuthenticated || !token) return;
 
-    try {
-      // Decode JWT payload (base64 middle section)
-      const parts = token.split(".");
-      if (parts.length !== 3) {
-        // Invalid token format
-        console.warn("Invalid JWT format - logging out");
-        localStorage.removeItem("persist:auth");
-        dispatch(logoutAction());
-        dispatch(clearBranch());
-        return;
-      }
+    const payload = decodeJwtPayload(token);
 
-      const payload = JSON.parse(atob(parts[1]));
-      const exp = payload.exp;
-
-      if (exp) {
-        const now = Math.floor(Date.now() / 1000);
-        if (now >= exp) {
-          // Token expired
-          console.warn("JWT expired - logging out");
-          localStorage.removeItem("persist:auth");
-          dispatch(logoutAction());
-          dispatch(clearBranch());
-          return;
-        }
-      }
-    } catch (e) {
-      // Token is malformed - clear it
-      console.warn("Failed to validate JWT - logging out", e);
+    if (!payload) {
+      console.warn("Invalid JWT payload - logging out");
       localStorage.removeItem("persist:auth");
       dispatch(logoutAction());
       dispatch(clearBranch());
+      return;
     }
-  }, []); // Only run once on startup
 
-  // CRITICAL: Clear branch state on app startup to prevent branch mismatch
-  // This ensures that when a user logs in, they start with a clean branch state
-  useEffect(() => {
-    if (isAuthenticated) {
-      // Clear persisted branch from localStorage
-      try {
-        localStorage.removeItem("persist:branch");
-      } catch (e) {
-        // ignore localStorage errors
+    if (payload.exp) {
+      const now = Math.floor(Date.now() / 1000);
+
+      if (now >= payload.exp) {
+        console.warn("JWT expired - logging out");
+        localStorage.removeItem("persist:auth");
+        dispatch(logoutAction());
+        dispatch(clearBranch());
       }
-      // Clear branch state in Redux
-      dispatch(clearBranch());
     }
-  }, []); // Only run once on startup
+  }, [dispatch, isAuthenticated, token]);
 
   // Shift recovery disabled - was causing annoying popups on every app load
   // Clear any previously saved shift data on startup
@@ -703,19 +687,6 @@ const App = () => {
   //   }
   //   return () => shiftPersistence.stopAutoSave();
   // }, [isAuthenticated, currentShiftData]);
-
-  const handleRestore = () => {
-    // The shift is already in the backend, just close the modal
-    // The user can continue working with the existing shift
-    setShowRecovery(false);
-    setRecoveredShift(null);
-  };
-
-  const handleDiscard = () => {
-    shiftPersistence.clear();
-    setShowRecovery(false);
-    setRecoveredShift(null);
-  };
 
   return (
     <ErrorBoundary>

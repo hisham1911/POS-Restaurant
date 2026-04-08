@@ -26,19 +26,28 @@ interface CustomerOrdersParams {
   pageSize?: number;
 }
 
+interface CompleteOrderApiResponse extends ApiResponse<Order> {
+  printAttempted?: boolean;
+  printDelivered?: boolean;
+}
+
 export const ordersApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // جلب كل الطلبات مع الفلاتر والباجنيشن
-    getOrders: builder.query<ApiResponse<PagedOrders>, OrdersQueryParams | void>({
+    getOrders: builder.query<
+      ApiResponse<PagedOrders>,
+      OrdersQueryParams | void
+    >({
       query: (params) => {
         const queryParams: Record<string, string> = {};
-        
+
         if (params) {
           if (params.status) queryParams.status = params.status;
           if (params.fromDate) queryParams.fromDate = params.fromDate;
           if (params.toDate) queryParams.toDate = params.toDate;
           if (params.page) queryParams.page = params.page.toString();
-          if (params.pageSize) queryParams.pageSize = params.pageSize.toString();
+          if (params.pageSize)
+            queryParams.pageSize = params.pageSize.toString();
         }
 
         return {
@@ -146,7 +155,7 @@ export const ordersApi = baseApi.injectEndpoints({
 
     // إكمال الطلب
     completeOrder: builder.mutation<
-      ApiResponse<Order>,
+      CompleteOrderApiResponse,
       { orderId: number; data: CompleteOrderRequest }
     >({
       query: ({ orderId, data }) => ({
@@ -154,6 +163,18 @@ export const ordersApi = baseApi.injectEndpoints({
         method: "POST",
         body: data,
       }),
+      transformResponse: (response: ApiResponse<Order>, meta) => {
+        const printAttempted =
+          meta?.response?.headers.get("x-print-attempted") === "1";
+        const printDelivered =
+          meta?.response?.headers.get("x-print-delivered") === "1";
+
+        return {
+          ...response,
+          printAttempted,
+          printDelivered,
+        };
+      },
       invalidatesTags: (_result, _error, { orderId }) => [
         { type: "Orders", id: orderId },
         { type: "Orders", id: "LIST" },

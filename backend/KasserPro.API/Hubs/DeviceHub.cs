@@ -8,7 +8,11 @@ namespace KasserPro.API.Hubs;
 public class DeviceHub : Hub
 {
     private readonly ILogger<DeviceHub> _logger;
+    private static readonly object _connectionLock = new();
     private static readonly Dictionary<string, string> _deviceConnections = new();
+    private static readonly Dictionary<string, DeviceConnectionInfo> _connectionInfoByConnectionId = new();
+
+    private sealed record DeviceConnectionInfo(string DeviceId, string GroupName, DateTime ConnectedAtUtc);
 
     public DeviceHub(ILogger<DeviceHub> logger)
     {
@@ -46,20 +50,29 @@ public class DeviceHub : Hub
             return;
         }
 
-        // Store device connection
-        lock (_deviceConnections)
-        {
-            _deviceConnections[deviceId] = Context.ConnectionId;
-        }
-
         // P0-5: Add device to a branch group for targeted receipt delivery.
         // Branch ID comes from the X-Branch-Id header (set by desktop bridge config).
         // Default to "branch-default" if not provided.
         var branchId = httpContext.Request.Headers["X-Branch-Id"].ToString();
         var groupName = !string.IsNullOrEmpty(branchId) ? $"branch-{branchId}" : "branch-default";
+
+        // Store device connection and group metadata for deterministic single-device routing.
+        lock (_connectionLock)
+        {
+            if (_deviceConnections.TryGetValue(deviceId, out var previousConnectionId)
+                && !string.Equals(previousConnectionId, Context.ConnectionId, StringComparison.Ordinal))
+            {
+                _connectionInfoByConnectionId.Remove(previousConnectionId);
+            }
+
+            _deviceConnections[deviceId] = Context.ConnectionId;
+            _connectionInfoByConnectionId[Context.ConnectionId] =
+                new DeviceConnectionInfo(deviceId, groupName, DateTime.UtcNow);
+        }
+
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
 
-        _logger.LogInformation("Device {DeviceId} connected with connection ID {ConnectionId} and added to group {GroupName}", 
+        _logger.LogInformation("Device {DeviceId} connected with connection ID {ConnectionId} and added to group {GroupName}",
             deviceId, Context.ConnectionId, groupName);
 
         await base.OnConnectedAsync();
@@ -70,20 +83,26 @@ public class DeviceHub : Hub
     /// </summary>
     public override async Task OnDisconnectedAsync(Exception? exception)
     {
-        var httpContext = Context.GetHttpContext();
-        if (httpContext != null)
-        {
-            var deviceId = httpContext.Request.Headers["X-Device-Id"].ToString();
-            
-            if (!string.IsNullOrEmpty(deviceId))
-            {
-                lock (_deviceConnections)
-                {
-                    _deviceConnections.Remove(deviceId);
-                }
+        string? disconnectedDeviceId = null;
 
-                _logger.LogInformation("Device {DeviceId} disconnected", deviceId);
+        lock (_connectionLock)
+        {
+            if (_connectionInfoByConnectionId.TryGetValue(Context.ConnectionId, out var info))
+            {
+                disconnectedDeviceId = info.DeviceId;
+                _connectionInfoByConnectionId.Remove(Context.ConnectionId);
+
+                if (_deviceConnections.TryGetValue(info.DeviceId, out var activeConnectionId)
+                    && string.Equals(activeConnectionId, Context.ConnectionId, StringComparison.Ordinal))
+                {
+                    _deviceConnections.Remove(info.DeviceId);
+                }
             }
+        }
+
+        if (!string.IsNullOrEmpty(disconnectedDeviceId))
+        {
+            _logger.LogInformation("Device {DeviceId} disconnected", disconnectedDeviceId);
         }
 
         if (exception != null)
@@ -101,8 +120,8 @@ public class DeviceHub : Hub
     public async Task PrintCompleted(PrintCompletedEventDto eventDto)
     {
         _logger.LogInformation(
-            "Print completed: CommandId={CommandId}, Success={Success}, Error={Error}", 
-            eventDto.CommandId, 
+            "Print completed: CommandId={CommandId}, Success={Success}, Error={Error}",
+            eventDto.CommandId,
             eventDto.Success,
             eventDto.ErrorMessage ?? "None"
         );
@@ -116,9 +135,25 @@ public class DeviceHub : Hub
     /// </summary>
     public static int GetConnectedDeviceCount()
     {
-        lock (_deviceConnections)
+        lock (_connectionLock)
         {
             return _deviceConnections.Count;
+        }
+    }
+
+    /// <summary>
+    /// Returns a preferred single device connection for a group.
+    /// Uses oldest active connection to keep routing deterministic.
+    /// </summary>
+    public static string? GetPreferredConnectionId(string groupName)
+    {
+        lock (_connectionLock)
+        {
+            return _connectionInfoByConnectionId
+                .Where(pair => string.Equals(pair.Value.GroupName, groupName, StringComparison.Ordinal))
+                .OrderBy(pair => pair.Value.ConnectedAtUtc)
+                .Select(pair => pair.Key)
+                .FirstOrDefault();
         }
     }
 }

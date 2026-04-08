@@ -4,69 +4,25 @@ import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { useGetBranchesQuery } from "@/api/branchesApi";
 import {
   setCurrentBranch,
-  setBranches,
   selectCurrentBranch,
   selectBranches,
 } from "@/store/slices/branchSlice";
 import { selectCurrentUser } from "@/store/slices/authSlice";
-import { baseApi } from "@/api/baseApi";
 import { clearCart } from "@/store/slices/cartSlice";
-
-const getBranchStorageKey = (userId?: number) =>
-  userId ? `selectedBranchId:${userId}` : null;
-
-const readSavedBranchId = (storageKey: string | null): number | null => {
-  if (!storageKey) {
-    return null;
-  }
-
-  try {
-    const value = localStorage.getItem(storageKey);
-    if (!value) {
-      return null;
-    }
-
-    const parsed = Number(value);
-    return Number.isInteger(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
-};
-
-const saveSelectedBranchId = (storageKey: string | null, branchId: number) => {
-  if (!storageKey) {
-    return;
-  }
-
-  try {
-    localStorage.setItem(storageKey, String(branchId));
-  } catch {
-    // Ignore storage errors and keep runtime state only.
-  }
-};
+import {
+  getBranchStorageKey,
+  saveSelectedBranchId,
+} from "@/utils/branchStorage";
 
 export const BranchSelector = () => {
   const dispatch = useAppDispatch();
   const currentBranch = useAppSelector(selectCurrentBranch);
   const branches = useAppSelector(selectBranches);
   const currentUser = useAppSelector(selectCurrentUser);
-  const { data: branchesData, isLoading } = useGetBranchesQuery();
+  const { isLoading } = useGetBranchesQuery(undefined, {
+    skip: !currentUser,
+  });
   const branchStorageKey = getBranchStorageKey(currentUser?.id);
-
-  useEffect(() => {
-    if (branchesData?.data) {
-      const savedBranchId = readSavedBranchId(branchStorageKey);
-
-      // Pass user's branchId to auto-select correct branch
-      dispatch(
-        setBranches({
-          branches: branchesData.data,
-          userBranchId: currentUser?.branchId,
-          preferredBranchId: savedBranchId,
-        }),
-      );
-    }
-  }, [branchesData, dispatch, currentUser?.branchId, branchStorageKey]);
 
   useEffect(() => {
     if (currentBranch?.id) {
@@ -83,24 +39,6 @@ export const BranchSelector = () => {
 
       // Prevent accidental checkout with items from the previous branch.
       dispatch(clearCart());
-      // Invalidate all branch-sensitive caches when branch changes.
-      dispatch(
-        baseApi.util.invalidateTags([
-          "Products",
-          "Categories",
-          "Orders",
-          "Shifts",
-          "Customers",
-          "Inventory",
-          "Suppliers",
-          "PurchaseInvoice",
-          "Reports",
-          "Expense",
-          "Expenses",
-          "CashRegisterBalance",
-          "CashRegisterTransactions",
-        ]),
-      );
     }
   };
 

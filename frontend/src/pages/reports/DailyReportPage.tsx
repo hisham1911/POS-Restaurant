@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Calendar,
   TrendingUp,
@@ -22,6 +22,8 @@ import {
   useGetDailyReportQuery,
   usePrintDailyReportMutation,
 } from "@/api/reportsApi";
+import { useGetCurrentTenantQuery } from "@/api/branchesApi";
+import type { ApiError } from "@/utils/errorHandler";
 import { toast } from "sonner";
 import { DailyReport } from "@/types/report.types";
 
@@ -290,12 +292,47 @@ export const DailyReportPage = () => {
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0],
   );
+  const autoPrintedDateRef = useRef<string | null>(null);
 
   const { data, isLoading, isError, error } =
     useGetDailyReportQuery(selectedDate);
+  const { data: tenantData } = useGetCurrentTenantQuery();
   const [printDailyReport, { isLoading: isPrintingThermal }] =
     usePrintDailyReportMutation();
   const report = data?.data;
+  const autoPrintDailyReports =
+    tenantData?.data?.autoPrintDailyReports ?? false;
+  const errorMessage =
+    (error as ApiError | undefined)?.data?.message || "حدث خطأ غير متوقع";
+
+  useEffect(() => {
+    const todayDate = new Date().toISOString().split("T")[0];
+    const shouldAutoPrintToday =
+      autoPrintDailyReports &&
+      Boolean(report) &&
+      selectedDate === todayDate &&
+      autoPrintedDateRef.current !== selectedDate;
+
+    if (!shouldAutoPrintToday) {
+      return;
+    }
+
+    autoPrintedDateRef.current = selectedDate;
+
+    void (async () => {
+      try {
+        await printDailyReport(selectedDate).unwrap();
+        toast.success("تم إرسال الطباعة التلقائية للتقرير اليومي");
+      } catch {
+        if (report) {
+          printDailyReportLocally(report, selectedDate);
+        }
+        toast.warning(
+          "تعذر الوصول لتطبيق الطابعة. تم تحويل الطباعة تلقائيًا إلى طابعة المتصفح",
+        );
+      }
+    })();
+  }, [autoPrintDailyReports, printDailyReport, report, selectedDate]);
 
   /** طباعة عبر الطابعة الحرارية (BridgeApp) مع fallback للطباعة المحلية */
   const handleThermalPrint = async () => {
@@ -331,9 +368,7 @@ export const DailyReportPage = () => {
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <p className="text-red-600">فشل في تحميل التقرير</p>
-          <p className="text-gray-500 text-sm mt-2">
-            {(error as any)?.data?.message || "حدث خطأ غير متوقع"}
-          </p>
+          <p className="text-gray-500 text-sm mt-2">{errorMessage}</p>
         </div>
       </div>
     );

@@ -226,15 +226,15 @@ export const POSPage = () => {
         {/* Search Input */}
         <div className="mb-3">
           <div className="relative">
-            <ScanBarcode className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-400" />
+            <ScanBarcode className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-primary-400" />
             <input
               ref={searchInputRef}
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={handleSearchKeyDown}
-              placeholder="🔍 بحث (اضغط Enter للإضافة)"
-              className="w-full pl-3 pr-11 py-3 border-2 border-gray-200 rounded-xl bg-white focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none text-base"
+              placeholder="ابحث بالاسم أو الباركود أو SKU"
+              className="w-full rounded-xl border-2 border-gray-200 bg-white py-3 pe-11 ps-3 text-base focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none"
               autoComplete="off"
             />
           </div>

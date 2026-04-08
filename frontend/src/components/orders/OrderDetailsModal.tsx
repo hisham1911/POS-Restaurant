@@ -8,6 +8,8 @@ import { RefundModal } from "./RefundModal";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentUser } from "@/store/slices/authSlice";
 import { usePrintReceiptMutation } from "@/api/ordersApi";
+import { useGetCurrentTenantQuery } from "@/api/branchesApi";
+import { printOrderReceiptFallback } from "@/utils/browserReceiptPrinter";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { Portal } from "@/components/common/Portal";
@@ -23,6 +25,7 @@ export const OrderDetailsModal = ({
 }: OrderDetailsModalProps) => {
   const [showRefundModal, setShowRefundModal] = useState(false);
   const user = useAppSelector(selectCurrentUser);
+  const { data: tenantData } = useGetCurrentTenantQuery();
   const [printReceipt, { isLoading: isPrinting }] = usePrintReceiptMutation();
   const isReturnOrder = order.orderType === "Return";
 
@@ -41,7 +44,16 @@ export const OrderDetailsModal = ({
       await printReceipt(order.id).unwrap();
       toast.success("تم إرسال أمر الطباعة بنجاح");
     } catch (error) {
-      toast.error("فشل إرسال أمر الطباعة");
+      toast.info("تعذر الوصول لبرنامج الطابعة. سيتم فتح الطباعة من المتصفح");
+      const isPrintWindowOpened = printOrderReceiptFallback(
+        order,
+        tenantData?.data,
+      );
+
+      if (!isPrintWindowOpened) {
+        toast.error("تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة");
+      }
+
       console.error("Print error:", error);
     }
   };

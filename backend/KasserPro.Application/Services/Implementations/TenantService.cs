@@ -15,13 +15,7 @@ using System.Text.RegularExpressions;
 
 public class TenantService : ITenantService
 {
-    private static readonly HashSet<string> AllowedPrintRoutingModes = new(StringComparer.Ordinal)
-    {
-        "BranchOnly",
-        "BranchWithFallback",
-        "AllDevices",
-        "Disabled"
-    };
+    private const string SharedPrinterRoutingMode = "BranchWithFallback";
 
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
@@ -103,14 +97,18 @@ public class TenantService : ITenantService
         if (dto.ReceiptShowLogo.HasValue)
             tenant.ReceiptShowLogo = dto.ReceiptShowLogo.Value;
 
-        // Update print routing settings if provided
-        if (dto.PrintRoutingMode != null)
+        // Enforce shared-printer mode to keep printing behavior simple for end users.
+        if (!string.IsNullOrWhiteSpace(dto.PrintRoutingMode)
+            && !string.Equals(dto.PrintRoutingMode, SharedPrinterRoutingMode, StringComparison.Ordinal))
         {
-            if (!AllowedPrintRoutingModes.Contains(dto.PrintRoutingMode))
-                return ApiResponse<TenantDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
-
-            tenant.PrintRoutingMode = dto.PrintRoutingMode;
+            _logger.LogInformation(
+                "Ignoring unsupported print routing mode {RequestedMode}; forcing {ForcedMode}",
+                dto.PrintRoutingMode,
+                SharedPrinterRoutingMode);
         }
+
+        tenant.PrintRoutingMode = SharedPrinterRoutingMode;
+
         if (dto.AutoPrintOnSale.HasValue)
             tenant.AutoPrintOnSale = dto.AutoPrintOnSale.Value;
         if (dto.AutoPrintOnDebtPayment.HasValue)
@@ -386,7 +384,7 @@ public class TenantService : ITenantService
         ReceiptPhoneNumber = tenant.ReceiptPhoneNumber,
         ReceiptShowCustomerName = tenant.ReceiptShowCustomerName,
         ReceiptShowLogo = tenant.ReceiptShowLogo,
-        PrintRoutingMode = tenant.PrintRoutingMode,
+        PrintRoutingMode = SharedPrinterRoutingMode,
         AutoPrintOnSale = tenant.AutoPrintOnSale,
         AutoPrintOnDebtPayment = tenant.AutoPrintOnDebtPayment,
         AutoPrintDailyReports = tenant.AutoPrintDailyReports,

@@ -15,6 +15,7 @@ import {
 import { Card } from "@/components/common/Card";
 import { formatCurrency } from "@/utils/formatters";
 import { useGetCustomerActivityReportQuery } from "@/api/customerReportsApi";
+import { handleApiError } from "@/utils/errorHandler";
 
 export const CustomerActivityReportPage = () => {
   const [fromDate, setFromDate] = useState(
@@ -46,7 +47,7 @@ export const CustomerActivityReportPage = () => {
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
           <p className="text-red-600">فشل في تحميل التقرير</p>
           <p className="text-gray-500 text-sm mt-2">
-            {(error as any)?.data?.message || "حدث خطأ غير متوقع"}
+            {handleApiError(error)}
           </p>
         </div>
       </div>

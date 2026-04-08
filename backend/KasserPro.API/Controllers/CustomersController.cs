@@ -297,18 +297,26 @@ public class CustomersController : ControllerBase
         };
 
         var branchGroup = $"branch-{branchId}";
-        await SendPrintCommandByRoutingAsync(
+        var printSent = await SendPrintCommandByRoutingAsync(
             printCommand,
             branchGroup,
             printRoutingMode,
             isAutomatic,
             "PrintDebtPaymentReceipt");
 
+        if (!printSent)
+        {
+            _logger.LogWarning(
+                "Debt payment print command for payment {PaymentId} could not be delivered; no connected printer device",
+                paymentId);
+            return (false, true);
+        }
+
         _logger.LogInformation("Print command sent for debt payment {PaymentId} to branch group {BranchId}", paymentId, branchId);
         return (true, true);
     }
 
-    private async Task SendPrintCommandByRoutingAsync(
+    private async Task<bool> SendPrintCommandByRoutingAsync(
         object printCommand,
         string branchGroup,
         string? routingMode,
@@ -325,27 +333,60 @@ public class CustomersController : ControllerBase
 
         if (string.Equals(mode, "BranchOnly", StringComparison.Ordinal))
         {
-            await _hubContext.Clients.Group(branchGroup).SendAsync(hubMethod, printCommand);
-            return;
+            var sentToBranchOnly = await SendToPreferredDeviceAsync(branchGroup, hubMethod, printCommand);
+            if (!sentToBranchOnly)
+            {
+                _logger.LogWarning("No connected printer device found for group {BranchGroup}", branchGroup);
+            }
+
+            return sentToBranchOnly;
         }
 
         if (string.Equals(mode, "AllDevices", StringComparison.Ordinal))
         {
             await _hubContext.Clients.All.SendAsync(hubMethod, printCommand);
-            return;
+            return DeviceHub.GetConnectedDeviceCount() > 0;
         }
 
         if (string.Equals(mode, "Disabled", StringComparison.Ordinal))
         {
             _logger.LogInformation("Skipping automatic print command because routing mode is Disabled");
-            return;
+            return false;
         }
 
-        await _hubContext.Clients.Group(branchGroup).SendAsync(hubMethod, printCommand);
-        if (branchGroup != "branch-default")
+        if (await SendToPreferredDeviceAsync(branchGroup, hubMethod, printCommand))
         {
-            await _hubContext.Clients.Group("branch-default").SendAsync(hubMethod, printCommand);
+            return true;
         }
+
+        if (branchGroup != "branch-default"
+            && await SendToPreferredDeviceAsync("branch-default", hubMethod, printCommand))
+        {
+            return true;
+        }
+
+        _logger.LogWarning(
+            "No connected printer device found for primary group {BranchGroup} or fallback group branch-default",
+            branchGroup);
+
+        return false;
+    }
+
+    private async Task<bool> SendToPreferredDeviceAsync(string groupName, string hubMethod, object printCommand)
+    {
+        var connectionId = DeviceHub.GetPreferredConnectionId(groupName);
+        if (string.IsNullOrWhiteSpace(connectionId))
+        {
+            return false;
+        }
+
+        await _hubContext.Clients.Client(connectionId).SendAsync(hubMethod, printCommand);
+        _logger.LogInformation(
+            "Print command routed to device connection {ConnectionId} in group {GroupName}",
+            connectionId,
+            groupName);
+
+        return true;
     }
 }
 

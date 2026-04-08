@@ -71,9 +71,7 @@ export const productsApi = baseApi.injectEndpoints({
         return `/products${queryString ? `?${queryString}` : ""}`;
       },
       providesTags: (result) => {
-        const items = Array.isArray(result?.data)
-          ? result.data
-          : ((result?.data as any)?.items ?? []);
+        const items = result?.data ?? [];
 
         return [
           ...items.map(({ id }: { id: number }) => ({

@@ -10,7 +10,7 @@ export const categoriesApi = baseApi.injectEndpoints({
       { search?: string; page?: number; pageSize?: number } | void
     >({
       query: (params) => {
-        const queryParams: Record<string, any> = {};
+        const queryParams: Record<string, string | number> = {};
 
         if (params) {
           if (params.search) queryParams.search = params.search;

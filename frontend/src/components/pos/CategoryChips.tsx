@@ -13,34 +13,33 @@ export const CategoryChips = ({
   onSelect,
 }: CategoryChipsProps) => {
   return (
-    <div className="flex flex-wrap gap-2">
-      {/* All Categories */}
+    <div className="flex gap-1.5 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none]">
       <button
+        type="button"
         onClick={() => onSelect(null)}
         className={clsx(
-          "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200",
+          "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
           selectedId === null
-            ? "bg-primary-600 text-white shadow-md scale-105"
-            : "bg-gray-100 text-gray-700 hover:bg-gray-200",
+            ? "border-primary-600 bg-primary-600 text-white"
+            : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50",
         )}
       >
         الكل
       </button>
 
-      {/* Category Chips */}
       {categories.map((category) => (
         <button
           key={category.id}
+          type="button"
           onClick={() => onSelect(category.id)}
           className={clsx(
-            "px-4 py-2 rounded-full text-sm font-medium transition-all duration-200",
-            "border-2",
+            "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
             selectedId === category.id
-              ? "bg-primary-600 text-white border-primary-600 shadow-md scale-105"
-              : "bg-white text-gray-700 border-gray-200 hover:border-primary-300 hover:bg-primary-50",
+              ? "border-primary-600 bg-primary-600 text-white"
+              : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50",
           )}
         >
-          {category.imageUrl || "📁"} {category.name}
+          {category.name}
         </button>
       ))}
     </div>

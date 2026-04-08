@@ -95,6 +95,8 @@ const isLocalNetworkHost = (host: string): boolean => {
   return !normalized.includes(".");
 };
 
+const SHARED_PRINTER_ROUTING_MODE = "BranchWithFallback";
+
 export const SettingsPage = () => {
   const dispatch = useAppDispatch();
   const browserHost =
@@ -152,9 +154,6 @@ export const SettingsPage = () => {
   const [logoUrl, setLogoUrl] = useState<string>("");
 
   // Print Routing settings state
-  const [printRoutingMode, setPrintRoutingMode] = useState<
-    "BranchOnly" | "BranchWithFallback" | "AllDevices" | "Disabled"
-  >("BranchWithFallback");
   const [autoPrintOnSale, setAutoPrintOnSale] = useState<boolean>(true);
   const [autoPrintOnDebtPayment, setAutoPrintOnDebtPayment] =
     useState<boolean>(true);
@@ -186,7 +185,6 @@ export const SettingsPage = () => {
       setReceiptShowLogo(tenant.receiptShowLogo ?? true);
       setLogoUrl(tenant.logoUrl || "");
       // Print Routing settings
-      setPrintRoutingMode(tenant.printRoutingMode || "BranchWithFallback");
       setAutoPrintOnSale(tenant.autoPrintOnSale ?? true);
       setAutoPrintOnDebtPayment(tenant.autoPrintOnDebtPayment ?? true);
       setAutoPrintDailyReports(tenant.autoPrintDailyReports ?? false);
@@ -221,7 +219,7 @@ export const SettingsPage = () => {
         receiptPhoneNumber: receiptPhoneNumber || undefined,
         receiptShowCustomerName,
         receiptShowLogo,
-        printRoutingMode,
+        printRoutingMode: SHARED_PRINTER_ROUTING_MODE,
         autoPrintOnSale,
         autoPrintOnDebtPayment,
         autoPrintDailyReports,
@@ -1187,51 +1185,22 @@ export const SettingsPage = () => {
         <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
           <div className="flex items-center gap-2 text-lg font-semibold">
             <Printer className="w-5 h-5 text-primary-600" />
-            <span>🖨️ إعدادات الطباعة التلقائية</span>
+            <span>إعدادات الطباعة التلقائية</span>
           </div>
 
-          {/* Print Routing Mode */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-3">
-              وضع توجيه الطباعة
-            </label>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[
-                {
-                  value: "BranchOnly",
-                  label: "الفرع فقط",
-                  desc: "طباعة للفرع الحالي فقط",
-                },
-                {
-                  value: "BranchWithFallback",
-                  label: "الفرع + احتياطي",
-                  desc: "الفرع + الأجهزة الافتراضية",
-                },
-                {
-                  value: "AllDevices",
-                  label: "كل الأجهزة",
-                  desc: "طباعة على جميع الطابعات",
-                },
-                { value: "Disabled", label: "معطل", desc: "لا طباعة تلقائية" },
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setPrintRoutingMode(option.value as any)}
-                  className={clsx(
-                    "p-4 rounded-lg border-2 text-left transition-all",
-                    printRoutingMode === option.value
-                      ? "border-primary-500 bg-primary-50"
-                      : "border-gray-200 hover:border-gray-300",
-                  )}
-                >
-                  <div className="font-medium">{option.label}</div>
-                  <div className="text-sm text-gray-500 mt-1">
-                    {option.desc}
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
+          {/* <div className="bg-primary-50 border border-primary-200 rounded-lg p-4 text-sm text-primary-900 space-y-2">
+            <p className="font-semibold">وضع الطباعة ثابت تلقائياً:</p>
+            <p>
+              <strong>طابعة واحدة مشتركة</strong> لكل المستخدمين.
+            </p>
+            <p>
+              1) شغّل برنامج الطابعة (Bridge App) على الجهاز الموصل بالطابعة.
+            </p>
+            <p>
+              2) أي مستخدم من أي جهاز سيطبع على نفس الطابعة، سواء كان السيرفر
+              محليًا أو عبر الإنترنت طالما جهاز الطابعة متصل بنفس الخادم.
+            </p>
+          </div> */}
 
           {/* Auto Print Toggles */}
           <div className="space-y-4">

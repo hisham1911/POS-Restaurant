@@ -16,6 +16,8 @@ import {
   handleApiError,
 } from "../utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
+import { useGetCurrentTenantQuery } from "@/api/branchesApi";
+import { printOrderReceiptFallback } from "@/utils/browserReceiptPrinter";
 
 export const useOrders = () => {
   const { items, clearCart, discountType, discountValue } = useCart();
@@ -26,6 +28,7 @@ export const useOrders = () => {
     isLoading: isLoadingOrders,
     refetch,
   } = useGetOrdersQuery();
+  const { data: tenantData } = useGetCurrentTenantQuery();
   const { data: todayOrdersData, isLoading: isLoadingToday } =
     useGetTodayOrdersQuery();
 
@@ -100,6 +103,26 @@ export const useOrders = () => {
         "ORDER_COMPLETE_EMPTY_RESPONSE",
         "تعذر إكمال الطلب",
       );
+
+      const shouldFallbackToBrowserPrint =
+        response.printAttempted === true && response.printDelivered === false;
+
+      if (shouldFallbackToBrowserPrint) {
+        const isPrintWindowOpened = printOrderReceiptFallback(
+          order,
+          tenantData?.data,
+        );
+
+        if (isPrintWindowOpened) {
+          toast.info(
+            "تعذر الوصول لتطبيق الطابعة. تم التحويل تلقائيًا لطباعة المتصفح",
+          );
+        } else {
+          toast.error(
+            "تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة",
+          );
+        }
+      }
 
       clearCart();
       toast.success("تم إكمال الطلب بنجاح");

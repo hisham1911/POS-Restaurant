@@ -3,11 +3,28 @@ import { useState, useEffect } from "react";
 export type POSMode = "cashier" | "standard";
 
 const POS_MODE_KEY = "pos_mode";
+const MOBILE_BREAKPOINT = 1024;
+
+const getDefaultPOSMode = (): POSMode => {
+  if (typeof window === "undefined") {
+    return "cashier";
+  }
+
+  return window.innerWidth < MOBILE_BREAKPOINT ? "standard" : "cashier";
+};
 
 export const usePOSMode = () => {
   const [mode, setModeState] = useState<POSMode>(() => {
+    if (typeof window === "undefined") {
+      return "cashier";
+    }
+
     const saved = localStorage.getItem(POS_MODE_KEY);
-    return (saved as POSMode) || "cashier";
+    if (saved === "cashier" || saved === "standard") {
+      return saved;
+    }
+
+    return getDefaultPOSMode();
   });
 
   const setMode = (newMode: POSMode) => {

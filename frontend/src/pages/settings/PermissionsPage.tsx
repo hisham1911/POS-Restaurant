@@ -59,7 +59,7 @@ export default function PermissionsPage() {
   }, {} as Record<string, PermissionInfo[]>);
 
   return (
-    <div className="container mx-auto p-6" dir="rtl">
+    <div className="container mx-auto p-4 sm:p-6" dir="rtl">
       <h1 className="text-3xl font-bold mb-6">إدارة صلاحيات الكاشيرين</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -145,3 +145,4 @@ export default function PermissionsPage() {
     </div>
   );
 }
+

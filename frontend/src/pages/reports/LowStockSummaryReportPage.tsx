@@ -50,7 +50,7 @@ export const LowStockSummaryReportPage = () => {
   }
 
   return (
-    <div className="h-full overflow-auto p-6 space-y-6">
+    <div className="h-full overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -65,7 +65,7 @@ export const LowStockSummaryReportPage = () => {
             onChange={(e) =>
               setBranchId(e.target.value ? Number(e.target.value) : undefined)
             }
-            className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm min-w-[180px]"
+            className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm w-full sm:min-w-[180px]"
           >
             <option value="">جميع الفروع</option>
             {branches.map((branch) => (
@@ -337,3 +337,4 @@ export const LowStockSummaryReportPage = () => {
 };
 
 export default LowStockSummaryReportPage;
+

@@ -78,16 +78,16 @@ export const InventoryReportsPage = () => {
   };
 
   return (
-    <div className="h-full overflow-auto p-6 space-y-6">
+    <div className="h-full overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">تقرير المخزون</h1>
           <p className="text-gray-500 mt-1">حالة المخزون حسب الفرع</p>
         </div>
         <button
           onClick={handleExport}
-          className="flex items-center gap-2 px-4 py-2 bg-primary-500 text-white rounded-lg hover:bg-primary-600 transition-colors"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary-500 px-4 py-2 text-white transition-colors hover:bg-primary-600 sm:w-auto"
         >
           <Download className="w-4 h-4" />
           تصدير CSV
@@ -96,17 +96,17 @@ export const InventoryReportsPage = () => {
 
       {/* Filters */}
       <Card>
-        <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex flex-col gap-4 xl:flex-row xl:flex-wrap xl:items-center">
           <div className="flex items-center gap-2">
             <Filter className="w-5 h-5 text-gray-400" />
             <span className="text-sm font-medium text-gray-700">الفلاتر:</span>
           </div>
 
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <select
               value={selectedBranchId}
               onChange={(e) => setSelectedBranchId(Number(e.target.value))}
-              className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm min-w-[180px]"
+              className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm w-full sm:min-w-[180px]"
             >
               {branches.map((branch) => (
                 <option key={branch.id} value={branch.id}>
@@ -117,7 +117,7 @@ export const InventoryReportsPage = () => {
             <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
           </div>
 
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <select
               value={selectedCategoryId || ""}
               onChange={(e) =>
@@ -125,7 +125,7 @@ export const InventoryReportsPage = () => {
                   e.target.value ? Number(e.target.value) : undefined,
                 )
               }
-              className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm min-w-[180px]"
+              className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm w-full sm:min-w-[180px]"
             >
               <option value="">كل الفئات</option>
               {categories.map((category) => (
@@ -150,7 +150,7 @@ export const InventoryReportsPage = () => {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
@@ -212,7 +212,7 @@ export const InventoryReportsPage = () => {
       <Card>
         <h3 className="text-lg font-bold text-gray-800 mb-4">تفاصيل المخزون</h3>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[720px]">
             <thead>
               <tr className="border-b">
                 <th className="px-4 py-3 text-right font-semibold text-gray-600">
@@ -340,3 +340,4 @@ export const InventoryReportsPage = () => {
 };
 
 export default InventoryReportsPage;
+

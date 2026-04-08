@@ -101,7 +101,7 @@ export function ExpensesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <Wallet className="w-8 h-8 text-blue-600" />
@@ -250,7 +250,7 @@ export function ExpensesPage() {
 
         <Card padding="none">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
+            <table className="min-w-[840px] divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -423,3 +423,4 @@ export function ExpensesPage() {
     </div>
   );
 }
+

@@ -132,7 +132,7 @@ export const CategoriesPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
@@ -465,3 +465,4 @@ export const CategoriesPage = () => {
 };
 
 export default CategoriesPage;
+

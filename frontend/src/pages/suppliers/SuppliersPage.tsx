@@ -65,7 +65,7 @@ export default function SuppliersPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-3 mb-2">
@@ -78,7 +78,7 @@ export default function SuppliersPage() {
           </div>
           <Button
             onClick={handleAddSupplier}
-            className="flex items-center gap-2"
+            className="flex w-full items-center justify-center gap-2 sm:w-auto"
           >
             <Plus className="w-4 h-4" />
             إضافة مورد
@@ -122,7 +122,7 @@ export default function SuppliersPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[720px]">
                 <thead className="bg-gray-50 border-b">
                   <tr>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
@@ -221,3 +221,4 @@ export default function SuppliersPage() {
     </div>
   );
 }
+

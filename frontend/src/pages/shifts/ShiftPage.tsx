@@ -88,7 +88,7 @@ export const ShiftPage = () => {
   if (isLoading) return <Loading />;
 
   return (
-    <div className="h-full overflow-auto p-6 space-y-6">
+    <div className="h-full overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Shift Warning Banner */}
       {shiftWarning && !dismissedWarning && (
         <ShiftWarningBanner
@@ -433,3 +433,4 @@ export const ShiftPage = () => {
 };
 
 export default ShiftPage;
+

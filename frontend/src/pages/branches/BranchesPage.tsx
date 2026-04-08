@@ -58,7 +58,7 @@ export const BranchesPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
@@ -116,7 +116,7 @@ export const BranchesPage = () => {
         ) : (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[720px]">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="text-right py-4 px-6 text-sm font-semibold text-gray-700">
@@ -262,3 +262,4 @@ export const BranchesPage = () => {
     </div>
   );
 };
+

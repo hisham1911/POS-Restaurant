@@ -54,7 +54,7 @@ export const ProfitLossReportPage = () => {
   const isProfit = (report?.netProfit || 0) >= 0;
 
   return (
-    <div className="h-full overflow-auto p-6 space-y-6">
+    <div className="h-full overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -323,3 +323,4 @@ export const ProfitLossReportPage = () => {
 };
 
 export default ProfitLossReportPage;
+

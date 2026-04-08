@@ -67,7 +67,7 @@ export default function UserManagementCard() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[720px]">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
@@ -189,3 +189,4 @@ export default function UserManagementCard() {
     </>
   );
 }
+

@@ -91,8 +91,8 @@ export const CustomersPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        <div className="mb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
+        <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-8 h-8 rounded-full bg-cyan-100 flex items-center justify-center">
               <Users className="w-5 h-5 text-cyan-600" />
@@ -104,14 +104,18 @@ export const CustomersPage = () => {
           </p>
         </div>
 
-        <div className="flex justify-end">
-          <Button variant="primary" onClick={() => setShowFormModal(true)}>
+        <div className="flex justify-stretch sm:justify-end">
+          <Button
+            variant="primary"
+            onClick={() => setShowFormModal(true)}
+            className="w-full sm:w-auto"
+          >
             <UserPlus className="w-5 h-5" />
             إضافة عميل جديد
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <Card className="border-cyan-100">
             <p className="text-sm text-gray-600">إجمالي العملاء</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">
@@ -134,8 +138,8 @@ export const CustomersPage = () => {
 
         <form onSubmit={handleSearch}>
           <Card>
-            <div className="flex gap-2">
-              <div className="relative flex-1 max-w-md">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <div className="relative flex-1 sm:max-w-md">
                 <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
                   type="text"
@@ -145,13 +149,18 @@ export const CustomersPage = () => {
                   className="w-full pr-10 pl-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
               </div>
-              <Button type="submit" variant="secondary">
+              <Button
+                type="submit"
+                variant="secondary"
+                className="w-full sm:w-auto"
+              >
                 بحث
               </Button>
               {search && (
                 <Button
                   type="button"
                   variant="ghost"
+                  className="w-full sm:w-auto"
                   onClick={() => {
                     setSearch("");
                     setSearchInput("");
@@ -167,7 +176,7 @@ export const CustomersPage = () => {
 
         <Card padding="none" className="flex-1 flex flex-col">
           <div className="overflow-x-auto flex-1">
-            <table className="w-full">
+            <table className="w-full min-w-[720px]">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="text-right px-6 py-4 text-sm font-semibold text-gray-600">
@@ -309,16 +318,17 @@ export const CustomersPage = () => {
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-6 py-4 border-t border-gray-200 bg-gray-50">
+            <div className="flex flex-col gap-3 border-t border-gray-200 bg-gray-50 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-sm text-gray-600">
                 صفحة {page} من {totalPages}
               </p>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:flex">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => setPage((p) => p - 1)}
                   disabled={!hasPreviousPage || isFetching}
+                  className="w-full sm:w-auto"
                 >
                   <ChevronRight className="w-4 h-4" />
                   السابق
@@ -328,6 +338,7 @@ export const CustomersPage = () => {
                   size="sm"
                   onClick={() => setPage((p) => p + 1)}
                   disabled={!hasNextPage || isFetching}
+                  className="w-full sm:w-auto"
                 >
                   التالي
                   <ChevronLeft className="w-4 h-4" />
@@ -440,3 +451,4 @@ export const CustomersPage = () => {
 };
 
 export default CustomersPage;
+

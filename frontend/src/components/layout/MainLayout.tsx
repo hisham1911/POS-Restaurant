@@ -155,18 +155,24 @@ export const MainLayout = () => {
         )}
       >
         <div className="border-b border-slate-200/80 p-4">
-          <div className="relative rounded-[1.6rem] border border-primary-100 bg-white/95 p-3 shadow-[0_18px_40px_-34px_rgba(37,99,235,0.45)]">
-            <div
-              className={clsx(
-                "flex items-center",
-                sidebarCollapsed ? "w-full flex-col justify-center gap-2" : "gap-3",
-              )}
-            >
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#2563eb_0%,#f97316_100%)] text-white shadow-[0_18px_30px_-24px_rgba(37,99,235,0.7)]">
+          {sidebarCollapsed ? (
+            <div className="flex justify-center">
+              <button
+                type="button"
+                onClick={() => setSidebarCollapsed(false)}
+                className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#2563eb_0%,#f97316_100%)] text-white shadow-[0_18px_30px_-24px_rgba(37,99,235,0.7)] transition-transform hover:scale-[1.03]"
+                title="فتح السايد بار"
+              >
                 <span className="text-base font-black">T</span>
-              </div>
+              </button>
+            </div>
+          ) : (
+            <div className="rounded-[1.6rem] border border-primary-100 bg-white/95 p-3 shadow-[0_18px_40px_-34px_rgba(37,99,235,0.45)]">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#2563eb_0%,#f97316_100%)] text-white shadow-[0_18px_30px_-24px_rgba(37,99,235,0.7)]">
+                  <span className="text-base font-black">T</span>
+                </div>
 
-              {!sidebarCollapsed && (
                 <div className="min-w-0 flex-1">
                   <h1 className="truncate text-base font-bold text-slate-900">
                     TajerPro
@@ -175,27 +181,18 @@ export const MainLayout = () => {
                     تنقل أسرع بين صفحات النظام
                   </p>
                 </div>
-              )}
 
-              <button
-                type="button"
-                onClick={() => setSidebarCollapsed((current) => !current)}
-                className={clsx(
-                  "flex items-center justify-center border shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700",
-                  sidebarCollapsed
-                    ? "h-8 min-w-[2.5rem] rounded-full border-primary-100 bg-primary-50 px-2 text-primary-700"
-                    : "h-9 w-9 rounded-xl border-slate-200 bg-white text-slate-500",
-                )}
-                title={sidebarCollapsed ? "فتح السايد بار" : "طي السايد بار"}
-              >
-                {sidebarCollapsed ? (
-                  <ChevronLeft className="h-4 w-4" />
-                ) : (
+                <button
+                  type="button"
+                  onClick={() => setSidebarCollapsed(true)}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-primary-200 hover:bg-primary-50 hover:text-primary-700"
+                  title="طي السايد بار"
+                >
                   <ChevronRight className="h-4 w-4" />
-                )}
-              </button>
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         <nav className="flex-1 space-y-5 overflow-y-auto p-4">

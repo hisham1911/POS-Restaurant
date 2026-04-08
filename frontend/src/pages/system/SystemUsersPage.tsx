@@ -136,7 +136,7 @@ export default function SystemUsersPage() {
   }, {} as Record<string, SystemUser[]>);
 
   return (
-    <div className="container mx-auto p-6" dir="rtl">
+    <div className="container mx-auto p-4 sm:p-6" dir="rtl">
       <div className="mb-6">
         <div className="flex items-center gap-3 mb-2">
           <Users className="w-8 h-8 text-blue-600" />
@@ -208,7 +208,7 @@ export default function SystemUsersPage() {
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full min-w-[720px]">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">
@@ -387,3 +387,4 @@ export default function SystemUsersPage() {
     </div>
   );
 }
+

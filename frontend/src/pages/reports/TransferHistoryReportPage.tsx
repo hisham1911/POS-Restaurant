@@ -97,30 +97,30 @@ export const TransferHistoryReportPage = () => {
   };
 
   return (
-    <div className="h-full overflow-auto p-6 space-y-6">
+    <div className="h-full overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">
             تقرير تاريخ التحويلات
           </h1>
           <p className="text-gray-500 mt-1">سجل تحويلات المخزون بين الفروع</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
+        <div className="flex w-full flex-col gap-3 xl:w-auto">
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             <Calendar className="w-5 h-5 text-gray-400" />
             <input
               type="date"
               value={fromDate}
               onChange={(e) => setFromDate(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary-500 sm:w-auto"
             />
             <span className="text-gray-500">إلى</span>
             <input
               type="date"
               value={toDate}
               onChange={(e) => setToDate(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-2 focus:ring-primary-500 sm:w-auto"
             />
           </div>
         </div>
@@ -128,9 +128,9 @@ export const TransferHistoryReportPage = () => {
 
       {/* Filters */}
       <Card>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
           <span className="text-sm font-medium text-gray-700">الفرع:</span>
-          <div className="relative">
+          <div className="relative w-full sm:w-auto">
             <select
               value={selectedBranchId || ""}
               onChange={(e) =>
@@ -138,7 +138,7 @@ export const TransferHistoryReportPage = () => {
                   e.target.value ? Number(e.target.value) : undefined,
                 )
               }
-              className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm min-w-[180px]"
+              className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm w-full sm:min-w-[180px]"
             >
               <option value="">جميع الفروع</option>
               {branches.map((branch) => (
@@ -153,7 +153,7 @@ export const TransferHistoryReportPage = () => {
       </Card>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="bg-gradient-to-br from-primary-50 to-primary-100 border-primary-200">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-primary-500 rounded-xl flex items-center justify-center">
@@ -220,7 +220,7 @@ export const TransferHistoryReportPage = () => {
             إحصائيات الفروع
           </h3>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[720px]">
               <thead>
                 <tr className="border-b">
                   <th className="px-4 py-3 text-right font-semibold text-gray-600">
@@ -290,7 +290,7 @@ export const TransferHistoryReportPage = () => {
       <Card>
         <h3 className="text-lg font-bold text-gray-800 mb-4">سجل التحويلات</h3>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[720px]">
             <thead>
               <tr className="border-b">
                 <th className="px-4 py-3 text-right font-semibold text-gray-600">
@@ -416,3 +416,4 @@ export const TransferHistoryReportPage = () => {
 };
 
 export default TransferHistoryReportPage;
+

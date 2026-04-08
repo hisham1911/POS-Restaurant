@@ -6,6 +6,7 @@ import {
   FileText,
   LogOut,
   Receipt,
+  Store,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getAccessibleNavigationItems, navigationItems } from "@/components/layout/navigation";
@@ -14,19 +15,21 @@ import {
   reportGroups,
   type GroupTone,
 } from "@/components/layout/navigationGroups";
+import { useGetCurrentTenantQuery } from "@/api/branchesApi";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermission } from "@/hooks/usePermission";
-import { useGetDailyReportQuery } from "@/api/reportsApi";
 import { cn } from "@/lib/utils";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentBranch } from "@/store/slices/branchSlice";
-import { formatCurrency, formatNumber } from "@/utils/formatters";
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { user, logout, isAdmin, isSystemOwner } = useAuth();
   const { hasPermission } = usePermission();
   const currentBranch = useAppSelector(selectCurrentBranch);
+  const { data: tenantResponse } = useGetCurrentTenantQuery(undefined, {
+    skip: isSystemOwner || !user,
+  });
 
   const accessibleItems = getAccessibleNavigationItems(navigationItems, {
     isAdmin,
@@ -38,36 +41,8 @@ export default function HomePage() {
   const canViewReports = !isSystemOwner && hasPermission("ReportsView");
   const visibleReportGroups = canViewReports ? reportGroups : [];
 
-  const { data: dailyReportResponse } = useGetDailyReportQuery(undefined, {
-    skip: !canViewReports || !currentBranch?.id,
-    refetchOnMountOrArgChange: true,
-    refetchOnFocus: true,
-    pollingInterval: 30000,
-  });
-
-  const dailyReport = dailyReportResponse?.data;
-
-  const managerMetrics = canViewReports
-    ? [
-        {
-          label: "مبيعات اليوم",
-          value: formatCurrency(dailyReport?.totalSales ?? 0),
-          tone: "primary" as GroupTone,
-        },
-        {
-          label: "طلبات اليوم",
-          value: formatNumber(dailyReport?.totalOrders ?? 0),
-          tone: "secondary" as GroupTone,
-        },
-        {
-          label: "ورديات اليوم",
-          value: formatNumber(dailyReport?.totalShifts ?? 0),
-          tone: "emerald" as GroupTone,
-        },
-      ]
-    : [];
-
   const firstName = user?.name?.trim().split(/\s+/)[0] ?? "المستخدم";
+  const storeName = tenantResponse?.data?.name ?? "TajerPro";
   const currentTime = new Date().toLocaleTimeString("ar-EG", {
     hour: "2-digit",
     minute: "2-digit",
@@ -78,7 +53,7 @@ export default function HomePage() {
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(37,99,235,0.10),_transparent_26%),radial-gradient(circle_at_bottom_left,_rgba(249,115,22,0.10),_transparent_22%),linear-gradient(180deg,_#f8fbff_0%,_#f9fafb_50%,_#fffaf5_100%)]">
       <div className="mx-auto max-w-7xl space-y-4 p-4 sm:p-6 lg:p-8">
         <section className="rounded-[1.8rem] border border-primary-100 bg-white/90 p-5 shadow-[0_20px_50px_-38px_rgba(37,99,235,0.30)] backdrop-blur">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div className="space-y-2">
               <div className="inline-flex items-center gap-2 rounded-full border border-primary-100 bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">
                 <FileText className="h-3.5 w-3.5" />
@@ -92,7 +67,8 @@ export default function HomePage() {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full flex-wrap justify-end gap-2 md:w-auto md:max-w-[52%] md:self-start">
+              <InfoChip label={storeName} icon={Store} tone="primary" />
               <InfoChip
                 label={currentBranch?.name ?? "بدون فرع"}
                 icon={Building2}
@@ -108,19 +84,6 @@ export default function HomePage() {
             </div>
           </div>
         </section>
-
-        {managerMetrics.length > 0 && (
-          <section className="grid gap-4 md:grid-cols-3">
-            {managerMetrics.map((metric) => (
-              <MetricCard
-                key={metric.label}
-                label={metric.label}
-                value={metric.value}
-                tone={metric.tone}
-              />
-            ))}
-          </section>
-        )}
 
         <section className="space-y-3">
           <SectionHeader title="الأقسام" count={visibleModuleSections.length} />
@@ -252,30 +215,6 @@ function ActionChip({
       <Icon className="h-4 w-4" />
       <span>{label}</span>
     </button>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: string;
-  tone: GroupTone;
-}) {
-  const toneClasses =
-    tone === "emerald"
-      ? "border-emerald-100 bg-emerald-50/75"
-      : tone === "secondary"
-        ? "border-secondary-100 bg-secondary-50/75"
-        : "border-primary-100 bg-primary-50/75";
-
-  return (
-    <div className={cn("rounded-[1.6rem] border p-4 shadow-sm", toneClasses)}>
-      <p className="text-sm text-gray-500">{label}</p>
-      <p className="mt-2 text-2xl font-bold text-gray-900">{value}</p>
-    </div>
   );
 }
 

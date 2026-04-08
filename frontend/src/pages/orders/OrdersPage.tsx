@@ -141,8 +141,8 @@ export const OrdersPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        <div className="flex items-start justify-between gap-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           {/* Header Section */}
           <div className="flex-1">
             <div className="flex items-center gap-3 mb-3">
@@ -169,13 +169,14 @@ export const OrdersPage = () => {
           </div>
 
           {/* View Mode Controls - Compact Section */}
-          <div className="flex flex-col gap-3 w-96">
-            <div className="flex gap-2">
+          <div className="flex w-full flex-col gap-3 xl:w-96">
+            <div className="grid grid-cols-2 gap-2">
               <Button
                 variant={viewMode === "today" ? "primary" : "outline"}
                 onClick={() => handleViewModeChange("today")}
                 rightIcon={<Calendar className="w-4 h-4" />}
                 size="sm"
+                className="w-full"
               >
                 اليوم
               </Button>
@@ -183,11 +184,12 @@ export const OrdersPage = () => {
                 variant={viewMode === "all" ? "primary" : "outline"}
                 onClick={() => handleViewModeChange("all")}
                 size="sm"
+                className="w-full"
               >
                 الكل
               </Button>
             </div>
-            <div className="flex items-end gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
               <div className="flex-1">
                 <label className="block text-xs text-gray-600 font-medium mb-1">
                   اختر يوم
@@ -207,6 +209,7 @@ export const OrdersPage = () => {
                   variant="primary"
                   size="sm"
                   leftIcon={<Calendar className="w-4 h-4" />}
+                  className="w-full sm:w-auto"
                 >
                   تصفية
                 </Button>
@@ -289,7 +292,7 @@ export const OrdersPage = () => {
         )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4 xl:grid-cols-5">
           <Card>
             <p className="text-sm text-gray-500">إجمالي الطلبات</p>
             <p className="text-2xl font-bold text-gray-800">
@@ -359,7 +362,7 @@ export const OrdersPage = () => {
         {/* Orders Table */}
         <Card padding="none" className="flex flex-col">
           <div className="overflow-auto flex-1">
-            <table className="w-full">
+            <table className="w-full min-w-[720px]">
               <thead>
                 <tr className="bg-gray-50 border-b">
                   <th className="px-4 py-3 text-right font-semibold text-gray-600">
@@ -479,12 +482,12 @@ export const OrdersPage = () => {
           </div>
 
           {viewMode === "all" && pagedData && pagedData.totalPages > 1 && (
-            <div className="border-t px-4 py-3 flex items-center justify-between">
+            <div className="flex flex-col gap-3 border-t px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="text-sm text-gray-600">
                 صفحة {pagedData.page} من {pagedData.totalPages} (
                 {pagedData.totalCount} طلب)
               </div>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:flex">
                 <Button
                   variant="outline"
                   size="sm"
@@ -493,6 +496,7 @@ export const OrdersPage = () => {
                   }
                   disabled={!pagedData.hasPreviousPage}
                   rightIcon={<ChevronRight className="w-4 h-4" />}
+                  className="w-full sm:w-auto"
                 >
                   السابق
                 </Button>
@@ -504,6 +508,7 @@ export const OrdersPage = () => {
                   }
                   disabled={!pagedData.hasNextPage}
                   leftIcon={<ChevronLeft className="w-4 h-4" />}
+                  className="w-full sm:w-auto"
                 >
                   التالي
                 </Button>
@@ -569,3 +574,5 @@ export const OrdersPage = () => {
 };
 
 export default OrdersPage;
+
+

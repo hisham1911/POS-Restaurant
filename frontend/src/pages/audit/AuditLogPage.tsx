@@ -337,7 +337,7 @@ const AuditLogPage = () => {
       {/* Table */}
       <div className="flex-1 bg-white rounded-xl border overflow-hidden flex flex-col">
         <div className="overflow-x-auto flex-1">
-          <table className="w-full">
+          <table className="w-full min-w-[720px]">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase w-1/3">العملية</th>
@@ -465,3 +465,4 @@ const AuditLogPage = () => {
 };
 
 export default AuditLogPage;
+

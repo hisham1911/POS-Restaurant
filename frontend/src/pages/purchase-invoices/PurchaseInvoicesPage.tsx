@@ -83,8 +83,8 @@ export function PurchaseInvoicesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        <div className="mb-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
+        <div className="mb-6 sm:mb-8">
           <div className="flex items-center gap-3 mb-2">
             <div className="w-8 h-8 rounded-full bg-violet-100 flex items-center justify-center">
               <ClipboardList className="w-5 h-5 text-violet-600" />
@@ -96,13 +96,16 @@ export function PurchaseInvoicesPage() {
           </p>
         </div>
 
-        <div className="flex justify-end">
-          <Button onClick={() => navigate("/purchase-invoices/new")}>
+        <div className="flex justify-stretch sm:justify-end">
+          <Button
+            onClick={() => navigate("/purchase-invoices/new")}
+            className="w-full sm:w-auto"
+          >
             إنشاء فاتورة جديدة
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <Card className="border-violet-100">
             <p className="text-sm text-gray-600">إجمالي الفواتير</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">
@@ -124,7 +127,7 @@ export function PurchaseInvoicesPage() {
         </div>
 
         <Card>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div>
               <label className="block text-sm font-medium mb-1">المورد</label>
               <div className="relative">
@@ -197,7 +200,7 @@ export function PurchaseInvoicesPage() {
 
         <Card padding="none">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[720px]">
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
@@ -266,7 +269,7 @@ export function PurchaseInvoicesPage() {
                         {formatCurrency(invoice.amountDue)}
                       </td>
                       <td className="px-4 py-3 text-sm">
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
                           <button
                             onClick={() =>
                               navigate(`/purchase-invoices/${invoice.id}`)
@@ -311,11 +314,12 @@ export function PurchaseInvoicesPage() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-2 p-4 border-t bg-gray-50">
+            <div className="flex flex-col items-stretch justify-center gap-2 border-t bg-gray-50 p-4 sm:flex-row sm:items-center">
               <Button
                 variant="outline"
                 onClick={() => setPageNumber((p) => Math.max(1, p - 1))}
                 disabled={pageNumber === 1}
+                className="w-full sm:w-auto"
               >
                 السابق
               </Button>
@@ -328,6 +332,7 @@ export function PurchaseInvoicesPage() {
                   setPageNumber((p) => Math.min(totalPages, p + 1))
                 }
                 disabled={pageNumber === totalPages}
+                className="w-full sm:w-auto"
               >
                 التالي
               </Button>
@@ -382,3 +387,4 @@ export function PurchaseInvoicesPage() {
     </div>
   );
 }
+

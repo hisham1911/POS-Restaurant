@@ -157,7 +157,7 @@ export const ProductsPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-3 mb-2">
@@ -175,12 +175,13 @@ export const ProductsPage = () => {
             onClick={() => setShowForm(true)}
             rightIcon={<Plus className="w-5 h-5" />}
             disabled={!canManageProducts}
+            className="w-full sm:w-auto"
           >
             إضافة منتج
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           <Card className="border-blue-100">
             <p className="text-sm text-gray-600">إجمالي المنتجات</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">
@@ -203,7 +204,7 @@ export const ProductsPage = () => {
 
         <Card className="shrink-0">
           <div className="space-y-4">
-            <div className="flex flex-col md:flex-row gap-4">
+            <div className="flex flex-col gap-4 lg:flex-row">
               <div className="flex-1">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -215,7 +216,7 @@ export const ProductsPage = () => {
                   />
                 </div>
               </div>
-              <div className="relative">
+              <div className="relative w-full lg:w-auto">
                 <select
                   value={selectedCategory || ""}
                   onChange={(e) =>
@@ -223,7 +224,7 @@ export const ProductsPage = () => {
                       e.target.value ? Number(e.target.value) : null,
                     )
                   }
-                  className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                  className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm lg:min-w-[220px]"
                 >
                   <option value="">كل التصنيفات</option>
                   {categories.map((cat) => (
@@ -237,7 +238,7 @@ export const ProductsPage = () => {
             </div>
 
             {/* Additional Filters */}
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -262,7 +263,7 @@ export const ProductsPage = () => {
 
         <Card padding="none">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[720px]">
               <thead>
                 <tr className="bg-gray-50 border-b">
                   <th className="px-4 py-3 text-right font-semibold text-gray-600">
@@ -400,3 +401,4 @@ export const ProductsPage = () => {
 };
 
 export default ProductsPage;
+

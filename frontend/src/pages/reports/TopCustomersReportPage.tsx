@@ -55,7 +55,7 @@ export const TopCustomersReportPage = () => {
   }
 
   return (
-    <div className="h-full overflow-auto p-6 space-y-6">
+    <div className="h-full overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -96,7 +96,7 @@ export const TopCustomersReportPage = () => {
             <select
               value={topCount}
               onChange={(e) => setTopCount(Number(e.target.value))}
-              className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm min-w-[140px]"
+              className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm w-full sm:min-w-[140px]"
             >
               <option value={10}>أفضل 10</option>
               <option value={20}>أفضل 20</option>
@@ -175,7 +175,7 @@ export const TopCustomersReportPage = () => {
           أفضل {topCount} عميل
         </h3>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[720px]">
             <thead>
               <tr className="border-b">
                 <th className="px-4 py-3 text-right font-semibold text-gray-600">
@@ -307,3 +307,4 @@ export const TopCustomersReportPage = () => {
 };
 
 export default TopCustomersReportPage;
+

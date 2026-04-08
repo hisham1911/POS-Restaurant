@@ -63,7 +63,7 @@ export const CashierPerformanceReportPage = () => {
   };
 
   return (
-    <div className="h-full overflow-auto p-6 space-y-6">
+    <div className="h-full overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -161,7 +161,7 @@ export const CashierPerformanceReportPage = () => {
           تفاصيل أداء الكاشيرات
         </h3>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[720px]">
             <thead>
               <tr className="border-b">
                 <th className="px-4 py-3 text-right font-semibold text-gray-600">
@@ -289,3 +289,4 @@ export const CashierPerformanceReportPage = () => {
 };
 
 export default CashierPerformanceReportPage;
+

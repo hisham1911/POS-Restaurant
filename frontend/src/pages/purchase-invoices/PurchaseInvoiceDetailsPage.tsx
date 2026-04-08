@@ -164,7 +164,7 @@ export function PurchaseInvoiceDetailsPage() {
           <h2 className="text-lg font-semibold">المنتجات</h2>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[720px]">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">المنتج</th>
@@ -235,7 +235,7 @@ export function PurchaseInvoiceDetailsPage() {
           <div className="text-center py-8 text-gray-500">لا توجد دفعات</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[720px]">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">التاريخ</th>
@@ -294,3 +294,4 @@ export function PurchaseInvoiceDetailsPage() {
     </div>
   );
 }
+

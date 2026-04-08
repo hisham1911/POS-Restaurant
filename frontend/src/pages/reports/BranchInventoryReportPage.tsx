@@ -66,7 +66,7 @@ export const BranchInventoryReportPage = () => {
   }
 
   return (
-    <div className="h-full overflow-auto p-6 space-y-6">
+    <div className="h-full overflow-auto p-4 sm:p-6 space-y-4 sm:space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -97,7 +97,7 @@ export const BranchInventoryReportPage = () => {
                     e.target.value ? Number(e.target.value) : undefined,
                   )
                 }
-                className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm min-w-[180px]"
+                className="appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white cursor-pointer hover:border-gray-400 transition-all duration-200 text-gray-700 font-medium shadow-sm w-full sm:min-w-[180px]"
               >
                 <option value="">جميع الفئات</option>
                 {categories.map((cat) => (
@@ -185,7 +185,7 @@ export const BranchInventoryReportPage = () => {
       <Card>
         <h3 className="text-lg font-bold text-gray-800 mb-4">تفاصيل المخزون</h3>
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full min-w-[720px]">
             <thead>
               <tr className="border-b">
                 <th className="px-4 py-3 text-right font-semibold text-gray-600">
@@ -311,3 +311,4 @@ export const BranchInventoryReportPage = () => {
 };
 
 export default BranchInventoryReportPage;
+

@@ -409,7 +409,7 @@ export default function TenantCreationPage() {
             <div className="p-6 text-gray-600">لا توجد شركات حتى الآن.</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-[840px] divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">
@@ -533,3 +533,4 @@ export default function TenantCreationPage() {
     </div>
   );
 }
+

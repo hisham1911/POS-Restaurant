@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul 2>&1
-title KasserPro - Start Service
+title TajerPro - Start Service
 
 :: Check for admin privileges
 net session >nul 2>&1
@@ -11,19 +11,19 @@ if %errorlevel% neq 0 (
 )
 
 echo ============================================
-echo    KasserPro POS - Starting Service
+echo    TajerPro POS - Starting Service
 echo ============================================
 echo.
 
 sc start KasserProService >nul 2>&1
 if %errorlevel% equ 0 (
-    echo [OK] KasserPro service is starting...
+    echo [OK] TajerPro service is starting...
     timeout /t 3 /nobreak >nul
     sc query KasserProService | find "RUNNING" >nul 2>&1
     if %errorlevel% equ 0 (
         echo [OK] Service is now RUNNING.
         echo.
-        echo You can access KasserPro POS at:
+        echo You can access TajerPro POS at:
         echo    http://localhost:5243
     ) else (
         echo [..] Service is still starting, please wait...

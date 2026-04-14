@@ -65,7 +65,7 @@ public class AutoCloseShiftBackgroundService : BackgroundService
         var hoursThreshold = _configuration.GetValue<int>("ShiftAutoClose:HoursThreshold", 12);
         var cutoffTime = DateTime.UtcNow.AddHours(-hoursThreshold);
 
-        _logger.LogInformation("Checking for shifts opened before {CutoffTime} (threshold: {Hours} hours)", 
+        _logger.LogInformation("Checking for shifts opened before {CutoffTime} (threshold: {Hours} hours)",
             cutoffTime, hoursThreshold);
 
         using var scope = _serviceProvider.CreateScope();
@@ -92,7 +92,7 @@ public class AutoCloseShiftBackgroundService : BackgroundService
             try
             {
                 var hoursOpen = (DateTime.UtcNow - shift.OpenedAt).TotalHours;
-                
+
                 _logger.LogInformation(
                     "Auto-closing shift {ShiftId} for user {UserName} (Tenant: {TenantId}, Branch: {BranchId}) - Open for {Hours:F1} hours",
                     shift.Id, shift.User?.Name ?? "Unknown", shift.TenantId, shift.BranchId, hoursOpen);
@@ -136,7 +136,7 @@ public class AutoCloseShiftBackgroundService : BackgroundService
                 try
                 {
                     var transactionNumber = await GenerateTransactionNumberAsync(context, shift.TenantId, shift.BranchId);
-                    
+
                     var cashTransaction = new Domain.Entities.CashRegisterTransaction
                     {
                         TenantId = shift.TenantId,
@@ -164,8 +164,8 @@ public class AutoCloseShiftBackgroundService : BackgroundService
                 }
                 catch (Exception cashRegEx)
                 {
-                    _logger.LogError(cashRegEx, 
-                        "Failed to record cash register transaction for auto-closed shift {ShiftId}", 
+                    _logger.LogError(cashRegEx,
+                        "Failed to record cash register transaction for auto-closed shift {ShiftId}",
                         shift.Id);
                     // Don't fail the entire auto-close if cash register transaction fails
                 }

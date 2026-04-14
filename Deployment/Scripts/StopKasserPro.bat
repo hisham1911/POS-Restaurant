@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul 2>&1
-title KasserPro - Stop Service
+title TajerPro - Stop Service
 
 :: Check for admin privileges
 net session >nul 2>&1
@@ -11,7 +11,7 @@ if %errorlevel% neq 0 (
 )
 
 echo ============================================
-echo    KasserPro POS - Stopping Service
+echo    TajerPro POS - Stopping Service
 echo ============================================
 echo.
 
@@ -19,7 +19,7 @@ sc query KasserProService | find "STOPPED" >nul 2>&1
 if %errorlevel% equ 0 (
     echo [OK] Service is already STOPPED.
 ) else (
-    echo Stopping KasserPro service...
+    echo Stopping TajerPro service...
     sc stop KasserProService >nul 2>&1
     timeout /t 3 /nobreak >nul
     sc query KasserProService | find "STOPPED" >nul 2>&1

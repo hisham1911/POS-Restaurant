@@ -2,11 +2,11 @@
 ; Developer password required: KasserPro@Installer2026
 ; MAC address binding active (license.key created on first install)
 
-#define AppName "KasserPro"
+#define AppName "TajerPro"
 #define AppVersion "1.0"
-#define AppPublisher "KasserPro Software"
+#define AppPublisher "TajerPro Software"
 #define ServiceName "KasserProService"
-#define ServiceDisplayName "KasserPro POS Backend"
+#define ServiceDisplayName "TajerPro POS Backend"
 #define SourceDir "C:\temp\kasserpro-src-win7-x86"
 #define DbFileName "kasserpro.db"
 #define DeploymentRoot "f:\POS\Deployment"
@@ -18,13 +18,13 @@ AppVersion={#AppVersion}
 AppPublisher={#AppPublisher}
 AppPublisherURL=http://localhost:5243
 AppSupportURL=http://localhost:5243
-DefaultDirName=C:\{#AppName}
+DefaultDirName=C:\KasserPro
 DirExistsWarning=no
 DisableDirPage=yes
 DisableProgramGroupPage=no
 DefaultGroupName={#AppName}
 OutputDir={#DeploymentRoot}\Installers
-OutputBaseFilename=KasserPro-Setup-Win7-x86
+OutputBaseFilename=TajerPro-Setup-Win7-x86
 Compression=lzma2/ultra64
 SolidCompression=yes
 PrivilegesRequired=admin
@@ -34,6 +34,8 @@ WizardStyle=modern
 CloseApplications=yes
 UninstallDisplayName={#AppName} POS
 SetupLogging=yes
+SetupIconFile={#DeploymentRoot}\Icons\kasserpro.ico
+UninstallDisplayIcon={app}\kasserpro.ico
 
 ; Windows 7 SP1 minimum (6.1.7601)
 MinVersion=6.1.7601
@@ -56,23 +58,23 @@ Source: "{#DeploymentRoot}\Scripts\StopKasserPro.bat"; DestDir: "{app}"; Flags: 
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#ServiceName}"; ValueType: multisz; ValueName: "Environment"; ValueData: "ASPNETCORE_ENVIRONMENT=Production"; Flags: uninsdeletevalue
 
 [Icons]
-Name: "{commondesktop}\{#AppName} Printer Bridge"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; Comment: "KasserPro Thermal Printer Controller"; Tasks: desktopicon
-Name: "{commondesktop}\{#AppName} POS"; Filename: "{app}\KasserPro.url"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Open KasserPro in browser"; Tasks: desktopicon
-Name: "{commondesktop}\{#AppName} - Start Service"; Filename: "{app}\StartKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Start KasserPro Backend Service"; Tasks: desktopicon
-Name: "{commondesktop}\{#AppName} - Stop Service"; Filename: "{app}\StopKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Stop KasserPro Backend Service"; Tasks: desktopicon
-Name: "{group}\{#AppName} Printer Bridge"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; Comment: "KasserPro Thermal Printer Controller"
-Name: "{group}\{#AppName} POS (Browser)"; Filename: "{app}\KasserPro.url"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Open KasserPro in browser"
-Name: "{group}\{#AppName} - Start Service"; Filename: "{app}\StartKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Start KasserPro Backend Service"
-Name: "{group}\{#AppName} - Stop Service"; Filename: "{app}\StopKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Stop KasserPro Backend Service"
+Name: "{commondesktop}\{#AppName} Printer Bridge"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "TajerPro Thermal Printer Controller"; Tasks: desktopicon
+Name: "{commondesktop}\{#AppName} POS"; Filename: "{app}\KasserPro.url"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Open TajerPro in browser"; Tasks: desktopicon
+Name: "{commondesktop}\{#AppName} - Start Service"; Filename: "{app}\StartKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Start TajerPro Backend Service"; Tasks: desktopicon
+Name: "{commondesktop}\{#AppName} - Stop Service"; Filename: "{app}\StopKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Stop TajerPro Backend Service"; Tasks: desktopicon
+Name: "{group}\{#AppName} Printer Bridge"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "TajerPro Thermal Printer Controller"
+Name: "{group}\{#AppName} POS (Browser)"; Filename: "{app}\KasserPro.url"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Open TajerPro in browser"
+Name: "{group}\{#AppName} - Start Service"; Filename: "{app}\StartKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Start TajerPro Backend Service"
+Name: "{group}\{#AppName} - Stop Service"; Filename: "{app}\StopKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Stop TajerPro Backend Service"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
-Name: "{commonstartup}\KasserPro BridgeApp"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; Comment: "KasserPro Thermal Printer Controller"
+Name: "{commonstartup}\{#AppName} BridgeApp"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "TajerPro Thermal Printer Controller"
 
 [Run]
-Filename: "{sys}\sc.exe"; Parameters: "create {#ServiceName} binPath= ""{app}\KasserPro.API.exe"" DisplayName= ""{#ServiceDisplayName}"" start= auto type= own obj= LocalSystem"; Flags: runhidden waituntilterminated; StatusMsg: "Installing KasserPro backend service..."
-Filename: "{sys}\sc.exe"; Parameters: "description {#ServiceName} ""KasserPro Point of Sale Backend Service"""; Flags: runhidden waituntilterminated
+Filename: "{sys}\sc.exe"; Parameters: "create {#ServiceName} binPath= ""{app}\KasserPro.API.exe"" DisplayName= ""{#ServiceDisplayName}"" start= auto type= own obj= LocalSystem"; Flags: runhidden waituntilterminated; StatusMsg: "Installing TajerPro backend service..."
+Filename: "{sys}\sc.exe"; Parameters: "description {#ServiceName} ""TajerPro Point of Sale Backend Service"""; Flags: runhidden waituntilterminated
 Filename: "{sys}\sc.exe"; Parameters: "failure {#ServiceName} actions= restart/30000/restart/60000/restart/120000 reset= 86400"; Flags: runhidden waituntilterminated
-Filename: "{sys}\sc.exe"; Parameters: "start {#ServiceName}"; Flags: runhidden waituntilterminated; StatusMsg: "Starting KasserPro backend service..."
-Filename: "{app}\KasserPro.url"; Flags: postinstall skipifsilent shellexec nowait; Description: "Open KasserPro in browser now"
+Filename: "{sys}\sc.exe"; Parameters: "start {#ServiceName}"; Flags: runhidden waituntilterminated; StatusMsg: "Starting TajerPro backend service..."
+Filename: "{app}\KasserPro.url"; Flags: postinstall skipifsilent shellexec nowait; Description: "Open TajerPro in browser now"
 
 [UninstallRun]
 Filename: "{sys}\sc.exe"; Parameters: "stop {#ServiceName}"; Flags: runhidden waituntilterminated; RunOnceId: "StopService"
@@ -147,7 +149,7 @@ end;
 function IsAlreadyInstalled(): Boolean;
 begin
   Result := RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\{#ServiceName}')
-         or FileExists('C:\{#AppName}\{#DbFileName}');
+         or FileExists('C:\KasserPro\{#DbFileName}');
 end;
 
 function InitializeSetup(): Boolean;
@@ -167,7 +169,7 @@ begin
     if MissingPatches <> '' then
     begin
       if MsgBox(
-        'KasserPro requires the following Windows 7 updates to run:' + #13#10 + #13#10 +
+        'TajerPro requires the following Windows 7 updates to run:' + #13#10 + #13#10 +
         MissingPatches + #13#10 +
         'Run "Win7-Prerequisites.bat" from the installer folder first.' + #13#10 + #13#10 +
         'Install order: KB4490628 first, then KB4474419, then restart.' + #13#10 + #13#10 +
@@ -184,10 +186,10 @@ begin
     Exit;
 
   case MsgBox(
-    'KasserPro is already installed on this computer.' + #13#10 + #13#10 +
+    'TajerPro is already installed on this computer.' + #13#10 + #13#10 +
     'Choose what to do:' + #13#10 + #13#10 +
-    '  [Yes]   Update — keep all your existing data' + #13#10 +
-    '  [No]    Fresh Install — DELETE all data and start over',
+    '  [Yes]   Update - keep all your existing data' + #13#10 +
+    '  [No]    Fresh Install - DELETE all data and start over',
     mbConfirmation, MB_YESNO) of
 
     IDYES:
@@ -199,10 +201,10 @@ begin
     begin
       if MsgBox(
         'WARNING: Fresh Install will permanently delete:' + #13#10 +
-        '  • All sales history and receipts' + #13#10 +
-        '  • All products and categories' + #13#10 +
-        '  • All customer and supplier records' + #13#10 +
-        '  • All expenses and cash register data' + #13#10 + #13#10 +
+        '  - All sales history and receipts' + #13#10 +
+        '  - All products and categories' + #13#10 +
+        '  - All customer and supplier records' + #13#10 +
+        '  - All expenses and cash register data' + #13#10 + #13#10 +
         'This action CANNOT be undone!' + #13#10 + #13#10 +
         'Click Yes to confirm deletion, or No to cancel.',
         mbError, MB_YESNO) = IDYES then
@@ -257,10 +259,8 @@ begin
                   'IconIndex=0' + #13#10;
     SaveStringToFile(UrlFile, UrlContent, False);
 
-    if IsWin7() then
-      Exec(ExpandConstant('{sys}\ie4uinit.exe'), '-ClearIconCache', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
-    else
-      Exec(ExpandConstant('{sys}\ie4uinit.exe'), '-show', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec(ExpandConstant('{sys}\ie4uinit.exe'), '-ClearIconCache', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec(ExpandConstant('{sys}\ie4uinit.exe'), '-show', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
     Sleep(2000);
   end;

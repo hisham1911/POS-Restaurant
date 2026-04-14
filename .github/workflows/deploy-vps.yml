@@ -1,0 +1,185 @@
+name: Deploy To VPS
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: vps-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DOTNET_VERSION: 9.0.x
+      NODE_VERSION: 20
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+      VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+      VPS_SERVICE_NAME: ${{ secrets.VPS_SERVICE_NAME }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Build Frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Copy Frontend Build To API wwwroot
+        run: |
+          rm -rf backend/KasserPro.API/wwwroot/*
+          mkdir -p backend/KasserPro.API/wwwroot
+          cp -a frontend/dist/. backend/KasserPro.API/wwwroot/
+
+      - name: Publish Backend
+        run: |
+          mkdir -p artifacts/backend-publish/ci
+          dotnet publish backend/KasserPro.API/KasserPro.API.csproj \
+            -c Release \
+            -o artifacts/backend-publish/ci \
+            --self-contained false
+
+      - name: Create Deploy Package
+        run: |
+          DEPLOY_TS="$(date +%Y%m%d-%H%M%S)"
+          PKG_NAME="kasserpro-deploy-${DEPLOY_TS}.zip"
+          (cd artifacts/backend-publish/ci && zip -qr "../../${PKG_NAME}" .)
+          echo "PKG_NAME=${PKG_NAME}" >> "$GITHUB_ENV"
+          echo "PKG_LOCAL_PATH=artifacts/${PKG_NAME}" >> "$GITHUB_ENV"
+          echo "PKG_REMOTE_PATH=/tmp/${PKG_NAME}" >> "$GITHUB_ENV"
+
+      - name: Validate Secrets
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          if [ -z "$VPS_HOST" ]; then
+            echo "Missing required secret: VPS_HOST" >&2
+            exit 1
+          fi
+
+          if [ -z "$VPS_SSH_KEY" ]; then
+            echo "Missing required secret: VPS_SSH_KEY" >&2
+            exit 1
+          fi
+
+      - name: Setup SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          PORT="${VPS_SSH_PORT:-22}"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p "$PORT" -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Upload Package To VPS
+        run: |
+          PORT="${VPS_SSH_PORT:-22}"
+          USER_NAME="${VPS_USER:-root}"
+          scp -P "$PORT" "$PKG_LOCAL_PATH" "${USER_NAME}@${VPS_HOST}:${PKG_REMOTE_PATH}"
+
+      - name: Deploy On VPS
+        run: |
+          PORT="${VPS_SSH_PORT:-22}"
+          USER_NAME="${VPS_USER:-root}"
+          APP_DIR="${VPS_APP_DIR:-/var/www/kasserpro}"
+          SERVICE_NAME="${VPS_SERVICE_NAME:-kasserpro}"
+
+          ssh -p "$PORT" "${USER_NAME}@${VPS_HOST}" "bash -s -- '$PKG_REMOTE_PATH' '$APP_DIR' '$SERVICE_NAME'" <<'EOF'
+          set -euo pipefail
+
+          PKG_PATH="$1"
+          APP_DIR="$2"
+          SERVICE_NAME="$3"
+
+          if [ "$(id -u)" -eq 0 ]; then
+            SUDO=""
+          else
+            SUDO="sudo"
+          fi
+
+          TS="$(date +%Y%m%d-%H%M%S)"
+          STAGE="/tmp/kasserpro-stage-${TS}"
+          BACKUP_DIR="${APP_DIR}/backups/deploy-${TS}"
+
+          $SUDO mkdir -p "${APP_DIR}/backups"
+          $SUDO mkdir -p "$BACKUP_DIR"
+
+          if [ -f "${APP_DIR}/kasserpro.db" ]; then
+            $SUDO cp -a "${APP_DIR}/kasserpro.db" "${BACKUP_DIR}/kasserpro.db.bak"
+          fi
+          if [ -f "${APP_DIR}/appsettings.json" ]; then
+            $SUDO cp -a "${APP_DIR}/appsettings.json" "${BACKUP_DIR}/appsettings.json.bak"
+          fi
+          if [ -f "${APP_DIR}/license.key" ]; then
+            $SUDO cp -a "${APP_DIR}/license.key" "${BACKUP_DIR}/license.key.bak"
+          fi
+          if [ -d "${APP_DIR}/wwwroot" ]; then
+            $SUDO cp -a "${APP_DIR}/wwwroot" "${APP_DIR}/wwwroot-backup-${TS}"
+          fi
+
+          if $SUDO systemctl is-active --quiet "$SERVICE_NAME"; then
+            $SUDO systemctl stop "$SERVICE_NAME"
+          fi
+
+          $SUDO mkdir -p "$STAGE"
+          $SUDO unzip -oq "$PKG_PATH" -d "$STAGE"
+
+          if command -v rsync >/dev/null 2>&1; then
+            $SUDO rsync -a --delete \
+              --exclude kasserpro.db \
+              --exclude appsettings.json \
+              --exclude appsettings.Development.json \
+              --exclude license.key \
+              --exclude backups \
+              --exclude logs \
+              "$STAGE/" "$APP_DIR/"
+          else
+            $SUDO cp -a "$STAGE/." "$APP_DIR/"
+          fi
+
+          SERVICE_USER="$($SUDO systemctl show -p User --value "$SERVICE_NAME" || true)"
+          SERVICE_GROUP="$($SUDO systemctl show -p Group --value "$SERVICE_NAME" || true)"
+          [ -z "$SERVICE_USER" ] && SERVICE_USER=root
+          [ -z "$SERVICE_GROUP" ] && SERVICE_GROUP=root
+
+          $SUDO chown -R "${SERVICE_USER}:${SERVICE_GROUP}" "$APP_DIR"
+          $SUDO chmod -R u+rwX,go+rX "$APP_DIR"
+
+          $SUDO systemctl start "$SERVICE_NAME"
+          $SUDO systemctl is-active --quiet "$SERVICE_NAME"
+
+          if command -v curl >/dev/null 2>&1; then
+            curl -fsS "http://127.0.0.1:5243/api/health" || true
+          fi
+
+          $SUDO journalctl -u "$SERVICE_NAME" -n 25 --no-pager || true
+          $SUDO rm -rf "$STAGE"
+          $SUDO rm -f "$PKG_PATH"
+
+          echo "Backup directory: $BACKUP_DIR"
+          EOF

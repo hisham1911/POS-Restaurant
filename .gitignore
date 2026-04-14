@@ -1,6 +1,9 @@
 # Ignore hidden directories (names starting with .)
 .*/
 **/.*!
+!.github/
+!.github/workflows/
+!.github/workflows/*.yml
 # =====================
 # .NET / C#
 # =====================

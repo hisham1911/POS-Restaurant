@@ -17,7 +17,10 @@ export const useDevicePrintPreferences = () => {
     readDevicePrintPreferences(userId),
   );
 
-  const storageKey = useMemo(() => getDevicePrintModeStorageKey(userId), [userId]);
+  const storageKey = useMemo(
+    () => getDevicePrintModeStorageKey(userId),
+    [userId],
+  );
 
   useEffect(() => {
     setPreferences(readDevicePrintPreferences(userId));

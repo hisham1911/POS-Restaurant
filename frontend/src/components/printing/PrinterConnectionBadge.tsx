@@ -48,7 +48,8 @@ export const PrinterConnectionBadge = () => {
   const printerStatus = data?.data;
   const bridgeConnected = printerStatus?.bridgeAvailable === true;
   const preferredDevice = printerStatus?.preferredDevice;
-  const preferredLabel = preferredDevice?.deviceName || preferredDevice?.deviceId;
+  const preferredLabel =
+    preferredDevice?.deviceName || preferredDevice?.deviceId;
 
   if (bridgeConnected) {
     return (

@@ -16,10 +16,7 @@ import { usePermission } from "@/hooks/usePermission";
 import { BranchSelector } from "./BranchSelector";
 import { NavItemWithSubmenu } from "./NavItemWithSubmenu";
 import { PrinterConnectionBadge } from "@/components/printing/PrinterConnectionBadge";
-import {
-  getAccessibleNavigationItems,
-  navigationItems,
-} from "./navigation";
+import { getAccessibleNavigationItems, navigationItems } from "./navigation";
 import {
   buildVisibleModuleSections,
   reportGroups,
@@ -325,9 +322,7 @@ export const MainLayout = () => {
                     </div>
                     <div>
                       <p className="font-bold text-slate-900">TajerPro</p>
-                      <p className="text-xs text-slate-500">
-                        تنقل منظم وسريع
-                      </p>
+                      <p className="text-xs text-slate-500">تنقل منظم وسريع</p>
                     </div>
                   </div>
 

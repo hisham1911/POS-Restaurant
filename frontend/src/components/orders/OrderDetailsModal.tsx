@@ -43,7 +43,10 @@ export const OrderDetailsModal = ({
 
   const handlePrint = async () => {
     if (printMode === "browser") {
-      const isPrintWindowOpened = printOrderReceiptFallback(order, tenantData?.data);
+      const isPrintWindowOpened = printOrderReceiptFallback(
+        order,
+        tenantData?.data,
+      );
 
       if (isPrintWindowOpened) {
         toast.success("تم فتح طباعة المتصفح حسب إعدادات هذا الجهاز");
@@ -66,7 +69,9 @@ export const OrderDetailsModal = ({
         );
 
         if (!isPrintWindowOpened) {
-          toast.error("تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة");
+          toast.error(
+            "تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة",
+          );
         }
       } else {
         toast.error("تعذر الوصول لبرنامج الطابعة. راجع حالة اتصال Bridge");

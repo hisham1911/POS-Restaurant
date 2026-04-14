@@ -1274,7 +1274,9 @@ export const SettingsPage = () => {
           ) : (
             <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
               <div className="flex items-center justify-between gap-3">
-                <div className="font-medium text-gray-800">حالة اتصال Bridge</div>
+                <div className="font-medium text-gray-800">
+                  حالة اتصال Bridge
+                </div>
                 {isPrinterStatusLoading || isPrinterStatusFetching ? (
                   <div className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
                     <Wifi className="w-3.5 h-3.5" />
@@ -1295,9 +1297,12 @@ export const SettingsPage = () => {
 
               {preferredBridgeDevice ? (
                 <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
-                  <p className="font-semibold">الجهاز الذي سيستقبل الطباعة الآن:</p>
+                  <p className="font-semibold">
+                    الجهاز الذي سيستقبل الطباعة الآن:
+                  </p>
                   <p className="mt-1">
-                    {preferredBridgeDevice.deviceName || preferredBridgeDevice.deviceId}
+                    {preferredBridgeDevice.deviceName ||
+                      preferredBridgeDevice.deviceId}
                   </p>
                   <p className="mt-1 text-xs text-green-700">
                     Device ID: {preferredBridgeDevice.deviceId}
@@ -1328,7 +1333,9 @@ export const SettingsPage = () => {
                       </p>
                       <p className="text-xs text-gray-500">
                         ID: {device.deviceId}
-                        {device.printerName ? ` • Printer: ${device.printerName}` : ""}
+                        {device.printerName
+                          ? ` • Printer: ${device.printerName}`
+                          : ""}
                       </p>
                     </div>
                   ))}

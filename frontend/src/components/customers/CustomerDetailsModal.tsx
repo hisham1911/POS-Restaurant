@@ -36,6 +36,7 @@ import { printDebtPaymentReceiptFallback } from "@/utils/browserReceiptPrinter";
 import clsx from "clsx";
 import { Portal } from "@/components/common/Portal";
 import { toast } from "sonner";
+import { useDevicePrintPreferences } from "@/hooks/useDevicePrintPreferences";
 
 interface CustomerDetailsModalProps {
   customer: Customer;
@@ -68,6 +69,7 @@ export const CustomerDetailsModal = ({
 
   const [printDebtPaymentReceipt, { isLoading: isPrinting }] =
     usePrintDebtPaymentReceiptMutation();
+  const { printMode } = useDevicePrintPreferences();
 
   const ordersPageSize = 5;
   const { data: ordersData, isLoading: isLoadingOrders } =
@@ -425,15 +427,7 @@ export const CustomerDetailsModal = ({
                           </div>
                           <button
                             onClick={async () => {
-                              try {
-                                await printDebtPaymentReceipt(
-                                  payment.id,
-                                ).unwrap();
-                                toast.success("تم إرسال أمر الطباعة بنجاح");
-                              } catch (error) {
-                                toast.info(
-                                  "تعذر الوصول لبرنامج الطابعة. سيتم فتح الطباعة من المتصفح",
-                                );
+                              if (printMode === "browser") {
                                 const isPrintWindowOpened =
                                   printDebtPaymentReceiptFallback(payment, {
                                     customerName: customer.name || "",
@@ -442,9 +436,45 @@ export const CustomerDetailsModal = ({
                                     tenant: tenantData?.data,
                                   });
 
-                                if (!isPrintWindowOpened) {
+                                if (isPrintWindowOpened) {
+                                  toast.success(
+                                    "تم فتح طباعة المتصفح حسب إعدادات هذا الجهاز",
+                                  );
+                                } else {
                                   toast.error(
                                     "تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة",
+                                  );
+                                }
+
+                                return;
+                              }
+
+                              try {
+                                await printDebtPaymentReceipt(
+                                  payment.id,
+                                ).unwrap();
+                                toast.success("تم إرسال أمر الطباعة بنجاح");
+                              } catch (error) {
+                                if (printMode === "auto") {
+                                  toast.info(
+                                    "تعذر الوصول لبرنامج الطابعة. سيتم فتح الطباعة من المتصفح",
+                                  );
+                                  const isPrintWindowOpened =
+                                    printDebtPaymentReceiptFallback(payment, {
+                                      customerName: customer.name || "",
+                                      cashierName: payment.recordedByUserName,
+                                      branchName: tenantData?.data?.name,
+                                      tenant: tenantData?.data,
+                                    });
+
+                                  if (!isPrintWindowOpened) {
+                                    toast.error(
+                                      "تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة",
+                                    );
+                                  }
+                                } else {
+                                  toast.error(
+                                    "تعذر الوصول لبرنامج الطابعة. راجع حالة اتصال Bridge",
                                   );
                                 }
 

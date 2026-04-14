@@ -12,7 +12,22 @@ public class DeviceHub : Hub
     private static readonly Dictionary<string, string> _deviceConnections = new();
     private static readonly Dictionary<string, DeviceConnectionInfo> _connectionInfoByConnectionId = new();
 
-    private sealed record DeviceConnectionInfo(string DeviceId, string GroupName, DateTime ConnectedAtUtc);
+    private sealed record DeviceConnectionInfo(
+        string DeviceId,
+        string GroupName,
+        DateTime ConnectedAtUtc,
+        string? DeviceName,
+        string? PrinterName,
+        string? MachineName);
+
+    public sealed record ConnectedDeviceSnapshot(
+        string ConnectionId,
+        string DeviceId,
+        string GroupName,
+        DateTime ConnectedAtUtc,
+        string? DeviceName,
+        string? PrinterName,
+        string? MachineName);
 
     public DeviceHub(ILogger<DeviceHub> logger)
     {
@@ -34,6 +49,9 @@ public class DeviceHub : Hub
 
         var deviceId = httpContext.Request.Headers["X-Device-Id"].ToString();
         var apiKey = httpContext.Request.Headers["X-API-Key"].ToString();
+        var deviceName = NormalizeHeaderValue(httpContext.Request.Headers["X-Device-Name"].ToString());
+        var printerName = NormalizeHeaderValue(httpContext.Request.Headers["X-Printer-Name"].ToString());
+        var machineName = NormalizeHeaderValue(httpContext.Request.Headers["X-Machine-Name"].ToString());
 
         // Validate API key (simplified for MVP - in production, validate against database)
         if (string.IsNullOrEmpty(apiKey))
@@ -67,13 +85,24 @@ public class DeviceHub : Hub
 
             _deviceConnections[deviceId] = Context.ConnectionId;
             _connectionInfoByConnectionId[Context.ConnectionId] =
-                new DeviceConnectionInfo(deviceId, groupName, DateTime.UtcNow);
+                new DeviceConnectionInfo(
+                    deviceId,
+                    groupName,
+                    DateTime.UtcNow,
+                    deviceName,
+                    printerName,
+                    machineName);
         }
 
         await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
 
-        _logger.LogInformation("Device {DeviceId} connected with connection ID {ConnectionId} and added to group {GroupName}",
-            deviceId, Context.ConnectionId, groupName);
+        _logger.LogInformation(
+            "Device {DeviceId} connected with connection ID {ConnectionId} and added to group {GroupName}. DeviceName={DeviceName}, PrinterName={PrinterName}",
+            deviceId,
+            Context.ConnectionId,
+            groupName,
+            deviceName ?? "Unknown",
+            printerName ?? "Unknown");
 
         await base.OnConnectedAsync();
     }
@@ -155,6 +184,52 @@ public class DeviceHub : Hub
                 .Select(pair => pair.Key)
                 .FirstOrDefault();
         }
+    }
+
+    /// <summary>
+    /// Returns connected device snapshots for one or more SignalR groups.
+    /// </summary>
+    public static IReadOnlyList<ConnectedDeviceSnapshot> GetConnectedDevicesForGroups(params string[] groupNames)
+    {
+        if (groupNames == null || groupNames.Length == 0)
+        {
+            return Array.Empty<ConnectedDeviceSnapshot>();
+        }
+
+        var allowedGroups = new HashSet<string>(
+            groupNames.Where(groupName => !string.IsNullOrWhiteSpace(groupName)),
+            StringComparer.Ordinal);
+
+        if (allowedGroups.Count == 0)
+        {
+            return Array.Empty<ConnectedDeviceSnapshot>();
+        }
+
+        lock (_connectionLock)
+        {
+            return _connectionInfoByConnectionId
+                .Where(pair => allowedGroups.Contains(pair.Value.GroupName))
+                .OrderBy(pair => pair.Value.ConnectedAtUtc)
+                .Select(pair => new ConnectedDeviceSnapshot(
+                    pair.Key,
+                    pair.Value.DeviceId,
+                    pair.Value.GroupName,
+                    pair.Value.ConnectedAtUtc,
+                    pair.Value.DeviceName,
+                    pair.Value.PrinterName,
+                    pair.Value.MachineName))
+                .ToList();
+        }
+    }
+
+    private static string? NormalizeHeaderValue(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        return value.Trim();
     }
 }
 

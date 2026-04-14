@@ -324,9 +324,21 @@ builder.Services.AddCors(options =>
     options.AddPolicy("AllowFrontend", policy =>
     {
         if (allowAll)
-            policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+        {
+            policy
+                .AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .WithExposedHeaders("X-Print-Attempted", "X-Print-Delivered");
+        }
         else
-            policy.WithOrigins(allowedOrigins).AllowAnyMethod().AllowAnyHeader();
+        {
+            policy
+                .WithOrigins(allowedOrigins)
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                .WithExposedHeaders("X-Print-Attempted", "X-Print-Delivered");
+        }
     });
 
     options.AddPolicy("SignalRPolicy", policy =>

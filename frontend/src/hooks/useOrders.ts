@@ -18,6 +18,7 @@ import {
 import { extractApiData } from "@/utils/apiResponse";
 import { useGetCurrentTenantQuery } from "@/api/branchesApi";
 import { printOrderReceiptFallback } from "@/utils/browserReceiptPrinter";
+import { useDevicePrintPreferences } from "@/hooks/useDevicePrintPreferences";
 
 export const useOrders = () => {
   const { items, clearCart, discountType, discountValue } = useCart();
@@ -29,6 +30,7 @@ export const useOrders = () => {
     refetch,
   } = useGetOrdersQuery();
   const { data: tenantData } = useGetCurrentTenantQuery();
+  const { printMode } = useDevicePrintPreferences();
   const { data: todayOrdersData, isLoading: isLoadingToday } =
     useGetTodayOrdersQuery();
 
@@ -104,22 +106,49 @@ export const useOrders = () => {
         "تعذر إكمال الطلب",
       );
 
-      const shouldFallbackToBrowserPrint =
-        response.printAttempted === true && response.printDelivered === false;
-
-      if (shouldFallbackToBrowserPrint) {
+      if (printMode === "browser") {
         const isPrintWindowOpened = printOrderReceiptFallback(
           order,
           tenantData?.data,
         );
 
         if (isPrintWindowOpened) {
-          toast.info(
-            "تعذر الوصول لتطبيق الطابعة. تم التحويل تلقائيًا لطباعة المتصفح",
-          );
+          toast.info("تم فتح طباعة المتصفح حسب إعدادات هذا الجهاز");
         } else {
           toast.error(
             "تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة",
+          );
+        }
+      } else {
+        const shouldFallbackToBrowserPrint =
+          printMode === "auto" &&
+          response.printAttempted === true &&
+          response.printDelivered === false;
+
+        if (shouldFallbackToBrowserPrint) {
+          const isPrintWindowOpened = printOrderReceiptFallback(
+            order,
+            tenantData?.data,
+          );
+
+          if (isPrintWindowOpened) {
+            toast.info(
+              "تعذر الوصول لتطبيق الطابعة. تم التحويل تلقائيًا لطباعة المتصفح",
+            );
+          } else {
+            toast.error(
+              "تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة",
+            );
+          }
+        }
+
+        if (
+          printMode === "bridge" &&
+          response.printAttempted === true &&
+          response.printDelivered === false
+        ) {
+          toast.error(
+            "تعذر الوصول لتطبيق الطابعة. راجع حالة اتصال Bridge في إعدادات الجهاز",
           );
         }
       }

@@ -30,6 +30,7 @@ import {
   useUploadLogoMutation,
 } from "@/api/branchesApi";
 import { useGetSystemInfoQuery, useHealthQuery } from "@/api/systemApi";
+import { useGetPrinterStatusQuery } from "@/api/printerApi";
 import { useAppDispatch } from "@/store/hooks";
 import { setTaxSettings } from "@/store/slices/cartSlice";
 import { Button } from "@/components/common/Button";
@@ -37,8 +38,10 @@ import { Loading } from "@/components/common/Loading";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { usePOSMode } from "@/hooks/usePOSMode";
+import { useDevicePrintPreferences } from "@/hooks/useDevicePrintPreferences";
 import { getApiErrorCode, handleApiError } from "@/utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
+import type { DevicePrintMode } from "@/utils/devicePrintPreferences";
 
 const isPrivateIpv4Host = (host: string): boolean => {
   const parts = host.split(".");
@@ -97,6 +100,30 @@ const isLocalNetworkHost = (host: string): boolean => {
 
 const SHARED_PRINTER_ROUTING_MODE = "BranchWithFallback";
 
+const DEVICE_PRINT_MODE_OPTIONS: Array<{
+  value: DevicePrintMode;
+  label: string;
+  description: string;
+}> = [
+  {
+    value: "auto",
+    label: "تلقائي (Bridge ثم متصفح)",
+    description:
+      "يحاول الطباعة عبر تطبيق الطابعة أولًا، ولو غير متصل يحوّل تلقائيًا لطباعة المتصفح.",
+  },
+  {
+    value: "browser",
+    label: "متصفح فقط",
+    description: "أي طباعة من هذا الجهاز ستفتح طباعة المتصفح مباشرة.",
+  },
+  {
+    value: "bridge",
+    label: "تطبيق الطابعة فقط",
+    description:
+      "أي طباعة من هذا الجهاز تعتمد على Bridge فقط ولن تتحول للمتصفح تلقائيًا.",
+  },
+];
+
 export const SettingsPage = () => {
   const dispatch = useAppDispatch();
   const browserHost =
@@ -109,6 +136,16 @@ export const SettingsPage = () => {
 
   // POS Mode
   const { mode, setMode } = usePOSMode();
+  const { printMode, setPrintMode } = useDevicePrintPreferences();
+  const shouldCheckBridgeStatus = printMode !== "browser";
+  const {
+    data: printerStatusData,
+    isLoading: isPrinterStatusLoading,
+    isFetching: isPrinterStatusFetching,
+  } = useGetPrinterStatusQuery(undefined, {
+    skip: !shouldCheckBridgeStatus,
+    pollingInterval: 10000,
+  });
 
   // System Info & Network Status
   const { data: systemData } = useGetSystemInfoQuery(undefined, {
@@ -125,6 +162,8 @@ export const SettingsPage = () => {
   const [urlCopied, setUrlCopied] = useState(false);
 
   const tenant = tenantData?.data;
+  const printerStatus = printerStatusData?.data;
+  const preferredBridgeDevice = printerStatus?.preferredDevice;
 
   // Form state
   const [taxRate, setTaxRate] = useState<number>(0);
@@ -1179,6 +1218,124 @@ export const SettingsPage = () => {
               )}
             </div>
           </div>
+        </div>
+
+        {/* Device-specific Print Settings */}
+        <div className="bg-white rounded-xl shadow-sm border p-6 space-y-6">
+          <div className="flex items-center gap-2 text-lg font-semibold">
+            <Printer className="w-5 h-5 text-primary-600" />
+            <span>إعدادات الطباعة لهذا الجهاز</span>
+          </div>
+
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-slate-700">
+            هذه الإعدادات محفوظة على هذا الجهاز فقط. كل جهاز (موبايل، لابتوب،
+            كمبيوتر) يمكنه اختيار طريقة الطباعة الخاصة به بشكل مستقل.
+          </div>
+
+          <div className="space-y-3">
+            {DEVICE_PRINT_MODE_OPTIONS.map((option) => {
+              const isSelected = printMode === option.value;
+
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setPrintMode(option.value)}
+                  className={clsx(
+                    "w-full rounded-lg border p-4 text-right transition-colors",
+                    isSelected
+                      ? "border-primary-300 bg-primary-50"
+                      : "border-gray-200 bg-white hover:bg-gray-50",
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-medium text-gray-900">
+                      {option.label}
+                    </span>
+                    {isSelected ? (
+                      <Check className="w-5 h-5 text-primary-600" />
+                    ) : (
+                      <span className="w-5 h-5 rounded-full border border-gray-300" />
+                    )}
+                  </div>
+                  <p className="mt-2 text-sm text-gray-600">
+                    {option.description}
+                  </p>
+                </button>
+              );
+            })}
+          </div>
+
+          {printMode === "browser" ? (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800">
+              الطباعة الآن من المتصفح مباشرة على هذا الجهاز، ولا تحتاج اتصال
+              Bridge.
+            </div>
+          ) : (
+            <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="font-medium text-gray-800">حالة اتصال Bridge</div>
+                {isPrinterStatusLoading || isPrinterStatusFetching ? (
+                  <div className="inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-700">
+                    <Wifi className="w-3.5 h-3.5" />
+                    <span>جاري التحقق...</span>
+                  </div>
+                ) : printerStatus?.bridgeAvailable ? (
+                  <div className="inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
+                    <Wifi className="w-3.5 h-3.5" />
+                    <span>متصل</span>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-2 rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
+                    <WifiOff className="w-3.5 h-3.5" />
+                    <span>غير متصل</span>
+                  </div>
+                )}
+              </div>
+
+              {preferredBridgeDevice ? (
+                <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                  <p className="font-semibold">الجهاز الذي سيستقبل الطباعة الآن:</p>
+                  <p className="mt-1">
+                    {preferredBridgeDevice.deviceName || preferredBridgeDevice.deviceId}
+                  </p>
+                  <p className="mt-1 text-xs text-green-700">
+                    Device ID: {preferredBridgeDevice.deviceId}
+                    {preferredBridgeDevice.printerName
+                      ? ` • Printer: ${preferredBridgeDevice.printerName}`
+                      : ""}
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  لا يوجد جهاز Bridge متصل حاليًا. يمكنك تشغيل برنامج الطابعة
+                  على أي جهاز لبدء الاستقبال.
+                </div>
+              )}
+
+              {printerStatus?.devices?.length ? (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-gray-500">
+                    الأجهزة المتصلة الآن ({printerStatus.devices.length})
+                  </p>
+                  {printerStatus.devices.map((device) => (
+                    <div
+                      key={device.connectionId}
+                      className="rounded-md border border-gray-200 bg-white p-2"
+                    >
+                      <p className="text-sm font-medium text-gray-800">
+                        {device.deviceName || device.deviceId}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        ID: {device.deviceId}
+                        {device.printerName ? ` • Printer: ${device.printerName}` : ""}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )}
         </div>
 
         {/* Print Routing Settings Card */}

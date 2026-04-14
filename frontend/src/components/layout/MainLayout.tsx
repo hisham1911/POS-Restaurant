@@ -15,6 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { usePermission } from "@/hooks/usePermission";
 import { BranchSelector } from "./BranchSelector";
 import { NavItemWithSubmenu } from "./NavItemWithSubmenu";
+import { PrinterConnectionBadge } from "@/components/printing/PrinterConnectionBadge";
 import {
   getAccessibleNavigationItems,
   navigationItems,
@@ -455,6 +456,10 @@ export const MainLayout = () => {
 
           <div className="flex items-center gap-3 sm:gap-4">
             <BranchSelector />
+
+            <div className="hidden md:block">
+              <PrinterConnectionBadge />
+            </div>
 
             <div className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-slate-500 sm:flex">
               <Clock className="h-4 w-4" />

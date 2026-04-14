@@ -13,6 +13,7 @@ import { printOrderReceiptFallback } from "@/utils/browserReceiptPrinter";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { Portal } from "@/components/common/Portal";
+import { useDevicePrintPreferences } from "@/hooks/useDevicePrintPreferences";
 
 interface OrderDetailsModalProps {
   order: Order;
@@ -26,6 +27,7 @@ export const OrderDetailsModal = ({
   const [showRefundModal, setShowRefundModal] = useState(false);
   const user = useAppSelector(selectCurrentUser);
   const { data: tenantData } = useGetCurrentTenantQuery();
+  const { printMode } = useDevicePrintPreferences();
   const [printReceipt, { isLoading: isPrinting }] = usePrintReceiptMutation();
   const isReturnOrder = order.orderType === "Return";
 
@@ -40,18 +42,34 @@ export const OrderDetailsModal = ({
   const hasRefund = isFullyRefunded || isPartiallyRefunded;
 
   const handlePrint = async () => {
+    if (printMode === "browser") {
+      const isPrintWindowOpened = printOrderReceiptFallback(order, tenantData?.data);
+
+      if (isPrintWindowOpened) {
+        toast.success("تم فتح طباعة المتصفح حسب إعدادات هذا الجهاز");
+      } else {
+        toast.error("تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة");
+      }
+
+      return;
+    }
+
     try {
       await printReceipt(order.id).unwrap();
       toast.success("تم إرسال أمر الطباعة بنجاح");
     } catch (error) {
-      toast.info("تعذر الوصول لبرنامج الطابعة. سيتم فتح الطباعة من المتصفح");
-      const isPrintWindowOpened = printOrderReceiptFallback(
-        order,
-        tenantData?.data,
-      );
+      if (printMode === "auto") {
+        toast.info("تعذر الوصول لبرنامج الطابعة. سيتم فتح الطباعة من المتصفح");
+        const isPrintWindowOpened = printOrderReceiptFallback(
+          order,
+          tenantData?.data,
+        );
 
-      if (!isPrintWindowOpened) {
-        toast.error("تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة");
+        if (!isPrintWindowOpened) {
+          toast.error("تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة");
+        }
+      } else {
+        toast.error("تعذر الوصول لبرنامج الطابعة. راجع حالة اتصال Bridge");
       }
 
       console.error("Print error:", error);

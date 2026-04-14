@@ -177,15 +177,29 @@ public class CustomersController : ControllerBase
         }
 
         var paymentId = result.Data?.PaymentId ?? 0;
+        var clientPrintPreference = Request.Headers["X-Print-Preference"].ToString();
+        var browserOnlyPrintRequested =
+            string.Equals(clientPrintPreference, "BrowserOnly", StringComparison.OrdinalIgnoreCase);
+
         if (paymentId > 0)
         {
-            try
+            if (browserOnlyPrintRequested)
             {
-                await TrySendDebtPaymentReceiptAsync(paymentId, isAutomatic: true);
+                _logger.LogInformation(
+                    "Automatic debt-payment print skipped for payment {PaymentId} due to client print preference {ClientPrintPreference}",
+                    paymentId,
+                    clientPrintPreference);
             }
-            catch (Exception ex)
+            else
             {
-                _logger.LogWarning(ex, "Debt payment recorded but automatic print failed for payment {PaymentId}", paymentId);
+                try
+                {
+                    await TrySendDebtPaymentReceiptAsync(paymentId, isAutomatic: true);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Debt payment recorded but automatic print failed for payment {PaymentId}", paymentId);
+                }
             }
         }
 

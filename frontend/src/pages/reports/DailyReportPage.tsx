@@ -26,6 +26,7 @@ import { useGetCurrentTenantQuery } from "@/api/branchesApi";
 import type { ApiError } from "@/utils/errorHandler";
 import { toast } from "sonner";
 import { DailyReport } from "@/types/report.types";
+import { useDevicePrintPreferences } from "@/hooks/useDevicePrintPreferences";
 
 /**
  * Generate receipt-style HTML for the daily report (thermal printer layout)
@@ -293,6 +294,7 @@ export const DailyReportPage = () => {
     new Date().toISOString().split("T")[0],
   );
   const autoPrintedDateRef = useRef<string | null>(null);
+  const { printMode } = useDevicePrintPreferences();
 
   const { data, isLoading, isError, error } =
     useGetDailyReportQuery(selectedDate);
@@ -320,30 +322,59 @@ export const DailyReportPage = () => {
     autoPrintedDateRef.current = selectedDate;
 
     void (async () => {
+      if (printMode === "browser") {
+        if (report) {
+          printDailyReportLocally(report, selectedDate);
+        }
+        toast.info("تمت الطباعة عبر المتصفح حسب إعدادات هذا الجهاز");
+        return;
+      }
+
       try {
         await printDailyReport(selectedDate).unwrap();
         toast.success("تم إرسال الطباعة التلقائية للتقرير اليومي");
       } catch {
-        if (report) {
+        if (report && printMode === "auto") {
           printDailyReportLocally(report, selectedDate);
+          toast.warning(
+            "تعذر الوصول لتطبيق الطابعة. تم تحويل الطباعة تلقائيًا إلى طابعة المتصفح",
+          );
+          return;
         }
-        toast.warning(
-          "تعذر الوصول لتطبيق الطابعة. تم تحويل الطباعة تلقائيًا إلى طابعة المتصفح",
-        );
+
+        toast.error("تعذر الوصول لتطبيق الطابعة. راجع حالة اتصال Bridge");
       }
     })();
-  }, [autoPrintDailyReports, printDailyReport, report, selectedDate]);
+  }, [
+    autoPrintDailyReports,
+    printDailyReport,
+    printMode,
+    report,
+    selectedDate,
+  ]);
 
   /** طباعة عبر الطابعة الحرارية (BridgeApp) مع fallback للطباعة المحلية */
   const handleThermalPrint = async () => {
     if (!report) return;
+
+    if (printMode === "browser") {
+      printDailyReportLocally(report, selectedDate);
+      toast.success("تمت الطباعة عبر المتصفح حسب إعدادات هذا الجهاز");
+      return;
+    }
+
     try {
       await printDailyReport(selectedDate).unwrap();
       toast.success("تم إرسال أمر الطباعة للطابعة الحرارية بنجاح");
     } catch {
-      // Fallback: إذا فشل الإرسال للطابعة الحرارية، نطبع محلياً
-      toast.info("جاري فتح نافذة الطباعة...");
-      printDailyReportLocally(report, selectedDate);
+      if (printMode === "auto") {
+        // Fallback: إذا فشل الإرسال للطابعة الحرارية، نطبع محلياً
+        toast.info("جاري فتح نافذة الطباعة...");
+        printDailyReportLocally(report, selectedDate);
+        return;
+      }
+
+      toast.error("تعذر الوصول لتطبيق الطابعة. راجع حالة اتصال Bridge");
     }
   };
 

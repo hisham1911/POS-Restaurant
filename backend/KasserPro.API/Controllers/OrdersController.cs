@@ -116,6 +116,9 @@ public class OrdersController : ControllerBase
         var result = await _orderService.CompleteAsync(id, request);
         var printAttempted = false;
         var printDelivered = false;
+        var clientPrintPreference = Request.Headers["X-Print-Preference"].ToString();
+        var browserOnlyPrintRequested =
+            string.Equals(clientPrintPreference, "BrowserOnly", StringComparison.OrdinalIgnoreCase);
 
         if (result.Success && result.Data != null)
         {
@@ -130,13 +133,14 @@ public class OrdersController : ControllerBase
                 var tenant = tenantResult.Data;
                 var printRoutingMode = tenant?.PrintRoutingMode ?? "BranchWithFallback";
 
-                if (tenant?.AutoPrintOnSale == false || printRoutingMode == "Disabled")
+                if (tenant?.AutoPrintOnSale == false || printRoutingMode == "Disabled" || browserOnlyPrintRequested)
                 {
                     _logger.LogInformation(
-                        "Auto print skipped for order {OrderId}. AutoPrintOnSale={AutoPrintOnSale}, RoutingMode={RoutingMode}",
+                        "Auto print skipped for order {OrderId}. AutoPrintOnSale={AutoPrintOnSale}, RoutingMode={RoutingMode}, ClientPrintPreference={ClientPrintPreference}",
                         order.Id,
                         tenant?.AutoPrintOnSale,
-                        printRoutingMode);
+                        printRoutingMode,
+                        string.IsNullOrWhiteSpace(clientPrintPreference) ? "Auto" : clientPrintPreference);
                 }
                 else
                 {

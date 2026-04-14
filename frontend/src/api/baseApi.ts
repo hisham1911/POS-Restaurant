@@ -7,6 +7,7 @@ import {
 import type { RootState } from "../store";
 import { toast } from "sonner";
 import { ERROR_MESSAGES } from "../utils/constants";
+import { getPrintPreferenceHeaderValue } from "@/utils/devicePrintPreferences";
 
 // Dynamic API URL resolution policy:
 // 1) If VITE_API_URL is set, use it in all environments.
@@ -64,6 +65,7 @@ const baseQuery = fetchBaseQuery({
   prepareHeaders: (headers, { getState }) => {
     const state = getState() as RootState;
     const token = state.auth.token;
+    const userId = state.auth.user?.id;
     const branchId = state.branch?.currentBranch?.id;
 
     if (token) {
@@ -72,6 +74,9 @@ const baseQuery = fetchBaseQuery({
     if (branchId) {
       headers.set("X-Branch-Id", branchId.toString());
     }
+
+    headers.set("X-Print-Preference", getPrintPreferenceHeaderValue(userId));
+
     return headers;
   },
 });
@@ -270,6 +275,7 @@ export const baseApi = createApi({
     "Backup",
     "Permissions",
     "SystemUsers",
+    "PrinterStatus",
   ],
   // Enable automatic refetching on focus and reconnect
   refetchOnFocus: true,

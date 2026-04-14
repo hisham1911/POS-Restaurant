@@ -56,6 +56,12 @@ public class SignalRClientService : ISignalRClientService
 
             Log.Information("Connecting to Device Hub at {Url}", settings.BackendUrl);
 
+            var machineName = Environment.MachineName;
+            var printerName = settings.DefaultPrinterName?.Trim();
+            var deviceName = !string.IsNullOrWhiteSpace(printerName)
+                ? $"{machineName} - {printerName}"
+                : machineName;
+
             // Dispose previous connection if any
             if (_hubConnection != null)
             {
@@ -69,6 +75,13 @@ public class SignalRClientService : ISignalRClientService
                     options.Headers.Add("X-API-Key", settings.ApiKey);
                     options.Headers.Add("X-Device-Id", settings.DeviceId);
                     options.Headers.Add("X-Branch-Id", settings.BranchId ?? "default");
+                    options.Headers.Add("X-Device-Name", deviceName);
+                    options.Headers.Add("X-Machine-Name", machineName);
+
+                    if (!string.IsNullOrWhiteSpace(printerName))
+                    {
+                        options.Headers.Add("X-Printer-Name", printerName);
+                    }
                 })
                 .WithAutomaticReconnect(new InfiniteRetryPolicy())
                 .Build();

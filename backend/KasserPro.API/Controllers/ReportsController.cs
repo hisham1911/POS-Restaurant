@@ -184,12 +184,14 @@ public class ReportsController : ControllerBase
             var branchId = User.FindFirst("branchId")?.Value ?? "default";
             var branchGroup = $"branch-{branchId}";
             var printRoutingMode = tenant?.PrintRoutingMode ?? "BranchWithFallback";
+            var targetDeviceId = Request.Headers["X-Target-Device-Id"].ToString();
 
             // Send via the existing PrintReceipt handler so BridgeApp processes it correctly
             var printSent = await SendPrintCommandByRoutingAsync(
                 printCommand,
                 branchGroup,
                 printRoutingMode,
+                targetDeviceId,
                 isAutomatic: false);
 
             if (!printSent)
@@ -255,6 +257,7 @@ public class ReportsController : ControllerBase
         object printCommand,
         string branchGroup,
         string? routingMode,
+        string? targetDeviceId,
         bool isAutomatic)
     {
         var mode = string.IsNullOrWhiteSpace(routingMode) ? "BranchWithFallback" : routingMode;
@@ -263,6 +266,36 @@ public class ReportsController : ControllerBase
         if (!isAutomatic && string.Equals(mode, "Disabled", StringComparison.Ordinal))
         {
             mode = "BranchWithFallback";
+        }
+
+        if (string.Equals(mode, "Disabled", StringComparison.Ordinal))
+        {
+            _logger.LogInformation("Skipping automatic print command because routing mode is Disabled");
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(targetDeviceId))
+        {
+            var normalizedTargetDeviceId = targetDeviceId.Trim();
+            var targetConnectionId = string.Equals(mode, "BranchOnly", StringComparison.Ordinal)
+                ? DeviceHub.GetConnectionIdForDevice(normalizedTargetDeviceId, branchGroup)
+                : DeviceHub.GetConnectionIdForDevice(normalizedTargetDeviceId, branchGroup, "branch-default");
+
+            if (string.IsNullOrWhiteSpace(targetConnectionId))
+            {
+                _logger.LogWarning(
+                    "Target printer device {DeviceId} is not connected in branch scope {BranchGroup}",
+                    normalizedTargetDeviceId,
+                    branchGroup);
+                return false;
+            }
+
+            await _hubContext.Clients.Client(targetConnectionId).SendAsync("PrintReceipt", printCommand);
+            _logger.LogInformation(
+                "Print command routed to target device {DeviceId} using connection {ConnectionId}",
+                normalizedTargetDeviceId,
+                targetConnectionId);
+            return true;
         }
 
         if (string.Equals(mode, "BranchOnly", StringComparison.Ordinal))
@@ -280,12 +313,6 @@ public class ReportsController : ControllerBase
         {
             await _hubContext.Clients.All.SendAsync("PrintReceipt", printCommand);
             return DeviceHub.GetConnectedDeviceCount() > 0;
-        }
-
-        if (string.Equals(mode, "Disabled", StringComparison.Ordinal))
-        {
-            _logger.LogInformation("Skipping automatic print command because routing mode is Disabled");
-            return false;
         }
 
         if (await SendToPreferredDeviceAsync(branchGroup, "PrintReceipt", printCommand))

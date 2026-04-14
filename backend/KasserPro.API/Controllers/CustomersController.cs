@@ -178,6 +178,7 @@ public class CustomersController : ControllerBase
 
         var paymentId = result.Data?.PaymentId ?? 0;
         var clientPrintPreference = Request.Headers["X-Print-Preference"].ToString();
+        var targetDeviceId = Request.Headers["X-Target-Device-Id"].ToString();
         var browserOnlyPrintRequested =
             string.Equals(clientPrintPreference, "BrowserOnly", StringComparison.OrdinalIgnoreCase);
 
@@ -194,7 +195,7 @@ public class CustomersController : ControllerBase
             {
                 try
                 {
-                    await TrySendDebtPaymentReceiptAsync(paymentId, isAutomatic: true);
+                    await TrySendDebtPaymentReceiptAsync(paymentId, isAutomatic: true, targetDeviceId);
                 }
                 catch (Exception ex)
                 {
@@ -228,7 +229,10 @@ public class CustomersController : ControllerBase
     {
         try
         {
-            var (sent, paymentFound) = await TrySendDebtPaymentReceiptAsync(paymentId, isAutomatic: false);
+            var (sent, paymentFound) = await TrySendDebtPaymentReceiptAsync(
+                paymentId,
+                isAutomatic: false,
+                Request.Headers["X-Target-Device-Id"].ToString());
             if (!paymentFound)
                 return NotFound(ApiResponse<object>.Fail(ErrorCodes.PAYMENT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PAYMENT_NOT_FOUND)));
 
@@ -246,7 +250,10 @@ public class CustomersController : ControllerBase
         }
     }
 
-    private async Task<(bool Sent, bool PaymentFound)> TrySendDebtPaymentReceiptAsync(int paymentId, bool isAutomatic)
+    private async Task<(bool Sent, bool PaymentFound)> TrySendDebtPaymentReceiptAsync(
+        int paymentId,
+        bool isAutomatic,
+        string? targetDeviceId)
     {
         var tenantId = int.Parse(User.FindFirst("tenantId")?.Value ?? "0");
         var payment = await _customerService.GetDebtPaymentByIdAsync(paymentId, tenantId);
@@ -315,6 +322,7 @@ public class CustomersController : ControllerBase
             printCommand,
             branchGroup,
             printRoutingMode,
+            targetDeviceId,
             isAutomatic,
             "PrintDebtPaymentReceipt");
 
@@ -334,6 +342,7 @@ public class CustomersController : ControllerBase
         object printCommand,
         string branchGroup,
         string? routingMode,
+        string? targetDeviceId,
         bool isAutomatic,
         string hubMethod)
     {
@@ -343,6 +352,36 @@ public class CustomersController : ControllerBase
         if (!isAutomatic && string.Equals(mode, "Disabled", StringComparison.Ordinal))
         {
             mode = "BranchWithFallback";
+        }
+
+        if (string.Equals(mode, "Disabled", StringComparison.Ordinal))
+        {
+            _logger.LogInformation("Skipping automatic print command because routing mode is Disabled");
+            return false;
+        }
+
+        if (!string.IsNullOrWhiteSpace(targetDeviceId))
+        {
+            var normalizedTargetDeviceId = targetDeviceId.Trim();
+            var targetConnectionId = string.Equals(mode, "BranchOnly", StringComparison.Ordinal)
+                ? DeviceHub.GetConnectionIdForDevice(normalizedTargetDeviceId, branchGroup)
+                : DeviceHub.GetConnectionIdForDevice(normalizedTargetDeviceId, branchGroup, "branch-default");
+
+            if (string.IsNullOrWhiteSpace(targetConnectionId))
+            {
+                _logger.LogWarning(
+                    "Target printer device {DeviceId} is not connected in branch scope {BranchGroup}",
+                    normalizedTargetDeviceId,
+                    branchGroup);
+                return false;
+            }
+
+            await _hubContext.Clients.Client(targetConnectionId).SendAsync(hubMethod, printCommand);
+            _logger.LogInformation(
+                "Print command routed to target device {DeviceId} using connection {ConnectionId}",
+                normalizedTargetDeviceId,
+                targetConnectionId);
+            return true;
         }
 
         if (string.Equals(mode, "BranchOnly", StringComparison.Ordinal))
@@ -360,12 +399,6 @@ public class CustomersController : ControllerBase
         {
             await _hubContext.Clients.All.SendAsync(hubMethod, printCommand);
             return DeviceHub.GetConnectedDeviceCount() > 0;
-        }
-
-        if (string.Equals(mode, "Disabled", StringComparison.Ordinal))
-        {
-            _logger.LogInformation("Skipping automatic print command because routing mode is Disabled");
-            return false;
         }
 
         if (await SendToPreferredDeviceAsync(branchGroup, hubMethod, printCommand))

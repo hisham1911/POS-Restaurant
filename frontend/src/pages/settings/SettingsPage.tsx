@@ -136,7 +136,12 @@ export const SettingsPage = () => {
 
   // POS Mode
   const { mode, setMode } = usePOSMode();
-  const { printMode, setPrintMode } = useDevicePrintPreferences();
+  const {
+    printMode,
+    targetBridgeDeviceId,
+    setPrintMode,
+    setTargetBridgeDeviceId,
+  } = useDevicePrintPreferences();
   const shouldCheckBridgeStatus = printMode !== "browser";
   const {
     data: printerStatusData,
@@ -164,6 +169,9 @@ export const SettingsPage = () => {
   const tenant = tenantData?.data;
   const printerStatus = printerStatusData?.data;
   const preferredBridgeDevice = printerStatus?.preferredDevice;
+  const targetBridgeDevice = printerStatus?.targetDevice;
+  const hasTargetSelection = Boolean(targetBridgeDeviceId);
+  const isTargetBridgeConnected = printerStatus?.targetDeviceConnected === true;
 
   // Form state
   const [taxRate, setTaxRate] = useState<number>(0);
@@ -1229,7 +1237,8 @@ export const SettingsPage = () => {
 
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-sm text-slate-700">
             هذه الإعدادات محفوظة على هذا الجهاز فقط. كل جهاز (موبايل، لابتوب،
-            كمبيوتر) يمكنه اختيار طريقة الطباعة الخاصة به بشكل مستقل.
+            كمبيوتر) يمكنه اختيار طريقة الطباعة الخاصة به بشكل مستقل، وربطه
+            بجهاز Bridge محدد إذا لزم.
           </div>
 
           <div className="space-y-3">
@@ -1273,6 +1282,40 @@ export const SettingsPage = () => {
             </div>
           ) : (
             <div className="space-y-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-gray-700">
+                  جهاز Bridge المستهدف لهذا الجهاز
+                </label>
+                <div className="relative">
+                  <select
+                    value={targetBridgeDeviceId ?? ""}
+                    onChange={(event) =>
+                      setTargetBridgeDeviceId(event.target.value || null)
+                    }
+                    className="w-full appearance-none rounded-lg border border-gray-300 bg-white px-3 py-2 pl-9 text-sm text-gray-800 focus:border-primary-500 focus:outline-none"
+                  >
+                    <option value="">
+                      تلقائي: أول جهاز Bridge متاح في نفس الفرع
+                    </option>
+                    {printerStatus?.devices?.map((device) => (
+                      <option
+                        key={`${device.deviceId}-${device.connectionId}`}
+                        value={device.deviceId}
+                      >
+                        {device.deviceName || device.deviceId}
+                        {device.printerName ? ` - ${device.printerName}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-500" />
+                </div>
+                <p className="text-xs text-gray-500">
+                  {hasTargetSelection
+                    ? "سيتم إرسال الطباعة من هذا الجهاز إلى جهاز Bridge المحدد فقط."
+                    : "بدون تحديد جهاز، سيتم التوجيه تلقائيًا حسب حالة الاتصال داخل الفرع."}
+                </p>
+              </div>
+
               <div className="flex items-center justify-between gap-3">
                 <div className="font-medium text-gray-800">
                   حالة اتصال Bridge
@@ -1285,17 +1328,46 @@ export const SettingsPage = () => {
                 ) : printerStatus?.bridgeAvailable ? (
                   <div className="inline-flex items-center gap-2 rounded-full bg-green-100 px-3 py-1 text-xs font-medium text-green-700">
                     <Wifi className="w-3.5 h-3.5" />
-                    <span>متصل</span>
+                    <span>
+                      {hasTargetSelection ? "الجهاز المحدد متصل" : "متصل"}
+                    </span>
                   </div>
                 ) : (
                   <div className="inline-flex items-center gap-2 rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-700">
                     <WifiOff className="w-3.5 h-3.5" />
-                    <span>غير متصل</span>
+                    <span>
+                      {hasTargetSelection
+                        ? "الجهاز المحدد غير متصل"
+                        : "غير متصل"}
+                    </span>
                   </div>
                 )}
               </div>
 
-              {preferredBridgeDevice ? (
+              {hasTargetSelection ? (
+                isTargetBridgeConnected && targetBridgeDevice ? (
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                    <p className="font-semibold">
+                      الجهاز المحدد الذي سيستقبل الطباعة:
+                    </p>
+                    <p className="mt-1">
+                      {targetBridgeDevice.deviceName ||
+                        targetBridgeDevice.deviceId}
+                    </p>
+                    <p className="mt-1 text-xs text-green-700">
+                      Device ID: {targetBridgeDevice.deviceId}
+                      {targetBridgeDevice.printerName
+                        ? ` • Printer: ${targetBridgeDevice.printerName}`
+                        : ""}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    جهاز Bridge المحدد ({targetBridgeDeviceId}) غير متصل حاليًا.
+                    يمكنك تشغيله أو اختيار جهاز آخر.
+                  </div>
+                )
+              ) : preferredBridgeDevice ? (
                 <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
                   <p className="font-semibold">
                     الجهاز الذي سيستقبل الطباعة الآن:
@@ -1326,11 +1398,23 @@ export const SettingsPage = () => {
                   {printerStatus.devices.map((device) => (
                     <div
                       key={device.connectionId}
-                      className="rounded-md border border-gray-200 bg-white p-2"
+                      className={clsx(
+                        "rounded-md border bg-white p-2",
+                        targetBridgeDeviceId === device.deviceId
+                          ? "border-primary-300 ring-1 ring-primary-200"
+                          : "border-gray-200",
+                      )}
                     >
-                      <p className="text-sm font-medium text-gray-800">
-                        {device.deviceName || device.deviceId}
-                      </p>
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm font-medium text-gray-800">
+                          {device.deviceName || device.deviceId}
+                        </p>
+                        {targetBridgeDeviceId === device.deviceId ? (
+                          <span className="rounded-full bg-primary-100 px-2 py-0.5 text-[10px] font-medium text-primary-700">
+                            مستهدف
+                          </span>
+                        ) : null}
+                      </div>
                       <p className="text-xs text-gray-500">
                         ID: {device.deviceId}
                         {device.printerName

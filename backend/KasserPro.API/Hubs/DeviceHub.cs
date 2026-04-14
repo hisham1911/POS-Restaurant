@@ -187,6 +187,39 @@ public class DeviceHub : Hub
     }
 
     /// <summary>
+    /// Returns the active connection id for a specific bridge device within allowed groups.
+    /// </summary>
+    public static string? GetConnectionIdForDevice(string deviceId, params string[] groupNames)
+    {
+        if (string.IsNullOrWhiteSpace(deviceId))
+        {
+            return null;
+        }
+
+        var normalizedDeviceId = deviceId.Trim();
+        var allowedGroups = new HashSet<string>(
+            (groupNames ?? Array.Empty<string>())
+                .Where(groupName => !string.IsNullOrWhiteSpace(groupName)),
+            StringComparer.Ordinal);
+
+        lock (_connectionLock)
+        {
+            var candidates = _connectionInfoByConnectionId
+                .Where(pair => string.Equals(pair.Value.DeviceId, normalizedDeviceId, StringComparison.OrdinalIgnoreCase));
+
+            if (allowedGroups.Count > 0)
+            {
+                candidates = candidates.Where(pair => allowedGroups.Contains(pair.Value.GroupName));
+            }
+
+            return candidates
+                .OrderBy(pair => pair.Value.ConnectedAtUtc)
+                .Select(pair => pair.Key)
+                .FirstOrDefault();
+        }
+    }
+
+    /// <summary>
     /// Returns connected device snapshots for one or more SignalR groups.
     /// </summary>
     public static IReadOnlyList<ConnectedDeviceSnapshot> GetConnectedDevicesForGroups(params string[] groupNames)

@@ -7,7 +7,7 @@ const badgeBaseClassName =
   "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium";
 
 export const PrinterConnectionBadge = () => {
-  const { printMode } = useDevicePrintPreferences();
+  const { printMode, targetBridgeDeviceId } = useDevicePrintPreferences();
   const shouldCheckBridge = printMode !== "browser";
 
   const { data, isLoading, isFetching } = useGetPrinterStatusQuery(undefined, {
@@ -47,9 +47,11 @@ export const PrinterConnectionBadge = () => {
 
   const printerStatus = data?.data;
   const bridgeConnected = printerStatus?.bridgeAvailable === true;
+  const isTargetMode = Boolean(targetBridgeDeviceId);
+  const targetDevice = printerStatus?.targetDevice;
   const preferredDevice = printerStatus?.preferredDevice;
-  const preferredLabel =
-    preferredDevice?.deviceName || preferredDevice?.deviceId;
+  const activeDevice = isTargetMode ? targetDevice : preferredDevice;
+  const activeLabel = activeDevice?.deviceName || activeDevice?.deviceId;
 
   if (bridgeConnected) {
     return (
@@ -58,10 +60,12 @@ export const PrinterConnectionBadge = () => {
           badgeBaseClassName,
           "max-w-[17rem] border-green-200 bg-green-50 text-green-700",
         )}
-        title={`Bridge متصل: ${preferredLabel || "Unknown Device"}`}
+        title={`Bridge متصل: ${activeLabel || "Unknown Device"}`}
       >
         <Wifi className="h-3.5 w-3.5" />
-        <span className="truncate">Bridge: {preferredLabel || "متصل"}</span>
+        <span className="truncate">
+          {isTargetMode ? "Bridge المحدد" : "Bridge"}: {activeLabel || "متصل"}
+        </span>
       </div>
     );
   }
@@ -74,10 +78,14 @@ export const PrinterConnectionBadge = () => {
           ? "border-red-200 bg-red-50 text-red-700"
           : "border-orange-200 bg-orange-50 text-orange-700",
       )}
-      title="لا يوجد جهاز Bridge متصل"
+      title={
+        isTargetMode
+          ? "جهاز Bridge المحدد غير متصل"
+          : "لا يوجد جهاز Bridge متصل"
+      }
     >
       <WifiOff className="h-3.5 w-3.5" />
-      <span>Bridge غير متصل</span>
+      <span>{isTargetMode ? "Bridge المحدد غير متصل" : "Bridge غير متصل"}</span>
     </div>
   );
 };

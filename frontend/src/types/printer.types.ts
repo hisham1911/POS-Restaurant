@@ -13,6 +13,9 @@ export interface PrinterStatus {
   fallbackGroup: string;
   bridgeAvailable: boolean;
   totalDevicesInScope: number;
+  targetDeviceId?: string;
+  targetDeviceConnected?: boolean;
+  targetDevice?: ConnectedPrinterDevice;
   preferredDeviceConnectionId?: string;
   preferredDevice?: ConnectedPrinterDevice;
   devices: ConnectedPrinterDevice[];

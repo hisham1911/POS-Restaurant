@@ -7,7 +7,10 @@ import {
 import type { RootState } from "../store";
 import { toast } from "sonner";
 import { ERROR_MESSAGES } from "../utils/constants";
-import { getPrintPreferenceHeaderValue } from "@/utils/devicePrintPreferences";
+import {
+  getPrintPreferenceHeaderValue,
+  getTargetBridgeDeviceIdHeaderValue,
+} from "@/utils/devicePrintPreferences";
 
 // Dynamic API URL resolution policy:
 // 1) If VITE_API_URL is set, use it in all environments.
@@ -76,6 +79,11 @@ const baseQuery = fetchBaseQuery({
     }
 
     headers.set("X-Print-Preference", getPrintPreferenceHeaderValue(userId));
+
+    const targetBridgeDeviceId = getTargetBridgeDeviceIdHeaderValue(userId);
+    if (targetBridgeDeviceId) {
+      headers.set("X-Target-Device-Id", targetBridgeDeviceId);
+    }
 
     return headers;
   },

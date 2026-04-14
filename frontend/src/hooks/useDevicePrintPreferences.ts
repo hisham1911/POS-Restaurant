@@ -7,6 +7,7 @@ import {
   getDevicePrintModeStorageKey,
   readDevicePrintPreferences,
   saveDevicePrintPreferences,
+  saveTargetBridgeDeviceId,
 } from "@/utils/devicePrintPreferences";
 
 export const useDevicePrintPreferences = () => {
@@ -44,10 +45,17 @@ export const useDevicePrintPreferences = () => {
     setPreferences(next);
   };
 
+  const setTargetBridgeDeviceId = (targetBridgeDeviceId?: string | null) => {
+    const next = saveTargetBridgeDeviceId(targetBridgeDeviceId, userId);
+    setPreferences(next);
+  };
+
   return {
     preferences,
     printMode: preferences.mode,
+    targetBridgeDeviceId: preferences.targetBridgeDeviceId,
     setPrintMode,
+    setTargetBridgeDeviceId,
     userId,
   };
 };

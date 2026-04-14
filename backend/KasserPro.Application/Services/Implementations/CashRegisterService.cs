@@ -566,15 +566,25 @@ public class CashRegisterService : ICashRegisterService
         var nextNumber = 1;
         if (lastTransaction != null)
         {
-            // Extract number from last transaction (CR-2026-0001 -> 0001)
+            // Extract sequence from legacy/current formats.
+            // Examples:
+            // - CR-2026-0001
+            // - CR-2026-000001-1a2b3c4d
             var parts = lastTransaction.TransactionNumber.Split('-');
             if (parts.Length == 3 && int.TryParse(parts[2], out var lastNumber))
             {
                 nextNumber = lastNumber + 1;
             }
+            else if (parts.Length >= 4 && int.TryParse(parts[2], out var lastNumberWithEntropy))
+            {
+                nextNumber = lastNumberWithEntropy + 1;
+            }
         }
 
-        return $"CR-{year}-{nextNumber:D4}";
+        // Add an entropy suffix to avoid collisions under concurrent order completion.
+        // Unique index is global on TransactionNumber, so sequence-only values can race.
+        var entropy = Guid.NewGuid().ToString("N")[..8];
+        return $"CR-{year}-{nextNumber:D6}-{entropy}";
     }
 
     private CashRegisterTransactionDto MapToDto(CashRegisterTransaction transaction)

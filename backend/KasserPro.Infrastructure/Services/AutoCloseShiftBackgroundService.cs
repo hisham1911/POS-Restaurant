@@ -193,6 +193,7 @@ public class AutoCloseShiftBackgroundService : BackgroundService
             .Where(t => t.TenantId == tenantId && t.BranchId == branchId && t.CreatedAt >= today)
             .CountAsync();
 
-        return $"CR-{branchId:D3}-{DateTime.UtcNow:yyyyMMdd}-{(todayTransactionCount + 1):D4}";
+        var entropy = Guid.NewGuid().ToString("N")[..8];
+        return $"CR-{branchId:D3}-{DateTime.UtcNow:yyyyMMdd}-{(todayTransactionCount + 1):D4}-{entropy}";
     }
 }

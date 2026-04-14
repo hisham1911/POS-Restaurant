@@ -88,7 +88,10 @@ public class RestoreService : IRestoreService
 
             // Step 2: Run integrity check on backup
             _logger.LogInformation("Running integrity check on backup: {BackupFileName}", backupFileName);
-            var integrityCheckPassed = await RunIntegrityCheckAsync(backupPath);
+            var rawConnectionString = _configuration.GetConnectionString("DefaultConnection")
+                ?? throw new InvalidOperationException("DefaultConnection not configured");
+            var defaultBuilder = new SqliteConnectionStringBuilder(rawConnectionString);
+            var integrityCheckPassed = await RunIntegrityCheckAsync(backupPath, defaultBuilder.Password);
 
             if (!integrityCheckPassed)
             {
@@ -133,10 +136,7 @@ public class RestoreService : IRestoreService
             await Task.Delay(2000); // Wait for connections to fully close
 
             // Step 6: Replace database file
-            var connectionString = _configuration.GetConnectionString("DefaultConnection")
-                ?? throw new InvalidOperationException("DefaultConnection not configured");
-
-            var builder = new SqliteConnectionStringBuilder(connectionString);
+            var builder = defaultBuilder;
             var dbPath = builder.DataSource;
 
             if (string.IsNullOrEmpty(dbPath))
@@ -184,7 +184,7 @@ public class RestoreService : IRestoreService
 
             // Step 7b: Validate data integrity after migrations
             _logger.LogInformation("Validating data integrity after restore and migrations...");
-            var validationIssues = await _dataValidationService.ValidateRestoredDataAsync(dbPath);
+            var validationIssues = await _dataValidationService.ValidateRestoredDataAsync(dbPath, builder.Password);
 
             if (validationIssues.Count > 0)
             {
@@ -332,11 +332,21 @@ public class RestoreService : IRestoreService
     /// <summary>
     /// P2: Runs SQLite integrity check on backup file
     /// </summary>
-    private async Task<bool> RunIntegrityCheckAsync(string backupPath)
+    private async Task<bool> RunIntegrityCheckAsync(string backupPath, string? password)
     {
         try
         {
-            using var connection = new SqliteConnection($"Data Source={backupPath}");
+            var backupBuilder = new SqliteConnectionStringBuilder
+            {
+                DataSource = backupPath
+            };
+
+            if (!string.IsNullOrWhiteSpace(password))
+            {
+                backupBuilder.Password = password;
+            }
+
+            using var connection = new SqliteConnection(backupBuilder.ConnectionString);
             await connection.OpenAsync();
 
             using var command = connection.CreateCommand();

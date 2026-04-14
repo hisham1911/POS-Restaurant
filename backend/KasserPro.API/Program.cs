@@ -16,6 +16,9 @@ using Microsoft.AspNetCore.RateLimiting;
 using Serilog;
 using Serilog.Events;
 
+var logDirectory = Path.Combine(AppContext.BaseDirectory, "logs");
+Directory.CreateDirectory(logDirectory);
+
 // P1 PRODUCTION: Configure Serilog for file-based logging
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
@@ -26,14 +29,14 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Console(
         outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}")
     .WriteTo.File(
-        path: "logs/kasserpro-.log",
+        path: Path.Combine(logDirectory, "kasserpro-.log"),
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 30,
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] [{SourceContext}] {Message:lj} {Properties:j}{NewLine}{Exception}")
     .WriteTo.Logger(lc => lc
         .Filter.ByIncludingOnly(e => e.Properties.ContainsKey("AuditType"))
         .WriteTo.File(
-            path: "logs/financial-audit-.log",
+            path: Path.Combine(logDirectory, "financial-audit-.log"),
             rollingInterval: RollingInterval.Day,
             retainedFileCountLimit: 90,
             outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}"))
@@ -45,6 +48,9 @@ try
 
     // License check - must pass before app starts
     LicenseService.ValidateOrCreateLicense(AppContext.BaseDirectory);
+
+    // Force SQLCipher provider for encrypted SQLite support.
+    SQLitePCL.raw.SetProvider(new SQLitePCL.SQLite3Provider_e_sqlcipher());
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -99,6 +105,25 @@ if (!Path.IsPathRooted(sqliteConnBuilder.DataSource))
 {
     sqliteConnBuilder.DataSource = Path.Combine(AppContext.BaseDirectory, sqliteConnBuilder.DataSource);
 }
+
+// Production password source policy (cross-platform):
+// 1) KASSERPRO_DB_PASSWORD env var
+// 2) Windows-only ProgramData password file
+// 3) Otherwise run without encryption (warning logged)
+var databasePassword = ResolveDatabasePassword();
+
+if (!string.IsNullOrWhiteSpace(databasePassword))
+{
+    sqliteConnBuilder.Password = databasePassword;
+    sqliteConnBuilder.Cache = Microsoft.Data.Sqlite.SqliteCacheMode.Default;
+    await EnsureDatabaseEncryptedAsync(sqliteConnBuilder.DataSource, databasePassword);
+    Log.Information("SQLite encryption is enabled for path: {DbPath}", sqliteConnBuilder.DataSource);
+}
+else
+{
+    Log.Information("SQLite encryption is disabled for this run");
+}
+
 var resolvedConnectionString = sqliteConnBuilder.ConnectionString;
 Log.Information("SQLite database path: {DbPath}", sqliteConnBuilder.DataSource);
 
@@ -109,8 +134,7 @@ builder.Services.AddDbContext<AppDbContext>((sp, options) =>
 {
     options.UseSqlite(resolvedConnectionString, sqliteOptions =>
     {
-        // FIX: Set QuerySplittingBehavior to SplitQuery to handle multiple .Include() efficiently
-        // This prevents MultipleCollectionIncludeWarning and improves performance
+        // Improves performance for heavy Include graphs.
         sqliteOptions.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery);
     });
     options.AddInterceptors(sp.GetRequiredService<AuditSaveChangesInterceptor>());
@@ -332,21 +356,29 @@ if (!app.Environment.IsEnvironment("Testing"))
         var pendingMigrations = await context.Database.GetPendingMigrationsAsync();
         if (pendingMigrations.Any())
         {
-            var migrationCount = pendingMigrations.Count();
-            Log.Warning("Detected {MigrationCount} pending migrations - creating pre-migration backup", migrationCount);
-
-            var backupService = scope.ServiceProvider.GetRequiredService<IBackupService>();
-            var backupResult = await backupService.CreateBackupAsync("pre-migration");
-
-            if (!backupResult.Success)
+            var appliedMigrations = await context.Database.GetAppliedMigrationsAsync();
+            if (appliedMigrations.Any())
             {
-                Log.Fatal("Pre-migration backup FAILED - aborting startup: {ErrorMessage}", backupResult.ErrorMessage);
-                throw new InvalidOperationException($"Pre-migration backup failed: {backupResult.ErrorMessage}");
-            }
+                var migrationCount = pendingMigrations.Count();
+                Log.Warning("Detected {MigrationCount} pending migrations - creating pre-migration backup", migrationCount);
 
-            Log.Information("Pre-migration backup created: {BackupPath} ({SizeMB:F2} MB)",
-                backupResult.BackupPath,
-                backupResult.BackupSizeBytes / 1024.0 / 1024.0);
+                var backupService = scope.ServiceProvider.GetRequiredService<IBackupService>();
+                var backupResult = await backupService.CreateBackupAsync("pre-migration");
+
+                if (!backupResult.Success)
+                {
+                    Log.Fatal("Pre-migration backup FAILED - aborting startup: {ErrorMessage}", backupResult.ErrorMessage);
+                    throw new InvalidOperationException($"Pre-migration backup failed: {backupResult.ErrorMessage}");
+                }
+
+                Log.Information("Pre-migration backup created: {BackupPath} ({SizeMB:F2} MB)",
+                    backupResult.BackupPath,
+                    backupResult.BackupSizeBytes / 1024.0 / 1024.0);
+            }
+            else
+            {
+                Log.Information("Skipping pre-migration backup: database is fresh with no applied migrations yet");
+            }
         }
 
         // Apply migrations
@@ -368,6 +400,11 @@ if (!app.Environment.IsEnvironment("Testing"))
         {
             Log.Warning(seedEx, "Realistic data seeding failed; continuing startup");
         }
+        finally
+        {
+            // Realistic seeding can fail mid-unit-of-work; clear tracked state to avoid cascading save failures.
+            context.ChangeTracker.Clear();
+        }
 
         // Ensure seeded catalog data always has descriptive icons for categories/products.
         try
@@ -378,26 +415,52 @@ if (!app.Environment.IsEnvironment("Testing"))
         {
             Log.Warning(iconEx, "Seed icon synchronization failed after seeding");
         }
+        finally
+        {
+            context.ChangeTracker.Clear();
+        }
 
-        // Seeders insert entities directly; reconcile inventory when rows are missing
-        // or when all quantities are zero (fresh/partially seeded state).
-        var expectedInventoryRows = await (
-            from product in context.Products.AsNoTracking()
-            join branch in context.Branches.AsNoTracking() on product.TenantId equals branch.TenantId
-            where product.IsActive && product.TrackInventory && branch.IsActive
-            select 1
-        ).CountAsync();
-
-        var existingInventoryRows = await context.BranchInventories
+        // Seeders insert entities directly; reconcile only demo tenants when a tenant
+        // still has missing inventory rows or no positive stock after the seed pipeline.
+        var seedTenantIds = await context.Tenants
             .AsNoTracking()
-            .CountAsync();
+            .Where(t => SeedTenantRegistry.Slugs.Contains(t.Slug))
+            .Select(t => t.Id)
+            .ToListAsync();
 
-        var hasPositiveInventory = await context.BranchInventories
-            .AsNoTracking()
-            .AnyAsync(i => i.Quantity > 0);
+        var shouldSynchronizeSeedInventory = false;
 
-        var shouldSynchronizeSeedInventory = expectedInventoryRows > 0
-            && (existingInventoryRows < expectedInventoryRows || !hasPositiveInventory);
+        foreach (var seedTenantId in seedTenantIds)
+        {
+            var expectedInventoryRows = await (
+                from product in context.Products.AsNoTracking()
+                join branch in context.Branches.AsNoTracking() on product.TenantId equals branch.TenantId
+                where product.TenantId == seedTenantId
+                    && product.IsActive
+                    && product.TrackInventory
+                    && branch.IsActive
+                select 1
+            ).CountAsync();
+
+            if (expectedInventoryRows == 0)
+            {
+                continue;
+            }
+
+            var existingInventoryRows = await context.BranchInventories
+                .AsNoTracking()
+                .CountAsync(i => i.TenantId == seedTenantId);
+
+            var hasPositiveInventory = await context.BranchInventories
+                .AsNoTracking()
+                .AnyAsync(i => i.TenantId == seedTenantId && i.Quantity > 0);
+
+            if (existingInventoryRows < expectedInventoryRows || !hasPositiveInventory)
+            {
+                shouldSynchronizeSeedInventory = true;
+                break;
+            }
+        }
 
         if (shouldSynchronizeSeedInventory)
         {
@@ -409,6 +472,24 @@ if (!app.Environment.IsEnvironment("Testing"))
             {
                 Log.Warning(syncEx, "Branch inventory synchronization failed after seeding");
             }
+            finally
+            {
+                context.ChangeTracker.Clear();
+            }
+        }
+
+        // Ensure seed tenants never start with open shifts after the full pipeline.
+        try
+        {
+            await MultiTenantSeeder.CloseOpenShiftsForTargetTenantsAsync(context);
+        }
+        catch (Exception shiftEx)
+        {
+            Log.Warning(shiftEx, "Seed shift close synchronization failed after seeding");
+        }
+        finally
+        {
+            context.ChangeTracker.Clear();
         }
     }
 }
@@ -515,4 +596,166 @@ catch (Exception ex)
 finally
 {
     Log.CloseAndFlush();
+}
+
+static string? ResolveDatabasePassword()
+{
+    var environmentPassword = Environment.GetEnvironmentVariable("KASSERPRO_DB_PASSWORD");
+    if (!string.IsNullOrWhiteSpace(environmentPassword))
+    {
+        Log.Information("SQLite encryption password source: environment variable KASSERPRO_DB_PASSWORD");
+        return environmentPassword;
+    }
+
+    if (OperatingSystem.IsWindows())
+    {
+        var passwordFilePassword = TryResolvePasswordFileDatabasePassword();
+        if (!string.IsNullOrWhiteSpace(passwordFilePassword))
+        {
+            Log.Information("SQLite encryption password source: ProgramData password file");
+            return passwordFilePassword;
+        }
+    }
+
+    Log.Warning(
+        "SQLite encryption password was not found. Set KASSERPRO_DB_PASSWORD or (Windows only) " +
+        @"C:\ProgramData\KasserPro\secrets\svc.dat. Running without encryption.");
+
+    return null;
+}
+
+static string? TryResolvePasswordFileDatabasePassword()
+{
+    var passwordFile = @"C:\ProgramData\KasserPro\secrets\svc.dat";
+    if (!File.Exists(passwordFile))
+    {
+        return null;
+    }
+
+    try
+    {
+        var password = File.ReadAllText(passwordFile).Trim();
+        if (string.IsNullOrWhiteSpace(password))
+        {
+            Log.Warning("Password file exists but is empty: {PasswordFile}", passwordFile);
+            return null;
+        }
+
+        return password;
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Failed to read database password from {PasswordFile}", passwordFile);
+        return null;
+    }
+}
+
+static async Task EnsureDatabaseEncryptedAsync(string dbPath, string password)
+{
+    if (string.IsNullOrWhiteSpace(dbPath) || !File.Exists(dbPath))
+    {
+        return;
+    }
+
+    var canOpenPlainText = await CanOpenDatabaseAsync(dbPath, null);
+    if (!canOpenPlainText)
+    {
+        if (await CanOpenDatabaseAsync(dbPath, password))
+        {
+            return;
+        }
+
+        throw new InvalidOperationException("Database exists but cannot be opened with configured password or without password");
+    }
+
+    var timestamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss");
+    var backupPath = dbPath + $".pre-encryption-{timestamp}.bak";
+    File.Copy(dbPath, backupPath, overwrite: false);
+
+    var tempEncryptedPath = dbPath + ".enc";
+    if (File.Exists(tempEncryptedPath))
+    {
+        File.Delete(tempEncryptedPath);
+    }
+
+    var sourceBuilder = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+    {
+        DataSource = dbPath,
+        Cache = Microsoft.Data.Sqlite.SqliteCacheMode.Default,
+        Pooling = false
+    };
+
+    using (var sourceConnection = new Microsoft.Data.Sqlite.SqliteConnection(sourceBuilder.ConnectionString))
+    {
+        await sourceConnection.OpenAsync();
+
+        var escapedTempPath = tempEncryptedPath.Replace("'", "''");
+        var escapedPassword = password.Replace("'", "''");
+
+        using (var prepareCommand = sourceConnection.CreateCommand())
+        {
+            prepareCommand.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+            await prepareCommand.ExecuteNonQueryAsync();
+        }
+
+        using (var exportCommand = sourceConnection.CreateCommand())
+        {
+            exportCommand.CommandText =
+                $"ATTACH DATABASE '{escapedTempPath}' AS encrypted KEY '{escapedPassword}'; " +
+                "SELECT sqlcipher_export('encrypted'); " +
+                "DETACH DATABASE encrypted;";
+            await exportCommand.ExecuteNonQueryAsync();
+        }
+    }
+
+    Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+
+    var walPath = dbPath + "-wal";
+    var shmPath = dbPath + "-shm";
+    if (File.Exists(walPath))
+    {
+        File.Delete(walPath);
+    }
+    if (File.Exists(shmPath))
+    {
+        File.Delete(shmPath);
+    }
+
+    File.Copy(tempEncryptedPath, dbPath, overwrite: true);
+    File.Delete(tempEncryptedPath);
+
+    if (!await CanOpenDatabaseAsync(dbPath, password))
+    {
+        throw new InvalidOperationException("Encrypted database verification failed after conversion");
+    }
+}
+
+static async Task<bool> CanOpenDatabaseAsync(string dbPath, string? password)
+{
+    try
+    {
+        var builder = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder
+        {
+            DataSource = dbPath,
+            Cache = Microsoft.Data.Sqlite.SqliteCacheMode.Default,
+            Pooling = false
+        };
+
+        if (!string.IsNullOrWhiteSpace(password))
+        {
+            builder.Password = password;
+        }
+
+        using var connection = new Microsoft.Data.Sqlite.SqliteConnection(builder.ConnectionString);
+        await connection.OpenAsync();
+
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM sqlite_master;";
+        _ = await command.ExecuteScalarAsync();
+        return true;
+    }
+    catch
+    {
+        return false;
+    }
 }

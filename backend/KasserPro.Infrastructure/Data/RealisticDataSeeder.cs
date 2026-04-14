@@ -76,6 +76,19 @@ public static class RealisticDataSeeder
             return;
         }
 
+        // On updates, this tenant may already have linked data (orders/purchases/inventory).
+        // In that case, destructive rebuild will fail on FK constraints and break later seed steps.
+        var hasOperationalData =
+            await context.Orders.AnyAsync(o => o.TenantId == tenant.Id) ||
+            await context.PurchaseInvoices.AnyAsync(i => i.TenantId == tenant.Id) ||
+            await context.BranchInventories.AnyAsync(bi => bi.TenantId == tenant.Id);
+
+        if (hasOperationalData)
+        {
+            Console.WriteLine("   ✓ تخطي إعادة بناء المنتجات لوجود بيانات تشغيل مرتبطة");
+            return;
+        }
+
         Console.WriteLine("📦 إنشاء الأصناف والمنتجات...");
 
         // Clear existing categories and products
@@ -370,7 +383,13 @@ public static class RealisticDataSeeder
                 shift.Difference = shift.ClosingBalance - shift.ExpectedBalance;
             }
 
-            // Create TODAY's open shift
+            // Create today's shift as closed to keep seed data consistent.
+            var todayClosedAt = DateTime.UtcNow;
+            if (todayClosedAt < DateTime.UtcNow.Date.AddHours(8))
+            {
+                todayClosedAt = DateTime.UtcNow.Date.AddHours(8);
+            }
+
             var todayShift = new Shift
             {
                 TenantId = tenant.Id,
@@ -378,16 +397,21 @@ public static class RealisticDataSeeder
                 UserId = admin.Id,
                 OpeningBalance = 2000,
                 OpenedAt = DateTime.UtcNow.Date.AddHours(8),
-                LastActivityAt = DateTime.UtcNow,
-                IsClosed = false,
+                LastActivityAt = todayClosedAt,
+                IsClosed = true,
                 IsForceClosed = false,
                 IsHandedOver = false,
-                HandoverBalance = 0
+                HandoverBalance = 0,
+                ClosedAt = todayClosedAt
             };
             context.Shifts.Add(todayShift);
             shiftCount++;
 
-            // Add 2-3 orders for today (some draft/pending)
+            decimal todayTotalCash = 0;
+            decimal todayTotalCard = 0;
+            var todayCompletedCount = 0;
+
+            // Add a small number of completed orders for today.
             for (int i = 0; i < 3; i++)
             {
                 var orderTime = DateTime.UtcNow.AddHours(-_random.Next(1, 4));
@@ -405,7 +429,27 @@ public static class RealisticDataSeeder
                 );
 
                 context.Orders.Add(order);
+
+                if (status == OrderStatus.Completed)
+                {
+                    todayCompletedCount++;
+                    var payment = order.Payments.FirstOrDefault();
+                    if (payment != null)
+                    {
+                        if (payment.Method == PaymentMethod.Cash)
+                            todayTotalCash += payment.Amount;
+                        else
+                            todayTotalCard += payment.Amount;
+                    }
+                }
             }
+
+            todayShift.TotalOrders = todayCompletedCount;
+            todayShift.TotalCash = todayTotalCash;
+            todayShift.TotalCard = todayTotalCard;
+            todayShift.ExpectedBalance = todayShift.OpeningBalance + todayTotalCash;
+            todayShift.ClosingBalance = todayShift.ExpectedBalance;
+            todayShift.Difference = 0;
         }
         finally
         {

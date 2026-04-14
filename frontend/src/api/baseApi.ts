@@ -8,17 +8,25 @@ import type { RootState } from "../store";
 import { toast } from "sonner";
 import { ERROR_MESSAGES } from "../utils/constants";
 
-// Dynamic API URL: In production, use the same origin so network devices work correctly
-// In development (Vite dev server), use relative URL and let Vite proxy handle it
+// Dynamic API URL resolution policy:
+// 1) If VITE_API_URL is set, use it in all environments.
+// 2) In local development, fallback to /api (Vite proxy).
+// 3) In production, fallback to same-origin /api.
 const getApiUrl = (): string => {
-  // If running in development with Vite dev server, use relative path
-  // Vite proxy will forward /api/* to the backend
+  const envApiUrl = import.meta.env.VITE_API_URL?.toString().trim();
+  if (envApiUrl) {
+    // Normalize trailing slash to avoid double-slash URL joins.
+    return envApiUrl.replace(/\/+$/, "");
+  }
+
+  // If running in development with Vite dev server, use relative path.
+  // Vite proxy will forward /api/* to the backend.
   if (import.meta.env.DEV) {
     return "/api";
   }
 
-  // In production, use the current page's origin
-  // This ensures network clients connect to the actual server, not localhost
+  // In production, use the current page's origin.
+  // This keeps same-origin behavior when env override is not configured.
   return `${window.location.origin}/api`;
 };
 

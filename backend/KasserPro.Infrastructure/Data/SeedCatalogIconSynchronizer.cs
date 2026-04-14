@@ -9,29 +9,56 @@ using Microsoft.EntityFrameworkCore;
 /// </summary>
 public static class SeedCatalogIconSynchronizer
 {
-    private static readonly string[] SeedTenantSlugs =
+    private static readonly Dictionary<string, string> ButcherProductIconMap = new(StringComparer.Ordinal)
     {
-        "kasserpro",
-        "al-amana-butcher",
-        "home-appliances",
-        "supermarket",
-        "restaurant"
-    };
-
-    private static readonly HashSet<string> GenericCategoryIcons = new(StringComparer.Ordinal)
-    {
-        "📁",
-        "📂",
-        "🗂️",
-        "🏷️",
-        "❓"
-    };
-
-    private static readonly HashSet<string> GenericProductIcons = new(StringComparer.Ordinal)
-    {
-        "📦",
-        "📁",
-        "❓"
+        ["قراقيش"] = "🥩",
+        ["لحم قطع"] = "🥩",
+        ["لحم ضلعه"] = "🍖",
+        ["لحم مميز"] = "🥩",
+        ["لحم دوش"] = "🥩",
+        ["لحم موزه"] = "🥩",
+        ["لحم راس"] = "🥩",
+        ["مكعبات لحم احمر"] = "🥩",
+        ["استيك"] = "🥩",
+        ["بوفتيك"] = "🥩",
+        ["كباب حله"] = "🍢",
+        ["كباب حله احمر"] = "🍢",
+        ["برجر"] = "🍔",
+        ["سجق مخصوص"] = "🍖",
+        ["مفروم مخصوص"] = "🥩",
+        ["مزاليكا"] = "🥩",
+        ["كوارع بالكيلو"] = "🥩",
+        ["كوارع"] = "🥩",
+        ["دهن طرب"] = "🥩",
+        ["حلويات"] = "🥩",
+        ["طحال"] = "🥩",
+        ["ممبار"] = "🥩",
+        ["ام الشلاتيت"] = "🥩",
+        ["دهن كلاوي"] = "🥩",
+        ["qaraqish"] = "🥩",
+        ["meat cuts"] = "🥩",
+        ["ribs"] = "🍖",
+        ["premium meat"] = "🥩",
+        ["doush meat"] = "🥩",
+        ["mouza meat"] = "🥩",
+        ["head meat"] = "🥩",
+        ["red meat cubes"] = "🥩",
+        ["steak"] = "🥩",
+        ["beefsteak"] = "🥩",
+        ["kebab halla"] = "🍢",
+        ["red kebab halla"] = "🍢",
+        ["burger"] = "🍔",
+        ["special sausage"] = "🍖",
+        ["special minced"] = "🥩",
+        ["mazalika"] = "🥩",
+        ["trotters per kg"] = "🥩",
+        ["trotters"] = "🥩",
+        ["fat tarab"] = "🥩",
+        ["sweetbreads"] = "🥩",
+        ["spleen"] = "🥩",
+        ["mumbar"] = "🥩",
+        ["um el-shalatit"] = "🥩",
+        ["kidney fat"] = "🥩"
     };
 
     public static async Task SynchronizeAsync(AppDbContext context)
@@ -40,7 +67,7 @@ public static class SeedCatalogIconSynchronizer
 
         var seedTenants = await context.Tenants
             .AsNoTracking()
-            .Where(t => SeedTenantSlugs.Contains(t.Slug))
+            .Where(t => SeedTenantRegistry.Slugs.Contains(t.Slug))
             .Select(t => t.Id)
             .ToListAsync();
 
@@ -62,16 +89,15 @@ public static class SeedCatalogIconSynchronizer
             var resolvedIcon = ResolveCategoryIcon(category.Name, category.NameEn);
             var currentIcon = NormalizeIcon(category.ImageUrl);
 
-            if (ShouldReplaceCategoryIcon(currentIcon))
+            // Always enforce deterministic icon mapping for seed tenants.
+            if (!string.Equals(currentIcon, resolvedIcon, StringComparison.Ordinal))
             {
                 category.ImageUrl = resolvedIcon;
                 currentIcon = resolvedIcon;
                 updatedCategories++;
             }
 
-            categoryIconById[category.Id] = string.IsNullOrWhiteSpace(currentIcon)
-                ? resolvedIcon
-                : currentIcon;
+            categoryIconById[category.Id] = resolvedIcon;
         }
 
         var products = await context.Products
@@ -89,7 +115,7 @@ public static class SeedCatalogIconSynchronizer
             var resolvedIcon = ResolveProductIcon(product.Name, product.NameEn, categoryIcon);
             var currentIcon = NormalizeIcon(product.ImageUrl);
 
-            if (ShouldReplaceProductIcon(currentIcon))
+            if (!string.Equals(currentIcon, resolvedIcon, StringComparison.Ordinal))
             {
                 product.ImageUrl = resolvedIcon;
                 updatedProducts++;
@@ -102,16 +128,6 @@ public static class SeedCatalogIconSynchronizer
         }
 
         Console.WriteLine($"   ✓ مزامنة الأيقونات: أصناف {updatedCategories} | منتجات {updatedProducts}");
-    }
-
-    private static bool ShouldReplaceCategoryIcon(string? icon)
-    {
-        return string.IsNullOrWhiteSpace(icon) || GenericCategoryIcons.Contains(icon);
-    }
-
-    private static bool ShouldReplaceProductIcon(string? icon)
-    {
-        return string.IsNullOrWhiteSpace(icon) || GenericProductIcons.Contains(icon);
     }
 
     private static string NormalizeIcon(string? icon)
@@ -131,7 +147,11 @@ public static class SeedCatalogIconSynchronizer
         if (ContainsAny(text, "بقالة", "grocery")) return "🛒";
         if (ContainsAny(text, "ألبان", "dairy", "milk")) return "🥛";
         if (ContainsAny(text, "خبز", "مخبوزات", "bakery")) return "🥖";
-        if (ContainsAny(text, "أحشاء", "offal")) return "🫀";
+        if (ContainsAny(text, "لحوم ودواجن", "meat & poultry")) return "🥩";
+        if (ContainsAny(text, "دواجن", "poultry", "chicken")) return "🍗";
+        if (ContainsAny(text, "مفرومة", "مصنعة", "minced", "processed", "sausage")) return "🍖";
+        if (ContainsAny(text, "أحشاء", "offal")) return "🥩";
+        if (ContainsAny(text, "مجمدة", "frozen")) return "❄️";
         if (ContainsAny(text, "لحوم", "meat", "beef", "poultry", "grill", "مشويات")) return "🥩";
         if (ContainsAny(text, "خضروات", "فواكه", "vegetable", "fruit", "produce")) return "🥬";
         if (ContainsAny(text, "حلويات", "dessert", "sweets", "chocolate")) return "🍰";
@@ -147,6 +167,18 @@ public static class SeedCatalogIconSynchronizer
 
     private static string ResolveProductIcon(string? name, string? nameEn, string categoryIcon)
     {
+        var normalizedName = NormalizeSingle(name);
+        if (ButcherProductIconMap.TryGetValue(normalizedName, out var explicitButcherIcon))
+        {
+            return explicitButcherIcon;
+        }
+
+        var normalizedNameEn = NormalizeSingle(nameEn);
+        if (ButcherProductIconMap.TryGetValue(normalizedNameEn, out explicitButcherIcon))
+        {
+            return explicitButcherIcon;
+        }
+
         var text = NormalizeText(name, nameEn);
 
         // Beverages
@@ -191,7 +223,8 @@ public static class SeedCatalogIconSynchronizer
         if (ContainsAny(text, "kebab", "kofta", "كباب", "كفتة", "grill", "مشويات")) return "🍢";
 
         // Meat / Butcher
-        if (ContainsAny(text, "offal", "كوارع", "طحال", "ممبار", "دهن", "شلاتيت", "trotters", "spleen", "kidney")) return "🫀";
+        if (ContainsAny(text, "offal", "كوارع", "طحال", "ممبار", "دهن", "شلاتيت", "trotters", "spleen", "kidney")) return "🥩";
+        if (ContainsAny(text, "poultry", "chicken", "دواجن")) return "🍗";
         if (ContainsAny(text, "meat", "beef", "lamb", "chicken", "steak", "rib", "sausage", "مفروم", "لحم", "استيك", "سجق", "دواجن")) return "🥩";
 
         // Sweets / Snacks
@@ -234,6 +267,11 @@ public static class SeedCatalogIconSynchronizer
             .Select(p => p!.Trim().ToLowerInvariant());
 
         return string.Join(' ', tokens);
+    }
+
+    private static string NormalizeSingle(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim().ToLowerInvariant();
     }
 
     private static bool ContainsAny(string source, params string[] keywords)

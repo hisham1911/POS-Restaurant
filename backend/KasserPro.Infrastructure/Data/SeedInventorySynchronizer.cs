@@ -15,12 +15,19 @@ public static class SeedInventorySynchronizer
 
     public static async Task SynchronizeAsync(AppDbContext context)
     {
-        Console.WriteLine("🔄 مزامنة مخزون الفروع مع بيانات السييد...");
+        Console.WriteLine("Synchronizing seeded branch inventory...");
 
         var tenantIds = await context.Tenants
             .AsNoTracking()
+            .Where(t => SeedTenantRegistry.Slugs.Contains(t.Slug))
             .Select(t => t.Id)
             .ToListAsync();
+
+        if (tenantIds.Count == 0)
+        {
+            Console.WriteLine("   No demo tenants found for inventory synchronization");
+            return;
+        }
 
         var now = DateTime.UtcNow;
         var createdCount = 0;
@@ -123,9 +130,11 @@ public static class SeedInventorySynchronizer
                     transferOutMap.TryGetValue(key, out var transferOutQty);
                     transferInMap.TryGetValue(key, out var transferInQty);
 
+                    var safetyStock = CalculateSafetyStock(product.ReorderLevel);
+                    var netSeedConsumption = Math.Max(0, orderQty + transferOutQty - transferInQty);
                     var baselineQty = purchaseQty > 0
                         ? 0
-                        : Math.Max(product.ReorderLevel * 12, 50);
+                        : netSeedConsumption + safetyStock;
 
                     var calculatedQty = baselineQty
                         + purchaseQty
@@ -133,7 +142,7 @@ public static class SeedInventorySynchronizer
                         - orderQty
                         - transferOutQty;
 
-                    var finalQty = Math.Max(0, calculatedQty);
+                    var finalQty = Math.Max(safetyStock, calculatedQty);
 
                     if (existingMap.TryGetValue(key, out var inventory))
                     {
@@ -164,6 +173,12 @@ public static class SeedInventorySynchronizer
             await context.SaveChangesAsync();
         }
 
-        Console.WriteLine($"   ✓ مزامنة المخزون تمت: جديد {createdCount} | محدث {updatedCount}");
+        Console.WriteLine($"   Inventory synchronization completed: created {createdCount}, updated {updatedCount}");
+    }
+
+    private static int CalculateSafetyStock(int reorderLevel)
+    {
+        var normalizedReorderLevel = Math.Max(reorderLevel, 10);
+        return Math.Max(normalizedReorderLevel * 4, 40);
     }
 }

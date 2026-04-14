@@ -57,29 +57,52 @@ public class BackupService : IBackupService
         {
             _logger.LogInformation("Starting backup: {FileName} (Reason: {Reason})", fileName, reason);
 
-            // Extract database file path from connection string
-            var builder = new SqliteConnectionStringBuilder(_connectionString);
-            var sourceDbPath = builder.DataSource;
+            // Extract database file path and optional password from connection string.
+            var sourceBuilder = new SqliteConnectionStringBuilder(_connectionString);
+            var sourceDbPath = sourceBuilder.DataSource;
+            var hasEncryptionPassword = !string.IsNullOrWhiteSpace(sourceBuilder.Password);
 
             if (string.IsNullOrEmpty(sourceDbPath))
             {
                 throw new InvalidOperationException("Cannot determine database file path from connection string");
             }
 
-            // Use SQLite Backup API for hot backup
-            using var sourceConnection = new SqliteConnection(_connectionString);
-            await sourceConnection.OpenAsync();
+            try
+            {
+                // Use SQLite Backup API for hot backup when provider supports it.
+                using var sourceConnection = new SqliteConnection(_connectionString);
+                await sourceConnection.OpenAsync();
 
-            using var backupConnection = new SqliteConnection($"Data Source={backupPath}");
-            await backupConnection.OpenAsync();
+                var backupBuilder = new SqliteConnectionStringBuilder
+                {
+                    DataSource = backupPath
+                };
 
-            // Perform backup using SQLite Backup API
-            sourceConnection.BackupDatabase(backupConnection);
+                if (hasEncryptionPassword)
+                {
+                    backupBuilder.Password = sourceBuilder.Password;
+                }
+
+                using var backupConnection = new SqliteConnection(backupBuilder.ConnectionString);
+                await backupConnection.OpenAsync();
+
+                sourceConnection.BackupDatabase(backupConnection);
+            }
+            catch (SqliteException ex) when (
+                hasEncryptionPassword
+                && ex.Message.Contains("backup is not supported with encrypted databases", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    ex,
+                    "SQLite Backup API is unsupported for encrypted databases; using file-copy fallback");
+
+                await CreateEncryptedFallbackBackupAsync(sourceDbPath, backupPath);
+            }
 
             _logger.LogInformation("Backup completed: {FileName}", fileName);
 
             // Run integrity check on backup
-            var integrityCheckPassed = await RunIntegrityCheckAsync(backupPath);
+            var integrityCheckPassed = await RunIntegrityCheckAsync(backupPath, sourceBuilder.Password);
 
             if (!integrityCheckPassed)
             {
@@ -149,13 +172,39 @@ public class BackupService : IBackupService
     }
 
     /// <summary>
+    /// SQLCipher fallback: force a checkpoint, then copy the DB file.
+    /// </summary>
+    private async Task CreateEncryptedFallbackBackupAsync(string sourceDbPath, string backupPath)
+    {
+        using (var sourceConnection = new SqliteConnection(_connectionString))
+        {
+            await sourceConnection.OpenAsync();
+            using var checkpointCommand = sourceConnection.CreateCommand();
+            checkpointCommand.CommandText = "PRAGMA wal_checkpoint(TRUNCATE);";
+            await checkpointCommand.ExecuteNonQueryAsync();
+        }
+
+        File.Copy(sourceDbPath, backupPath, overwrite: true);
+    }
+
+    /// <summary>
     /// P2: Runs SQLite integrity check on backup file
     /// </summary>
-    private async Task<bool> RunIntegrityCheckAsync(string backupPath)
+    private async Task<bool> RunIntegrityCheckAsync(string backupPath, string? password)
     {
         try
         {
-            using var connection = new SqliteConnection($"Data Source={backupPath}");
+            var backupBuilder = new SqliteConnectionStringBuilder
+            {
+                DataSource = backupPath
+            };
+
+            if (!string.IsNullOrWhiteSpace(password))
+            {
+                backupBuilder.Password = password;
+            }
+
+            using var connection = new SqliteConnection(backupBuilder.ConnectionString);
             await connection.OpenAsync();
 
             using var command = connection.CreateCommand();

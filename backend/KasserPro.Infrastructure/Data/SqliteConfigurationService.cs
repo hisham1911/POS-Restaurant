@@ -34,17 +34,27 @@ public class SqliteConfigurationService
 
         using var cmd = sqliteConnection.CreateCommand();
 
-        // P1: Set WAL mode (persistent, database-level)
-        cmd.CommandText = "PRAGMA journal_mode=WAL;";
+        var connectionStringBuilder = new SqliteConnectionStringBuilder(sqliteConnection.ConnectionString);
+        var isEncryptedDatabase = !string.IsNullOrWhiteSpace(connectionStringBuilder.Password);
+
+        // WAL offers better concurrency on plaintext SQLite.
+        // SQLCipher deployments are more stable on DELETE journaling.
+        cmd.CommandText = isEncryptedDatabase
+            ? "PRAGMA journal_mode=DELETE;"
+            : "PRAGMA journal_mode=WAL;";
         var journalMode = await cmd.ExecuteScalarAsync();
-        
-        if (journalMode?.ToString()?.ToUpper() == "WAL")
+
+        if (!isEncryptedDatabase && journalMode?.ToString()?.ToUpper() == "WAL")
         {
             _logger.LogInformation("✓ SQLite journal_mode: WAL (Write-Ahead Logging enabled)");
         }
+        else if (isEncryptedDatabase && journalMode?.ToString()?.ToUpper() == "DELETE")
+        {
+            _logger.LogInformation("✓ SQLite journal_mode: DELETE (SQLCipher compatibility mode)");
+        }
         else
         {
-            _logger.LogWarning("⚠ Failed to enable WAL mode, current mode: {Mode}", journalMode);
+            _logger.LogWarning("⚠ Failed to set expected journal mode, current mode: {Mode}", journalMode);
         }
 
         // P1: Set per-connection PRAGMAs
@@ -74,7 +84,7 @@ public class SqliteConfigurationService
         // Verify journal_mode
         cmd.CommandText = "PRAGMA journal_mode;";
         var journalMode = await cmd.ExecuteScalarAsync();
-        
+
         // Verify foreign_keys
         cmd.CommandText = "PRAGMA foreign_keys;";
         var foreignKeys = await cmd.ExecuteScalarAsync();
@@ -83,10 +93,15 @@ public class SqliteConfigurationService
             "SQLite Configuration Verified - journal_mode={JournalMode}, foreign_keys={ForeignKeys}",
             journalMode, foreignKeys);
 
-        if (journalMode?.ToString()?.ToUpper() != "WAL")
+        var isEncryptedDatabase = !string.IsNullOrWhiteSpace(new SqliteConnectionStringBuilder(connection.ConnectionString).Password);
+        var expectedJournalMode = isEncryptedDatabase ? "DELETE" : "WAL";
+
+        if (!string.Equals(journalMode?.ToString(), expectedJournalMode, StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogWarning(
-                "⚠ PRODUCTION WARNING: WAL mode not active. Database may experience lock contention under concurrent load.");
+                "⚠ PRODUCTION WARNING: journal_mode is {CurrentMode}, expected {ExpectedMode}",
+                journalMode,
+                expectedJournalMode);
         }
     }
 }

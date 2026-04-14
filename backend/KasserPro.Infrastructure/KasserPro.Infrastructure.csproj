@@ -1,33 +1,33 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    
+
     <!-- Aggressive Build Performance Optimizations -->
     <UseSharedCompilation>true</UseSharedCompilation>
     <BuildInParallel>true</BuildInParallel>
     <MultiProcessorCompilation>true</MultiProcessorCompilation>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <DisableImplicitNuGetFallbackFolder>true</DisableImplicitNuGetFallbackFolder>
-    
+
     <!-- Skip ALL Heavy Tasks in Debug -->
     <RunAnalyzersDuringBuild Condition="'$(Configuration)' == 'Debug'">false</RunAnalyzersDuringBuild>
     <RunCodeAnalysis Condition="'$(Configuration)' == 'Debug'">false</RunCodeAnalysis>
     <GenerateDocumentationFile Condition="'$(Configuration)' == 'Debug'">false</GenerateDocumentationFile>
     <TreatWarningsAsErrors Condition="'$(Configuration)' == 'Debug'">false</TreatWarningsAsErrors>
-    
+
     <!-- Minimize Assembly Generation -->
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
     <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
     <GenerateAssemblyCompanyAttribute>false</GenerateAssemblyCompanyAttribute>
     <GenerateAssemblyProductAttribute>false</GenerateAssemblyProductAttribute>
-    
+
     <!-- Suppress Warnings to Speed Up Compilation -->
     <NoWarn>$(NoWarn);CS0414;CS8618;CS8625;CS1591;CS8602;CS8604</NoWarn>
-    
+
     <!-- EF Core Optimizations -->
     <RestoreUseSkipNonexistentTargets>true</RestoreUseSkipNonexistentTargets>
     <RestoreIgnoreFailedSources>true</RestoreIgnoreFailedSources>
@@ -45,7 +45,9 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite.Core" Version="8.0.11" />
+    <PackageReference Include="SQLitePCLRaw.provider.e_sqlcipher" Version="2.1.6" />
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlcipher" Version="2.1.6" />
   </ItemGroup>
 
 </Project>

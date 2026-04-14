@@ -39,6 +39,16 @@ public static class SupermarketSeeder
 
         var customers = await SeedCustomersAsync(context, tenant);
         await SeedExpenseCategoriesAsync(context, tenant);
+
+        // The realistic supermarket dataset owns products, purchase invoices, and historical orders.
+        // When the catalog is still in its lightweight bootstrap form, stop here so the later
+        // RealisticDataSeeder can safely expand it without conflicting operational rows.
+        if (products.Count < 20)
+        {
+            Console.WriteLine("   ✓ Supermarket bootstrap data prepared; detailed operational data will be added by RealisticDataSeeder");
+            return;
+        }
+
         await SeedShiftsAndOrdersAsync(context, tenant, branch, allUsers, products, customers);
         await SeedExpensesAsync(context, tenant, branch, admin);
         await SeedCashRegisterTransactionsAsync(context, tenant, branch, admin);
@@ -48,6 +58,15 @@ public static class SupermarketSeeder
 
     private static async Task<List<User>> SeedCashiersAsync(AppDbContext context, Tenant tenant, Branch branch)
     {
+        var existingCashiers = await context.Users
+            .Where(u => u.TenantId == tenant.Id && u.Role == UserRole.Cashier)
+            .ToListAsync();
+
+        if (existingCashiers.Count > 0)
+        {
+            return existingCashiers;
+        }
+
         var cashiers = new List<User>
         {
             new()
@@ -89,6 +108,15 @@ public static class SupermarketSeeder
 
     private static async Task<List<Customer>> SeedCustomersAsync(AppDbContext context, Tenant tenant)
     {
+        var existingCustomers = await context.Customers
+            .Where(c => c.TenantId == tenant.Id)
+            .ToListAsync();
+
+        if (existingCustomers.Count > 0)
+        {
+            return existingCustomers;
+        }
+
         var customers = new List<Customer>
         {
             // عملاء VIP (عائلات كبيرة)
@@ -120,6 +148,11 @@ public static class SupermarketSeeder
 
     private static async Task SeedExpenseCategoriesAsync(AppDbContext context, Tenant tenant)
     {
+        if (await context.ExpenseCategories.AnyAsync(c => c.TenantId == tenant.Id))
+        {
+            return;
+        }
+
         var categories = new List<ExpenseCategory>
         {
             new() { TenantId = tenant.Id, Name = "رواتب", NameEn = "Salaries", Icon = "💰", Color = "#3B82F6", IsActive = true, IsSystem = true, SortOrder = 1 },
@@ -139,11 +172,10 @@ public static class SupermarketSeeder
         var cashiers = users.Where(u => u.Role == UserRole.Cashier).ToList();
         if (cashiers.Count == 0) cashiers = users;
 
-        // Create 12 days of closed shifts + 1 open shift today
+        // Create 13 closed shifts (including today)
         for (int day = 12; day >= 0; day--)
         {
             var shiftDate = DateTime.UtcNow.Date.AddDays(-day);
-            var isClosed = day > 0;
             var cashier = cashiers[day % cashiers.Count];
 
             var shift = new Shift
@@ -153,19 +185,14 @@ public static class SupermarketSeeder
                 UserId = cashier.Id,
                 OpeningBalance = 2000,
                 OpenedAt = shiftDate.AddHours(8),
-                LastActivityAt = shiftDate.AddHours(8),
-                IsClosed = isClosed,
+                LastActivityAt = shiftDate.AddHours(22),
+                IsClosed = true,
                 IsForceClosed = false,
                 IsHandedOver = false,
-                HandoverBalance = 0
+                HandoverBalance = 0,
+                ClosedAt = shiftDate.AddHours(22),
+                Notes = $"وردية {shiftDate:yyyy-MM-dd}"
             };
-
-            if (isClosed)
-            {
-                shift.ClosedAt = shiftDate.AddHours(22);
-                shift.LastActivityAt = shiftDate.AddHours(22);
-                shift.Notes = $"وردية {shiftDate:yyyy-MM-dd}";
-            }
 
             context.Shifts.Add(shift);
             await context.SaveChangesAsync();
@@ -208,17 +235,13 @@ public static class SupermarketSeeder
 
             await context.SaveChangesAsync();
 
-            // Update shift totals for closed shifts
-            if (isClosed)
-            {
-                shift.TotalOrders = completedCount;
-                shift.TotalCash = totalCash;
-                shift.TotalCard = totalCard;
-                shift.ExpectedBalance = shift.OpeningBalance + totalCash;
-                shift.ClosingBalance = shift.ExpectedBalance + _random.Next(-50, 80);
-                shift.Difference = shift.ClosingBalance - shift.ExpectedBalance;
-                await context.SaveChangesAsync();
-            }
+            shift.TotalOrders = completedCount;
+            shift.TotalCash = totalCash;
+            shift.TotalCard = totalCard;
+            shift.ExpectedBalance = shift.OpeningBalance + totalCash;
+            shift.ClosingBalance = shift.ExpectedBalance + _random.Next(-50, 80);
+            shift.Difference = shift.ClosingBalance - shift.ExpectedBalance;
+            await context.SaveChangesAsync();
         }
 
         // Deduct stock for completed orders

@@ -20,13 +20,23 @@ public class DataValidationService
     /// Validates critical columns after restore
     /// Returns list of issues found (empty = all good)
     /// </summary>
-    public async Task<List<DataValidationIssue>> ValidateRestoredDataAsync(string dbPath)
+    public async Task<List<DataValidationIssue>> ValidateRestoredDataAsync(string dbPath, string? password = null)
     {
         var issues = new List<DataValidationIssue>();
 
         try
         {
-            using var connection = new SqliteConnection($"Data Source={dbPath}");
+            var connectionBuilder = new SqliteConnectionStringBuilder
+            {
+                DataSource = dbPath
+            };
+
+            if (!string.IsNullOrWhiteSpace(password))
+            {
+                connectionBuilder.Password = password;
+            }
+
+            using var connection = new SqliteConnection(connectionBuilder.ConnectionString);
             await connection.OpenAsync();
 
             // Check 1: Products.Price should be numeric
@@ -107,10 +117,10 @@ public class DataValidationService
             // Instead: if the value is text, check if it matches a numeric pattern.
             // A text value that CAST to REAL gives 0.0 AND doesn't start with '0' (or is just '0') is non-numeric.
             command.CommandText = $@"
-                SELECT COUNT(*) 
-                FROM {tableName} 
-                WHERE {columnName} IS NOT NULL 
-                  AND typeof({columnName}) != 'real' 
+                SELECT COUNT(*)
+                FROM {tableName}
+                WHERE {columnName} IS NOT NULL
+                  AND typeof({columnName}) != 'real'
                   AND typeof({columnName}) != 'integer'
                   AND typeof({columnName}) != 'null'
                   AND (
@@ -171,7 +181,7 @@ public class DataValidationService
             while (await reader.ReadAsync())
             {
                 var tableName = reader[0].ToString();
-                
+
                 // Count deleted records
                 using var countCmd = connection.CreateCommand();
                 countCmd.CommandText = $"SELECT COUNT(*) FROM {tableName} WHERE IsDeleted = 1";

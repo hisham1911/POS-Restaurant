@@ -74,6 +74,8 @@ public static class DbInitializer
         // Seed Users
         if (!await context.Users.AnyAsync())
         {
+            var systemOwnerPassword = SeedSystemOwnerPasswordResolver.Resolve(out _);
+
             var users = new List<User>
             {
                 new()
@@ -122,7 +124,7 @@ public static class DbInitializer
                     BranchId = null,
                     Name = "System Owner",
                     Email = "owner@kasserpro.com",
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword("Owner@123"),
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(systemOwnerPassword),
                     Role = UserRole.SystemOwner,
                     IsActive = true
                 }

@@ -105,6 +105,46 @@ var
   DbBackupPath: String;
   FreshInstallMode: Boolean;
 
+function GenerateRandomPassword: String;
+var
+  Chars: String;
+  PwdLen: Integer;
+  i, idx: Integer;
+begin
+  Chars := 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+  PwdLen := 32;
+  Result := '';
+  for i := 1 to PwdLen do
+  begin
+    idx := Random(62) + 1;
+    Result := Result + Copy(Chars, idx, 1);
+  end;
+end;
+
+procedure CreateDbPassword;
+var
+  SecretsDir: String;
+  FilePath: String;
+  Password: String;
+  ResultCode: Integer;
+begin
+  SecretsDir := ExpandConstant('{commonappdata}') + '\KasserPro\secrets';
+  FilePath := SecretsDir + '\svc.dat';
+
+  if FileExists(FilePath) then
+    Exit;
+
+  if not DirExists(SecretsDir) then
+    ForceDirectories(SecretsDir);
+
+  Password := GenerateRandomPassword;
+  SaveStringToFile(FilePath, Password, False);
+
+  Exec('icacls.exe',
+    '"' + FilePath + '" /inheritance:r /grant "SYSTEM:(R)" /grant "Administrators:(R)"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
 function IsAlreadyInstalled(): Boolean;
 begin
   Result := RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\{#ServiceName}')
@@ -161,6 +201,8 @@ var
 begin
   if CurStep = ssInstall then
   begin
+    CreateDbPassword();
+
     DbPath       := ExpandConstant('{app}\{#DbFileName}');
     DbBackupPath := ExpandConstant('{app}\kasserpro.db.update-backup');
 

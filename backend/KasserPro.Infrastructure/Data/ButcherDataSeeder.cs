@@ -133,19 +133,24 @@ public static class ButcherDataSeeder
         // Create System Owner first (if not exists)
         if (!await context.Users.AnyAsync(u => u.Role == UserRole.SystemOwner))
         {
+            var systemOwnerPassword = SeedSystemOwnerPasswordResolver.Resolve(out var passwordFromEnvironment);
+
             var systemOwner = new User
             {
                 TenantId = null,
                 BranchId = null,
                 Name = "System Owner",
                 Email = "owner@kasserpro.com",
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword("Owner@123"),
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(systemOwnerPassword),
                 Role = UserRole.SystemOwner,
                 IsActive = true
             };
             context.Users.Add(systemOwner);
             await context.SaveChangesAsync();
-            Console.WriteLine("   ✓ System Owner: owner@kasserpro.com (Password: Owner@123)");
+            Console.WriteLine("   ✓ System Owner: owner@kasserpro.com");
+            Console.WriteLine(passwordFromEnvironment
+                ? $"     Password source: env {SeedSystemOwnerPasswordResolver.EnvironmentVariableName}"
+                : "     Password source: auto-generated for this seed run");
         }
 
         var users = new List<User>
@@ -194,7 +199,7 @@ public static class ButcherDataSeeder
         {
             new() { TenantId = tenant.Id, Name = "لحوم بقري", NameEn = "Beef", SortOrder = 1, ImageUrl = "🥩", IsActive = true },
             new() { TenantId = tenant.Id, Name = "لحوم مفرومة ومصنعة", NameEn = "Minced & Processed", SortOrder = 2, ImageUrl = "🍖", IsActive = true },
-            new() { TenantId = tenant.Id, Name = "أحشاء ومنتجات ثانوية", NameEn = "Offal & By-products", SortOrder = 3, ImageUrl = "🫀", IsActive = true }
+            new() { TenantId = tenant.Id, Name = "أحشاء ومنتجات ثانوية", NameEn = "Offal & By-products", SortOrder = 3, ImageUrl = "🥩", IsActive = true }
         };
 
         context.Categories.AddRange(categories);
@@ -354,11 +359,10 @@ public static class ButcherDataSeeder
         var cashier1 = users.First(u => u.Role == UserRole.Cashier);
         var cashier2 = users.Last(u => u.Role == UserRole.Cashier);
 
-        // Create 14 days of closed shifts + 1 open shift today
+        // Create 15 closed shifts (including today)
         for (int day = 14; day >= 0; day--)
         {
             var shiftDate = DateTime.UtcNow.Date.AddDays(-day);
-            var isClosed = day > 0;
             var cashier = day % 2 == 0 ? cashier1 : cashier2;
 
             var shift = new Shift
@@ -368,19 +372,14 @@ public static class ButcherDataSeeder
                 UserId = cashier.Id,
                 OpeningBalance = 1000,
                 OpenedAt = shiftDate.AddHours(8),
-                LastActivityAt = shiftDate.AddHours(8),
-                IsClosed = isClosed,
+                LastActivityAt = shiftDate.AddHours(20),
+                IsClosed = true,
                 IsForceClosed = false,
                 IsHandedOver = false,
-                HandoverBalance = 0
+                HandoverBalance = 0,
+                ClosedAt = shiftDate.AddHours(20),
+                Notes = $"وردية {shiftDate:yyyy-MM-dd}"
             };
-
-            if (isClosed)
-            {
-                shift.ClosedAt = shiftDate.AddHours(20);
-                shift.LastActivityAt = shiftDate.AddHours(20);
-                shift.Notes = $"وردية {shiftDate:yyyy-MM-dd}";
-            }
 
             context.Shifts.Add(shift);
             await context.SaveChangesAsync();
@@ -423,17 +422,13 @@ public static class ButcherDataSeeder
 
             await context.SaveChangesAsync();
 
-            // Update shift totals for closed shifts
-            if (isClosed)
-            {
-                shift.TotalOrders = completedCount;
-                shift.TotalCash = totalCash;
-                shift.TotalCard = totalCard;
-                shift.ExpectedBalance = shift.OpeningBalance + totalCash;
-                shift.ClosingBalance = shift.ExpectedBalance + _random.Next(-50, 100);
-                shift.Difference = shift.ClosingBalance - shift.ExpectedBalance;
-                await context.SaveChangesAsync();
-            }
+            shift.TotalOrders = completedCount;
+            shift.TotalCash = totalCash;
+            shift.TotalCard = totalCard;
+            shift.ExpectedBalance = shift.OpeningBalance + totalCash;
+            shift.ClosingBalance = shift.ExpectedBalance + _random.Next(-50, 100);
+            shift.Difference = shift.ClosingBalance - shift.ExpectedBalance;
+            await context.SaveChangesAsync();
         }
 
         // Deduct stock for completed orders
@@ -446,7 +441,7 @@ public static class ButcherDataSeeder
         // No need to manually update product stock here
         await context.SaveChangesAsync();
 
-        Console.WriteLine($"   ✓ الورديات: 15 (14 مغلقة + 1 مفتوحة)");
+        Console.WriteLine($"   ✓ الورديات: 15 (كلها مغلقة)");
         Console.WriteLine($"   ✓ الطلبات: {completedOrders.Count} طلب مكتمل");
     }
 

@@ -20,8 +20,8 @@ export const LoginPage = () => {
       <div className="bg-white rounded-3xl shadow-2xl p-8 w-full max-w-md animate-fade-in">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-primary-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-4xl">🏪</span>
+          <div className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4 bg-[linear-gradient(135deg,#2563eb_0%,#f97316_100%)] text-white shadow-[0_18px_30px_-22px_rgba(37,99,235,0.6)]">
+            <span className="text-4xl font-black">T</span>
           </div>
           <h1 className="text-3xl font-bold text-primary-600">TajerPro</h1>
           <p className="text-gray-500 mt-2">نظام نقاط البيع</p>

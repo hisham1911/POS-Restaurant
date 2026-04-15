@@ -9,5 +9,6 @@ public class AddCustomItemRequest
     public decimal UnitPrice { get; set; }
     public int Quantity { get; set; } = 1;
     public decimal? TaxRate { get; set; } // null = use tenant default
+    public bool? TaxInclusive { get; set; } // null = preserve legacy tax-exclusive behavior
     public string? Notes { get; set; }
 }

@@ -2083,7 +2083,7 @@ export const POSWorkspacePage = () => {
               name: item.name,
               price: item.unitPrice,
               taxRate: item.taxRate ?? taxRate,
-              taxInclusive: false,
+              taxInclusive: item.taxInclusive ?? false,
               categoryId: 0,
               isActive: true,
               type: ProductType.Service,

@@ -1,16 +1,22 @@
 import { useEffect, useState } from "react";
 import { X, Plus } from "lucide-react";
-import { useAddCustomItemMutation } from "@/api/ordersApi";
 import { toast } from "sonner";
-import { AddCustomItemRequest } from "@/types/order.types";
+import { useAddCustomItemMutation } from "@/api/ordersApi";
 import { Portal } from "@/components/common/Portal";
 import { numberToDisplay, displayToNumber } from "@/hooks/useNumberInput";
 import { useAppSelector } from "@/store/hooks";
-import { selectTaxRate } from "@/store/slices/cartSlice";
+import { selectIsTaxEnabled, selectTaxRate } from "@/store/slices/cartSlice";
+import { AddCustomItemRequest } from "@/types/order.types";
+import { Product, ProductType } from "@/types/product.types";
 import { handleApiError } from "@/utils/errorHandler";
+import {
+  getCartItemSubtotal,
+  getCartItemTaxAmount,
+  getCartItemTotal,
+} from "@/utils/cartPricing";
 
 interface CustomItemModalProps {
-  orderId?: number; // Optional now
+  orderId?: number;
   onClose: () => void;
   onSuccess?: (item: AddCustomItemRequest) => void;
 }
@@ -21,11 +27,13 @@ export const CustomItemModal = ({
   onSuccess,
 }: CustomItemModalProps) => {
   const currentTaxRate = useAppSelector(selectTaxRate);
+  const isTaxEnabled = useAppSelector(selectIsTaxEnabled);
   const [formData, setFormData] = useState<AddCustomItemRequest>({
     name: "",
     unitPrice: 0,
     quantity: 1,
     taxRate: currentTaxRate,
+    taxInclusive: false,
     notes: "",
   });
 
@@ -34,6 +42,39 @@ export const CustomItemModal = ({
   useEffect(() => {
     setFormData((current) => ({ ...current, taxRate: currentTaxRate }));
   }, [currentTaxRate]);
+
+  const previewTaxRate = formData.taxRate ?? currentTaxRate;
+  const previewProduct: Product = {
+    id: 0,
+    name: formData.name || "منتج مخصص",
+    price: formData.unitPrice,
+    taxRate: previewTaxRate,
+    taxInclusive: formData.taxInclusive ?? false,
+    categoryId: 0,
+    isActive: true,
+    type: ProductType.Service,
+    trackInventory: false,
+    createdAt: "",
+  };
+  const previewItem = {
+    product: previewProduct,
+    quantity: formData.quantity || 1,
+  };
+  const previewSubtotal = getCartItemSubtotal(
+    previewItem,
+    currentTaxRate,
+    isTaxEnabled,
+  );
+  const previewTaxAmount = getCartItemTaxAmount(
+    previewItem,
+    currentTaxRate,
+    isTaxEnabled,
+  );
+  const previewTotal = getCartItemTotal(
+    previewItem,
+    currentTaxRate,
+    isTaxEnabled,
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,7 +94,6 @@ export const CustomItemModal = ({
       return;
     }
 
-    // If orderId is provided, add to existing order via API
     if (orderId) {
       try {
         await addCustomItem({
@@ -67,28 +107,27 @@ export const CustomItemModal = ({
       } catch (error) {
         toast.error(handleApiError(error));
       }
-    } else {
-      // Otherwise, just return the data to parent component
-      onSuccess?.(formData);
-      onClose();
+      return;
     }
+
+    onSuccess?.(formData);
+    onClose();
   };
 
   return (
     <Portal>
-      <div 
-        className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50"
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
         onClick={onClose}
       >
-        <div 
-          className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden"
+        <div
+          className="flex max-h-[90vh] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-gray-200 flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center justify-between border-b border-gray-200 p-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
-                <Plus className="w-5 h-5 text-orange-600" />
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100">
+                <Plus className="h-5 w-5 text-orange-600" />
               </div>
               <div>
                 <h2 className="text-xl font-bold text-gray-800">منتج مخصص</h2>
@@ -97,20 +136,18 @@ export const CustomItemModal = ({
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              className="rounded-lg p-2 transition-colors hover:bg-gray-100"
             >
-              <X className="w-5 h-5 text-gray-500" />
+              <X className="h-5 w-5 text-gray-500" />
             </button>
           </div>
 
-          {/* Form - Scrollable */}
           <form
             onSubmit={handleSubmit}
-            className="p-6 space-y-4 overflow-y-auto flex-1"
+            className="flex-1 space-y-4 overflow-y-auto p-6"
           >
-            {/* Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="mb-2 block text-sm font-medium text-gray-700">
                 الاسم *
               </label>
               <input
@@ -119,40 +156,37 @@ export const CustomItemModal = ({
                 onChange={(e) =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
                 placeholder="مثال: رسوم توصيل، خدمة تغليف"
                 required
                 autoFocus
               />
             </div>
 
-            {/* Price & Quantity */}
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="mb-2 block text-sm font-medium text-gray-700">
                   السعر *
                 </label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={numberToDisplay(formData.unitPrice)}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        unitPrice: displayToNumber(e.target.value),
-                      })
-                    }
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                    placeholder="0.00"
-                    required
-                  />
-                </div>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={numberToDisplay(formData.unitPrice)}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      unitPrice: displayToNumber(e.target.value),
+                    })
+                  }
+                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
+                  placeholder="0.00"
+                  required
+                />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="mb-2 block text-sm font-medium text-gray-700">
                   الكمية *
                 </label>
                 <input
@@ -162,19 +196,18 @@ export const CustomItemModal = ({
                   onChange={(e) =>
                     setFormData({
                       ...formData,
-                      quantity: parseInt(e.target.value) || 1,
+                      quantity: parseInt(e.target.value, 10) || 1,
                     })
                   }
-                  className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                  className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
                   placeholder="1"
                   required
                 />
               </div>
             </div>
 
-            {/* Tax Rate */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="mb-2 block text-sm font-medium text-gray-700">
                 نسبة الضريبة (%)
               </label>
               <input
@@ -192,7 +225,7 @@ export const CustomItemModal = ({
                       : nextTaxRate,
                   });
                 }}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
+                className="w-full rounded-xl border border-gray-300 px-4 py-2.5 focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
                 placeholder={currentTaxRate.toString()}
               />
               <p className="mt-1 text-xs text-gray-500">
@@ -200,9 +233,40 @@ export const CustomItemModal = ({
               </p>
             </div>
 
-            {/* Notes */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="mb-2 block text-sm font-medium text-gray-700">
+                السعر شامل الضريبة؟
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-gray-300 px-4 py-3">
+                  <input
+                    type="radio"
+                    name="custom-item-tax-mode"
+                    checked={Boolean(formData.taxInclusive)}
+                    onChange={() =>
+                      setFormData({ ...formData, taxInclusive: true })
+                    }
+                    className="h-4 w-4 text-orange-600"
+                  />
+                  <span className="text-sm text-gray-700">نعم (شامل)</span>
+                </label>
+                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-gray-300 px-4 py-3">
+                  <input
+                    type="radio"
+                    name="custom-item-tax-mode"
+                    checked={!formData.taxInclusive}
+                    onChange={() =>
+                      setFormData({ ...formData, taxInclusive: false })
+                    }
+                    className="h-4 w-4 text-orange-600"
+                  />
+                  <span className="text-sm text-gray-700">لا (تضاف)</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">
                 ملاحظات (اختياري)
               </label>
               <textarea
@@ -210,38 +274,48 @@ export const CustomItemModal = ({
                 onChange={(e) =>
                   setFormData({ ...formData, notes: e.target.value })
                 }
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500 resize-none"
+                className="w-full resize-none rounded-xl border border-gray-300 px-4 py-2.5 focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
                 placeholder="أي ملاحظات إضافية..."
                 rows={2}
               />
             </div>
 
-            {/* Preview */}
-            <div className="p-4 bg-orange-50 rounded-xl border border-orange-200">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">الإجمالي المتوقع:</span>
-                <span className="text-lg font-bold text-orange-600">
-                  {(
-                    formData.unitPrice *
-                    (formData.quantity || 1) *
-                    (1 + (formData.taxRate || 0) / 100)
-                  ).toFixed(2)}{" "}
-                  ج.م
-                </span>
+            <div className="rounded-xl border border-orange-200 bg-orange-50 p-4">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">المجموع الفرعي:</span>
+                  <span className="text-sm font-semibold text-gray-700">
+                    {previewSubtotal.toFixed(2)} ج.م
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-gray-600">
+                    الضريبة ({isTaxEnabled ? previewTaxRate : 0}%):
+                  </span>
+                  <span className="text-sm font-semibold text-gray-700">
+                    {previewTaxAmount.toFixed(2)} ج.م
+                  </span>
+                </div>
+                <div className="flex items-center justify-between border-t border-orange-200 pt-2">
+                  <span className="text-sm text-gray-600">الإجمالي المتوقع:</span>
+                  <span className="text-lg font-bold text-orange-600">
+                    {previewTotal.toFixed(2)} ج.م
+                  </span>
+                </div>
               </div>
-              <p className="text-xs text-gray-500 mt-1">
-                {formData.unitPrice.toFixed(2)} × {formData.quantity || 1} +
-                ضريبة {formData.taxRate || 0}%
+              <p className="mt-2 text-xs text-gray-500">
+                {formData.taxInclusive
+                  ? "السعر المُدخل شامل الضريبة وسيتم استخراج صافي السعر تلقائيًا."
+                  : "السعر المُدخل قبل الضريبة وسيتم إضافة الضريبة عليه."}
               </p>
             </div>
           </form>
 
-          {/* Actions - Fixed at bottom */}
-          <div className="flex gap-3 p-6 border-t border-gray-200 flex-shrink-0">
+          <div className="flex flex-shrink-0 gap-3 border-t border-gray-200 p-6">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium"
+              className="flex-1 rounded-xl border border-gray-300 px-4 py-2.5 font-medium text-gray-700 transition-colors hover:bg-gray-50"
               disabled={orderId ? isLoading : false}
             >
               إلغاء
@@ -249,7 +323,7 @@ export const CustomItemModal = ({
             <button
               type="submit"
               onClick={handleSubmit}
-              className="flex-1 px-4 py-2.5 bg-orange-500 text-white rounded-xl hover:bg-orange-600 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 rounded-xl bg-orange-500 px-4 py-2.5 font-medium text-white transition-colors hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
               disabled={orderId ? isLoading : false}
             >
               {orderId && isLoading ? "جاري الإضافة..." : "إضافة للطلب"}
@@ -260,4 +334,3 @@ export const CustomItemModal = ({
     </Portal>
   );
 };
-

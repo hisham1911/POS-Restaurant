@@ -438,6 +438,9 @@ public class OrderService : IOrderService
         if (tenant?.IsTaxEnabled != true)
             taxRate = 0m;
 
+        var taxInclusive = request.TaxInclusive ?? false;
+        var unitPrice = ResolveNetUnitPrice(request.UnitPrice, taxInclusive, taxRate);
+
         // Create custom order item
         var orderItem = new OrderItem
         {
@@ -455,14 +458,14 @@ public class OrderService : IOrderService
             ProductBarcode = null,
 
             // Price Snapshot
-            UnitPrice = request.UnitPrice,
+            UnitPrice = unitPrice,
             UnitCost = null,
             OriginalPrice = request.UnitPrice,
             Quantity = request.Quantity,
 
             // Tax Snapshot
             TaxRate = taxRate,
-            TaxInclusive = false, // Always Tax Exclusive (Additive)
+            TaxInclusive = taxInclusive,
             Notes = request.Notes
         };
 

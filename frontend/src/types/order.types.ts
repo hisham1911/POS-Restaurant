@@ -163,5 +163,6 @@ export interface AddCustomItemRequest {
   unitPrice: number;
   quantity?: number;
   taxRate?: number;
+  taxInclusive?: boolean;
   notes?: string;
 }

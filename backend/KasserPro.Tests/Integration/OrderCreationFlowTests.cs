@@ -449,6 +449,114 @@ public class OrderCreationFlowTests : IClassFixture<CustomWebApplicationFactory>
         await CleanupOrderAsync(createdOrder.Id);
     }
 
+    [Fact]
+    public async Task AddCustomItem_WithTaxInclusivePrice_ShouldPersistNetUnitPriceAndExpectedTotals()
+    {
+        var (testUserId, testProductId, branch1Id, _) = await SeedTestDataAsync();
+
+        const int tenantId = 1;
+        var token = TestHelpers.GenerateTestToken(
+            userId: testUserId,
+            tenantId: tenantId,
+            branchId: branch1Id,
+            email: "cashier@test.com",
+            name: "Test Cashier",
+            role: "Cashier"
+        );
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var createOrderRequest = new CreateOrderRequest
+        {
+            OrderType = OrderType.DineIn,
+            Items = new List<CreateOrderItemRequest>
+            {
+                new() { ProductId = testProductId, Quantity = 1 }
+            }
+        };
+
+        var createResponse = await client.PostAsJsonAsync("/api/orders", createOrderRequest);
+        createResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var createContent = await createResponse.Content.ReadAsStringAsync();
+        var createApiResponse = JsonSerializer.Deserialize<ApiResponse<OrderDto>>(createContent, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        createApiResponse.Should().NotBeNull();
+        createApiResponse!.Success.Should().BeTrue(because: createApiResponse.Message);
+        createApiResponse.Data.Should().NotBeNull();
+
+        var createdOrder = createApiResponse.Data!;
+
+        var addCustomItemRequest = new AddCustomItemRequest
+        {
+            Name = "Custom Tax Inclusive Item",
+            UnitPrice = 114m,
+            Quantity = 1,
+            TaxRate = 14m,
+            TaxInclusive = true,
+            Notes = "Tax-inclusive regression test"
+        };
+
+        var addCustomResponse = await client.PostAsJsonAsync(
+            $"/api/orders/{createdOrder.Id}/items/custom",
+            addCustomItemRequest);
+
+        addCustomResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var addCustomContent = await addCustomResponse.Content.ReadAsStringAsync();
+        var addCustomApiResponse = JsonSerializer.Deserialize<ApiResponse<OrderDto>>(addCustomContent, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        addCustomApiResponse.Should().NotBeNull();
+        addCustomApiResponse!.Success.Should().BeTrue(because: addCustomApiResponse.Message);
+        addCustomApiResponse.Data.Should().NotBeNull();
+
+        var updatedOrder = addCustomApiResponse.Data!;
+        updatedOrder.Subtotal.Should().Be(200m);
+        updatedOrder.TaxAmount.Should().Be(28m);
+        updatedOrder.Total.Should().Be(228m);
+        updatedOrder.Items.Should().HaveCount(2);
+
+        var customItem = updatedOrder.Items.Single(i => i.IsCustomItem);
+        customItem.CustomName.Should().Be("Custom Tax Inclusive Item");
+        customItem.CustomUnitPrice.Should().Be(114m);
+        customItem.TaxInclusive.Should().BeTrue();
+        customItem.OriginalPrice.Should().Be(114m);
+        customItem.UnitPrice.Should().Be(100m);
+        customItem.Subtotal.Should().Be(100m);
+        customItem.TaxAmount.Should().Be(14m);
+        customItem.Total.Should().Be(114m);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var persistedOrder = await db.Orders
+            .Include(o => o.Items)
+            .SingleAsync(o => o.Id == createdOrder.Id);
+
+        persistedOrder.Subtotal.Should().Be(200m);
+        persistedOrder.TaxAmount.Should().Be(28m);
+        persistedOrder.Total.Should().Be(228m);
+
+        var persistedCustomItem = persistedOrder.Items.Single(i => i.IsCustomItem);
+        persistedCustomItem.CustomName.Should().Be("Custom Tax Inclusive Item");
+        persistedCustomItem.CustomUnitPrice.Should().Be(114m);
+        persistedCustomItem.TaxInclusive.Should().BeTrue();
+        persistedCustomItem.OriginalPrice.Should().Be(114m);
+        persistedCustomItem.UnitPrice.Should().Be(100m);
+        persistedCustomItem.Subtotal.Should().Be(100m);
+        persistedCustomItem.TaxAmount.Should().Be(14m);
+        persistedCustomItem.Total.Should().Be(114m);
+
+        await CleanupOrderAsync(createdOrder.Id);
+    }
+
     /// <summary>
     /// Seeds test data: Tenant, Branches, User, Category, Product
     /// Returns (userId, productId, branch1Id, branch2Id)

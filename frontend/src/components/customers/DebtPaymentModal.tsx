@@ -1,5 +1,12 @@
 import React, { useState } from "react";
-import { X, DollarSign, CreditCard, Building2, Banknote } from "lucide-react";
+import {
+  X,
+  DollarSign,
+  CreditCard,
+  Building2,
+  Banknote,
+  AlertTriangle,
+} from "lucide-react";
 import { usePayDebtMutation } from "../../api/customersApi";
 import { Customer, PayDebtRequest } from "../../types/customer.types";
 import { toast } from "sonner";
@@ -7,6 +14,7 @@ import { Portal } from "@/components/common/Portal";
 import clsx from "clsx";
 import { getApiErrorCode, handleApiError } from "@/utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
+import { useGetCurrentShiftQuery } from "@/api/shiftsApi";
 
 interface DebtPaymentModalProps {
   customer: Customer;
@@ -19,7 +27,18 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
   onClose,
   onSuccess,
 }) => {
+  const noOpenShiftMessage = "يجب فتح وردية أولاً قبل تسجيل سداد الدين";
   const [payDebt, { isLoading }] = usePayDebtMutation();
+  const {
+    data: currentShiftResponse,
+    isLoading: isShiftLoading,
+    isFetching: isShiftFetching,
+  } = useGetCurrentShiftQuery(undefined, {
+    refetchOnMountOrArgChange: true,
+  });
+  const hasOpenShift = Boolean(currentShiftResponse?.data);
+  const isSubmitDisabled =
+    isLoading || isShiftLoading || isShiftFetching || !hasOpenShift;
 
   const [formData, setFormData] = useState<
     Omit<PayDebtRequest, "amount"> & { amount: string | number }
@@ -50,6 +69,11 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!hasOpenShift) {
+      toast.error(noOpenShiftMessage);
+      return;
+    }
 
     if (!validate()) return;
 
@@ -135,6 +159,7 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
 
           {/* Body */}
           <form
+            id="debt-payment-form"
             onSubmit={handleSubmit}
             className="flex-1 overflow-y-auto p-6 space-y-5"
           >
@@ -152,6 +177,25 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
                 </div>
               )}
             </div>
+
+            {isShiftLoading || isShiftFetching ? (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
+                جارٍ التحقق من الوردية المفتوحة قبل تسجيل السداد...
+              </div>
+            ) : !hasOpenShift ? (
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                <div className="flex items-start gap-3 text-red-700">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
+                  <div>
+                    <p className="font-semibold">لا توجد وردية مفتوحة</p>
+                    <p className="mt-1 text-sm text-red-600">
+                      {noOpenShiftMessage} حتى يظهر المبلغ في تقارير النقدية
+                      الخاصة بالوردية.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ) : null}
 
             {/* Amount */}
             <div>
@@ -316,14 +360,22 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
             </button>
             <button
               type="submit"
-              onClick={handleSubmit}
+              form="debt-payment-form"
               className="flex-1 px-6 py-3 bg-orange-600 text-white font-semibold rounded-xl hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-lg shadow-orange-600/30"
-              disabled={isLoading}
+              disabled={isSubmitDisabled}
             >
               {isLoading ? (
                 <span className="flex items-center justify-center gap-2">
                   <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   جاري التسديد...
+                </span>
+              ) : isShiftLoading || isShiftFetching ? (
+                <span className="flex items-center justify-center gap-2">
+                  جارٍ التحقق من الوردية...
+                </span>
+              ) : !hasOpenShift ? (
+                <span className="flex items-center justify-center gap-2">
+                  افتح وردية أولاً
                 </span>
               ) : (
                 <span className="flex items-center justify-center gap-2">

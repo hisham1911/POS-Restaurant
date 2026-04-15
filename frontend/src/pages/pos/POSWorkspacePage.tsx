@@ -11,6 +11,7 @@ import { useProducts, useCategories } from "@/hooks/useProducts";
 import { useCart } from "@/hooks/useCart";
 import { useShift } from "@/hooks/useShift";
 import { useOrders } from "@/hooks/useOrders";
+import { usePreparedPaymentOrder } from "@/hooks/usePreparedPaymentOrder";
 import { usePOSShortcuts } from "@/hooks/usePOSShortcuts";
 import { useGetShiftWarningsQuery } from "@/api/shiftsApi";
 import { useGetBranchInventoryQuery } from "@/api/inventoryApi";
@@ -218,7 +219,8 @@ export const POSWorkspacePage = () => {
     isLoading: isLoadingShift,
     currentShift,
   } = useShift();
-  const { createOrder, completeOrder, isCreating, isCompleting } = useOrders();
+  const { createOrder, completeOrder, cancelOrder, isCreating, isCompleting } =
+    useOrders();
   const currentBranch = useAppSelector(selectCurrentBranch);
   const allowNegativeStock = useAppSelector(selectAllowNegativeStock);
   const { hasPermission } = usePermission();
@@ -239,6 +241,17 @@ export const POSWorkspacePage = () => {
     searchCustomer,
     { data: searchResult, isFetching: isSearchingCustomer },
   ] = useLazyGetCustomerByPhoneQuery();
+  const {
+    preparedOrder,
+    isPreparingOrder,
+    markPreparedOrderCompleted,
+  } = usePreparedPaymentOrder({
+    enabled: activeTab === "payment" && items.length > 0,
+    customerId: selectedCustomer?.id,
+    createOrder,
+    cancelOrder,
+    onPrepareFailed: () => setActiveTab("cart"),
+  });
 
   const { data: warningsData } = useGetShiftWarningsQuery(undefined, {
     pollingInterval: 10 * 60 * 1000,
@@ -246,6 +259,7 @@ export const POSWorkspacePage = () => {
   });
 
   const shiftWarning = warningsData?.data;
+  const paymentTotal = preparedOrder?.total ?? total;
 
   const openPaymentWorkspace = useCallback(() => {
     if (items.length === 0) {
@@ -253,8 +267,7 @@ export const POSWorkspacePage = () => {
     }
 
     setActiveTab("payment");
-    setAmountPaid(total.toFixed(2));
-  }, [items.length, total]);
+  }, [items.length]);
 
   usePOSShortcuts({
     onCheckout: openPaymentWorkspace,
@@ -266,10 +279,10 @@ export const POSWorkspacePage = () => {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "payment") {
-      setAmountPaid(total.toFixed(2));
+    if (preparedOrder) {
+      setAmountPaid(preparedOrder.total.toFixed(2));
     }
-  }, [activeTab, total]);
+  }, [preparedOrder]);
 
   useEffect(() => {
     if (activeTab === "customer" && !selectedCustomer) {
@@ -423,10 +436,6 @@ export const POSWorkspacePage = () => {
       return;
     }
 
-    if (tab === "payment") {
-      setAmountPaid(total.toFixed(2));
-    }
-
     setActiveTab(tab);
   };
 
@@ -453,10 +462,6 @@ export const POSWorkspacePage = () => {
       return;
     }
 
-    if (tab === "payment") {
-      setAmountPaid(total.toFixed(2));
-    }
-
     setActiveTab(tab);
   };
 
@@ -470,23 +475,27 @@ export const POSWorkspacePage = () => {
   };
 
   const handleCompletePayment = async () => {
-    const numericAmount = parseFloat(amountPaid) || 0;
-    const amountDue = total - numericAmount;
+    if (!preparedOrder) {
+      return;
+    }
 
-    if (numericAmount < total && !allowPartialPayment) {
+    const numericAmount = parseFloat(amountPaid) || 0;
+    const amountDue = paymentTotal - numericAmount;
+
+    if (numericAmount < paymentTotal && !allowPartialPayment) {
       setShowPaymentError(true);
       setTimeout(() => setShowPaymentError(false), 500);
       toast.error("المبلغ المدفوع أقل من الإجمالي");
       return;
     }
 
-    if (numericAmount < total && !selectedCustomer) {
+    if (numericAmount < paymentTotal && !selectedCustomer) {
       toast.error("البيع الآجل يتطلب ربط عميل بالطلب");
       return;
     }
 
     if (
-      numericAmount < total &&
+      numericAmount < paymentTotal &&
       selectedCustomer &&
       !selectedCustomer.isActive
     ) {
@@ -499,7 +508,7 @@ export const POSWorkspacePage = () => {
         selectedCustomer.creditLimit - selectedCustomer.totalDue;
       const creditLimitExceeded = amountDue > availableCredit;
 
-      if (numericAmount < total && creditLimitExceeded) {
+      if (numericAmount < paymentTotal && creditLimitExceeded) {
         toast.error(
           `تجاوز حد الائتمان. المتاح: ${formatCurrency(availableCredit)} ج.م، المطلوب: ${formatCurrency(amountDue)} ج.م`,
           { duration: 5000 },
@@ -509,15 +518,12 @@ export const POSWorkspacePage = () => {
     }
 
     try {
-      const order = await createOrder(selectedCustomer?.id);
-      if (!order) return;
-
-      const completedOrder = await completeOrder(order.id, {
+      const completedOrder = await completeOrder(preparedOrder.id, {
         payments: [{ method: selectedPaymentMethod, amount: numericAmount }],
       });
 
-        if (completedOrder) {
-          const changeAmount = numericAmount - total;
+      if (completedOrder) {
+        const changeAmount = numericAmount - paymentTotal;
 
         if (changeAmount > 0) {
           toast.success(`تم إتمام الدفع! الباقي: ${formatCurrency(changeAmount)}`);
@@ -529,12 +535,13 @@ export const POSWorkspacePage = () => {
           toast.success("تم إتمام الدفع بنجاح!");
         }
 
+        markPreparedOrderCompleted(preparedOrder.id);
         setSelectedCustomer(null);
-          setCustomerPhone("");
-          setAmountPaid("");
-          setAllowPartialPayment(false);
-          setActiveTab("cart");
-        }
+        setCustomerPhone("");
+        setAmountPaid("");
+        setAllowPartialPayment(false);
+        setActiveTab("cart");
+      }
     } catch {
       toast.error("حدث خطأ غير متوقع");
     }
@@ -618,8 +625,8 @@ export const POSWorkspacePage = () => {
   }
 
   const numericAmount = parseFloat(amountPaid) || 0;
-  const change = numericAmount - total;
-  const amountDue = total - numericAmount;
+  const change = numericAmount - paymentTotal;
+  const amountDue = paymentTotal - numericAmount;
   const availableCredit = selectedCustomer
     ? selectedCustomer.creditLimit - selectedCustomer.totalDue
     : 0;
@@ -1037,7 +1044,24 @@ export const POSWorkspacePage = () => {
       </div>
     );
   };
-  const renderPaymentTab = () => (
+  const renderPaymentTab = () => {
+    if (isPreparingOrder || !preparedOrder) {
+      return (
+        <SurfaceCard className="flex min-h-[260px] flex-col items-center justify-center gap-4 text-center">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary-100 border-t-primary-600" />
+          <div>
+            <p className="text-lg font-black text-slate-900">
+              جارٍ تأكيد إجمالي الطلب
+            </p>
+            <p className="mt-1 text-sm text-slate-500">
+              يتم إنشاء الطلب ومزامنة الإجمالي من الباك-إند قبل الدفع.
+            </p>
+          </div>
+        </SurfaceCard>
+      );
+    }
+
+    return (
     <div className="space-y-4">
       <div>
         <h3 className="text-lg font-black text-slate-900">الدفع</h3>
@@ -1053,13 +1077,13 @@ export const POSWorkspacePage = () => {
               المبلغ المطلوب
             </p>
             <p className="mt-1 text-2xl font-black text-primary-700">
-              {formatCurrency(total)}
+              {formatCurrency(paymentTotal)}
             </p>
           </div>
 
           <button
             type="button"
-            onClick={() => setAmountPaid(total.toFixed(2))}
+            onClick={() => setAmountPaid(paymentTotal.toFixed(2))}
             className="inline-flex min-h-[38px] items-center justify-center rounded-full bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 transition-colors hover:bg-primary-100"
           >
             دفع كامل
@@ -1138,7 +1162,7 @@ export const POSWorkspacePage = () => {
         </SurfaceCard>
       )}
 
-      {numericAmount < total && numericAmount > 0 && (
+      {numericAmount < paymentTotal && numericAmount > 0 && (
         <SurfaceCard
           className={clsx(
             creditLimitExceeded
@@ -1190,7 +1214,8 @@ export const POSWorkspacePage = () => {
           </div>
         )}
     </div>
-  );
+    );
+  };
 
   const renderSummaryTab = () => (
     <SurfaceCard className="space-y-3">
@@ -1209,7 +1234,7 @@ export const POSWorkspacePage = () => {
             الإجمالي
           </p>
           <p className="mt-1 text-lg font-black text-primary-700">
-            {formatCurrency(total)}
+            {formatCurrency(activeTab === "payment" ? paymentTotal : total)}
           </p>
         </div>
       </div>
@@ -1293,7 +1318,7 @@ export const POSWorkspacePage = () => {
             الإجمالي
           </p>
           <p className="mt-1 text-lg font-black text-primary-700">
-            {formatCurrency(total)}
+            {formatCurrency(activeTab === "payment" ? paymentTotal : total)}
           </p>
         </div>
         <div className="text-end text-xs text-slate-500">
@@ -1314,20 +1339,22 @@ export const POSWorkspacePage = () => {
           size="xl"
           className="w-full rounded-[1.5rem]"
           onClick={handleCompletePayment}
-          isLoading={isCreating || isCompleting}
+          isLoading={isPreparingOrder || isCreating || isCompleting}
           disabled={
+            isPreparingOrder ||
             isCreating ||
             isCompleting ||
-            (numericAmount < total && !allowPartialPayment) ||
-            (numericAmount < total && creditLimitExceeded)
+            !preparedOrder ||
+            (numericAmount < paymentTotal && !allowPartialPayment) ||
+            (numericAmount < paymentTotal && creditLimitExceeded)
           }
           rightIcon={<Check className="h-5 w-5" />}
         >
-          {isCreating
+          {isPreparingOrder ? "جارٍ تأكيد الإجمالي..." : isCreating
             ? "جاري إنشاء الطلب..."
             : isCompleting
               ? "جاري الدفع..."
-              : numericAmount < total && allowPartialPayment
+              : numericAmount < paymentTotal && allowPartialPayment
                 ? `إتمام البيع الآجل (مستحق: ${formatCurrency(amountDue)})`
                 : "إتمام الدفع"}
         </Button>
@@ -1651,7 +1678,9 @@ export const POSWorkspacePage = () => {
                 )}
                 <span className="inline-flex items-center gap-1 rounded-full bg-success-50 px-2.5 py-1 text-[11px] font-semibold text-success-700">
                   <Wallet className="h-3 w-3" />
-                  {itemsCount > 0 ? formatCurrency(total) : "جاهز للبيع"}
+                  {itemsCount > 0
+                    ? formatCurrency(activeTab === "payment" ? paymentTotal : total)
+                    : "جاهز للبيع"}
                 </span>
               </div>
             </div>
@@ -1814,7 +1843,7 @@ export const POSWorkspacePage = () => {
                     </span>
                     <span className="inline-flex items-center gap-1 rounded-lg bg-success-50 px-3 py-1.5 text-xs font-semibold text-success-700">
                       <Wallet className="h-3.5 w-3.5" />
-                      {formatCurrency(total)}
+                      {formatCurrency(activeTab === "payment" ? paymentTotal : total)}
                     </span>
                   </div>
                 </div>
@@ -1947,7 +1976,7 @@ export const POSWorkspacePage = () => {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
                     الإجمالي
                   </p>
-                  <p className="mt-1 text-lg font-black text-primary-700">{formatCurrency(total)}</p>
+                  <p className="mt-1 text-lg font-black text-primary-700">{formatCurrency(activeTab === "payment" ? paymentTotal : total)}</p>
                 </div>
               </div>
             </div>
@@ -1977,7 +2006,7 @@ export const POSWorkspacePage = () => {
                     الإجمالي
                   </p>
                   <p className="mt-1 text-lg font-black text-primary-700">
-                    {formatCurrency(total)}
+                    {formatCurrency(activeTab === "payment" ? paymentTotal : total)}
                   </p>
                 </div>
                 <div className="text-end text-xs text-slate-500">
@@ -1998,20 +2027,22 @@ export const POSWorkspacePage = () => {
                   size="xl"
                   className="w-full rounded-[1.5rem]"
                   onClick={handleCompletePayment}
-                  isLoading={isCreating || isCompleting}
+                  isLoading={isPreparingOrder || isCreating || isCompleting}
                   disabled={
+                    isPreparingOrder ||
                     isCreating ||
                     isCompleting ||
-                    (numericAmount < total && !allowPartialPayment) ||
-                    (numericAmount < total && creditLimitExceeded)
+                    !preparedOrder ||
+                    (numericAmount < paymentTotal && !allowPartialPayment) ||
+                    (numericAmount < paymentTotal && creditLimitExceeded)
                   }
                   rightIcon={<Check className="h-5 w-5" />}
                 >
-                  {isCreating
+                  {isPreparingOrder ? "جارٍ تأكيد الإجمالي..." : isCreating
                     ? "جاري إنشاء الطلب..."
                     : isCompleting
                       ? "جاري الدفع..."
-                      : numericAmount < total && allowPartialPayment
+                      : numericAmount < paymentTotal && allowPartialPayment
                         ? `إتمام البيع الآجل (مستحق: ${formatCurrency(amountDue)})`
                         : "إتمام الدفع"}
                 </Button>

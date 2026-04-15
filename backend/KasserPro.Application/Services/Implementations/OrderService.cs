@@ -112,7 +112,7 @@ public class OrderService : IOrderService
             // Tax Rate from Tenant (dynamic)
             TaxRate = tenantTaxRate,
             // Order-level discount
-            DiscountType = request.DiscountType?.ToLower(),
+            DiscountType = NormalizeDiscountType(request.DiscountType),
             DiscountValue = request.DiscountValue
         };
 
@@ -160,6 +160,8 @@ public class OrderService : IOrderService
             if (!tenant.IsTaxEnabled)
                 taxRate = 0m;
 
+            var unitPrice = ResolveNetUnitPrice(product.Price, product.TaxInclusive, taxRate);
+
             var orderItem = new OrderItem
             {
                 ProductId = product.Id,
@@ -169,13 +171,16 @@ public class OrderService : IOrderService
                 ProductSku = product.Sku,
                 ProductBarcode = product.Barcode,
                 // Price Snapshot - UnitPrice is NET (excluding tax)
-                UnitPrice = product.Price,
+                UnitPrice = unitPrice,
                 UnitCost = product.Cost,
                 OriginalPrice = product.Price,
                 Quantity = item.Quantity,
+                DiscountType = NormalizeDiscountType(item.DiscountType),
+                DiscountValue = item.DiscountValue,
+                DiscountReason = item.DiscountReason,
                 // Tax Snapshot - Dynamic from Product or Tenant
                 TaxRate = taxRate,
-                TaxInclusive = false, // Always Tax Exclusive (Additive)
+                TaxInclusive = product.TaxInclusive,
                 Notes = item.Notes
             };
 
@@ -364,6 +369,8 @@ public class OrderService : IOrderService
         if (tenant?.IsTaxEnabled != true)
             taxRate = 0m;
 
+        var unitPrice = ResolveNetUnitPrice(product.Price, product.TaxInclusive, taxRate);
+
         var orderItem = new OrderItem
         {
             ProductId = product.Id,
@@ -373,13 +380,16 @@ public class OrderService : IOrderService
             ProductSku = product.Sku,
             ProductBarcode = product.Barcode,
             // Price Snapshot
-            UnitPrice = product.Price,
+            UnitPrice = unitPrice,
             UnitCost = product.Cost,
             OriginalPrice = product.Price,
             Quantity = request.Quantity,
+            DiscountType = NormalizeDiscountType(request.DiscountType),
+            DiscountValue = request.DiscountValue,
+            DiscountReason = request.DiscountReason,
             // Tax Snapshot - Dynamic from Product or Tenant
             TaxRate = taxRate,
-            TaxInclusive = false, // Always Tax Exclusive (Additive)
+            TaxInclusive = product.TaxInclusive,
             Notes = request.Notes
         };
 
@@ -1193,19 +1203,26 @@ public class OrderService : IOrderService
     /// </summary>
     private static void CalculateItemTotals(OrderItem item)
     {
-        // Subtotal = Net price * Quantity (before tax, before discount)
-        item.Subtotal = Math.Round(item.UnitPrice * item.Quantity, 2);
+        var grossSubtotal = Math.Round(item.UnitPrice * item.Quantity, 2);
+        item.Subtotal = grossSubtotal;
+        item.DiscountType = NormalizeDiscountType(item.DiscountType);
 
         // Apply discount if any
         if (item.DiscountType == "percentage" && item.DiscountValue.HasValue)
-            item.DiscountAmount = Math.Round(item.Subtotal * (item.DiscountValue.Value / 100m), 2);
+        {
+            var percentageDiscount = Math.Clamp(item.DiscountValue.Value, 0m, 100m);
+            item.DiscountAmount = Math.Round(grossSubtotal * (percentageDiscount / 100m), 2);
+        }
         else if (item.DiscountType == "fixed" && item.DiscountValue.HasValue)
-            item.DiscountAmount = Math.Round(item.DiscountValue.Value, 2);
+        {
+            var fixedDiscount = Math.Clamp(item.DiscountValue.Value, 0m, grossSubtotal);
+            item.DiscountAmount = Math.Round(fixedDiscount, 2);
+        }
         else
             item.DiscountAmount = 0;
 
         // Net amount after discount
-        var netAfterDiscount = Math.Round(item.Subtotal - item.DiscountAmount, 2);
+        var netAfterDiscount = Math.Round(grossSubtotal - item.DiscountAmount, 2);
 
         // Tax Exclusive (Additive): Calculate tax and add on top
         // TaxAmount = NetAmount * (TaxRate / 100)
@@ -1217,32 +1234,43 @@ public class OrderService : IOrderService
 
     private static void CalculateOrderTotals(Order order)
     {
-        // Subtotal = Sum of all item subtotals (net amounts before item-level tax)
+        // Subtotal = Sum of gross item subtotals before discounts
         order.Subtotal = Math.Round(order.Items.Sum(i => i.Subtotal), 2);
+        order.DiscountType = NormalizeDiscountType(order.DiscountType);
 
-        // Apply order-level discount (on subtotal, before tax)
+        var itemDiscountsTotal = Math.Round(order.Items.Sum(i => i.DiscountAmount), 2);
+        var netAfterItemDiscounts = Math.Round(order.Subtotal - itemDiscountsTotal, 2);
+
+        // Apply order-level discount after item-level discounts
         if (order.DiscountType == "percentage" && order.DiscountValue.HasValue)
-            order.DiscountAmount = Math.Round(order.Subtotal * (order.DiscountValue.Value / 100m), 2);
+        {
+            var percentageDiscount = Math.Clamp(order.DiscountValue.Value, 0m, 100m);
+            order.DiscountAmount = Math.Round(netAfterItemDiscounts * (percentageDiscount / 100m), 2);
+        }
         else if (order.DiscountType == "fixed" && order.DiscountValue.HasValue)
-            order.DiscountAmount = Math.Round(order.DiscountValue.Value, 2);
+        {
+            var fixedDiscount = Math.Clamp(order.DiscountValue.Value, 0m, netAfterItemDiscounts);
+            order.DiscountAmount = Math.Round(fixedDiscount, 2);
+        }
         else
             order.DiscountAmount = 0;
 
-        if (order.DiscountAmount > order.Subtotal)
-            order.DiscountAmount = order.Subtotal;
+        if (order.DiscountAmount > netAfterItemDiscounts)
+            order.DiscountAmount = netAfterItemDiscounts;
 
-        var afterDiscount = order.Subtotal - order.DiscountAmount;
+        var afterDiscount = netAfterItemDiscounts - order.DiscountAmount;
 
         // P0-4: Tax = SUM of per-item taxes (respects product-specific tax rates).
         // If there's an order-level discount, scale item taxes proportionally.
-        if (order.DiscountAmount > 0 && order.Subtotal > 0)
+        if (order.DiscountAmount > 0 && netAfterItemDiscounts > 0)
         {
             // Each item's tax is reduced proportionally by the discount ratio.
-            // Example: 10% order discount → each item's taxable amount is 90% of its subtotal.
-            var discountRatio = order.DiscountAmount / order.Subtotal;
+            // Example: 10% order discount → each item's taxable amount is 90% of its net after item discount.
+            var discountRatio = order.DiscountAmount / netAfterItemDiscounts;
             order.TaxAmount = Math.Round(order.Items.Sum(item =>
             {
-                var itemAfterDiscount = item.Subtotal * (1m - discountRatio);
+                var itemNetAfterItemDiscount = item.Subtotal - item.DiscountAmount;
+                var itemAfterDiscount = itemNetAfterItemDiscount * (1m - discountRatio);
                 return itemAfterDiscount * (item.TaxRate / 100m);
             }), 2);
         }
@@ -1258,6 +1286,28 @@ public class OrderService : IOrderService
         // Total = (Subtotal - Discount) + Tax + Service Charge
         order.Total = Math.Round(afterDiscount + order.TaxAmount + order.ServiceChargeAmount, 2);
         order.AmountDue = Math.Round(order.Total - order.AmountPaid, 2);
+    }
+
+    private static string? NormalizeDiscountType(string? discountType)
+    {
+        if (string.IsNullOrWhiteSpace(discountType))
+            return null;
+
+        var normalized = discountType.Trim().ToLowerInvariant();
+        return normalized switch
+        {
+            "percentage" => "percentage",
+            "fixed" => "fixed",
+            _ => normalized
+        };
+    }
+
+    private static decimal ResolveNetUnitPrice(decimal configuredPrice, bool taxInclusive, decimal taxRate)
+    {
+        if (taxInclusive && taxRate > 0)
+            return Math.Round(configuredPrice / (1m + (taxRate / 100m)), 4);
+
+        return configuredPrice;
     }
 
     private static string GenerateOrderNumber()

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   X,
   Check,
@@ -10,8 +10,8 @@ import {
   Star,
   AlertCircle,
 } from "lucide-react";
-import { useCart } from "@/hooks/useCart";
 import { useOrders } from "@/hooks/useOrders";
+import { usePreparedPaymentOrder } from "@/hooks/usePreparedPaymentOrder";
 import { formatCurrency } from "@/utils/formatters";
 import { PaymentMethod } from "@/types/order.types";
 import { Customer } from "@/types/customer.types";
@@ -41,18 +41,38 @@ export const PaymentModal = ({
   selectedCustomer,
   onOrderComplete,
 }: PaymentModalProps) => {
-  const { total, clearCart } = useCart();
-  const { createOrder, completeOrder, isCreating, isCompleting } = useOrders();
+  const { createOrder, completeOrder, cancelOrder, isCreating, isCompleting } =
+    useOrders();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("Cash");
-  const [amountPaid, setAmountPaid] = useState<string>(total.toFixed(2));
+  const [amountPaid, setAmountPaid] = useState<string>("");
   const [showError, setShowError] = useState(false);
   const [allowPartialPayment, setAllowPartialPayment] = useState(false);
 
   const customerId = selectedCustomer?.id;
+  const { preparedOrder, isPreparingOrder, markPreparedOrderCompleted, discardPreparedOrder } =
+    usePreparedPaymentOrder({
+      enabled: true,
+      customerId,
+      createOrder,
+      cancelOrder,
+      onPrepareFailed: onClose,
+    });
+  const total = preparedOrder?.total ?? 0;
+
+  useEffect(() => {
+    if (preparedOrder) {
+      setAmountPaid(preparedOrder.total.toFixed(2));
+    }
+  }, [preparedOrder]);
 
   const numericAmount = parseFloat(amountPaid) || 0;
   const change = numericAmount - total;
   const amountDue = total - numericAmount;
+
+  const handleClose = async () => {
+    await discardPreparedOrder();
+    onClose();
+  };
 
   // Calculate available credit for customer
   const availableCredit = selectedCustomer
@@ -90,6 +110,10 @@ export const PaymentModal = ({
   };
 
   const handleComplete = async () => {
+    if (!preparedOrder) {
+      return;
+    }
+
     // Validate payment amount
     if (numericAmount < total && !allowPartialPayment) {
       setShowError(true);
@@ -121,14 +145,14 @@ export const PaymentModal = ({
 
     try {
       // 1. إنشاء الطلب أولاً (مع العميل إن وجد)
-      const order = await createOrder(customerId);
+      const order = preparedOrder;
       if (!order) {
         // فشل إنشاء الطلب - لا نغلق النافذة، السلة محفوظة
         return;
       }
 
       // 2. إكمال الطلب بالدفع
-      const completedOrder = await completeOrder(order.id, {
+      const completedOrder = await completeOrder(preparedOrder.id, {
         payments: [
           {
             method: selectedMethod,
@@ -149,6 +173,7 @@ export const PaymentModal = ({
           toast.success("تم إتمام الدفع بنجاح!");
         }
         // مسح العميل المحدد
+        markPreparedOrderCompleted(preparedOrder.id);
         onOrderComplete?.();
         onClose();
       }
@@ -161,6 +186,38 @@ export const PaymentModal = ({
 
   const quickAmounts = [50, 100, 200, 500];
 
+  if (isPreparingOrder || !preparedOrder) {
+    return (
+      <Portal>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+          <div className="flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b p-6">
+              <h2 className="text-xl font-bold">الدفع</h2>
+              <button
+                onClick={handleClose}
+                className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 transition-colors hover:bg-danger-50 hover:text-danger-500"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 p-6 text-center">
+              <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary-100 border-t-primary-600" />
+              <div>
+                <p className="text-lg font-bold text-slate-900">
+                  جارٍ تأكيد إجمالي الطلب
+                </p>
+                <p className="mt-1 text-sm text-slate-500">
+                  يتم الآن إنشاء الطلب ومزامنة الإجمالي من الباك-إند قبل الدفع.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Portal>
+    );
+  }
+
   return (
     <Portal>
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
@@ -169,7 +226,7 @@ export const PaymentModal = ({
           <div className="flex items-center justify-between p-6 border-b shrink-0">
             <h2 className="text-xl font-bold">الدفع</h2>
             <button
-              onClick={onClose}
+              onClick={handleClose}
               className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center hover:bg-danger-50 hover:text-danger-500 transition-colors"
             >
               <X className="w-5 h-5" />

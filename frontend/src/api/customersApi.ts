@@ -143,6 +143,7 @@ export const customersApi = baseApi.injectEndpoints({
         url: `/customers/${customerId}/pay-debt`,
         method: "POST",
         body: data,
+        headers: { "X-Idempotency-Key": crypto.randomUUID() },
       }),
       invalidatesTags: (_result, _error, { customerId }) => [
         { type: "Customers", id: customerId },

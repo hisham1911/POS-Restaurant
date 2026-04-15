@@ -5,7 +5,17 @@ import { Button } from "@/components/common/Button";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { Portal } from "@/components/common/Portal";
-import { CartItem, ItemDiscount } from "@/store/slices/cartSlice";
+import {
+  CartItem,
+  ItemDiscount,
+  selectIsTaxEnabled,
+  selectTaxRate,
+} from "@/store/slices/cartSlice";
+import { useAppSelector } from "@/store/hooks";
+import {
+  getCartItemSubtotal,
+  getProductNetUnitPrice,
+} from "@/utils/cartPricing";
 
 interface ItemDiscountModalProps {
   item: CartItem;
@@ -20,7 +30,10 @@ export const ItemDiscountModal = ({
   onRemove,
   onClose,
 }: ItemDiscountModalProps) => {
-  const itemTotal = item.product.price * item.quantity;
+  const taxRate = useAppSelector(selectTaxRate);
+  const isTaxEnabled = useAppSelector(selectIsTaxEnabled);
+  const unitPrice = getProductNetUnitPrice(item.product, taxRate, isTaxEnabled);
+  const itemTotal = getCartItemSubtotal(item, taxRate, isTaxEnabled);
   const currentDiscount = item.discount;
 
   const [discountType, setDiscountType] = useState<"percentage" | "fixed">(
@@ -112,7 +125,7 @@ export const ItemDiscountModal = ({
             <div className="text-center p-4 bg-gray-50 rounded-xl">
               <p className="text-gray-500 text-sm mb-1">
                 سعر المنتج ({item.quantity} ×{" "}
-                {formatCurrency(item.product.price)})
+                {formatCurrency(unitPrice)})
               </p>
               <p className="text-2xl font-bold text-gray-800">
                 {formatCurrency(itemTotal)}

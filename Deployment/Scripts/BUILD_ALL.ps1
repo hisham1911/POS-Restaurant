@@ -94,7 +94,7 @@ if (-not $SkipBackend) {
             -p:PublishSingleFile=true -p:PublishReadyToRun=false
     }
 
-    $iconPath = Join-Path $DeploymentRoot 'Icons\kasserpro.ico'
+    $iconPath = Join-Path $DeploymentRoot 'Icons\tajerpro.ico'
     Copy-Item $iconPath 'C:\temp\kasserpro-src\' -Force
     Write-Host ".NET 8 x64 published" -ForegroundColor Green
     Write-Host ""
@@ -119,7 +119,7 @@ if (-not $SkipBackend) {
             -p:PublishSingleFile=true -p:PublishReadyToRun=false
     }
 
-    $iconPath = Join-Path $DeploymentRoot 'Icons\kasserpro.ico'
+    $iconPath = Join-Path $DeploymentRoot 'Icons\tajerpro.ico'
     Copy-Item $iconPath 'C:\temp\kasserpro-src-x86\' -Force
     Write-Host ".NET 8 x86 published" -ForegroundColor Green
     Write-Host ""
@@ -142,7 +142,7 @@ if (-not $SkipBackend) {
             -p:PublishSingleFile=true -p:PublishReadyToRun=false -p:LangVersion=11.0
     }
 
-    $iconPath = Join-Path $DeploymentRoot 'Icons\kasserpro.ico'
+    $iconPath = Join-Path $DeploymentRoot 'Icons\tajerpro.ico'
     Copy-Item $iconPath 'C:\temp\kasserpro-src-win7-x64\' -Force
     Write-Host ".NET 6 x64 published" -ForegroundColor Green
     Write-Host ""
@@ -165,7 +165,7 @@ if (-not $SkipBackend) {
             -p:PublishSingleFile=true -p:PublishReadyToRun=false -p:LangVersion=11.0
     }
 
-    $iconPath = Join-Path $DeploymentRoot 'Icons\kasserpro.ico'
+    $iconPath = Join-Path $DeploymentRoot 'Icons\tajerpro.ico'
     Copy-Item $iconPath 'C:\temp\kasserpro-src-win7-x86\' -Force
     Write-Host ".NET 6 x86 published" -ForegroundColor Green
     Write-Host ""

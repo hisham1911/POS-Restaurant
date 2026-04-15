@@ -3,6 +3,11 @@ import { Plus, Minus, Trash2, Tag } from "lucide-react";
 import { CartItem } from "@/store/slices/cartSlice";
 import { useCart } from "@/hooks/useCart";
 import { formatCurrency } from "@/utils/formatters";
+import {
+  getCartItemDiscountAmount,
+  getCartItemSubtotal,
+  getProductNetUnitPrice,
+} from "@/utils/cartPricing";
 import { ItemDiscountModal } from "./ItemDiscountModal";
 
 interface CartItemProps {
@@ -10,19 +15,20 @@ interface CartItemProps {
 }
 
 export const CartItemComponent = ({ item }: CartItemProps) => {
-  const { updateQuantity, removeItem, applyItemDiscount, removeItemDiscount } =
-    useCart();
+  const {
+    updateQuantity,
+    removeItem,
+    applyItemDiscount,
+    removeItemDiscount,
+    taxRate,
+    isTaxEnabled,
+  } = useCart();
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const { product, quantity, discount } = item;
-  const total = product.price * quantity;
-
-  let discountAmount = 0;
-  if (discount) {
-    discountAmount =
-      discount.type === "percentage"
-        ? total * (discount.value / 100)
-        : Math.min(discount.value, total);
-  }
+  const unitPrice = getProductNetUnitPrice(product, taxRate, isTaxEnabled);
+  const subtotal = getCartItemSubtotal(item, taxRate, isTaxEnabled);
+  const discountAmount = getCartItemDiscountAmount(item, taxRate, isTaxEnabled);
+  const total = subtotal - discountAmount;
 
   return (
     <>
@@ -38,7 +44,7 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
             {product.name}
           </h4>
           <p className="text-xs font-medium text-gray-500">
-            {formatCurrency(product.price)} × {quantity}
+            {formatCurrency(unitPrice)} × {quantity}
           </p>
 
           {/* Item Discount Badge - with success color */}
@@ -101,10 +107,10 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
             {discountAmount > 0 ? (
               <>
                 <p className="text-xs text-gray-400 line-through">
-                  {formatCurrency(total)}
+                  {formatCurrency(subtotal)}
                 </p>
                 <p className="text-base font-bold text-green-600">
-                  {formatCurrency(total - discountAmount)}
+                  {formatCurrency(total)}
                 </p>
               </>
             ) : (

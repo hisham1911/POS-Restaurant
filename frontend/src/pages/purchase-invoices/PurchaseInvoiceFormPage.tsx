@@ -6,6 +6,7 @@ import {
   useUpdatePurchaseInvoiceMutation,
   useGetPurchaseInvoiceByIdQuery,
 } from "../../api/purchaseInvoiceApi";
+import { useGetCurrentTenantQuery } from "../../api/branchesApi";
 import { useGetSuppliersQuery } from "../../api/suppliersApi";
 import { useGetProductsQuery } from "../../api/productsApi";
 import { Button } from "../../components/common/Button";
@@ -23,6 +24,8 @@ interface InvoiceItem extends CreatePurchaseInvoiceItemRequest {
   productName?: string;
   productType?: number; // ProductType enum
 }
+
+const roundCurrency = (value: number) => Number(value.toFixed(2));
 
 export function PurchaseInvoiceFormPage() {
   const navigate = useNavigate();
@@ -44,6 +47,7 @@ export function PurchaseInvoiceFormPage() {
 
   const { data: suppliersResponse } = useGetSuppliersQuery();
   const { data: productsResponse } = useGetProductsQuery();
+  const { data: tenantResponse } = useGetCurrentTenantQuery();
   const { data: invoiceResponse, isLoading: isLoadingInvoice } =
     useGetPurchaseInvoiceByIdQuery(Number(id), { skip: !isEditMode });
 
@@ -55,6 +59,7 @@ export function PurchaseInvoiceFormPage() {
   const suppliers = suppliersResponse?.data || [];
   const products = productsResponse?.data || [];
   const invoice = invoiceResponse?.data;
+  const purchaseTaxRate = tenantResponse?.data?.taxRate ?? 14;
 
   // Load invoice data in edit mode
   useEffect(() => {
@@ -128,11 +133,22 @@ export function PurchaseInvoiceFormPage() {
   };
 
   const calculateSubtotal = () => {
-    return items.reduce(
-      (sum, item) => sum + item.quantity * item.purchasePrice,
-      0,
+    return roundCurrency(
+      items.reduce((sum, item) => sum + item.quantity * item.purchasePrice, 0),
     );
   };
+
+  const calculateTaxAmount = () => {
+    return roundCurrency(calculateSubtotal() * (purchaseTaxRate / 100));
+  };
+
+  const calculateTotal = () => {
+    return roundCurrency(calculateSubtotal() + calculateTaxAmount());
+  };
+
+  const subtotal = calculateSubtotal();
+  const taxAmount = calculateTaxAmount();
+  const total = calculateTotal();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -439,11 +455,29 @@ export function PurchaseInvoiceFormPage() {
           {items.length > 0 && (
             <div className="p-4 border-t bg-gray-50">
               <div className="flex justify-end">
-                <div className="w-64">
+                <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
                   <div className="flex justify-between mb-2">
-                    <span className="text-sm">المجموع الفرعي:</span>
+                    <span className="text-sm text-gray-600">
+                      المجموع الفرعي:
+                    </span>
                     <span className="text-sm font-medium">
-                      {formatCurrency(calculateSubtotal())}
+                      {formatCurrency(subtotal)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between mb-2">
+                    <span className="text-sm text-gray-600">
+                      الضريبة ({purchaseTaxRate}%):
+                    </span>
+                    <span className="text-sm font-medium">
+                      {formatCurrency(taxAmount)}
+                    </span>
+                  </div>
+                  <div className="mt-3 flex justify-between border-t border-gray-200 pt-3">
+                    <span className="text-base font-semibold text-gray-900">
+                      الإجمالي / المبلغ المستحق:
+                    </span>
+                    <span className="text-lg font-bold text-blue-600">
+                      {formatCurrency(total)}
                     </span>
                   </div>
                 </div>

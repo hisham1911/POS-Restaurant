@@ -1,4 +1,4 @@
-﻿; KasserPro POS System - Inno Setup Script (Win7 x64 edition)
+; KasserPro POS System - Inno Setup Script (Win7 x64 edition)
 ; Developer password required: KasserPro@Installer2026
 ; MAC address binding active (license.key created on first install)
 
@@ -34,8 +34,8 @@ WizardStyle=modern
 CloseApplications=yes
 UninstallDisplayName={#AppName} POS
 SetupLogging=yes
-SetupIconFile={#DeploymentRoot}\Icons\kasserpro.ico
-UninstallDisplayIcon={app}\kasserpro.ico
+SetupIconFile={#DeploymentRoot}\Icons\tajerpro.ico
+UninstallDisplayIcon={app}\tajerpro.ico
 
 ; Windows 7 SP1 minimum (6.1.7601)
 MinVersion=6.1.7601
@@ -57,17 +57,25 @@ Source: "{#DeploymentRoot}\Scripts\StopKasserPro.bat"; DestDir: "{app}"; Flags: 
 ; Set ASPNETCORE_ENVIRONMENT=Production for the Windows Service
 Root: HKLM; Subkey: "SYSTEM\CurrentControlSet\Services\{#ServiceName}"; ValueType: multisz; ValueName: "Environment"; ValueData: "ASPNETCORE_ENVIRONMENT=Production"; Flags: uninsdeletevalue
 
+[InstallDelete]
+; Remove legacy KasserPro shortcuts so users do not keep old K icons after upgrade.
+Type: files; Name: "{commondesktop}\KasserPro POS.lnk"
+Type: files; Name: "{commondesktop}\KasserPro - Start Service.lnk"
+Type: files; Name: "{commondesktop}\KasserPro - Stop Service.lnk"
+Type: files; Name: "{commondesktop}\KasserPro Printer Bridge.lnk"
+Type: files; Name: "{commonstartup}\KasserPro BridgeApp.lnk"
+Type: filesandordirs; Name: "{commonprograms}\KasserPro"
 [Icons]
-Name: "{commondesktop}\{#AppName} Printer Bridge"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "TajerPro Thermal Printer Controller"; Tasks: desktopicon
-Name: "{commondesktop}\{#AppName} POS"; Filename: "{app}\KasserPro.url"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Open TajerPro in browser"; Tasks: desktopicon
-Name: "{commondesktop}\{#AppName} - Start Service"; Filename: "{app}\StartKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Start TajerPro Backend Service"; Tasks: desktopicon
-Name: "{commondesktop}\{#AppName} - Stop Service"; Filename: "{app}\StopKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Stop TajerPro Backend Service"; Tasks: desktopicon
-Name: "{group}\{#AppName} Printer Bridge"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "TajerPro Thermal Printer Controller"
-Name: "{group}\{#AppName} POS (Browser)"; Filename: "{app}\KasserPro.url"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Open TajerPro in browser"
-Name: "{group}\{#AppName} - Start Service"; Filename: "{app}\StartKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Start TajerPro Backend Service"
-Name: "{group}\{#AppName} - Stop Service"; Filename: "{app}\StopKasserPro.bat"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "Stop TajerPro Backend Service"
+Name: "{commondesktop}\{#AppName} Printer Bridge"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; IconFilename: "{app}\tajerpro.ico"; IconIndex: 0; Comment: "TajerPro Thermal Printer Controller"; Tasks: desktopicon
+Name: "{commondesktop}\{#AppName} POS"; Filename: "{app}\KasserPro.url"; IconFilename: "{app}\tajerpro.ico"; IconIndex: 0; Comment: "Open TajerPro in browser"; Tasks: desktopicon
+Name: "{commondesktop}\{#AppName} - Start Service"; Filename: "{app}\StartKasserPro.bat"; IconFilename: "{app}\tajerpro.ico"; IconIndex: 0; Comment: "Start TajerPro Backend Service"; Tasks: desktopicon
+Name: "{commondesktop}\{#AppName} - Stop Service"; Filename: "{app}\StopKasserPro.bat"; IconFilename: "{app}\tajerpro.ico"; IconIndex: 0; Comment: "Stop TajerPro Backend Service"; Tasks: desktopicon
+Name: "{group}\{#AppName} Printer Bridge"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; IconFilename: "{app}\tajerpro.ico"; IconIndex: 0; Comment: "TajerPro Thermal Printer Controller"
+Name: "{group}\{#AppName} POS (Browser)"; Filename: "{app}\KasserPro.url"; IconFilename: "{app}\tajerpro.ico"; IconIndex: 0; Comment: "Open TajerPro in browser"
+Name: "{group}\{#AppName} - Start Service"; Filename: "{app}\StartKasserPro.bat"; IconFilename: "{app}\tajerpro.ico"; IconIndex: 0; Comment: "Start TajerPro Backend Service"
+Name: "{group}\{#AppName} - Stop Service"; Filename: "{app}\StopKasserPro.bat"; IconFilename: "{app}\tajerpro.ico"; IconIndex: 0; Comment: "Stop TajerPro Backend Service"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
-Name: "{commonstartup}\{#AppName} BridgeApp"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; IconFilename: "{app}\kasserpro.ico"; IconIndex: 0; Comment: "TajerPro Thermal Printer Controller"
+Name: "{commonstartup}\{#AppName} BridgeApp"; Filename: "{app}\bridge\KasserPro.BridgeApp.exe"; IconFilename: "{app}\tajerpro.ico"; IconIndex: 0; Comment: "TajerPro Thermal Printer Controller"
 
 [Run]
 Filename: "{sys}\sc.exe"; Parameters: "create {#ServiceName} binPath= ""{app}\KasserPro.API.exe"" DisplayName= ""{#ServiceDisplayName}"" start= auto type= own obj= LocalSystem"; Flags: runhidden waituntilterminated; StatusMsg: "Installing TajerPro backend service..."
@@ -259,7 +267,7 @@ begin
     UrlFile    := ExpandConstant('{app}\KasserPro.url');
     UrlContent := '[InternetShortcut]' + #13#10 +
                   'URL=http://localhost:5243' + #13#10 +
-                  'IconFile=' + ExpandConstant('{app}\kasserpro.ico') + #13#10 +
+                  'IconFile=' + ExpandConstant('{app}\tajerpro.ico') + #13#10 +
                   'IconIndex=0' + #13#10;
     SaveStringToFile(UrlFile, UrlContent, False);
 

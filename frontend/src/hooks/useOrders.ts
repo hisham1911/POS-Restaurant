@@ -50,7 +50,7 @@ export const useOrders = () => {
     }
 
     if (!currentBranch?.id) {
-      toast.error("اختر فرعًا أولاً");
+      toast.error("اختر فرعًا أولًا");
       return null;
     }
 
@@ -75,6 +75,7 @@ export const useOrders = () => {
         discountType,
         discountValue,
       }).unwrap();
+
       return extractApiData(
         response,
         "ORDER_CREATE_EMPTY_RESPONSE",
@@ -172,6 +173,7 @@ export const useOrders = () => {
   const cancelOrder = async (
     orderId: number,
     reason?: string,
+    options?: { silent?: boolean },
   ): Promise<boolean> => {
     try {
       const response = await cancelMutation({ orderId, reason }).unwrap();
@@ -181,8 +183,11 @@ export const useOrders = () => {
         "تعذر إلغاء الطلب",
       );
 
-      toast.success("تم إلغاء الطلب");
-      refetch();
+      if (!options?.silent) {
+        toast.success("تم إلغاء الطلب");
+        refetch();
+      }
+
       return true;
     } catch (error) {
       const apiError = error as ApiError;
@@ -190,7 +195,8 @@ export const useOrders = () => {
         !getApiErrorCode(error) &&
         apiError.status !== 400 &&
         apiError.status !== 403 &&
-        apiError.status !== 409
+        apiError.status !== 409 &&
+        !options?.silent
       ) {
         toast.error(handleApiError(error));
       }

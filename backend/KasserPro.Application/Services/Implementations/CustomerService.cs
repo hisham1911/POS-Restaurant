@@ -1,5 +1,6 @@
 namespace KasserPro.Application.Services.Implementations;
 
+using KasserPro.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using KasserPro.Application.Common.Interfaces;
 using KasserPro.Application.DTOs.Common;
@@ -340,18 +341,25 @@ public class CustomerService : ICustomerService
         if (user == null)
             return ApiResponse<PayDebtResponse>.Fail("USER_NOT_FOUND", "المستخدم غير موجود");
 
-        // Get current shift (optional)
-        var currentShift = await _unitOfWork.Shifts.Query()
-            .FirstOrDefaultAsync(s => s.TenantId == tenantId
-                                   && s.BranchId == branchId
-                                   && s.UserId == recordedByUserId
-                                   && !s.IsClosed);
-
         // BEGIN TRANSACTION - SQLite will acquire EXCLUSIVE lock on first write
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
 
         try
         {
+            var currentShift = await _unitOfWork.Shifts.Query()
+                .FirstOrDefaultAsync(s => s.TenantId == tenantId
+                                       && s.BranchId == branchId
+                                       && s.UserId == recordedByUserId
+                                       && !s.IsClosed);
+
+            if (currentShift == null)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                return ApiResponse<PayDebtResponse>.Fail(
+                    ErrorCodes.NO_OPEN_SHIFT,
+                    ErrorMessages.Get(ErrorCodes.NO_OPEN_SHIFT));
+            }
+
             // FIX: Read customer INSIDE transaction with fresh data protected by lock
             var customer = await _unitOfWork.Customers.Query()
                 .FirstOrDefaultAsync(c => c.Id == customerId && c.TenantId == tenantId);
@@ -386,7 +394,7 @@ public class CustomerService : ICustomerService
                 Notes = request.Notes,
                 RecordedByUserId = recordedByUserId,
                 RecordedByUserName = user.Name,
-                ShiftId = currentShift?.Id,
+                ShiftId = currentShift.Id,
                 BalanceBefore = balanceBefore,
                 BalanceAfter = balanceAfter
             };
@@ -407,10 +415,11 @@ public class CustomerService : ICustomerService
                     description: $"تسديد دين - عميل: {customer.Name ?? customer.Phone}",
                     referenceType: "DebtPayment",
                     referenceId: debtPayment.Id,
-                    shiftId: currentShift?.Id
+                    shiftId: currentShift.Id
                 );
             }
 
+            await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitTransactionAsync();
 
             var response = new PayDebtResponse

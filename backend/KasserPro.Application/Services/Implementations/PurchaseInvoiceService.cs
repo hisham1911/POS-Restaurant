@@ -542,7 +542,8 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         if (invoice == null)
             return ApiResponse<PurchaseInvoicePaymentDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND));
 
-        if (invoice.Status != PurchaseInvoiceStatus.Confirmed)
+        if (invoice.Status != PurchaseInvoiceStatus.Confirmed
+            && invoice.Status != PurchaseInvoiceStatus.PartiallyPaid)
             return ApiResponse<PurchaseInvoicePaymentDto>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_EDITABLE, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_EDITABLE));
 
         if (request.Amount <= 0)
@@ -554,42 +555,54 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         var user = await _unitOfWork.Users.Query()
             .FirstOrDefaultAsync(u => u.Id == userId);
 
-        var payment = new PurchaseInvoicePayment
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
+
+        try
         {
-            PurchaseInvoiceId = invoiceId,
-            Amount = request.Amount,
-            PaymentDate = request.PaymentDate,
-            Method = request.Method,
-            ReferenceNumber = request.ReferenceNumber,
-            Notes = request.Notes,
-            CreatedByUserId = userId,
-            CreatedByUserName = user?.Name,
-            CreatedAt = DateTime.UtcNow
-        };
+            var payment = new PurchaseInvoicePayment
+            {
+                PurchaseInvoiceId = invoiceId,
+                Amount = request.Amount,
+                PaymentDate = request.PaymentDate,
+                Method = request.Method,
+                ReferenceNumber = request.ReferenceNumber,
+                Notes = request.Notes,
+                CreatedByUserId = userId,
+                CreatedByUserName = user?.Name,
+                CreatedAt = DateTime.UtcNow
+            };
 
-        await _unitOfWork.PurchaseInvoicePayments.AddAsync(payment);
+            await _unitOfWork.PurchaseInvoicePayments.AddAsync(payment);
 
-        // Update invoice amounts
-        invoice.AmountPaid += request.Amount;
-        invoice.AmountDue = invoice.Total - invoice.AmountPaid;
-        invoice.UpdatedAt = DateTime.UtcNow;
+            // Update invoice amounts
+            invoice.AmountPaid = Math.Round(invoice.AmountPaid + request.Amount, 2);
+            invoice.AmountDue = Math.Round(invoice.Total - invoice.AmountPaid, 2);
+            RecalculateInvoiceStatus(invoice);
+            invoice.UpdatedAt = DateTime.UtcNow;
 
-        _unitOfWork.PurchaseInvoices.Update(invoice);
-        await _unitOfWork.SaveChangesAsync();
+            _unitOfWork.PurchaseInvoices.Update(invoice);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
 
-        var dto = new PurchaseInvoicePaymentDto
+            var dto = new PurchaseInvoicePaymentDto
+            {
+                Id = payment.Id,
+                Amount = payment.Amount,
+                PaymentDate = payment.PaymentDate,
+                Method = payment.Method.ToString(),
+                ReferenceNumber = payment.ReferenceNumber,
+                Notes = payment.Notes,
+                CreatedByUserName = payment.CreatedByUserName ?? "",
+                CreatedAt = payment.CreatedAt
+            };
+
+            return ApiResponse<PurchaseInvoicePaymentDto>.Ok(dto, "تم إضافة الدفعة بنجاح");
+        }
+        catch
         {
-            Id = payment.Id,
-            Amount = payment.Amount,
-            PaymentDate = payment.PaymentDate,
-            Method = payment.Method.ToString(),
-            ReferenceNumber = payment.ReferenceNumber,
-            Notes = payment.Notes,
-            CreatedByUserName = payment.CreatedByUserName ?? "",
-            CreatedAt = payment.CreatedAt
-        };
-
-        return ApiResponse<PurchaseInvoicePaymentDto>.Ok(dto, "تم إضافة الدفعة بنجاح");
+            await _unitOfWork.RollbackTransactionAsync();
+            throw;
+        }
     }
 
     public async Task<ApiResponse<bool>> DeletePaymentAsync(int invoiceId, int paymentId)
@@ -602,22 +615,58 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         if (invoice == null)
             return ApiResponse<bool>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND));
 
+        if (invoice.Status == PurchaseInvoiceStatus.Cancelled
+            || invoice.Status == PurchaseInvoiceStatus.Returned
+            || invoice.Status == PurchaseInvoiceStatus.PartiallyReturned
+            || invoice.Status == PurchaseInvoiceStatus.Draft)
+        {
+            return ApiResponse<bool>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_EDITABLE, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_EDITABLE));
+        }
+
         var payment = await _unitOfWork.PurchaseInvoicePayments.Query()
             .FirstOrDefaultAsync(p => p.Id == paymentId && p.PurchaseInvoiceId == invoiceId);
 
         if (payment == null)
             return ApiResponse<bool>.Fail(ErrorCodes.PAYMENT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PAYMENT_NOT_FOUND));
 
-        // Update invoice amounts
-        invoice.AmountPaid -= payment.Amount;
-        invoice.AmountDue = invoice.Total - invoice.AmountPaid;
-        invoice.UpdatedAt = DateTime.UtcNow;
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
 
-        _unitOfWork.PurchaseInvoices.Update(invoice);
-        _unitOfWork.PurchaseInvoicePayments.Delete(payment);
-        await _unitOfWork.SaveChangesAsync();
+        try
+        {
+            // Update invoice amounts
+            invoice.AmountPaid = Math.Round(Math.Max(0m, invoice.AmountPaid - payment.Amount), 2);
+            invoice.AmountDue = Math.Round(invoice.Total - invoice.AmountPaid, 2);
+            RecalculateInvoiceStatus(invoice);
+            invoice.UpdatedAt = DateTime.UtcNow;
 
-        return ApiResponse<bool>.Ok(true, "تم حذف الدفعة بنجاح");
+            _unitOfWork.PurchaseInvoices.Update(invoice);
+            _unitOfWork.PurchaseInvoicePayments.Delete(payment);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+
+            return ApiResponse<bool>.Ok(true, "تم حذف الدفعة بنجاح");
+        }
+        catch
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            throw;
+        }
+    }
+
+    private static void RecalculateInvoiceStatus(PurchaseInvoice invoice)
+    {
+        if (invoice.AmountDue <= 0)
+        {
+            invoice.Status = PurchaseInvoiceStatus.Paid;
+        }
+        else if (invoice.AmountPaid > 0)
+        {
+            invoice.Status = PurchaseInvoiceStatus.PartiallyPaid;
+        }
+        else
+        {
+            invoice.Status = PurchaseInvoiceStatus.Confirmed;
+        }
     }
 
     private async Task<string> GenerateInvoiceNumberAsync(int tenantId)
@@ -653,4 +702,3 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         return $"{prefix}{maxSequence + 1:D4}";
     }
 }
-

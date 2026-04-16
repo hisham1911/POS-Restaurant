@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { useOrders } from "@/hooks/useOrders";
 import { usePreparedPaymentOrder } from "@/hooks/usePreparedPaymentOrder";
+import { useCart } from "@/hooks/useCart";
 import { formatCurrency } from "@/utils/formatters";
 import { PaymentMethod } from "@/types/order.types";
 import { Customer } from "@/types/customer.types";
@@ -43,6 +44,7 @@ export const PaymentModal = ({
 }: PaymentModalProps) => {
   const { createOrder, completeOrder, cancelOrder, isCreating, isCompleting } =
     useOrders();
+  const { clearCart } = useCart();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("Cash");
   const [amountPaid, setAmountPaid] = useState<string>("");
   const [showError, setShowError] = useState(false);
@@ -174,6 +176,7 @@ export const PaymentModal = ({
         }
         // مسح العميل المحدد
         markPreparedOrderCompleted(preparedOrder.id);
+        clearCart();
         onOrderComplete?.();
         onClose();
       }

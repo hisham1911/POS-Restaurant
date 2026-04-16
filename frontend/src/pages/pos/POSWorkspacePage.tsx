@@ -536,6 +536,7 @@ export const POSWorkspacePage = () => {
         }
 
         markPreparedOrderCompleted(preparedOrder.id);
+        clearCart();
         setSelectedCustomer(null);
         setCustomerPhone("");
         setAmountPaid("");

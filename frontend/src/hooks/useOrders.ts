@@ -21,7 +21,7 @@ import { printOrderReceiptFallback } from "@/utils/browserReceiptPrinter";
 import { useDevicePrintPreferences } from "@/hooks/useDevicePrintPreferences";
 
 export const useOrders = () => {
-  const { items, clearCart, discountType, discountValue } = useCart();
+  const { items, discountType, discountValue } = useCart();
   const currentBranch = useAppSelector(selectCurrentBranch);
 
   const {
@@ -154,7 +154,6 @@ export const useOrders = () => {
         }
       }
 
-      clearCart();
       toast.success("تم إكمال الطلب بنجاح");
       return order;
     } catch (error) {

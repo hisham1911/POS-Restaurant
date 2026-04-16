@@ -102,5 +102,5 @@ public interface ICustomerService
     /// <summary>
     /// Soft delete a customer
     /// </summary>
-    Task<bool> DeleteAsync(int id);
+    Task<ApiResponse<bool>> DeleteAsync(int id);
 }

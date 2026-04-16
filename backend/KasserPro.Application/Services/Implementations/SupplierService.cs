@@ -7,6 +7,7 @@ using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Suppliers;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Entities;
+using KasserPro.Domain.Enums;
 
 public class SupplierService : ISupplierService
 {
@@ -123,6 +124,13 @@ public class SupplierService : ISupplierService
         if (supplier == null)
             return ApiResponse<SupplierDto>.Fail(ErrorCodes.SUPPLIER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.SUPPLIER_NOT_FOUND));
 
+        if (!request.IsActive && supplier.TotalDue > 0)
+        {
+            return ApiResponse<SupplierDto>.Fail(
+                ErrorCodes.VALIDATION_ERROR,
+                "لا يمكن تعطيل مورد لديه رصيد متبقي غير مسدد");
+        }
+
         supplier.Name = request.Name.Trim();
         supplier.NameEn = request.NameEn?.Trim();
         supplier.Phone = request.Phone?.Trim();
@@ -161,6 +169,20 @@ public class SupplierService : ISupplierService
         
         if (supplier == null)
             return ApiResponse<bool>.Fail(ErrorCodes.SUPPLIER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.SUPPLIER_NOT_FOUND));
+
+        var hasOutstandingInvoices = await _unitOfWork.PurchaseInvoices.Query()
+            .AnyAsync(pi => pi.TenantId == tenantId
+                         && !pi.IsDeleted
+                         && pi.SupplierId == supplier.Id
+                         && pi.Status != PurchaseInvoiceStatus.Draft
+                         && pi.Status != PurchaseInvoiceStatus.Cancelled);
+
+        if (supplier.TotalDue > 0 || hasOutstandingInvoices)
+        {
+            return ApiResponse<bool>.Fail(
+                ErrorCodes.VALIDATION_ERROR,
+                "لا يمكن حذف مورد لديه فواتير قائمة أو رصيد متبقي");
+        }
 
         // Soft delete
         supplier.IsDeleted = true;

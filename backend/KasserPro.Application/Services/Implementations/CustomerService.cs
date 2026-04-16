@@ -7,6 +7,7 @@ using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Customers;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Entities;
+using KasserPro.Domain.Enums;
 
 /// <summary>
 /// Service for customer management operations
@@ -132,7 +133,12 @@ public class CustomerService : ICustomerService
         if (request.Notes != null)
             customer.Notes = request.Notes;
         if (request.IsActive.HasValue)
+        {
+            if (!request.IsActive.Value && customer.TotalDue > 0)
+                throw new ArgumentException("لا يمكن تعطيل عميل لديه ديون مستحقة");
+
             customer.IsActive = request.IsActive.Value;
+        }
         if (request.CreditLimit.HasValue)
             customer.CreditLimit = request.CreditLimit.Value;
 
@@ -330,6 +336,20 @@ public class CustomerService : ICustomerService
     {
         var tenantId = _currentUser.TenantId;
         var branchId = _currentUser.BranchId;
+        var actingUserId = _currentUser.UserId;
+
+        var currentShift = await _unitOfWork.Shifts.Query()
+            .FirstOrDefaultAsync(s => s.TenantId == tenantId
+                                   && s.BranchId == branchId
+                                   && s.UserId == actingUserId
+                                   && !s.IsClosed);
+
+        if (currentShift == null)
+        {
+            return ApiResponse<PayDebtResponse>.Fail(
+                ErrorCodes.NO_OPEN_SHIFT,
+                "لا يمكن تسجيل سداد دين بدون وردية مفتوحة");
+        }
 
         // Validate amount
         if (request.Amount <= 0)
@@ -346,20 +366,6 @@ public class CustomerService : ICustomerService
 
         try
         {
-            var currentShift = await _unitOfWork.Shifts.Query()
-                .FirstOrDefaultAsync(s => s.TenantId == tenantId
-                                       && s.BranchId == branchId
-                                       && s.UserId == recordedByUserId
-                                       && !s.IsClosed);
-
-            if (currentShift == null)
-            {
-                await _unitOfWork.RollbackTransactionAsync();
-                return ApiResponse<PayDebtResponse>.Fail(
-                    ErrorCodes.NO_OPEN_SHIFT,
-                    ErrorMessages.Get(ErrorCodes.NO_OPEN_SHIFT));
-            }
-
             // FIX: Read customer INSIDE transaction with fresh data protected by lock
             var customer = await _unitOfWork.Customers.Query()
                 .FirstOrDefaultAsync(c => c.Id == customerId && c.TenantId == tenantId);
@@ -537,7 +543,7 @@ public class CustomerService : ICustomerService
         // NO Commit - parent will commit
     }
 
-    public async Task<bool> DeleteAsync(int id)
+    public async Task<ApiResponse<bool>> DeleteAsync(int id)
     {
         var tenantId = _currentUser.TenantId;
 
@@ -545,14 +551,26 @@ public class CustomerService : ICustomerService
             .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId);
 
         if (customer == null)
-            return false;
+            return ApiResponse<bool>.Fail(ErrorCodes.CUSTOMER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CUSTOMER_NOT_FOUND));
+
+        var hasOpenOrders = await _unitOfWork.Orders.Query()
+            .AnyAsync(o => o.TenantId == tenantId
+                        && !o.IsDeleted
+                        && o.CustomerId == customer.Id
+                        && o.Status != OrderStatus.Completed
+                        && o.Status != OrderStatus.Cancelled);
+
+        if (customer.TotalDue > 0 || hasOpenOrders)
+            return ApiResponse<bool>.Fail(
+                ErrorCodes.VALIDATION_ERROR,
+                "لا يمكن حذف عميل لديه ديون أو طلبات مفتوحة");
 
         // Soft delete (using both IsActive and IsDeleted for compatibility)
         customer.IsActive = false;
         customer.IsDeleted = true;
 
         await _unitOfWork.SaveChangesAsync();
-        return true;
+        return ApiResponse<bool>.Ok(true, "تم حذف العميل بنجاح");
     }
 
     #region Private Methods

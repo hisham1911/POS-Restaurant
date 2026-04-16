@@ -374,6 +374,19 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<ExpenseDto>> PayAsync(int id, PayExpenseRequest request)
     {
+        var currentShift = await _unitOfWork.Shifts.Query()
+            .FirstOrDefaultAsync(s => s.TenantId == _currentUserService.TenantId
+                                   && s.BranchId == _currentUserService.BranchId
+                                   && s.UserId == _currentUserService.UserId
+                                   && !s.IsClosed);
+
+        if (currentShift == null)
+        {
+            return ApiResponse<ExpenseDto>.Fail(
+                ErrorCodes.NO_OPEN_SHIFT,
+                "لا يمكن دفع مصروف بدون وردية مفتوحة");
+        }
+
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
@@ -431,7 +444,7 @@ public class ExpenseService : IExpenseService
                     $"Expense: {expense.Description}",
                     "Expense",
                     expense.Id,
-                    expense.ShiftId);
+                    expense.ShiftId ?? currentShift.Id);
             }
 
             await _unitOfWork.SaveChangesAsync();

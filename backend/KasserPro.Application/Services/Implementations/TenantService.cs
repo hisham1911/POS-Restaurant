@@ -322,6 +322,22 @@ public class TenantService : ITenantService
         if (tenant.IsActive == isActive)
             return ApiResponse<bool>.Ok(true, isActive ? "الشركة مفعلة بالفعل" : "الشركة معطلة بالفعل");
 
+        if (!isActive)
+        {
+            var hasOpenShifts = await _unitOfWork.Shifts.Query()
+                .AnyAsync(s => s.TenantId == tenantId && !s.IsClosed);
+
+            var hasActiveUsers = await _unitOfWork.Users.Query()
+                .AnyAsync(u => u.TenantId == tenantId && u.IsActive);
+
+            if (hasOpenShifts || hasActiveUsers)
+            {
+                return ApiResponse<bool>.Fail(
+                    ErrorCodes.VALIDATION_ERROR,
+                    "لا يمكن تعطيل الشركة لوجود ورديات مفتوحة أو مستخدمين نشطين");
+            }
+        }
+
         tenant.IsActive = isActive;
         _unitOfWork.Tenants.Update(tenant);
 

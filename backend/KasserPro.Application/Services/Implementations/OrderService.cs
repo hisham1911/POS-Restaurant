@@ -24,6 +24,7 @@ public class OrderService : IOrderService
         { OrderStatus.Draft, new[] { OrderStatus.Pending, OrderStatus.Completed, OrderStatus.Cancelled } },
         { OrderStatus.Pending, new[] { OrderStatus.Completed, OrderStatus.Cancelled } },
         { OrderStatus.Completed, new[] { OrderStatus.Refunded } },
+        { OrderStatus.PartiallyRefunded, new[] { OrderStatus.Refunded } },
         { OrderStatus.Cancelled, Array.Empty<OrderStatus>() },
         { OrderStatus.Refunded, Array.Empty<OrderStatus>() }
     };
@@ -511,6 +512,23 @@ public class OrderService : IOrderService
     /// </summary>
     public async Task<ApiResponse<OrderDto>> CompleteAsync(int orderId, CompleteOrderRequest request)
     {
+        var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
+        var actingUserId = _currentUser.UserId; // from current JWT claims
+
+        var currentShift = await _unitOfWork.Shifts.Query()
+            .FirstOrDefaultAsync(s => s.TenantId == tenantId
+                                   && s.BranchId == branchId
+                                   && s.UserId == actingUserId
+                                   && !s.IsClosed);
+
+        if (currentShift == null)
+        {
+            return ApiResponse<OrderDto>.Fail(
+                ErrorCodes.NO_OPEN_SHIFT,
+                "لا يمكن إتمام البيع بدون وردية مفتوحة");
+        }
+
         // Use transaction for atomicity - Order + Payments must succeed together
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
 
@@ -668,7 +686,7 @@ public class OrderService : IOrderService
                     description: $"مبيعات - طلب #{order.OrderNumber}",
                     referenceType: "Order",
                     referenceId: order.Id,
-                    shiftId: order.ShiftId
+                    shiftId: order.ShiftId ?? currentShift.Id
                 );
             }
 

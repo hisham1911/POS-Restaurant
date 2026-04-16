@@ -99,7 +99,7 @@ export default function InventoryTransferList() {
         icon: Check,
         label: "تمت الموافقة",
       },
-      Received: {
+      Completed: {
         bg: "bg-green-100",
         text: "text-green-800",
         icon: Package,
@@ -233,7 +233,7 @@ export default function InventoryTransferList() {
                 <option value="">جميع الحالات</option>
                 <option value="Pending">قيد الانتظار</option>
                 <option value="Approved">تمت الموافقة</option>
-                <option value="Received">تم الاستلام</option>
+                <option value="Completed">تم الاستلام</option>
                 <option value="Cancelled">ملغي</option>
               </select>
               <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />

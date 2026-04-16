@@ -329,8 +329,12 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         if (invoice == null)
             return ApiResponse<bool>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND));
 
-        if (invoice.Status == PurchaseInvoiceStatus.Confirmed)
-            return ApiResponse<bool>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_DELETABLE, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_DELETABLE));
+        if (invoice.Status != PurchaseInvoiceStatus.Draft)
+        {
+            return ApiResponse<bool>.Fail(
+                ErrorCodes.PURCHASE_INVOICE_NOT_DELETABLE,
+                "لا يمكن حذف إلا الفواتير في حالة مسودة");
+        }
 
         // Soft delete
         invoice.IsDeleted = true;
@@ -466,10 +470,26 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         if (invoice.Status == PurchaseInvoiceStatus.Cancelled)
             return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PURCHASE_INVOICE_ALREADY_CANCELLED, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_ALREADY_CANCELLED));
 
+        if (invoice.Status == PurchaseInvoiceStatus.Paid)
+        {
+            return ApiResponse<PurchaseInvoiceDto>.Fail(
+                ErrorCodes.PURCHASE_INVOICE_NOT_EDITABLE,
+                "لا يمكن إلغاء فاتورة مدفوعة بالكامل، يجب إنشاء مسترد أولاً");
+        }
+
+        if (invoice.Status != PurchaseInvoiceStatus.Confirmed
+            && invoice.Status != PurchaseInvoiceStatus.PartiallyPaid)
+        {
+            return ApiResponse<PurchaseInvoiceDto>.Fail(
+                ErrorCodes.PURCHASE_INVOICE_NOT_EDITABLE,
+                ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_EDITABLE));
+        }
+
         var user = await _unitOfWork.Users.Query()
             .FirstOrDefaultAsync(u => u.Id == userId);
 
-        var wasConfirmed = invoice.Status == PurchaseInvoiceStatus.Confirmed;
+        var wasConfirmed = invoice.Status == PurchaseInvoiceStatus.Confirmed
+            || invoice.Status == PurchaseInvoiceStatus.PartiallyPaid;
 
         // Update invoice status
         invoice.Status = PurchaseInvoiceStatus.Cancelled;
@@ -615,8 +635,14 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         if (invoice == null)
             return ApiResponse<bool>.Fail(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_NOT_FOUND));
 
-        if (invoice.Status == PurchaseInvoiceStatus.Cancelled
-            || invoice.Status == PurchaseInvoiceStatus.Returned
+        if (invoice.Status == PurchaseInvoiceStatus.Cancelled)
+        {
+            return ApiResponse<bool>.Fail(
+                ErrorCodes.PURCHASE_INVOICE_NOT_EDITABLE,
+                "لا يمكن حذف دفعة من فاتورة ملغاة");
+        }
+
+        if (invoice.Status == PurchaseInvoiceStatus.Returned
             || invoice.Status == PurchaseInvoiceStatus.PartiallyReturned
             || invoice.Status == PurchaseInvoiceStatus.Draft)
         {
@@ -636,7 +662,18 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             // Update invoice amounts
             invoice.AmountPaid = Math.Round(Math.Max(0m, invoice.AmountPaid - payment.Amount), 2);
             invoice.AmountDue = Math.Round(invoice.Total - invoice.AmountPaid, 2);
-            RecalculateInvoiceStatus(invoice);
+            if (invoice.AmountPaid == 0)
+            {
+                invoice.Status = PurchaseInvoiceStatus.Confirmed;
+            }
+            else if (invoice.AmountPaid > 0 && invoice.AmountDue > 0)
+            {
+                invoice.Status = PurchaseInvoiceStatus.PartiallyPaid;
+            }
+            else if (invoice.AmountDue <= 0)
+            {
+                invoice.Status = PurchaseInvoiceStatus.Paid;
+            }
             invoice.UpdatedAt = DateTime.UtcNow;
 
             _unitOfWork.PurchaseInvoices.Update(invoice);

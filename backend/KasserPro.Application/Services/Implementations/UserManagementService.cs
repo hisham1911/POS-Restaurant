@@ -268,6 +268,19 @@ public class UserManagementService : IUserManagementService
             if (user.Id == _currentUserService.UserId)
                 return ApiResponse<bool>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
 
+            var hasOpenShift = await _unitOfWork.Shifts.Query()
+                .AnyAsync(s => s.TenantId == _currentUserService.TenantId
+                            && !s.IsDeleted
+                            && s.UserId == user.Id
+                            && !s.IsClosed);
+
+            if (hasOpenShift)
+            {
+                return ApiResponse<bool>.Fail(
+                    ErrorCodes.VALIDATION_ERROR,
+                    "لا يمكن حذف موظف لديه وردية مفتوحة");
+            }
+
             user.IsDeleted = true;
             user.UpdateSecurityStamp();
             _unitOfWork.Users.Update(user);
@@ -297,6 +310,22 @@ public class UserManagementService : IUserManagementService
 
             if (user.Id == _currentUserService.UserId)
                 return ApiResponse<bool>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
+
+            if (!isActive)
+            {
+                var hasOpenShift = await _unitOfWork.Shifts.Query()
+                    .AnyAsync(s => s.TenantId == _currentUserService.TenantId
+                                && !s.IsDeleted
+                                && s.UserId == user.Id
+                                && !s.IsClosed);
+
+                if (hasOpenShift)
+                {
+                    return ApiResponse<bool>.Fail(
+                        ErrorCodes.VALIDATION_ERROR,
+                        "لا يمكن تعطيل موظف لديه وردية مفتوحة");
+                }
+            }
 
             user.IsActive = isActive;
             if (!isActive)

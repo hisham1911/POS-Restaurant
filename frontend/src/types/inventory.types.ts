@@ -47,7 +47,7 @@ export interface InventoryTransfer {
   cancellationReason?: string;
 }
 
-export type TransferStatus = "Pending" | "Approved" | "Received" | "Cancelled";
+export type TransferStatus = "Pending" | "Approved" | "Completed" | "Cancelled";
 
 export interface CreateTransferRequest {
   fromBranchId: number;

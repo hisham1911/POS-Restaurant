@@ -141,6 +141,19 @@ public class CashRegisterService : ICashRegisterService
 
     public async Task<ApiResponse<CashRegisterTransactionDto>> CreateTransactionAsync(CreateCashRegisterTransactionRequest request)
     {
+        var activeShift = await _unitOfWork.Shifts.Query()
+            .FirstOrDefaultAsync(s => s.TenantId == _currentUserService.TenantId
+                                   && s.BranchId == _currentUserService.BranchId
+                                   && s.UserId == _currentUserService.UserId
+                                   && !s.IsClosed);
+
+        if (activeShift == null)
+        {
+            return ApiResponse<CashRegisterTransactionDto>.Fail(
+                ErrorCodes.NO_OPEN_SHIFT,
+                "لا يمكن تسجيل حركة خزينة بدون وردية مفتوحة");
+        }
+
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
@@ -167,10 +180,6 @@ public class CashRegisterService : ICashRegisterService
                         ErrorMessages.Get(ErrorCodes.CASH_REGISTER_INSUFFICIENT_BALANCE));
                 }
             }
-
-            // Get active shift
-            var activeShift = await _unitOfWork.Shifts.Query()
-                .FirstOrDefaultAsync(s => s.BranchId == _currentUserService.BranchId && !s.IsClosed);
 
             // Get user name
             var user = await _unitOfWork.Users.Query()

@@ -7,6 +7,7 @@ using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Products;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Entities;
+using KasserPro.Domain.Enums;
 
 public class ProductService : IProductService
 {
@@ -328,9 +329,29 @@ public class ProductService : IProductService
     {
         var tenantId = _currentUser.TenantId;
         var product = await _unitOfWork.Products.Query()
-            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
+            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId && !p.IsDeleted);
         if (product == null)
             return ApiResponse<bool>.Fail(ErrorCodes.PRODUCT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PRODUCT_NOT_FOUND));
+
+        var hasInventory = await _unitOfWork.BranchInventories.Query()
+            .AnyAsync(bi => bi.TenantId == tenantId
+                         && !bi.IsDeleted
+                         && bi.ProductId == product.Id
+                         && bi.Quantity > 0);
+
+        var hasOpenOrders = await _unitOfWork.Orders.Query()
+            .AnyAsync(o => o.TenantId == tenantId
+                        && !o.IsDeleted
+                        && o.Status != OrderStatus.Completed
+                        && o.Status != OrderStatus.Cancelled
+                        && o.Items.Any(oi => !oi.IsDeleted && oi.ProductId == product.Id));
+
+        if (hasInventory || hasOpenOrders)
+        {
+            return ApiResponse<bool>.Fail(
+                ErrorCodes.VALIDATION_ERROR,
+                "لا يمكن حذف منتج لديه مخزون أو طلبات مفتوحة");
+        }
 
         product.IsDeleted = true;
         _unitOfWork.Products.Update(product);

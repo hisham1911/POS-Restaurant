@@ -172,6 +172,28 @@ public class BranchService : IBranchService
         if (branch == null)
             return ApiResponse<bool>.Fail(ErrorCodes.BRANCH_NOT_FOUND, ErrorMessages.Get(ErrorCodes.BRANCH_NOT_FOUND));
 
+        var hasOpenShifts = await _unitOfWork.Shifts.Query()
+            .AnyAsync(s => s.TenantId == tenantId
+                        && s.BranchId == branch.Id
+                        && !s.IsClosed);
+
+        var hasActiveUsers = await _unitOfWork.Users.Query()
+            .AnyAsync(u => u.TenantId == tenantId
+                        && u.BranchId == branch.Id
+                        && u.IsActive);
+
+        var hasInventory = await _unitOfWork.BranchInventories.Query()
+            .AnyAsync(bi => bi.TenantId == tenantId
+                         && bi.BranchId == branch.Id
+                         && bi.Quantity > 0);
+
+        if (hasOpenShifts || hasActiveUsers || hasInventory)
+        {
+            return ApiResponse<bool>.Fail(
+                ErrorCodes.VALIDATION_ERROR,
+                "لا يمكن حذف الفرع لوجود ورديات مفتوحة أو مستخدمين أو مخزون مرتبط به");
+        }
+
         branch.IsDeleted = true;
         _unitOfWork.Branches.Update(branch);
         await _unitOfWork.SaveChangesAsync();

@@ -159,10 +159,14 @@ public class CustomersController : ControllerBase
     [HasPermission(Permission.CustomersManage)]
     public async Task<IActionResult> Delete(int id)
     {
-        var success = await _customerService.DeleteAsync(id);
-        return success
-            ? Ok(ApiResponse<bool>.Ok(true, "تم حذف العميل بنجاح"))
-            : NotFound(ApiResponse<object>.Fail(ErrorCodes.CUSTOMER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CUSTOMER_NOT_FOUND)));
+        var result = await _customerService.DeleteAsync(id);
+        if (result.Success)
+            return Ok(result);
+
+        if (result.ErrorCode == ErrorCodes.CUSTOMER_NOT_FOUND)
+            return NotFound(result);
+
+        return BadRequest(result);
     }
 
     [HttpPost("{id}/pay-debt")]

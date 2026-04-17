@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   useCreateTenantMutation,
   useGetTenantsQuery,
+  useRunSeedPipelineMutation,
   useSetTenantStatusMutation,
 } from "../../api/systemApi";
 import {
@@ -14,6 +15,7 @@ import {
   RefreshCw,
   Power,
   ChevronDown,
+  Database,
 } from "lucide-react";
 import { formatDateOnly } from "../../utils/formatters";
 import { handleApiError } from "../../utils/errorHandler";
@@ -23,6 +25,8 @@ const strongPasswordRegex =
 
 export default function TenantCreationPage() {
   const [createTenant, { isLoading }] = useCreateTenantMutation();
+  const [runSeedPipeline, { isLoading: isSeeding }] =
+    useRunSeedPipelineMutation();
   const [setTenantStatus, { isLoading: isUpdatingStatus }] =
     useSetTenantStatusMutation();
   const {
@@ -157,6 +161,33 @@ export default function TenantCreationPage() {
     }
   };
 
+  const handleRunSeedPipeline = async () => {
+    setError("");
+    setSuccess("");
+
+    const confirmed = window.confirm(
+      "سيتم تشغيل نفس السيدر داتا الحالية كما هي. قد تستغرق العملية عدة دقائق حسب حجم البيانات. هل تريد المتابعة؟",
+    );
+    if (!confirmed) return;
+
+    try {
+      const result = await runSeedPipeline().unwrap();
+      const warningsCount = result.data?.optionalWarnings?.length ?? 0;
+      const message = result.message || "تم تشغيل السيدر بنجاح";
+
+      setSuccess(
+        warningsCount > 0
+          ? `${message} (تحذيرات اختيارية: ${warningsCount})`
+          : message,
+      );
+
+      await refetch();
+    } catch (err: unknown) {
+      setError(handleApiError(err));
+      setSuccess("");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 p-6">
       <div className="max-w-6xl mx-auto">
@@ -169,6 +200,51 @@ export default function TenantCreationPage() {
             إنشاء شركة جديدة
           </h1>
           <p className="text-gray-600">لوحة إدارة الشركات (مالك النظام)</p>
+        </div>
+
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 sm:p-5">
+          <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-amber-900 flex items-center gap-2">
+                <Database className="w-5 h-5" />
+                تشغيل السيدر يدويًا
+              </h2>
+              <p className="text-sm text-amber-800 mt-1">
+                التطبيق يبدأ الآن بشكل نظيف، ويمكنك تحميل نفس بيانات السيدر
+                الحالية وقت الحاجة فقط.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleRunSeedPipeline}
+              disabled={isSeeding}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-amber-600 text-white font-medium hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSeeding ? (
+                <>
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  جاري تشغيل السيدر...
+                </>
+              ) : (
+                "تشغيل السيدر الآن"
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Dashboard Cards */}
@@ -533,4 +609,3 @@ export default function TenantCreationPage() {
     </div>
   );
 }
-

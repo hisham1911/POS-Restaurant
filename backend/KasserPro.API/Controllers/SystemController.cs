@@ -19,15 +19,18 @@ public class SystemController : ControllerBase
 {
     private readonly ITenantService _tenantService;
     private readonly ISystemUserService _systemUserService;
+    private readonly ISystemSeedService _systemSeedService;
     private readonly ILogger<SystemController> _logger;
 
     public SystemController(
         ITenantService tenantService,
         ISystemUserService systemUserService,
+        ISystemSeedService systemSeedService,
         ILogger<SystemController> logger)
     {
         _tenantService = tenantService;
         _systemUserService = systemUserService;
+        _systemSeedService = systemSeedService;
         _logger = logger;
     }
 
@@ -157,6 +160,24 @@ public class SystemController : ControllerBase
     {
         var result = await _systemUserService.ResetUserPasswordAsync(userId, request.NewPassword);
         return result.Success ? Ok(result) : BadRequest(result);
+    }
+
+    /// <summary>
+    /// Run full demo seed pipeline manually (SystemOwner only)
+    /// </summary>
+    [HttpPost("seed/run")]
+    [Authorize(Roles = "SystemOwner")]
+    public async Task<IActionResult> RunSeedPipeline()
+    {
+        var result = await _systemSeedService.RunFullSeedPipelineAsync(HttpContext.RequestAborted);
+
+        if (result.Success)
+            return Ok(result);
+
+        if (result.ErrorCode == ErrorCodes.CONFLICT)
+            return Conflict(result);
+
+        return BadRequest(result);
     }
 
     /// <summary>

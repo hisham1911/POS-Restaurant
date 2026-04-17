@@ -157,6 +157,7 @@ builder.Services.AddScoped<ITenantService, TenantService>();
 builder.Services.AddScoped<IBranchService, BranchService>();
 builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<ISystemUserService, SystemUserService>();
+builder.Services.AddScoped<ISystemSeedService, SystemSeedService>();
 
 // Sellable V1: New services for inventory and customer management
 builder.Services.AddScoped<IInventoryService, KasserPro.Infrastructure.Services.InventoryService>();
@@ -396,112 +397,35 @@ if (!app.Environment.IsEnvironment("Testing"))
         // Apply migrations
         await context.Database.MigrateAsync();
 
-        // Seed initial data (first run only - seeder checks if data exists)
-        await ButcherDataSeeder.SeedAsync(context);
+        var systemSeedService = scope.ServiceProvider.GetRequiredService<ISystemSeedService>();
 
-        // Seed multiple tenants for demo purposes (optional)
-        await MultiTenantSeeder.SeedAsync(context);
+        // Always ensure bootstrap access exists even when demo seeding is disabled.
+        await systemSeedService.EnsureSystemOwnerAsync();
 
-        // Seed realistic data for 120 days (comprehensive dataset)
-        // Never block API startup if optional seed data fails.
-        try
+        // Auto-seeding is disabled by default.
+        // Set Seeding__AutoRunOnStartup=true only when explicitly needed.
+        var autoRunSeedOnStartup = app.Configuration.GetValue("Seeding:AutoRunOnStartup", false);
+        if (autoRunSeedOnStartup)
         {
-            await RealisticDataSeeder.SeedAsync(context);
-        }
-        catch (Exception seedEx)
-        {
-            Log.Warning(seedEx, "Realistic data seeding failed; continuing startup");
-        }
-        finally
-        {
-            // Realistic seeding can fail mid-unit-of-work; clear tracked state to avoid cascading save failures.
-            context.ChangeTracker.Clear();
-        }
+            var seedResult = await systemSeedService.RunFullSeedPipelineAsync();
 
-        // Ensure seeded catalog data always has descriptive icons for categories/products.
-        try
-        {
-            await SeedCatalogIconSynchronizer.SynchronizeAsync(context);
-        }
-        catch (Exception iconEx)
-        {
-            Log.Warning(iconEx, "Seed icon synchronization failed after seeding");
-        }
-        finally
-        {
-            context.ChangeTracker.Clear();
-        }
-
-        // Seeders insert entities directly; reconcile only demo tenants when a tenant
-        // still has missing inventory rows or no positive stock after the seed pipeline.
-        var seedTenantIds = await context.Tenants
-            .AsNoTracking()
-            .Where(t => SeedTenantRegistry.Slugs.Contains(t.Slug))
-            .Select(t => t.Id)
-            .ToListAsync();
-
-        var shouldSynchronizeSeedInventory = false;
-
-        foreach (var seedTenantId in seedTenantIds)
-        {
-            var expectedInventoryRows = await (
-                from product in context.Products.AsNoTracking()
-                join branch in context.Branches.AsNoTracking() on product.TenantId equals branch.TenantId
-                where product.TenantId == seedTenantId
-                    && product.IsActive
-                    && product.TrackInventory
-                    && branch.IsActive
-                select 1
-            ).CountAsync();
-
-            if (expectedInventoryRows == 0)
+            if (seedResult.Success)
             {
-                continue;
+                Log.Information(
+                    "Startup seed pipeline completed with {WarningCount} warnings",
+                    seedResult.Data?.OptionalWarnings.Count ?? 0);
             }
-
-            var existingInventoryRows = await context.BranchInventories
-                .AsNoTracking()
-                .CountAsync(i => i.TenantId == seedTenantId);
-
-            var hasPositiveInventory = await context.BranchInventories
-                .AsNoTracking()
-                .AnyAsync(i => i.TenantId == seedTenantId && i.Quantity > 0);
-
-            if (existingInventoryRows < expectedInventoryRows || !hasPositiveInventory)
+            else
             {
-                shouldSynchronizeSeedInventory = true;
-                break;
+                Log.Warning(
+                    "Startup seed pipeline failed: {ErrorCode} - {Message}",
+                    seedResult.ErrorCode,
+                    seedResult.Message);
             }
         }
-
-        if (shouldSynchronizeSeedInventory)
+        else
         {
-            try
-            {
-                await SeedInventorySynchronizer.SynchronizeAsync(context);
-            }
-            catch (Exception syncEx)
-            {
-                Log.Warning(syncEx, "Branch inventory synchronization failed after seeding");
-            }
-            finally
-            {
-                context.ChangeTracker.Clear();
-            }
-        }
-
-        // Ensure seed tenants never start with open shifts after the full pipeline.
-        try
-        {
-            await MultiTenantSeeder.CloseOpenShiftsForTargetTenantsAsync(context);
-        }
-        catch (Exception shiftEx)
-        {
-            Log.Warning(shiftEx, "Seed shift close synchronization failed after seeding");
-        }
-        finally
-        {
-            context.ChangeTracker.Clear();
+            Log.Information("Automatic startup seeding is disabled (Seeding:AutoRunOnStartup=false)");
         }
     }
 }

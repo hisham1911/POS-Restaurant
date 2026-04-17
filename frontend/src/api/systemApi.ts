@@ -3,6 +3,7 @@ import type {
   CreateTenantRequest,
   CreateTenantResponse,
   SetTenantStatusRequest,
+  SystemSeedRunResult,
   SystemTenantSummary,
 } from "../types/system";
 import type { ApiResponse } from "../types/api.types";
@@ -53,6 +54,21 @@ export const systemApi = baseApi.injectEndpoints({
         body,
       }),
     }),
+    runSeedPipeline: builder.mutation<
+      {
+        success: boolean;
+        data: SystemSeedRunResult;
+        message?: string;
+        errorCode?: string;
+        errors?: string[];
+      },
+      void
+    >({
+      query: () => ({
+        url: "/system/seed/run",
+        method: "POST",
+      }),
+    }),
 
     // System Info (IP, Network, Environment)
     getSystemInfo: builder.query<{ success: boolean; data: SystemInfo }, void>({
@@ -70,6 +86,7 @@ export const {
   useGetTenantsQuery,
   useCreateTenantMutation,
   useSetTenantStatusMutation,
+  useRunSeedPipelineMutation,
   useGetSystemInfoQuery,
   useHealthQuery,
 } = systemApi;

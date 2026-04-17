@@ -39,3 +39,13 @@ export interface SystemTenantSummary {
 export interface SetTenantStatusRequest {
   isActive: boolean;
 }
+
+export interface SystemSeedRunResult {
+  startedAtUtc: string;
+  completedAtUtc: string;
+  durationMs: number;
+  inventorySynchronizationTriggered: boolean;
+  preservedExistingData: boolean;
+  seededTenantSlugs: string[];
+  optionalWarnings: string[];
+}

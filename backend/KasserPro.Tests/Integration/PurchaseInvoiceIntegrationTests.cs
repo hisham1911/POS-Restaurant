@@ -69,6 +69,23 @@ public class PurchaseInvoiceIntegrationTests : IClassFixture<CustomWebApplicatio
     }
 
     [Fact]
+    public async Task CreatePurchaseInvoice_ShouldNotReuseNumberFromSoftDeletedDraft()
+    {
+        var testData = await SeedPurchaseInvoiceDataAsync(0m);
+        using var client = CreateAuthenticatedAdminClient(testData);
+
+        var firstInvoice = await CreateInvoiceAsync(client, testData.SupplierId, testData.ProductId, 250m);
+
+        var deleteResponse = await client.DeleteAsync($"/api/purchaseinvoices/{firstInvoice.Id}");
+        deleteResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var secondInvoice = await CreateInvoiceAsync(client, testData.SupplierId, testData.ProductId, 300m);
+
+        secondInvoice.InvoiceNumber.Should().NotBe(firstInvoice.InvoiceNumber);
+        secondInvoice.InvoiceNumber.Should().EndWith("0002");
+    }
+
+    [Fact]
     public async Task PurchaseInvoicePayments_ShouldRecalculateStatusAcrossFullDeleteAndPartialFlows()
     {
         var testData = await SeedPurchaseInvoiceDataAsync(0m);

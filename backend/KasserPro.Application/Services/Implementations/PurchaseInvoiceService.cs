@@ -712,6 +712,9 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         var prefix = $"PI-{year}-";
 
         var existingNumbers = await _unitOfWork.PurchaseInvoices.Query()
+            // InvoiceNumber has a unique index that includes soft-deleted rows.
+            // Ignore global filters here to avoid reusing numbers from deleted drafts.
+            .IgnoreQueryFilters()
             .Where(pi => pi.TenantId == tenantId && pi.InvoiceNumber.StartsWith(prefix))
             .Select(pi => pi.InvoiceNumber)
             .ToListAsync();

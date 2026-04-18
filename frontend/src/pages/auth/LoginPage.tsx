@@ -83,7 +83,9 @@ export const LoginPage = () => {
                 <span className="text-4xl font-black">K</span>
               </div>
 
-              <h2 className="text-3xl font-black text-slate-800">تسجيل الدخول</h2>
+              <h2 className="text-3xl font-black text-slate-800">
+                تسجيل الدخول
+              </h2>
               <p className="mt-2 text-sm text-slate-500">
                 أدخل بيانات حسابك للوصول إلى النظام
               </p>

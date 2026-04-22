@@ -2,18 +2,12 @@ import { useEffect, useRef } from "react";
 import { useGetBranchesQuery } from "@/api/branchesApi";
 import { baseApi } from "@/api/baseApi";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import {
-  selectCurrentBranch,
-  setBranches,
-} from "@/store/slices/branchSlice";
+import { selectCurrentBranch, setBranches } from "@/store/slices/branchSlice";
 import {
   selectCurrentUser,
   selectIsAuthenticated,
 } from "@/store/slices/authSlice";
-import {
-  getBranchStorageKey,
-  readSavedBranchId,
-} from "@/utils/branchStorage";
+import { getBranchStorageKey, readSavedBranchId } from "@/utils/branchStorage";
 
 const BRANCH_SENSITIVE_TAGS = [
   "Products",

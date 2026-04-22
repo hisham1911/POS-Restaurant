@@ -38,15 +38,16 @@ export const BranchStateSync = () => {
   const currentBranch = useAppSelector(selectCurrentBranch);
   const previousBranchIdRef = useRef<number | null>(null);
   const branchStorageKey = getBranchStorageKey(currentUser?.id);
+  const canReadBranches = isAuthenticated && currentUser?.role === "Admin";
 
   const { data: branchesData } = useGetBranchesQuery(undefined, {
-    skip: !isAuthenticated,
+    skip: !canReadBranches,
   });
 
   useEffect(() => {
     const branches = branchesData?.data;
 
-    if (!isAuthenticated || !branches) {
+    if (!canReadBranches || !branches) {
       return;
     }
 
@@ -61,8 +62,8 @@ export const BranchStateSync = () => {
     branchesData,
     branchStorageKey,
     currentUser?.branchId,
+    canReadBranches,
     dispatch,
-    isAuthenticated,
   ]);
 
   useEffect(() => {

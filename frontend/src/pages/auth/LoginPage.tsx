@@ -8,7 +8,6 @@ import {
   EyeOff,
   LogIn,
   Mail,
-  ShieldCheck,
   Sparkles,
   KeyRound,
 } from "lucide-react";
@@ -44,34 +43,34 @@ export const LoginPage = () => {
           <div className="relative">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold tracking-wide text-blue-100">
               <Sparkles className="h-4 w-4" />
-              نظام تشغيل نقاط البيع
+              تاجر برو | نظام نقاط البيع
             </div>
 
             <h1 className="text-4xl font-black leading-tight">
-              KasserPro
+              تاجر برو
               <span className="mt-1 block text-xl font-medium text-blue-100">
-                إدارة سريعة. تشغيل واضح. أداء يومي ثابت.
+                نظام بسيط لإدارة المبيعات والفواتير والمخزون
               </span>
             </h1>
 
             <p className="mt-6 max-w-md text-sm leading-7 text-blue-100/90">
-              لوحة دخول مصممة لفريق العمل داخل الفروع، مع تجربة مباشرة لاختبار
-              الحسابات التجريبية قبل التشغيل الفعلي.
+              كل ما تحتاجه لإدارة الشغل اليومي في مكان واحد: بيع أسرع، متابعة
+              واضحة، وتقارير مفهومة.
             </p>
           </div>
 
           <div className="relative space-y-3 rounded-2xl border border-white/20 bg-white/10 p-5">
             <div className="flex items-center gap-3 text-sm">
-              <ShieldCheck className="h-5 w-5 text-emerald-300" />
-              حماية جلسات المستخدم والتوكن
+              <BadgeCheck className="h-5 w-5 text-emerald-300" />
+              واجهة سهلة وسريعة لكل الموظفين
             </div>
             <div className="flex items-center gap-3 text-sm">
               <BadgeCheck className="h-5 w-5 text-amber-300" />
-              صلاحيات دقيقة حسب الدور والفرع
+              بيع وفواتير ومخزون من نفس النظام
             </div>
             <div className="flex items-center gap-3 text-sm">
               <LogIn className="h-5 w-5 text-cyan-300" />
-              بدء العمل خلال ثوانٍ
+              تقارير يومية تساعدك تتابع الأداء
             </div>
           </div>
         </section>
@@ -80,7 +79,7 @@ export const LoginPage = () => {
           <div className="w-full max-w-md animate-fade-in">
             <div className="mb-7 text-center">
               <div className="mx-auto mb-4 inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-[linear-gradient(140deg,#1d4ed8_0%,#f97316_100%)] text-white shadow-[0_22px_35px_-24px_rgba(37,99,235,0.8)]">
-                <span className="text-4xl font-black">K</span>
+                <span className="text-4xl font-black">ت</span>
               </div>
 
               <h2 className="text-3xl font-black text-slate-800">
@@ -97,7 +96,7 @@ export const LoginPage = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="مثال: admin@kasserpro.com"
+                placeholder="مثال: karim@supermarket.com"
                 required
               />
 

@@ -19,8 +19,9 @@ export const BranchSelector = () => {
   const currentBranch = useAppSelector(selectCurrentBranch);
   const branches = useAppSelector(selectBranches);
   const currentUser = useAppSelector(selectCurrentUser);
+  const canReadBranches = currentUser?.role === "Admin";
   const { isLoading } = useGetBranchesQuery(undefined, {
-    skip: !currentUser,
+    skip: !canReadBranches,
   });
   const branchStorageKey = getBranchStorageKey(currentUser?.id);
 
@@ -54,13 +55,13 @@ export const BranchSelector = () => {
   // Cashiers can only see their assigned branch (no dropdown)
   const isCashier = currentUser?.role === "Cashier";
 
-  // Show static branch name for cashiers or single-branch users
-  if (isCashier || branches.length <= 1) {
+  // Show static branch name for non-admin users or when there is only one branch.
+  if (!canReadBranches || isCashier || branches.length <= 1) {
     return (
       <div className="flex items-center gap-2 px-3 py-2 bg-gray-100 rounded-lg">
         <Building2 className="w-4 h-4 text-gray-500" />
         <span className="text-sm font-medium">
-          {currentBranch?.name || "الفرع الرئيسي"}
+          {currentBranch?.name || (isCashier ? "فرعك المحدد" : "بدون فرع")}
         </span>
       </div>
     );

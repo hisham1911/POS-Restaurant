@@ -585,13 +585,24 @@ public class OrderService : IOrderService
                 if (paymentReq.Amount <= 0)
                     continue;
 
+                var paymentMethod = Enum.Parse<PaymentMethod>(paymentReq.Method);
+                var referenceValidation = ValidateReferenceForNonCashPayment(
+                    paymentMethod,
+                    paymentReq.Reference);
+                if (!referenceValidation.Success)
+                {
+                    return ApiResponse<OrderDto>.Fail(
+                        ErrorCodes.PAYMENT_REFERENCE_REQUIRED,
+                        referenceValidation.Message!);
+                }
+
                 var payment = new Payment
                 {
                     TenantId = _currentUser.TenantId,
                     BranchId = _currentUser.BranchId,
                     OrderId = order.Id,
                     Amount = Math.Round(paymentReq.Amount, 2),
-                    Method = Enum.Parse<PaymentMethod>(paymentReq.Method),
+                    Method = paymentMethod,
                     Reference = paymentReq.Reference
                 };
                 await _unitOfWork.Payments.AddAsync(payment);
@@ -705,6 +716,23 @@ public class OrderService : IOrderService
             return ApiResponse<OrderDto>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR,
                 $"حدث خطأ أثناء إتمام الطلب: {ex.Message}");
         }
+    }
+
+    private static (bool Success, string? Message) ValidateReferenceForNonCashPayment(
+        PaymentMethod method,
+        string? reference)
+    {
+        if (method == PaymentMethod.Cash)
+        {
+            return (true, null);
+        }
+
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return (false, "رقم المعاملة مطلوب لطرق الدفع غير النقدية");
+        }
+
+        return (true, null);
     }
 
     public async Task<ApiResponse<bool>> CancelAsync(int orderId, string? reason)

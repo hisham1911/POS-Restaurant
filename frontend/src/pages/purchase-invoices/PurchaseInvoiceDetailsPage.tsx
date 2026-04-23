@@ -1,25 +1,25 @@
-import { useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   useGetPurchaseInvoiceByIdQuery,
   useConfirmPurchaseInvoiceMutation,
   useDeletePurchaseInvoiceMutation,
-} from '../../api/purchaseInvoiceApi';
-import { Button } from '../../components/common/Button';
-import { Card } from '../../components/common/Card';
-import { Loading } from '../../components/common/Loading';
-import { formatCurrency, formatDateOnly } from '../../utils/formatters';
-import { toast } from 'sonner';
-import { AddPaymentModal } from '../../components/purchase-invoices/AddPaymentModal';
-import { CancelInvoiceModal } from '../../components/purchase-invoices/CancelInvoiceModal';
-import { handleApiError } from '../../utils/errorHandler';
+} from "../../api/purchaseInvoiceApi";
+import { Button } from "../../components/common/Button";
+import { Card } from "../../components/common/Card";
+import { Loading } from "../../components/common/Loading";
+import { formatCurrency, formatDateOnly } from "../../utils/formatters";
+import { toast } from "sonner";
+import { AddPaymentModal } from "../../components/purchase-invoices/AddPaymentModal";
+import { CancelInvoiceModal } from "../../components/purchase-invoices/CancelInvoiceModal";
+import { handleApiError } from "../../utils/errorHandler";
 
 const getPaymentMethodLabel = (method: string) => {
   const labels: Record<string, string> = {
-    Cash: 'نقدي',
-    Card: 'بطاقة',
-    Fawry: 'فوري',
-    BankTransfer: 'تحويل بنكي',
+    Cash: "نقدي",
+    Card: "فيزا",
+    Fawry: "فودافون كاش",
+    BankTransfer: "تحويل بنكي",
   };
 
   return labels[method] || method;
@@ -31,56 +31,61 @@ export function PurchaseInvoiceDetailsPage() {
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
 
-  const { data: invoiceResponse, isLoading } = useGetPurchaseInvoiceByIdQuery(Number(id));
-  const [confirmInvoice, { isLoading: isConfirming }] = useConfirmPurchaseInvoiceMutation();
+  const { data: invoiceResponse, isLoading } = useGetPurchaseInvoiceByIdQuery(
+    Number(id),
+  );
+  const [confirmInvoice, { isLoading: isConfirming }] =
+    useConfirmPurchaseInvoiceMutation();
   const [deleteInvoice] = useDeletePurchaseInvoiceMutation();
 
   const invoice = invoiceResponse?.data;
 
   const handleConfirm = async () => {
-    if (!confirm('هل أنت متأكد من تأكيد الفاتورة؟ سيتم تحديث المخزون.')) return;
+    if (!confirm("هل أنت متأكد من تأكيد الفاتورة؟ سيتم تحديث المخزون.")) return;
 
     try {
       await confirmInvoice(Number(id)).unwrap();
-      toast.success('تم تأكيد الفاتورة بنجاح');
+      toast.success("تم تأكيد الفاتورة بنجاح");
     } catch (error) {
-      console.error('Error confirming invoice:', error);
+      console.error("Error confirming invoice:", error);
       toast.error(handleApiError(error));
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm('هل أنت متأكد من حذف الفاتورة؟')) return;
+    if (!confirm("هل أنت متأكد من حذف الفاتورة؟")) return;
 
     try {
       await deleteInvoice(Number(id)).unwrap();
-      toast.success('تم حذف الفاتورة بنجاح');
-      navigate('/purchase-invoices');
+      toast.success("تم حذف الفاتورة بنجاح");
+      navigate("/purchase-invoices");
     } catch (error) {
-      console.error('Error deleting invoice:', error);
+      console.error("Error deleting invoice:", error);
       toast.error(handleApiError(error));
     }
   };
 
   const getStatusBadge = (status: string) => {
     const statusColors: Record<string, string> = {
-      Draft: 'bg-gray-100 text-gray-800',
-      Confirmed: 'bg-blue-100 text-blue-800',
-      Paid: 'bg-green-100 text-green-800',
-      PartiallyPaid: 'bg-yellow-100 text-yellow-800',
-      Cancelled: 'bg-red-100 text-red-800',
+      Draft: "bg-gray-100 text-gray-800",
+      Confirmed: "bg-blue-100 text-blue-800",
+      Paid: "bg-green-100 text-green-800",
+      PartiallyPaid: "bg-yellow-100 text-yellow-800",
+      Cancelled: "bg-red-100 text-red-800",
     };
 
     const statusLabels: Record<string, string> = {
-      Draft: 'مسودة',
-      Confirmed: 'مؤكدة',
-      Paid: 'مدفوعة',
-      PartiallyPaid: 'مدفوعة جزئياً',
-      Cancelled: 'ملغاة',
+      Draft: "مسودة",
+      Confirmed: "مؤكدة",
+      Paid: "مدفوعة",
+      PartiallyPaid: "مدفوعة جزئياً",
+      Cancelled: "ملغاة",
     };
 
     return (
-      <span className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[status] || 'bg-gray-100 text-gray-800'}`}>
+      <span
+        className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[status] || "bg-gray-100 text-gray-800"}`}
+      >
         {statusLabels[status] || status}
       </span>
     );
@@ -93,20 +98,28 @@ export function PurchaseInvoiceDetailsPage() {
     <div className="p-6 pb-20">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h1 className="text-2xl font-bold">فاتورة شراء {invoice.invoiceNumber}</h1>
+          <h1 className="text-2xl font-bold">
+            فاتورة شراء {invoice.invoiceNumber}
+          </h1>
           <div className="mt-2">{getStatusBadge(invoice.status)}</div>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate('/purchase-invoices')}>
+          <Button
+            variant="outline"
+            onClick={() => navigate("/purchase-invoices")}
+          >
             رجوع
           </Button>
-          {invoice.status === 'Draft' && (
+          {invoice.status === "Draft" && (
             <>
-              <Button variant="outline" onClick={() => navigate(`/purchase-invoices/${id}/edit`)}>
+              <Button
+                variant="outline"
+                onClick={() => navigate(`/purchase-invoices/${id}/edit`)}
+              >
                 تعديل
               </Button>
               <Button onClick={handleConfirm} disabled={isConfirming}>
-                {isConfirming ? 'جاري التأكيد...' : 'تأكيد الفاتورة'}
+                {isConfirming ? "جاري التأكيد..." : "تأكيد الفاتورة"}
               </Button>
             </>
           )}
@@ -136,7 +149,9 @@ export function PurchaseInvoiceDetailsPage() {
           <div className="space-y-2">
             <div className="flex justify-between">
               <span className="text-gray-600">التاريخ:</span>
-              <span className="font-medium">{formatDateOnly(invoice.invoiceDate)}</span>
+              <span className="font-medium">
+                {formatDateOnly(invoice.invoiceDate)}
+              </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">أنشئت بواسطة:</span>
@@ -145,7 +160,9 @@ export function PurchaseInvoiceDetailsPage() {
             {invoice.confirmedByUserName && (
               <div className="flex justify-between">
                 <span className="text-gray-600">أكدت بواسطة:</span>
-                <span className="font-medium">{invoice.confirmedByUserName}</span>
+                <span className="font-medium">
+                  {invoice.confirmedByUserName}
+                </span>
               </div>
             )}
             {invoice.notes && (
@@ -167,11 +184,21 @@ export function PurchaseInvoiceDetailsPage() {
           <table className="w-full min-w-[720px]">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">المنتج</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الكمية</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">سعر الشراء</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الإجمالي</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">ملاحظات</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  المنتج
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  الكمية
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  سعر الشراء
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  الإجمالي
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  ملاحظات
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
@@ -180,13 +207,21 @@ export function PurchaseInvoiceDetailsPage() {
                   <td className="px-4 py-3 text-sm">
                     <div>{item.productName}</div>
                     {item.productSku && (
-                      <div className="text-xs text-gray-500">{item.productSku}</div>
+                      <div className="text-xs text-gray-500">
+                        {item.productSku}
+                      </div>
                     )}
                   </td>
                   <td className="px-4 py-3 text-sm">{item.quantity}</td>
-                  <td className="px-4 py-3 text-sm">{formatCurrency(item.purchasePrice)}</td>
-                  <td className="px-4 py-3 text-sm font-medium">{formatCurrency(item.total)}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">{item.notes || '-'}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {formatCurrency(item.purchasePrice)}
+                  </td>
+                  <td className="px-4 py-3 text-sm font-medium">
+                    {formatCurrency(item.total)}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-500">
+                    {item.notes || "-"}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -199,11 +234,15 @@ export function PurchaseInvoiceDetailsPage() {
             <div className="w-64 space-y-2">
               <div className="flex justify-between">
                 <span className="text-sm">المجموع الفرعي:</span>
-                <span className="text-sm font-medium">{formatCurrency(invoice.subtotal)}</span>
+                <span className="text-sm font-medium">
+                  {formatCurrency(invoice.subtotal)}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-sm">الضريبة ({invoice.taxRate}%):</span>
-                <span className="text-sm font-medium">{formatCurrency(invoice.taxAmount)}</span>
+                <span className="text-sm font-medium">
+                  {formatCurrency(invoice.taxAmount)}
+                </span>
               </div>
               <div className="flex justify-between text-lg font-bold border-t pt-2">
                 <span>الإجمالي:</span>
@@ -211,11 +250,15 @@ export function PurchaseInvoiceDetailsPage() {
               </div>
               <div className="flex justify-between text-green-600">
                 <span>المدفوع:</span>
-                <span className="font-medium">{formatCurrency(invoice.amountPaid)}</span>
+                <span className="font-medium">
+                  {formatCurrency(invoice.amountPaid)}
+                </span>
               </div>
               <div className="flex justify-between text-red-600">
                 <span>المتبقي:</span>
-                <span className="font-medium">{formatCurrency(invoice.amountDue)}</span>
+                <span className="font-medium">
+                  {formatCurrency(invoice.amountDue)}
+                </span>
               </div>
             </div>
           </div>
@@ -226,9 +269,13 @@ export function PurchaseInvoiceDetailsPage() {
       <Card padding="none" className="mb-6">
         <div className="p-4 border-b flex justify-between items-center">
           <h2 className="text-lg font-semibold">الدفعات</h2>
-          {invoice.amountDue > 0 && invoice.status !== 'Cancelled' && invoice.status !== 'Draft' && (
-            <Button onClick={() => setShowAddPaymentModal(true)}>إضافة دفعة</Button>
-          )}
+          {invoice.amountDue > 0 &&
+            invoice.status !== "Cancelled" &&
+            invoice.status !== "Draft" && (
+              <Button onClick={() => setShowAddPaymentModal(true)}>
+                إضافة دفعة
+              </Button>
+            )}
         </div>
 
         {invoice.payments.length === 0 ? (
@@ -238,21 +285,41 @@ export function PurchaseInvoiceDetailsPage() {
             <table className="w-full min-w-[720px]">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">التاريخ</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">المبلغ</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">الطريقة</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">رقم المرجع</th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">بواسطة</th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    التاريخ
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    المبلغ
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    الطريقة
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    رقم المرجع
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    بواسطة
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
                 {invoice.payments.map((payment) => (
                   <tr key={payment.id}>
-                    <td className="px-4 py-3 text-sm">{formatDateOnly(payment.paymentDate)}</td>
-                    <td className="px-4 py-3 text-sm font-medium">{formatCurrency(payment.amount)}</td>
-                    <td className="px-4 py-3 text-sm">{getPaymentMethodLabel(payment.method)}</td>
-                    <td className="px-4 py-3 text-sm">{payment.referenceNumber || '-'}</td>
-                    <td className="px-4 py-3 text-sm">{payment.createdByUserName}</td>
+                    <td className="px-4 py-3 text-sm">
+                      {formatDateOnly(payment.paymentDate)}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-medium">
+                      {formatCurrency(payment.amount)}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {getPaymentMethodLabel(payment.method)}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {payment.referenceNumber || "-"}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {payment.createdByUserName}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -263,13 +330,22 @@ export function PurchaseInvoiceDetailsPage() {
 
       {/* Actions */}
       <div className="flex justify-end gap-4 mb-6">
-        {invoice.status === 'Draft' && (
-          <Button variant="outline" onClick={handleDelete} className="text-red-600 border-red-600 hover:bg-red-50">
+        {invoice.status === "Draft" && (
+          <Button
+            variant="outline"
+            onClick={handleDelete}
+            className="text-red-600 border-red-600 hover:bg-red-50"
+          >
             حذف الفاتورة
           </Button>
         )}
-        {(invoice.status === 'Confirmed' || invoice.status === 'PartiallyPaid') && (
-          <Button variant="outline" onClick={() => setShowCancelModal(true)} className="text-red-600 border-red-600 hover:bg-red-50">
+        {(invoice.status === "Confirmed" ||
+          invoice.status === "PartiallyPaid") && (
+          <Button
+            variant="outline"
+            onClick={() => setShowCancelModal(true)}
+            className="text-red-600 border-red-600 hover:bg-red-50"
+          >
             إلغاء الفاتورة
           </Button>
         )}
@@ -287,11 +363,12 @@ export function PurchaseInvoiceDetailsPage() {
       {showCancelModal && (
         <CancelInvoiceModal
           invoiceId={Number(id)}
-          isConfirmed={invoice.status === 'Confirmed' || invoice.status === 'PartiallyPaid'}
+          isConfirmed={
+            invoice.status === "Confirmed" || invoice.status === "PartiallyPaid"
+          }
           onClose={() => setShowCancelModal(false)}
         />
       )}
     </div>
   );
 }
-

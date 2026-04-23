@@ -33,8 +33,12 @@ const paymentMethods: {
   icon: React.ReactNode;
 }[] = [
   { id: "Cash", label: "نقدي", icon: <Banknote className="w-8 h-8" /> },
-  { id: "Card", label: "بطاقة", icon: <CreditCard className="w-8 h-8" /> },
-  { id: "Fawry", label: "فوري", icon: <Building2 className="w-8 h-8" /> },
+  { id: "Card", label: "فيزا", icon: <CreditCard className="w-8 h-8" /> },
+  {
+    id: "Fawry",
+    label: "فودافون كاش",
+    icon: <Building2 className="w-8 h-8" />,
+  },
 ];
 
 export const PaymentModal = ({
@@ -47,18 +51,23 @@ export const PaymentModal = ({
   const { clearCart } = useCart();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("Cash");
   const [amountPaid, setAmountPaid] = useState<string>("");
+  const [transactionReference, setTransactionReference] = useState("");
   const [showError, setShowError] = useState(false);
   const [allowPartialPayment, setAllowPartialPayment] = useState(false);
 
   const customerId = selectedCustomer?.id;
-  const { preparedOrder, isPreparingOrder, markPreparedOrderCompleted, discardPreparedOrder } =
-    usePreparedPaymentOrder({
-      enabled: true,
-      customerId,
-      createOrder,
-      cancelOrder,
-      onPrepareFailed: onClose,
-    });
+  const {
+    preparedOrder,
+    isPreparingOrder,
+    markPreparedOrderCompleted,
+    discardPreparedOrder,
+  } = usePreparedPaymentOrder({
+    enabled: true,
+    customerId,
+    createOrder,
+    cancelOrder,
+    onPrepareFailed: onClose,
+  });
   const total = preparedOrder?.total ?? 0;
 
   useEffect(() => {
@@ -67,9 +76,20 @@ export const PaymentModal = ({
     }
   }, [preparedOrder]);
 
+  useEffect(() => {
+    if (selectedMethod === "Cash") {
+      setTransactionReference("");
+      return;
+    }
+
+    setAllowPartialPayment(false);
+    setAmountPaid(total.toFixed(2));
+  }, [selectedMethod, total]);
+
   const numericAmount = parseFloat(amountPaid) || 0;
   const change = numericAmount - total;
   const amountDue = total - numericAmount;
+  const requiresTransactionReference = selectedMethod !== "Cash";
 
   const handleClose = async () => {
     await discardPreparedOrder();
@@ -85,8 +105,7 @@ export const PaymentModal = ({
   const canTakeCredit =
     selectedCustomer &&
     selectedCustomer.isActive &&
-    (selectedCustomer.creditLimit === 0 ||
-      amountDue <= availableCredit);
+    (selectedCustomer.creditLimit === 0 || amountDue <= availableCredit);
 
   const creditLimitExceeded =
     selectedCustomer &&
@@ -131,7 +150,11 @@ export const PaymentModal = ({
     }
 
     // Validate customer is active
-    if (numericAmount < total && selectedCustomer && !selectedCustomer.isActive) {
+    if (
+      numericAmount < total &&
+      selectedCustomer &&
+      !selectedCustomer.isActive
+    ) {
       toast.error("العميل غير نشط - لا يمكن البيع الآجل");
       return;
     }
@@ -140,8 +163,13 @@ export const PaymentModal = ({
     if (numericAmount < total && creditLimitExceeded) {
       toast.error(
         `تجاوز حد الائتمان. المتاح: ${formatCurrency(availableCredit)} ج.م، المطلوب: ${formatCurrency(amountDue)} ج.م`,
-        { duration: 5000 }
+        { duration: 5000 },
       );
+      return;
+    }
+
+    if (requiresTransactionReference && !transactionReference.trim()) {
+      toast.error("رقم المعاملة مطلوب عند الدفع بفودافون كاش أو فيزا");
       return;
     }
 
@@ -159,6 +187,9 @@ export const PaymentModal = ({
           {
             method: selectedMethod,
             amount: numericAmount,
+            reference: requiresTransactionReference
+              ? transactionReference.trim()
+              : undefined,
           },
         ],
       });
@@ -177,6 +208,7 @@ export const PaymentModal = ({
         // مسح العميل المحدد
         markPreparedOrderCompleted(preparedOrder.id);
         clearCart();
+        setTransactionReference("");
         onOrderComplete?.();
         onClose();
       }
@@ -315,7 +347,7 @@ export const PaymentModal = ({
                               (selectedCustomer.totalDue /
                                 selectedCustomer.creditLimit) *
                                 100,
-                              100
+                              100,
                             )}%`,
                           }}
                         />
@@ -362,6 +394,23 @@ export const PaymentModal = ({
                 ))}
               </div>
             </div>
+
+            {requiresTransactionReference && (
+              <div>
+                <p className="text-sm font-medium text-gray-500 mb-3">
+                  رقم المعاملة <span className="text-danger-500">*</span>
+                </p>
+                <input
+                  type="text"
+                  value={transactionReference}
+                  onChange={(event) =>
+                    setTransactionReference(event.target.value)
+                  }
+                  className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+                  placeholder="اكتب رقم العملية من فودافون كاش أو الفيزا"
+                />
+              </div>
+            )}
 
             {/* Amount Input (for Cash) */}
             {selectedMethod === "Cash" && (
@@ -466,7 +515,8 @@ export const PaymentModal = ({
                     </p>
                     {creditLimitExceeded && (
                       <p className="text-xs text-danger-600 mt-1">
-                        تجاوز حد الائتمان - المتاح: {formatCurrency(availableCredit)}
+                        تجاوز حد الائتمان - المتاح:{" "}
+                        {formatCurrency(availableCredit)}
                       </p>
                     )}
                     {selectedCustomer && !selectedCustomer.isActive && (

@@ -44,11 +44,11 @@ const DEFAULT_RECEIPT_SETTINGS: ReceiptTenantSettings = {
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   Cash: "💵 كاش",
   cash: "💵 كاش",
-  Card: "💳 بطاقة",
-  card: "💳 بطاقة",
+  Card: "💳 فيزا",
+  card: "💳 فيزا",
   Wallet: "📱 محفظة",
   wallet: "📱 محفظة",
-  Fawry: "🧾 فوري",
+  Fawry: "📱 فودافون كاش",
   BankTransfer: "🏦 تحويل بنكي",
 };
 

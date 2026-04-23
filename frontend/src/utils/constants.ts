@@ -19,8 +19,8 @@ export const ORDER_TYPES = {
 // طرق الدفع
 export const PAYMENT_METHODS = {
   Cash: { label: "نقدي", icon: "💵" },
-  Card: { label: "بطاقة", icon: "💳" },
-  Fawry: { label: "فوري", icon: "�" },
+  Card: { label: "فيزا", icon: "💳" },
+  Fawry: { label: "فودافون كاش", icon: "📱" },
   BankTransfer: { label: "تحويل بنكي", icon: "🏦" },
 } as const;
 
@@ -56,6 +56,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // Payment
   PAYMENT_INSUFFICIENT: "المبلغ المدفوع غير كافٍ",
   PAYMENT_INVALID_METHOD: "طريقة الدفع غير صالحة",
+  PAYMENT_REFERENCE_REQUIRED: "رقم المعاملة مطلوب لطرق الدفع غير النقدية",
   PAYMENT_INVALID_AMOUNT: "مبلغ الدفع غير صالح",
   PAYMENT_EXCEEDS_DUE: "مبلغ الدفع يتجاوز المطلوب",
 

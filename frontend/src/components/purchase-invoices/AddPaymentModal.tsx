@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
-import { useAddPaymentMutation } from '../../api/purchaseInvoiceApi';
-import { Modal } from '../common/Modal';
-import { Button } from '../common/Button';
-import { formatCurrency } from '../../utils/formatters';
-import { toast } from 'sonner';
-import type { PaymentMethod } from '../../types/purchaseInvoice.types';
-import { handleApiError } from '../../utils/errorHandler';
+import { useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { useAddPaymentMutation } from "../../api/purchaseInvoiceApi";
+import { Modal } from "../common/Modal";
+import { Button } from "../common/Button";
+import { formatCurrency } from "../../utils/formatters";
+import { toast } from "sonner";
+import type { PaymentMethod } from "../../types/purchaseInvoice.types";
+import { handleApiError } from "../../utils/errorHandler";
 
 interface AddPaymentModalProps {
   invoiceId: number;
@@ -14,14 +14,19 @@ interface AddPaymentModalProps {
   onClose: () => void;
 }
 
-export function AddPaymentModal({ invoiceId, amountDue, onClose }: AddPaymentModalProps) {
+export function AddPaymentModal({
+  invoiceId,
+  amountDue,
+  onClose,
+}: AddPaymentModalProps) {
   const [amount, setAmount] = useState<string>(String(amountDue));
   const [paymentDate, setPaymentDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
+    new Date().toISOString().split("T")[0],
   );
-  const [method, setMethod] = useState<PaymentMethod>('Cash');
-  const [referenceNumber, setReferenceNumber] = useState<string>('');
-  const [notes, setNotes] = useState<string>('');
+  const [method, setMethod] = useState<PaymentMethod>("Cash");
+  const [referenceNumber, setReferenceNumber] = useState<string>("");
+  const [notes, setNotes] = useState<string>("");
+  const requiresReference = method !== "Cash";
 
   const [addPayment, { isLoading }] = useAddPaymentMutation();
 
@@ -30,12 +35,19 @@ export function AddPaymentModal({ invoiceId, amountDue, onClose }: AddPaymentMod
 
     const numAmount = Number(amount) || 0;
     if (numAmount <= 0) {
-      toast.error('المبلغ يجب أن يكون أكبر من صفر');
+      toast.error("المبلغ يجب أن يكون أكبر من صفر");
       return;
     }
 
     if (numAmount > amountDue) {
-      toast.error(`المبلغ يتجاوز المبلغ المستحق (${formatCurrency(amountDue)})`);
+      toast.error(
+        `المبلغ يتجاوز المبلغ المستحق (${formatCurrency(amountDue)})`,
+      );
+      return;
+    }
+
+    if (requiresReference && !referenceNumber.trim()) {
+      toast.error("رقم المعاملة مطلوب عند الدفع بفودافون كاش أو فيزا");
       return;
     }
 
@@ -47,16 +59,16 @@ export function AddPaymentModal({ invoiceId, amountDue, onClose }: AddPaymentMod
         referenceNumber: referenceNumber.trim() || undefined,
         notes: notes.trim() || undefined,
       };
-      
+
       await addPayment({
         invoiceId,
         payment: paymentData,
       }).unwrap();
 
-      toast.success('تم إضافة الدفعة بنجاح');
+      toast.success("تم إضافة الدفعة بنجاح");
       onClose();
     } catch (error) {
-      console.error('Error adding payment:', error);
+      console.error("Error adding payment:", error);
       toast.error(handleApiError(error));
     }
   };
@@ -108,21 +120,25 @@ export function AddPaymentModal({ invoiceId, amountDue, onClose }: AddPaymentMod
               required
             >
               <option value="Cash">نقدي</option>
-              <option value="Card">بطاقة</option>
-              <option value="Fawry">فوري</option>
+              <option value="Card">فيزا</option>
+              <option value="Fawry">فودافون كاش</option>
             </select>
             <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium mb-1">رقم المرجع</label>
+          <label className="block text-sm font-medium mb-1">
+            رقم المعاملة{" "}
+            {requiresReference && <span className="text-red-500">*</span>}
+          </label>
           <input
             type="text"
             value={referenceNumber}
             onChange={(e) => setReferenceNumber(e.target.value)}
             className="w-full px-3 py-2 border rounded-lg"
-            placeholder="اختياري"
+            placeholder={requiresReference ? "اكتب رقم العملية" : "اختياري"}
+            required={requiresReference}
           />
         </div>
 
@@ -142,7 +158,7 @@ export function AddPaymentModal({ invoiceId, amountDue, onClose }: AddPaymentMod
             إلغاء
           </Button>
           <Button type="submit" disabled={isLoading}>
-            {isLoading ? 'جاري الحفظ...' : 'حفظ'}
+            {isLoading ? "جاري الحفظ..." : "حفظ"}
           </Button>
         </div>
       </form>

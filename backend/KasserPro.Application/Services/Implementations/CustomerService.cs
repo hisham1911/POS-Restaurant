@@ -355,6 +355,16 @@ public class CustomerService : ICustomerService
         if (request.Amount <= 0)
             return ApiResponse<PayDebtResponse>.Fail("INVALID_AMOUNT", "المبلغ يجب أن يكون أكبر من صفر");
 
+        var referenceValidation = ValidateReferenceForNonCashPayment(
+            request.PaymentMethod,
+            request.ReferenceNumber);
+        if (!referenceValidation.Success)
+        {
+            return ApiResponse<PayDebtResponse>.Fail(
+                ErrorCodes.PAYMENT_REFERENCE_REQUIRED,
+                referenceValidation.Message!);
+        }
+
         // Get user for snapshot (filter by TenantId for multi-tenancy)
         var user = await _unitOfWork.Users.Query()
             .FirstOrDefaultAsync(u => u.Id == recordedByUserId && u.TenantId == tenantId);
@@ -476,6 +486,23 @@ public class CustomerService : ICustomerService
             BalanceAfter = payment.BalanceAfter,
             CreatedAt = payment.CreatedAt
         };
+    }
+
+    private static (bool Success, string? Message) ValidateReferenceForNonCashPayment(
+        PaymentMethod method,
+        string? reference)
+    {
+        if (method == PaymentMethod.Cash)
+        {
+            return (true, null);
+        }
+
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return (false, "رقم المعاملة مطلوب لطرق الدفع غير النقدية");
+        }
+
+        return (true, null);
     }
 
     public async Task<List<DebtPaymentDto>> GetDebtPaymentHistoryAsync(int customerId)

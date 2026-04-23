@@ -79,7 +79,7 @@ export const LoginPage = () => {
           <div className="w-full max-w-md animate-fade-in">
             <div className="mb-7 text-center">
               <div className="mx-auto mb-4 inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-[linear-gradient(140deg,#1d4ed8_0%,#f97316_100%)] text-white shadow-[0_22px_35px_-24px_rgba(37,99,235,0.8)]">
-                <span className="text-4xl font-black">t</span>
+                <span className="text-4xl font-black">T</span>
               </div>
 
               <h2 className="text-3xl font-black text-slate-800">

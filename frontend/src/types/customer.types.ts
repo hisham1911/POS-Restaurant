@@ -85,7 +85,7 @@ export interface CustomersQueryParams {
 // Debt Payment Types
 export interface PayDebtRequest {
   amount: number;
-  paymentMethod: 'Cash' | 'Card' | 'BankTransfer' | 'Fawry';
+  paymentMethod: "Cash" | "Card" | "Fawry";
   referenceNumber?: string;
   notes?: string;
 }
@@ -103,7 +103,7 @@ export interface DebtPaymentDto {
   id: number;
   customerId: number;
   amount: number;
-  paymentMethod: 'Cash' | 'Card' | 'BankTransfer' | 'Fawry';
+  paymentMethod: "Cash" | "Card" | "Fawry";
   referenceNumber?: string;
   notes?: string;
   recordedByUserId: number;

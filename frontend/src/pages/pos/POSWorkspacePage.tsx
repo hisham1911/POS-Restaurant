@@ -184,6 +184,7 @@ export const POSWorkspacePage = () => {
   const [customerPhone, setCustomerPhone] = useState("");
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<PaymentMethod>("Cash");
+  const [transactionReference, setTransactionReference] = useState("");
   const [amountPaid, setAmountPaid] = useState<string>("");
   const [allowPartialPayment, setAllowPartialPayment] = useState(false);
   const [showPaymentError, setShowPaymentError] = useState(false);
@@ -241,17 +242,14 @@ export const POSWorkspacePage = () => {
     searchCustomer,
     { data: searchResult, isFetching: isSearchingCustomer },
   ] = useLazyGetCustomerByPhoneQuery();
-  const {
-    preparedOrder,
-    isPreparingOrder,
-    markPreparedOrderCompleted,
-  } = usePreparedPaymentOrder({
-    enabled: activeTab === "payment" && items.length > 0,
-    customerId: selectedCustomer?.id,
-    createOrder,
-    cancelOrder,
-    onPrepareFailed: () => setActiveTab("cart"),
-  });
+  const { preparedOrder, isPreparingOrder, markPreparedOrderCompleted } =
+    usePreparedPaymentOrder({
+      enabled: activeTab === "payment" && items.length > 0,
+      customerId: selectedCustomer?.id,
+      createOrder,
+      cancelOrder,
+      onPrepareFailed: () => setActiveTab("cart"),
+    });
 
   const { data: warningsData } = useGetShiftWarningsQuery(undefined, {
     pollingInterval: 10 * 60 * 1000,
@@ -371,7 +369,9 @@ export const POSWorkspacePage = () => {
     [handleAddProductToCart, products],
   );
 
-  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleSearchKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
     if (event.key === "Enter") {
       event.preventDefault();
       handleSearchSubmit(searchInput);
@@ -517,16 +517,32 @@ export const POSWorkspacePage = () => {
       }
     }
 
+    if (selectedPaymentMethod !== "Cash" && !transactionReference.trim()) {
+      toast.error("رقم المعاملة مطلوب عند الدفع بفودافون كاش أو فيزا");
+      return;
+    }
+
     try {
       const completedOrder = await completeOrder(preparedOrder.id, {
-        payments: [{ method: selectedPaymentMethod, amount: numericAmount }],
+        payments: [
+          {
+            method: selectedPaymentMethod,
+            amount: numericAmount,
+            reference:
+              selectedPaymentMethod !== "Cash"
+                ? transactionReference.trim()
+                : undefined,
+          },
+        ],
       });
 
       if (completedOrder) {
         const changeAmount = numericAmount - paymentTotal;
 
         if (changeAmount > 0) {
-          toast.success(`تم إتمام الدفع! الباقي: ${formatCurrency(changeAmount)}`);
+          toast.success(
+            `تم إتمام الدفع! الباقي: ${formatCurrency(changeAmount)}`,
+          );
         } else if (amountDue > 0) {
           toast.success(
             `تم إتمام البيع الآجل! المبلغ المستحق: ${formatCurrency(amountDue)}`,
@@ -539,6 +555,7 @@ export const POSWorkspacePage = () => {
         clearCart();
         setSelectedCustomer(null);
         setCustomerPhone("");
+        setTransactionReference("");
         setAmountPaid("");
         setAllowPartialPayment(false);
         setActiveTab("cart");
@@ -587,7 +604,9 @@ export const POSWorkspacePage = () => {
   ]);
 
   const showProductResults =
-    showCatalog || Boolean(deferredSearchInput.trim()) || selectedCategory !== null;
+    showCatalog ||
+    Boolean(deferredSearchInput.trim()) ||
+    selectedCategory !== null;
   const visibleSearchResults = showCatalog
     ? filteredProducts
     : filteredProducts.slice(0, 12);
@@ -646,7 +665,10 @@ export const POSWorkspacePage = () => {
       })
     : null;
   const shiftDuration = currentShift
-    ? formatShiftDuration(currentShift.durationHours, currentShift.durationMinutes)
+    ? formatShiftDuration(
+        currentShift.durationHours,
+        currentShift.durationMinutes,
+      )
     : null;
 
   const paymentMethods: Array<{
@@ -655,8 +677,12 @@ export const POSWorkspacePage = () => {
     icon: ReactNode;
   }> = [
     { id: "Cash", label: "نقدي", icon: <Banknote className="h-5 w-5" /> },
-    { id: "Card", label: "بطاقة", icon: <CreditCard className="h-5 w-5" /> },
-    { id: "Fawry", label: "فوري", icon: <Building2 className="h-5 w-5" /> },
+    { id: "Card", label: "فيزا", icon: <CreditCard className="h-5 w-5" /> },
+    {
+      id: "Fawry",
+      label: "فودافون كاش",
+      icon: <Building2 className="h-5 w-5" />,
+    },
   ];
 
   const quickAmounts = [50, 100, 200, 500];
@@ -697,11 +723,23 @@ export const POSWorkspacePage = () => {
   ];
 
   const selectedPaymentMethodLabel =
-    paymentMethods.find((method) => method.id === selectedPaymentMethod)?.label ??
-    selectedPaymentMethod;
+    paymentMethods.find((method) => method.id === selectedPaymentMethod)
+      ?.label ?? selectedPaymentMethod;
+  const requiresTransactionReference = selectedPaymentMethod !== "Cash";
+
+  useEffect(() => {
+    if (selectedPaymentMethod === "Cash") {
+      setTransactionReference("");
+      return;
+    }
+
+    setAllowPartialPayment(false);
+    setAmountPaid(paymentTotal.toFixed(2));
+  }, [selectedPaymentMethod, paymentTotal]);
   const selectedCategoryName =
     selectedCategory !== null
-      ? categories.find((category) => category.id === selectedCategory)?.name ?? null
+      ? (categories.find((category) => category.id === selectedCategory)
+          ?.name ?? null)
       : null;
 
   const renderCartTab = () => {
@@ -733,7 +771,9 @@ export const POSWorkspacePage = () => {
             <h3 className="text-lg font-black text-slate-900">
               السلة ({itemsCount})
             </h3>
-            <p className="mt-1 text-sm text-slate-500">راجع الكميات والإجمالي قبل الدفع.</p>
+            <p className="mt-1 text-sm text-slate-500">
+              راجع الكميات والإجمالي قبل الدفع.
+            </p>
           </div>
           <button
             type="button"
@@ -802,8 +842,12 @@ export const POSWorkspacePage = () => {
                 <input
                   type="number"
                   value={discountInputValue === "0" ? "" : discountInputValue}
-                  onChange={(event) => setDiscountInputValue(event.target.value)}
-                  placeholder={discountInputType === "Percentage" ? "0-100" : "0.00"}
+                  onChange={(event) =>
+                    setDiscountInputValue(event.target.value)
+                  }
+                  placeholder={
+                    discountInputType === "Percentage" ? "0-100" : "0.00"
+                  }
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
                   autoFocus
                 />
@@ -857,7 +901,10 @@ export const POSWorkspacePage = () => {
         </SurfaceCard>
 
         <SurfaceCard className="space-y-3">
-          <SummaryLine label="المجموع الفرعي" value={formatCurrency(subtotal)} />
+          <SummaryLine
+            label="المجموع الفرعي"
+            value={formatCurrency(subtotal)}
+          />
           {discountAmount > 0 && (
             <SummaryLine
               label="خصم الطلب"
@@ -890,8 +937,12 @@ export const POSWorkspacePage = () => {
       return (
         <div className="space-y-4">
           <div>
-            <h3 className="text-lg font-black text-slate-900">العميل المرتبط</h3>
-            <p className="mt-1 text-sm text-slate-500">البيانات هنا تؤثر على البيع الآجل والائتمان.</p>
+            <h3 className="text-lg font-black text-slate-900">
+              العميل المرتبط
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              البيانات هنا تؤثر على البيع الآجل والائتمان.
+            </p>
           </div>
 
           <div className="rounded-[1.75rem] border border-primary-200 bg-[linear-gradient(180deg,#eff6ff_0%,#ffffff_100%)] p-4 shadow-sm">
@@ -928,7 +979,9 @@ export const POSWorkspacePage = () => {
                     label="نقاط الولاء"
                     value={selectedCustomer.loyaltyPoints.toString()}
                     valueClassName="text-amber-600"
-                    icon={<Star className="h-4 w-4 fill-current text-amber-500" />}
+                    icon={
+                      <Star className="h-4 w-4 fill-current text-amber-500" />
+                    }
                   />
                 </SurfaceCard>
               )}
@@ -972,7 +1025,9 @@ export const POSWorkspacePage = () => {
       <div className="space-y-4">
         <div>
           <h3 className="text-lg font-black text-slate-900">ربط عميل</h3>
-          <p className="mt-1 text-sm text-slate-500">ابحث برقم الهاتف أو اتركه للبيع النقدي.</p>
+          <p className="mt-1 text-sm text-slate-500">
+            ابحث برقم الهاتف أو اتركه للبيع النقدي.
+          </p>
         </div>
 
         <div className="relative">
@@ -994,30 +1049,32 @@ export const POSWorkspacePage = () => {
           )}
         </div>
 
-        {customerPhone.length >= 8 && !isSearchingCustomer && searchResult?.data && (
-          <button
-            type="button"
-            onClick={() => handleSelectCustomer(searchResult.data!)}
-            className="w-full rounded-[1.5rem] border border-success-200 bg-success-50 p-4 text-start transition-colors hover:bg-success-100"
-          >
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-success-600 text-white">
-                <User className="h-5 w-5" />
+        {customerPhone.length >= 8 &&
+          !isSearchingCustomer &&
+          searchResult?.data && (
+            <button
+              type="button"
+              onClick={() => handleSelectCustomer(searchResult.data!)}
+              className="w-full rounded-[1.5rem] border border-success-200 bg-success-50 p-4 text-start transition-colors hover:bg-success-100"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-success-600 text-white">
+                  <User className="h-5 w-5" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="truncate font-bold text-slate-900">
+                    {searchResult.data.name || "عميل"}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-600">
+                    {searchResult.data.phone}
+                  </p>
+                </div>
+                <span className="text-xs font-semibold text-success-600">
+                  اضغط للاختيار
+                </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="truncate font-bold text-slate-900">
-                  {searchResult.data.name || "عميل"}
-                </p>
-                <p className="mt-1 text-sm text-slate-600">
-                  {searchResult.data.phone}
-                </p>
-              </div>
-              <span className="text-xs font-semibold text-success-600">
-                اضغط للاختيار
-              </span>
-            </div>
-          </button>
-        )}
+            </button>
+          )}
 
         {customerPhone.length >= 8 &&
           !isSearchingCustomer &&
@@ -1063,158 +1120,183 @@ export const POSWorkspacePage = () => {
     }
 
     return (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-black text-slate-900">الدفع</h3>
-        <p className="mt-1 text-sm text-slate-500">
-          اختر الطريقة، أدخل المبلغ، ثم أنهِ الفاتورة من الزر السفلي.
-        </p>
-      </div>
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-lg font-black text-slate-900">الدفع</h3>
+          <p className="mt-1 text-sm text-slate-500">
+            اختر الطريقة، أدخل المبلغ، ثم أنهِ الفاتورة من الزر السفلي.
+          </p>
+        </div>
 
-      <SurfaceCard className="space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              المبلغ المطلوب
-            </p>
-            <p className="mt-1 text-2xl font-black text-primary-700">
-              {formatCurrency(paymentTotal)}
-            </p>
+        <SurfaceCard className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                المبلغ المطلوب
+              </p>
+              <p className="mt-1 text-2xl font-black text-primary-700">
+                {formatCurrency(paymentTotal)}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setAmountPaid(paymentTotal.toFixed(2))}
+              className="inline-flex min-h-[38px] items-center justify-center rounded-full bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 transition-colors hover:bg-primary-100"
+            >
+              دفع كامل
+            </button>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setAmountPaid(paymentTotal.toFixed(2))}
-            className="inline-flex min-h-[38px] items-center justify-center rounded-full bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 transition-colors hover:bg-primary-100"
-          >
-            دفع كامل
-          </button>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2">
-          {paymentMethods.map((method) => (
-            <button
-              key={method.id}
-              type="button"
-              onClick={() => setSelectedPaymentMethod(method.id)}
-              className={clsx(
-                "flex min-h-[68px] flex-col items-center justify-center gap-2 rounded-[1.15rem] border px-3 py-3 text-sm font-semibold transition-all",
-                selectedPaymentMethod === method.id
-                  ? "border-primary-600 bg-primary-50 text-primary-700 shadow-sm"
-                  : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50",
-              )}
-            >
-              {method.icon}
-              <span>{method.label}</span>
-            </button>
-          ))}
-        </div>
-
-        <div className="space-y-3">
-          <label className="block text-sm font-bold text-slate-900">
-            المبلغ المدفوع
-          </label>
-          <input
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.01"
-            value={amountPaid}
-            onChange={(event) => setAmountPaid(event.target.value)}
-            className={clsx(
-              "w-full rounded-[1.35rem] border bg-white px-4 py-3.5 text-lg font-black text-slate-900 outline-none transition",
-              showPaymentError
-                ? "border-danger-400 ring-2 ring-danger-100"
-                : "border-slate-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100",
-            )}
-            placeholder="0.00"
-          />
-
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {quickAmounts.map((amount) => (
+          <div className="grid grid-cols-3 gap-2">
+            {paymentMethods.map((method) => (
               <button
-                key={amount}
+                key={method.id}
                 type="button"
-                onClick={() => handleQuickAmount(amount)}
-                className="inline-flex min-h-[40px] shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                onClick={() => {
+                  setSelectedPaymentMethod(method.id);
+                  if (method.id === "Cash") {
+                    setTransactionReference("");
+                  }
+                }}
+                className={clsx(
+                  "flex min-h-[68px] flex-col items-center justify-center gap-2 rounded-[1.15rem] border px-3 py-3 text-sm font-semibold transition-all",
+                  selectedPaymentMethod === method.id
+                    ? "border-primary-600 bg-primary-50 text-primary-700 shadow-sm"
+                    : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50",
+                )}
               >
-                {amount}
+                {method.icon}
+                <span>{method.label}</span>
               </button>
             ))}
-            <button
-              type="button"
-              onClick={() => setAmountPaid("")}
-              className="inline-flex min-h-[40px] shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-500 transition-colors hover:bg-slate-50"
-            >
-              مسح
-            </button>
           </div>
-        </div>
-      </SurfaceCard>
 
-      {change > 0 && (
-        <SurfaceCard className="border-success-200 bg-success-50">
-          <SummaryLine
-            label="الباقي"
-            value={formatCurrency(change)}
-            valueClassName="text-success-600 text-base font-black"
-            icon={<Banknote className="h-4 w-4 text-success-500" />}
-          />
-        </SurfaceCard>
-      )}
+          {requiresTransactionReference && (
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-slate-900">
+                رقم المعاملة <span className="text-danger-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={transactionReference}
+                onChange={(event) =>
+                  setTransactionReference(event.target.value)
+                }
+                className="w-full rounded-[1.35rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                placeholder="اكتب رقم العملية من فودافون كاش أو الفيزا"
+              />
+            </div>
+          )}
 
-      {numericAmount < paymentTotal && numericAmount > 0 && (
-        <SurfaceCard
-          className={clsx(
-            creditLimitExceeded
-              ? "border-danger-200 bg-danger-50"
-              : "border-orange-200 bg-orange-50",
-          )}
-        >
-          <SummaryLine
-            label="المبلغ المستحق"
-            value={formatCurrency(amountDue)}
-            valueClassName={clsx(
-              "text-base font-black",
-              creditLimitExceeded ? "text-danger-600" : "text-orange-600",
-            )}
-            icon={<Wallet className="h-4 w-4 text-orange-500" />}
-          />
-          {creditLimitExceeded && (
-            <p className="mt-2 text-xs font-semibold text-danger-600">
-              تجاوز حد الائتمان. المتاح: {formatCurrency(availableCredit)}
-            </p>
-          )}
-          {selectedCustomer && !selectedCustomer.isActive && (
-            <p className="mt-2 text-xs font-semibold text-danger-600">
-              العميل غير نشط
-            </p>
-          )}
-        </SurfaceCard>
-      )}
-
-      {selectedCustomer &&
-        canTakeCredit &&
-        selectedPaymentMethod === "Cash" && (
-          <div className="flex items-start gap-3 rounded-[1.35rem] border border-blue-200 bg-blue-50 p-4">
-            <input
-              type="checkbox"
-              id="partialPayment"
-              checked={allowPartialPayment}
-              onChange={(event) => setAllowPartialPayment(event.target.checked)}
-              className="mt-1 h-5 w-5 rounded text-primary-600 focus:ring-2 focus:ring-primary-500"
-            />
-            <label htmlFor="partialPayment" className="flex-1 cursor-pointer">
-              <p className="text-sm font-bold text-slate-900">
-                السماح بالدفع الجزئي
-              </p>
-              <p className="mt-1 text-xs leading-6 text-slate-600">
-                يخصم المدفوع الآن ويُسجل الباقي على العميل ضمن الائتمان المتاح.
-              </p>
+          <div className="space-y-3">
+            <label className="block text-sm font-bold text-slate-900">
+              المبلغ المدفوع
             </label>
+            <input
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.01"
+              value={amountPaid}
+              onChange={(event) => setAmountPaid(event.target.value)}
+              className={clsx(
+                "w-full rounded-[1.35rem] border bg-white px-4 py-3.5 text-lg font-black text-slate-900 outline-none transition",
+                showPaymentError
+                  ? "border-danger-400 ring-2 ring-danger-100"
+                  : "border-slate-200 focus:border-primary-500 focus:ring-2 focus:ring-primary-100",
+              )}
+              placeholder="0.00"
+            />
+
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {quickAmounts.map((amount) => (
+                <button
+                  key={amount}
+                  type="button"
+                  onClick={() => handleQuickAmount(amount)}
+                  className="inline-flex min-h-[40px] shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  {amount}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setAmountPaid("")}
+                className="inline-flex min-h-[40px] shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-500 transition-colors hover:bg-slate-50"
+              >
+                مسح
+              </button>
+            </div>
           </div>
+        </SurfaceCard>
+
+        {change > 0 && (
+          <SurfaceCard className="border-success-200 bg-success-50">
+            <SummaryLine
+              label="الباقي"
+              value={formatCurrency(change)}
+              valueClassName="text-success-600 text-base font-black"
+              icon={<Banknote className="h-4 w-4 text-success-500" />}
+            />
+          </SurfaceCard>
         )}
-    </div>
+
+        {numericAmount < paymentTotal && numericAmount > 0 && (
+          <SurfaceCard
+            className={clsx(
+              creditLimitExceeded
+                ? "border-danger-200 bg-danger-50"
+                : "border-orange-200 bg-orange-50",
+            )}
+          >
+            <SummaryLine
+              label="المبلغ المستحق"
+              value={formatCurrency(amountDue)}
+              valueClassName={clsx(
+                "text-base font-black",
+                creditLimitExceeded ? "text-danger-600" : "text-orange-600",
+              )}
+              icon={<Wallet className="h-4 w-4 text-orange-500" />}
+            />
+            {creditLimitExceeded && (
+              <p className="mt-2 text-xs font-semibold text-danger-600">
+                تجاوز حد الائتمان. المتاح: {formatCurrency(availableCredit)}
+              </p>
+            )}
+            {selectedCustomer && !selectedCustomer.isActive && (
+              <p className="mt-2 text-xs font-semibold text-danger-600">
+                العميل غير نشط
+              </p>
+            )}
+          </SurfaceCard>
+        )}
+
+        {selectedCustomer &&
+          canTakeCredit &&
+          selectedPaymentMethod === "Cash" && (
+            <div className="flex items-start gap-3 rounded-[1.35rem] border border-blue-200 bg-blue-50 p-4">
+              <input
+                type="checkbox"
+                id="partialPayment"
+                checked={allowPartialPayment}
+                onChange={(event) =>
+                  setAllowPartialPayment(event.target.checked)
+                }
+                className="mt-1 h-5 w-5 rounded text-primary-600 focus:ring-2 focus:ring-primary-500"
+              />
+              <label htmlFor="partialPayment" className="flex-1 cursor-pointer">
+                <p className="text-sm font-bold text-slate-900">
+                  السماح بالدفع الجزئي
+                </p>
+                <p className="mt-1 text-xs leading-6 text-slate-600">
+                  يخصم المدفوع الآن ويُسجل الباقي على العميل ضمن الائتمان
+                  المتاح.
+                </p>
+              </label>
+            </div>
+          )}
+      </div>
     );
   };
 
@@ -1346,18 +1428,21 @@ export const POSWorkspacePage = () => {
             isCreating ||
             isCompleting ||
             !preparedOrder ||
+            (requiresTransactionReference && !transactionReference.trim()) ||
             (numericAmount < paymentTotal && !allowPartialPayment) ||
             (numericAmount < paymentTotal && creditLimitExceeded)
           }
           rightIcon={<Check className="h-5 w-5" />}
         >
-          {isPreparingOrder ? "جارٍ تأكيد الإجمالي..." : isCreating
-            ? "جاري إنشاء الطلب..."
-            : isCompleting
-              ? "جاري الدفع..."
-              : numericAmount < paymentTotal && allowPartialPayment
-                ? `إتمام البيع الآجل (مستحق: ${formatCurrency(amountDue)})`
-                : "إتمام الدفع"}
+          {isPreparingOrder
+            ? "جارٍ تأكيد الإجمالي..."
+            : isCreating
+              ? "جاري إنشاء الطلب..."
+              : isCompleting
+                ? "جاري الدفع..."
+                : numericAmount < paymentTotal && allowPartialPayment
+                  ? `إتمام البيع الآجل (مستحق: ${formatCurrency(amountDue)})`
+                  : "إتمام الدفع"}
         </Button>
       ) : (
         <Button
@@ -1384,7 +1469,9 @@ export const POSWorkspacePage = () => {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-bold text-slate-900">
-                  {selectedCategoryName ? `فئة ${selectedCategoryName}` : "الكتالوج"}
+                  {selectedCategoryName
+                    ? `فئة ${selectedCategoryName}`
+                    : "الكتالوج"}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
                   {filteredProducts.length} منتج متاح للعرض
@@ -1425,7 +1512,8 @@ export const POSWorkspacePage = () => {
             <div>
               <p className="text-sm font-bold text-slate-900">نتائج البحث</p>
               <p className="mt-1 text-xs text-slate-500">
-                {filteredProducts.length} نتيجة لعبارة "{deferredSearchInput.trim()}"
+                {filteredProducts.length} نتيجة لعبارة "
+                {deferredSearchInput.trim()}"
               </p>
             </div>
 
@@ -1442,9 +1530,14 @@ export const POSWorkspacePage = () => {
         {visibleSearchResults.length > 0 ? (
           <div className="space-y-2">
             {visibleSearchResults.map((product) => {
-              const cartItem = items.find((item) => item.product.id === product.id);
+              const cartItem = items.find(
+                (item) => item.product.id === product.id,
+              );
               const quantityInCart = cartItem?.quantity ?? 0;
-              const totalStock = getProductCurrentStock(product, stockByProductId);
+              const totalStock = getProductCurrentStock(
+                product,
+                stockByProductId,
+              );
               const availableStock = hasInventorySnapshot
                 ? getProductAvailableStock(
                     product,
@@ -1463,8 +1556,9 @@ export const POSWorkspacePage = () => {
                 hasInventorySnapshot &&
                 totalStock <= 0;
               const categoryName =
-                categories.find((category) => category.id === product.categoryId)?.name ??
-                "غير مصنف";
+                categories.find(
+                  (category) => category.id === product.categoryId,
+                )?.name ?? "غير مصنف";
 
               return (
                 <button
@@ -1499,7 +1593,9 @@ export const POSWorkspacePage = () => {
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-xs text-slate-500">{categoryName}</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {categoryName}
+                    </p>
                     {product.trackInventory && hasInventorySnapshot && (
                       <p
                         className={clsx(
@@ -1507,7 +1603,9 @@ export const POSWorkspacePage = () => {
                           isOutOfStock ? "text-danger-600" : "text-emerald-600",
                         )}
                       >
-                        {isOutOfStock ? "نفد المخزون" : `المتاح ${availableStock}`}
+                        {isOutOfStock
+                          ? "نفد المخزون"
+                          : `المتاح ${availableStock}`}
                       </p>
                     )}
                   </div>
@@ -1524,7 +1622,9 @@ export const POSWorkspacePage = () => {
                           : "bg-primary-50 text-primary-700",
                       )}
                     >
-                      {!product.isActive || isOutOfStock || !canAddMore ? "غير متاح" : "إضافة"}
+                      {!product.isActive || isOutOfStock || !canAddMore
+                        ? "غير متاح"
+                        : "إضافة"}
                     </span>
                   </div>
                 </button>
@@ -1533,7 +1633,8 @@ export const POSWorkspacePage = () => {
 
             {filteredProducts.length > visibleSearchResults.length && (
               <div className="rounded-[1.15rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                تم عرض أول 12 منتج فقط. افتح الكتالوج إذا كنت تريد استعراض المزيد.
+                تم عرض أول 12 منتج فقط. افتح الكتالوج إذا كنت تريد استعراض
+                المزيد.
               </div>
             )}
           </div>
@@ -1543,7 +1644,8 @@ export const POSWorkspacePage = () => {
               لا توجد منتجات مطابقة.
             </p>
             <p className="mt-1 text-xs leading-6 text-slate-500">
-              جرّب اسمًا مختلفًا أو افتح الكتالوج، ويمكنك إنشاء منتج جديد إذا كانت لديك الصلاحية.
+              جرّب اسمًا مختلفًا أو افتح الكتالوج، ويمكنك إنشاء منتج جديد إذا
+              كانت لديك الصلاحية.
             </p>
             {canQuickCreateProduct && (
               <button
@@ -1583,7 +1685,9 @@ export const POSWorkspacePage = () => {
               : "إضافة عميل للفاتورة"}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            {selectedCustomer ? "تغيير أو مراجعة بيانات العميل" : "اتركها نقدي أو اربط عميلًا للبيع الآجل"}
+            {selectedCustomer
+              ? "تغيير أو مراجعة بيانات العميل"
+              : "اتركها نقدي أو اربط عميلًا للبيع الآجل"}
           </p>
         </button>
 
@@ -1680,7 +1784,9 @@ export const POSWorkspacePage = () => {
                 <span className="inline-flex items-center gap-1 rounded-full bg-success-50 px-2.5 py-1 text-[11px] font-semibold text-success-700">
                   <Wallet className="h-3 w-3" />
                   {itemsCount > 0
-                    ? formatCurrency(activeTab === "payment" ? paymentTotal : total)
+                    ? formatCurrency(
+                        activeTab === "payment" ? paymentTotal : total,
+                      )
                     : "جاهز للبيع"}
                 </span>
               </div>
@@ -1779,9 +1885,13 @@ export const POSWorkspacePage = () => {
             itemsCount > 0 ? "pb-28 lg:pb-4" : "pb-4",
           )}
         >
-          {showProductResults ? renderProductResultsPanel() : renderSearchLanding()}
+          {showProductResults
+            ? renderProductResultsPanel()
+            : renderSearchLanding()}
 
-          {itemsCount > 0 && <div className="mt-4 lg:hidden">{renderOrderSections()}</div>}
+          {itemsCount > 0 && (
+            <div className="mt-4 lg:hidden">{renderOrderSections()}</div>
+          )}
         </div>
       </section>
 
@@ -1815,252 +1925,271 @@ export const POSWorkspacePage = () => {
 
         {false && (
           <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
-          <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
-            <div className="border-b border-gray-200 bg-white px-3 pb-3 pt-3 md:px-4">
-              <div className="flex flex-col gap-3">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700">
-                      <Store className="h-3.5 w-3.5 text-primary-500" />
-                      {currentBranch?.name || "الفرع الحالي"}
-                    </span>
-                    {shiftDuration && (
+            <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+              <div className="border-b border-gray-200 bg-white px-3 pb-3 pt-3 md:px-4">
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700">
-                        <Clock3 className="h-3.5 w-3.5 text-gray-500" />
-                        {shiftDuration}
+                        <Store className="h-3.5 w-3.5 text-primary-500" />
+                        {currentBranch?.name || "الفرع الحالي"}
                       </span>
-                    )}
-                    {shiftOpenedAt && (
-                      <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700">
-                        فتحت {shiftOpenedAt}
+                      {shiftDuration && (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700">
+                          <Clock3 className="h-3.5 w-3.5 text-gray-500" />
+                          {shiftDuration}
+                        </span>
+                      )}
+                      {shiftOpenedAt && (
+                        <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700">
+                          فتحت {shiftOpenedAt}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700">
+                        <ShoppingCart className="h-3.5 w-3.5" />
+                        {itemsCount}
                       </span>
-                    )}
+                      <span className="inline-flex items-center gap-1 rounded-lg bg-success-50 px-3 py-1.5 text-xs font-semibold text-success-700">
+                        <Wallet className="h-3.5 w-3.5" />
+                        {formatCurrency(
+                          activeTab === "payment" ? paymentTotal : total,
+                        )}
+                      </span>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-lg bg-primary-50 px-3 py-1.5 text-xs font-semibold text-primary-700">
-                      <ShoppingCart className="h-3.5 w-3.5" />
-                      {itemsCount}
-                    </span>
-                    <span className="inline-flex items-center gap-1 rounded-lg bg-success-50 px-3 py-1.5 text-xs font-semibold text-success-700">
-                      <Wallet className="h-3.5 w-3.5" />
-                      {formatCurrency(activeTab === "payment" ? paymentTotal : total)}
-                    </span>
-                  </div>
-                </div>
+                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <div className="relative">
+                      <ScanBarcode className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+                      <input
+                        ref={searchInputRef}
+                        type="text"
+                        value={searchInput}
+                        onChange={(event) => setSearchInput(event.target.value)}
+                        onKeyDown={handleSearchKeyDown}
+                        placeholder="بحث بالاسم أو الباركود أو SKU... واضغط Enter للإضافة"
+                        className="w-full rounded-[1.45rem] border border-slate-200 bg-white px-4 py-3.5 pe-12 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                        autoComplete="off"
+                      />
+                    </div>
 
-                <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-                  <div className="relative">
-                    <ScanBarcode className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
-                    <input
-                      ref={searchInputRef}
-                      type="text"
-                      value={searchInput}
-                      onChange={(event) => setSearchInput(event.target.value)}
-                      onKeyDown={handleSearchKeyDown}
-                      placeholder="بحث بالاسم أو الباركود أو SKU... واضغط Enter للإضافة"
-                      className="w-full rounded-[1.45rem] border border-slate-200 bg-white px-4 py-3.5 pe-12 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                      autoComplete="off"
+                    <button
+                      type="button"
+                      onClick={() => setShowCatalog(true)}
+                      className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-primary-700"
+                    >
+                      <Package className="h-4.5 w-4.5" />
+                      عرض الكتالوج
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowAvailableOnly(!showAvailableOnly)}
+                      className={clsx(
+                        "inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all",
+                        showAvailableOnly
+                          ? "bg-success-600 text-white shadow-sm"
+                          : "bg-gray-100 text-gray-700 hover:bg-gray-200",
+                      )}
+                    >
+                      <PackageCheck className="h-4 w-4" />
+                      المتاح فقط
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleOpenQuickCreate}
+                      disabled={!canQuickCreateProduct}
+                      className={clsx(
+                        "inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all",
+                        canQuickCreateProduct
+                          ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          : "cursor-not-allowed bg-gray-100 text-gray-400",
+                      )}
+                    >
+                      <PlusCircle className="h-4 w-4" />
+                      منتج جديد
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomItem(true)}
+                      disabled={itemsCount === 0}
+                      className={clsx(
+                        "inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all",
+                        itemsCount > 0
+                          ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                          : "cursor-not-allowed bg-gray-100 text-gray-400",
+                      )}
+                      title={
+                        itemsCount > 0 ? "إضافة منتج مخصص" : "ابدأ طلب أولاً"
+                      }
+                    >
+                      <FileText className="h-4 w-4" />
+                      منتج مخصص
+                    </button>
+                  </div>
+
+                  <div className="rounded-xl bg-gray-50 p-2">
+                    <CategoryChips
+                      categories={categories}
+                      selectedId={selectedCategory}
+                      onSelect={setSelectedCategory}
                     />
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowCatalog(true)}
-                    className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-primary-700"
-                  >
-                    <Package className="h-4.5 w-4.5" />
-                    عرض الكتالوج
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowAvailableOnly(!showAvailableOnly)}
-                    className={clsx(
-                      "inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all",
-                      showAvailableOnly
-                        ? "bg-success-600 text-white shadow-sm"
-                        : "bg-gray-100 text-gray-700 hover:bg-gray-200",
-                    )}
-                  >
-                    <PackageCheck className="h-4 w-4" />
-                    المتاح فقط
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleOpenQuickCreate}
-                    disabled={!canQuickCreateProduct}
-                    className={clsx(
-                      "inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all",
-                      canQuickCreateProduct
-                        ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                        : "cursor-not-allowed bg-gray-100 text-gray-400",
-                    )}
-                  >
-                    <PlusCircle className="h-4 w-4" />
-                    منتج جديد
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setShowCustomItem(true)}
-                    disabled={itemsCount === 0}
-                    className={clsx(
-                      "inline-flex min-h-[42px] shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition-all",
-                      itemsCount > 0
-                        ? "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                        : "cursor-not-allowed bg-gray-100 text-gray-400",
-                    )}
-                    title={itemsCount > 0 ? "إضافة منتج مخصص" : "ابدأ طلب أولاً"}
-                  >
-                    <FileText className="h-4 w-4" />
-                    منتج مخصص
-                  </button>
-                </div>
-
-                <div className="rounded-xl bg-gray-50 p-2">
-                  <CategoryChips
-                    categories={categories}
-                    selectedId={selectedCategory}
-                    onSelect={setSelectedCategory}
-                  />
                 </div>
               </div>
-            </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3 md:px-4">
-              {deferredSearchInput.trim() && (
-                <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+              <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4 pt-3 md:px-4">
+                {deferredSearchInput.trim() && (
+                  <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">
+                        نتائج البحث
+                      </p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {filteredProducts.length} نتيجة لعبارة "
+                        {deferredSearchInput.trim()}"
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSearchInput("")}
+                      className="inline-flex min-h-[40px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                    >
+                      مسح
+                    </button>
+                  </div>
+                )}
+
+                <ProductListView
+                  products={filteredProducts}
+                  categories={categories}
+                  stockByProductId={stockByProductId}
+                  hasInventorySnapshot={hasInventorySnapshot}
+                  isInventoryLoading={isInventoryLoading}
+                />
+              </div>
+            </section>
+
+            <aside className="flex min-h-[22rem] max-h-[56vh] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm lg:min-h-0 lg:max-h-none lg:w-[26rem] xl:w-[29rem]">
+              <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
+                <div className="mx-auto mb-2 h-1.5 w-16 rounded-full bg-gray-300 lg:hidden" />
+                <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="text-sm font-semibold text-slate-900">
-                      نتائج البحث
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
+                      الطلب الحالي
                     </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {filteredProducts.length} نتيجة لعبارة "{deferredSearchInput.trim()}"
+                    <h2 className="mt-1 text-lg font-black text-gray-900">
+                      السلة والدفع
+                    </h2>
+                  </div>
+
+                  <div className="rounded-xl bg-white px-3 py-2 text-end ring-1 ring-gray-200">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
+                      الإجمالي
+                    </p>
+                    <p className="mt-1 text-lg font-black text-primary-700">
+                      {formatCurrency(
+                        activeTab === "payment" ? paymentTotal : total,
+                      )}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setSearchInput("")}
-                    className="inline-flex min-h-[40px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-                  >
-                    مسح
-                  </button>
-                </div>
-              )}
-
-              <ProductListView
-                products={filteredProducts}
-                categories={categories}
-                stockByProductId={stockByProductId}
-                hasInventorySnapshot={hasInventorySnapshot}
-                isInventoryLoading={isInventoryLoading}
-              />
-            </div>
-          </section>
-
-          <aside className="flex min-h-[22rem] max-h-[56vh] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm lg:min-h-0 lg:max-h-none lg:w-[26rem] xl:w-[29rem]">
-            <div className="border-b border-gray-200 bg-gray-50 px-4 py-3">
-              <div className="mx-auto mb-2 h-1.5 w-16 rounded-full bg-gray-300 lg:hidden" />
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
-                    الطلب الحالي
-                  </p>
-                  <h2 className="mt-1 text-lg font-black text-gray-900">السلة والدفع</h2>
-                </div>
-
-                <div className="rounded-xl bg-white px-3 py-2 text-end ring-1 ring-gray-200">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
-                    الإجمالي
-                  </p>
-                  <p className="mt-1 text-lg font-black text-primary-700">{formatCurrency(activeTab === "payment" ? paymentTotal : total)}</p>
                 </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-4 gap-2 border-b border-slate-200 bg-white p-2">
-              {workspaceTabs.map((tab) => (
-                <WorkspaceTabButton
-                  key={tab.id}
-                  icon={tab.icon}
-                  label={tab.label}
-                  active={activeTab === tab.id}
-                  disabled={tab.disabled}
-                  indicator={tab.indicator}
-                  onClick={() => handleWorkspaceTabChange(tab.id)}
-                />
-              ))}
-            </div>
+              <div className="grid grid-cols-4 gap-2 border-b border-slate-200 bg-white p-2">
+                {workspaceTabs.map((tab) => (
+                  <WorkspaceTabButton
+                    key={tab.id}
+                    icon={tab.icon}
+                    label={tab.label}
+                    active={activeTab === tab.id}
+                    disabled={tab.disabled}
+                    indicator={tab.indicator}
+                    onClick={() => handleWorkspaceTabChange(tab.id)}
+                  />
+                ))}
+              </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto bg-white px-3 py-4 md:px-4">
-              {renderActiveTab()}
-            </div>
+              <div className="min-h-0 flex-1 overflow-y-auto bg-white px-3 py-4 md:px-4">
+                {renderActiveTab()}
+              </div>
 
-            <div className="border-t border-slate-200 bg-white px-4 py-4">
-              <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-4 py-3">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                    الإجمالي
-                  </p>
-                  <p className="mt-1 text-lg font-black text-primary-700">
-                    {formatCurrency(activeTab === "payment" ? paymentTotal : total)}
-                  </p>
-                </div>
-                <div className="text-end text-xs text-slate-500">
-                  <p>{itemsCount} عنصر</p>
-                  {selectedCustomer ? (
-                    <p className="mt-1 truncate font-semibold text-slate-700">
-                      {selectedCustomer.name || selectedCustomer.phone}
+              <div className="border-t border-slate-200 bg-white px-4 py-4">
+                <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-4 py-3">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      الإجمالي
                     </p>
-                  ) : (
-                    <p className="mt-1 font-semibold text-slate-700">عميل نقدي</p>
-                  )}
+                    <p className="mt-1 text-lg font-black text-primary-700">
+                      {formatCurrency(
+                        activeTab === "payment" ? paymentTotal : total,
+                      )}
+                    </p>
+                  </div>
+                  <div className="text-end text-xs text-slate-500">
+                    <p>{itemsCount} عنصر</p>
+                    {selectedCustomer ? (
+                      <p className="mt-1 truncate font-semibold text-slate-700">
+                        {selectedCustomer.name || selectedCustomer.phone}
+                      </p>
+                    ) : (
+                      <p className="mt-1 font-semibold text-slate-700">
+                        عميل نقدي
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {activeTab === "payment" && items.length > 0 ? (
-                <Button
-                  variant="success"
-                  size="xl"
-                  className="w-full rounded-[1.5rem]"
-                  onClick={handleCompletePayment}
-                  isLoading={isPreparingOrder || isCreating || isCompleting}
-                  disabled={
-                    isPreparingOrder ||
-                    isCreating ||
-                    isCompleting ||
-                    !preparedOrder ||
-                    (numericAmount < paymentTotal && !allowPartialPayment) ||
-                    (numericAmount < paymentTotal && creditLimitExceeded)
-                  }
-                  rightIcon={<Check className="h-5 w-5" />}
-                >
-                  {isPreparingOrder ? "جارٍ تأكيد الإجمالي..." : isCreating
-                    ? "جاري إنشاء الطلب..."
-                    : isCompleting
-                      ? "جاري الدفع..."
-                      : numericAmount < paymentTotal && allowPartialPayment
-                        ? `إتمام البيع الآجل (مستحق: ${formatCurrency(amountDue)})`
-                        : "إتمام الدفع"}
-                </Button>
-              ) : (
-                <Button
-                  variant="success"
-                  size="xl"
-                  className="w-full rounded-[1.5rem]"
-                  onClick={openPaymentWorkspace}
-                  disabled={items.length === 0}
-                  rightIcon={<CreditCard className="h-5 w-5" />}
-                >
-                  الدفع {formatCurrency(total)}
-                </Button>
-              )}
-            </div>
-          </aside>
+                {activeTab === "payment" && items.length > 0 ? (
+                  <Button
+                    variant="success"
+                    size="xl"
+                    className="w-full rounded-[1.5rem]"
+                    onClick={handleCompletePayment}
+                    isLoading={isPreparingOrder || isCreating || isCompleting}
+                    disabled={
+                      isPreparingOrder ||
+                      isCreating ||
+                      isCompleting ||
+                      !preparedOrder ||
+                      (requiresTransactionReference &&
+                        !transactionReference.trim()) ||
+                      (numericAmount < paymentTotal && !allowPartialPayment) ||
+                      (numericAmount < paymentTotal && creditLimitExceeded)
+                    }
+                    rightIcon={<Check className="h-5 w-5" />}
+                  >
+                    {isPreparingOrder
+                      ? "جارٍ تأكيد الإجمالي..."
+                      : isCreating
+                        ? "جاري إنشاء الطلب..."
+                        : isCompleting
+                          ? "جاري الدفع..."
+                          : numericAmount < paymentTotal && allowPartialPayment
+                            ? `إتمام البيع الآجل (مستحق: ${formatCurrency(amountDue)})`
+                            : "إتمام الدفع"}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="success"
+                    size="xl"
+                    className="w-full rounded-[1.5rem]"
+                    onClick={openPaymentWorkspace}
+                    disabled={items.length === 0}
+                    rightIcon={<CreditCard className="h-5 w-5" />}
+                  >
+                    الدفع {formatCurrency(total)}
+                  </Button>
+                )}
+              </div>
+            </aside>
           </div>
         )}
       </div>

@@ -572,6 +572,14 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         if (request.Amount > invoice.AmountDue)
             return ApiResponse<PurchaseInvoicePaymentDto>.Fail(ErrorCodes.PAYMENT_EXCEEDS_DUE, ErrorMessages.Get(ErrorCodes.PAYMENT_EXCEEDS_DUE));
 
+        var referenceValidation = ValidateReferenceForNonCashPayment(
+            request.Method,
+            request.ReferenceNumber);
+        if (!referenceValidation.Success)
+            return ApiResponse<PurchaseInvoicePaymentDto>.Fail(
+                ErrorCodes.PAYMENT_REFERENCE_REQUIRED,
+                referenceValidation.Message!);
+
         var user = await _unitOfWork.Users.Query()
             .FirstOrDefaultAsync(u => u.Id == userId);
 
@@ -704,6 +712,23 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         {
             invoice.Status = PurchaseInvoiceStatus.Confirmed;
         }
+    }
+
+    private static (bool Success, string? Message) ValidateReferenceForNonCashPayment(
+        PaymentMethod method,
+        string? reference)
+    {
+        if (method == PaymentMethod.Cash)
+        {
+            return (true, null);
+        }
+
+        if (string.IsNullOrWhiteSpace(reference))
+        {
+            return (false, "رقم المعاملة مطلوب لطرق الدفع غير النقدية");
+        }
+
+        return (true, null);
     }
 
     private async Task<string> GenerateInvoiceNumberAsync(int tenantId)

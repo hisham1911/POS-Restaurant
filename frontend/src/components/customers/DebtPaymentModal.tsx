@@ -3,7 +3,6 @@ import {
   X,
   DollarSign,
   CreditCard,
-  Building2,
   Banknote,
   AlertTriangle,
 } from "lucide-react";
@@ -63,6 +62,14 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
       newErrors.amount = `المبلغ أكبر من الدين المستحق (${customer.totalDue.toFixed(2)} ج.م)`;
     }
 
+    if (
+      formData.paymentMethod !== "Cash" &&
+      !String(formData.referenceNumber || "").trim()
+    ) {
+      newErrors.referenceNumber =
+        "رقم المعاملة مطلوب عند الدفع بفودافون كاش أو فيزا";
+    }
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -115,13 +122,12 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
 
   const paymentMethods = [
     { id: "Cash", label: "نقدي", icon: <Banknote className="w-5 h-5" /> },
-    { id: "Card", label: "بطاقة", icon: <CreditCard className="w-5 h-5" /> },
+    { id: "Card", label: "فيزا", icon: <CreditCard className="w-5 h-5" /> },
     {
-      id: "BankTransfer",
-      label: "تحويل بنكي",
-      icon: <Building2 className="w-5 h-5" />,
+      id: "Fawry",
+      label: "فودافون كاش",
+      icon: <DollarSign className="w-5 h-5" />,
     },
-    { id: "Fawry", label: "فوري", icon: <DollarSign className="w-5 h-5" /> },
   ];
 
   return (
@@ -256,7 +262,7 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
               <label className="block text-sm font-semibold text-gray-700 mb-3">
                 طريقة الدفع <span className="text-red-500">*</span>
               </label>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 {paymentMethods.map((method) => (
                   <button
                     key={method.id}
@@ -287,7 +293,7 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
             {formData.paymentMethod !== "Cash" && (
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  رقم المرجع / الإيصال
+                  رقم المعاملة <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -298,10 +304,20 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
                       referenceNumber: e.target.value,
                     })
                   }
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500"
-                  placeholder="رقم الشيك، رقم التحويل، إلخ"
+                  className={clsx(
+                    "w-full px-4 py-3 border-2 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-orange-500",
+                    errors.referenceNumber
+                      ? "border-red-500"
+                      : "border-gray-200",
+                  )}
+                  placeholder="اكتب رقم العملية من فودافون كاش أو الفيزا"
                   disabled={isLoading}
                 />
+                {errors.referenceNumber && (
+                  <p className="text-red-500 text-sm mt-1 flex items-center gap-1">
+                    <span>⚠️</span> {errors.referenceNumber}
+                  </p>
+                )}
               </div>
             )}
 

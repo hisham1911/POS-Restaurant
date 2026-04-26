@@ -45,8 +45,9 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             query = query.Where(pi => pi.InvoiceDate <= toDate.Value);
 
         var totalCount = await query.CountAsync();
+        // SQLite doesn't support Sum on decimal - cast to double first
         var totalAmount = Math.Round(
-            await query.SumAsync(pi => (decimal?)pi.Total) ?? 0m,
+            (decimal)(await query.SumAsync(pi => (double?)pi.Total) ?? 0.0),
             2);
 
         var invoices = await query

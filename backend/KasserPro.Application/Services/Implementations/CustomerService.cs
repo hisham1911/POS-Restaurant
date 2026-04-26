@@ -43,11 +43,12 @@ public class CustomerService : ICustomerService
         }
 
         var totalCount = await query.CountAsync();
+        // SQLite doesn't support Sum on decimal - cast to double first
         var totalSpentAmount = Math.Round(
-            await query.SumAsync(c => (decimal?)c.TotalSpent) ?? 0m,
+            (decimal)(await query.SumAsync(c => (double?)c.TotalSpent) ?? 0.0),
             2);
         var totalDueAmount = Math.Round(
-            await query.SumAsync(c => (decimal?)c.TotalDue) ?? 0m,
+            (decimal)(await query.SumAsync(c => (double?)c.TotalDue) ?? 0.0),
             2);
 
         var customers = await query

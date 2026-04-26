@@ -88,6 +88,7 @@ public static class ErrorCodes
     public const string SHIFT_INACTIVE_TOO_LONG = "SHIFT_INACTIVE_TOO_LONG";
     public const string SHIFT_WARNING_12_HOURS = "SHIFT_WARNING_12_HOURS";
     public const string SHIFT_CRITICAL_24_HOURS = "SHIFT_CRITICAL_24_HOURS";
+    public const string SHIFT_HAS_PENDING_ORDERS = "SHIFT_HAS_PENDING_ORDERS";
 
     // System Errors (1900-1999)
     public const string SYSTEM_INTERNAL_ERROR = "SYSTEM_INTERNAL_ERROR";
@@ -244,6 +245,7 @@ public static class ErrorMessages
         { ErrorCodes.SHIFT_INACTIVITY_WARNING, "تحذير: الوردية غير نشطة منذ فترة طويلة" },
         { ErrorCodes.SHIFT_WARNING_12_HOURS, "⚠️ تحذير: الوردية مفتوحة منذ أكثر من 12 ساعة. يُنصح بإغلاقها وفتح وردية جديدة" },
         { ErrorCodes.SHIFT_CRITICAL_24_HOURS, "🚨 تحذير شديد: الوردية مفتوحة منذ أكثر من 24 ساعة! يجب إغلاقها فوراً" },
+        { ErrorCodes.SHIFT_HAS_PENDING_ORDERS, "لا يمكن إغلاق الوردية وجود طلبات غير مكتملة أو ملغاة" },
 
         // System
         { ErrorCodes.SYSTEM_INTERNAL_ERROR, "حدث خطأ في النظام" },

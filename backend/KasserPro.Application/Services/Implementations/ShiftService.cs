@@ -185,6 +185,21 @@ public class ShiftService : IShiftService
             if (shift.IsClosed)
                 return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_ALREADY_CLOSED, "الوردية مغلقة بالفعل");
 
+            // Guard: cannot close shift with unresolved orders
+            var hasPendingOrders = await _unitOfWork.Orders.Query()
+                .AnyAsync(o => o.TenantId == tenantId
+                            && o.BranchId == branchId
+                            && o.ShiftId == shift.Id
+                            && !o.IsDeleted
+                            && o.Status != OrderStatus.Completed
+                            && o.Status != OrderStatus.Cancelled
+                            && o.Status != OrderStatus.Refunded);
+
+            if (hasPendingOrders)
+                return ApiResponse<ShiftDto>.Fail(
+                    ErrorCodes.SHIFT_HAS_PENDING_ORDERS,
+                    "لا يمكن إغلاق الوردية وجود طلبات غير مكتملة أو ملغاة");
+
             // FIX C-2/C-3/H-8: Use unified helper for 100% parity with ForceCloseAsync
             var financials = CalculateShiftFinancials(shift.Orders);
             shift.TotalOrders = financials.TotalOrders;

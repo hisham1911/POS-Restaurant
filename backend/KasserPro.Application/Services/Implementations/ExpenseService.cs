@@ -137,10 +137,17 @@ public class ExpenseService : IExpenseService
             // Generate expense number
             var expenseNumber = await GenerateExpenseNumberAsync();
 
-            // Get active shift
+            // Get active shift for current user/branch
             var activeShift = await _unitOfWork.Shifts.Query()
-                .FirstOrDefaultAsync(s => s.BranchId == _currentUserService.BranchId &&
-                                         !s.IsClosed);
+                .FirstOrDefaultAsync(s => s.TenantId == _currentUserService.TenantId
+                                       && s.BranchId == _currentUserService.BranchId
+                                       && s.UserId == _currentUserService.UserId
+                                       && !s.IsClosed);
+
+            if (activeShift == null)
+                return ApiResponse<ExpenseDto>.Fail(
+                    ErrorCodes.NO_OPEN_SHIFT,
+                    "لا يمكن تسجيل مصروف بدون وردية مفتوحة");
 
             // Create expense
             var expense = new Expense
@@ -156,7 +163,7 @@ public class ExpenseService : IExpenseService
                 ReferenceNumber = request.ReferenceNumber,
                 Notes = request.Notes,
                 Status = ExpenseStatus.Draft,
-                ShiftId = activeShift?.Id,
+                ShiftId = activeShift.Id,
                 CreatedByUserId = _currentUserService.UserId,
                 CreatedByUserName = user?.Name ?? _currentUserService.Email ?? "Unknown"
             };

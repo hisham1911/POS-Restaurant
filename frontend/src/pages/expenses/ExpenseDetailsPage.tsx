@@ -24,7 +24,10 @@ import { Loading } from "../../components/common/Loading";
 import { Modal } from "../../components/common/Modal";
 import { formatDateOnly, formatDateTimeFull } from "../../utils/formatters";
 import { handleApiError } from "../../utils/errorHandler";
-import type { ExpenseStatus, PayExpenseRequest } from "../../types/expense.types";
+import type {
+  ExpenseStatus,
+  PayExpenseRequest,
+} from "../../types/expense.types";
 
 const getPaymentMethodLabel = (method?: string) => {
   switch (method) {
@@ -48,9 +51,8 @@ export function ExpenseDetailsPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<
-    PayExpenseRequest["paymentMethod"]
-  >("Cash");
+  const [paymentMethod, setPaymentMethod] =
+    useState<PayExpenseRequest["paymentMethod"]>("Cash");
   const [paymentReferenceNumber, setPaymentReferenceNumber] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
   const [approveNotes, setApproveNotes] = useState("");
@@ -95,10 +97,10 @@ export function ExpenseDetailsPage() {
         id: Number(id),
         request: { notes: approveNotes || undefined },
       }).unwrap();
-          paymentReferenceNumber: requiresPaymentReference
-            ? paymentReferenceNumber.trim()
-            : undefined,
-      setShowApproveModal(false);
+      paymentReferenceNumber: (requiresPaymentReference
+        ? paymentReferenceNumber.trim()
+        : undefined,
+        setShowApproveModal(false));
       setApproveNotes("");
     } catch (error) {
       console.error("Failed to approve expense:", error);
@@ -513,7 +515,9 @@ export function ExpenseDetailsPage() {
               <select
                 value={paymentMethod}
                 onChange={(e) =>
-                  setPaymentMethod(e.target.value as PayExpenseRequest["paymentMethod"])
+                  setPaymentMethod(
+                    e.target.value as PayExpenseRequest["paymentMethod"],
+                  )
                 }
                 className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
               >

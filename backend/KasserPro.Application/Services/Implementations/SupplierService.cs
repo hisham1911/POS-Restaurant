@@ -181,7 +181,7 @@ public class SupplierService : ISupplierService
         {
             return ApiResponse<bool>.Fail(
                 ErrorCodes.VALIDATION_ERROR,
-                "لا يمكن حذف مورد لديه فواتير قائمة أو رصيد متبقي");
+                "لا يمكن حذف هذا المورد. لديه فواتير غير مسددة أو رصيد متبقٍ. يرجى تسوية جميع الفواتير أولاً.");
         }
 
         // Soft delete

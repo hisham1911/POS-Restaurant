@@ -139,7 +139,7 @@ public class CategoryService : ICategoryService
         var hasProducts = await _unitOfWork.Products.Query()
             .AnyAsync(p => p.CategoryId == id && p.TenantId == tenantId && !p.IsDeleted);
         if (hasProducts)
-            return ApiResponse<bool>.Fail(ErrorCodes.CATEGORY_HAS_PRODUCTS, "لا يمكن حذف تصنيف يحتوي على منتجات");
+            return ApiResponse<bool>.Fail(ErrorCodes.CATEGORY_HAS_PRODUCTS, "لا يمكن حذف هذا التصنيف. يحتوي على منتجات مرتبطة به. يرجى نقل المنتجات إلى تصنيف آخر أو حذفها أولاً.");
 
         category.IsDeleted = true;
         _unitOfWork.Categories.Update(category);

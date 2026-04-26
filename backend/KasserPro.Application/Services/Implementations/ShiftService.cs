@@ -198,7 +198,7 @@ public class ShiftService : IShiftService
             if (hasPendingOrders)
                 return ApiResponse<ShiftDto>.Fail(
                     ErrorCodes.SHIFT_HAS_PENDING_ORDERS,
-                    "لا يمكن إغلاق الوردية وجود طلبات غير مكتملة أو ملغاة");
+                    "لا يمكن إغلاق الوردية. يوجد طلبات لم يتم إكمالها أو إلغاؤها. يرجى إنهاء جميع الطلبات المفتوحة أولاً.");
 
             // FIX C-2/C-3/H-8: Use unified helper for 100% parity with ForceCloseAsync
             var financials = CalculateShiftFinancials(shift.Orders);

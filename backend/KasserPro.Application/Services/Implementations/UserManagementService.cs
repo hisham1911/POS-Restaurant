@@ -278,7 +278,7 @@ public class UserManagementService : IUserManagementService
             {
                 return ApiResponse<bool>.Fail(
                     ErrorCodes.VALIDATION_ERROR,
-                    "لا يمكن حذف موظف لديه وردية مفتوحة");
+                    "لا يمكن حذف هذا الموظف. لديه وردية مفتوحة حالياً. يرجى إغلاق الوردية أولاً.");
             }
 
             user.IsDeleted = true;
@@ -323,7 +323,7 @@ public class UserManagementService : IUserManagementService
                 {
                     return ApiResponse<bool>.Fail(
                         ErrorCodes.VALIDATION_ERROR,
-                        "لا يمكن تعطيل موظف لديه وردية مفتوحة");
+                        "لا يمكن تعطيل هذا الموظف. لديه وردية مفتوحة حالياً. يرجى إغلاق الوردية أولاً.");
                 }
             }
 

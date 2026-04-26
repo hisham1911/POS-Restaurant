@@ -147,7 +147,7 @@ public class ExpenseService : IExpenseService
             if (activeShift == null)
                 return ApiResponse<ExpenseDto>.Fail(
                     ErrorCodes.NO_OPEN_SHIFT,
-                    "لا يمكن تسجيل مصروف بدون وردية مفتوحة");
+                    "لا يمكن تسجيل مصروف. لا توجد وردية مفتوحة حالياً. يرجى فتح وردية أولاً.");
 
             // Create expense
             var expense = new Expense

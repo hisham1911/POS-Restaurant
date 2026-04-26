@@ -339,6 +339,13 @@ public class ProductService : IProductService
                          && bi.ProductId == product.Id
                          && bi.Quantity > 0);
 
+        if (hasInventory)
+        {
+            return ApiResponse<bool>.Fail(
+                ErrorCodes.VALIDATION_ERROR,
+                "لا يمكن حذف هذا المنتج. لا يزال يوجد مخزون منه في الفرع. يرجى تصفية المخزون أولاً أو نقله.");
+        }
+
         var hasOpenOrders = await _unitOfWork.Orders.Query()
             .AnyAsync(o => o.TenantId == tenantId
                         && !o.IsDeleted
@@ -346,11 +353,11 @@ public class ProductService : IProductService
                         && o.Status != OrderStatus.Cancelled
                         && o.Items.Any(oi => !oi.IsDeleted && oi.ProductId == product.Id));
 
-        if (hasInventory || hasOpenOrders)
+        if (hasOpenOrders)
         {
             return ApiResponse<bool>.Fail(
                 ErrorCodes.VALIDATION_ERROR,
-                "لا يمكن حذف منتج لديه مخزون أو طلبات مفتوحة");
+                "لا يمكن حذف هذا المنتج. يوجد طلبات مفتوحة تحتوي عليه. يرجى إغلاق أو إلغاء هذه الطلبات أولاً.");
         }
 
         product.IsDeleted = true;

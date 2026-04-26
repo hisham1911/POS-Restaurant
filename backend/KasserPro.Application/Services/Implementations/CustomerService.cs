@@ -621,7 +621,7 @@ public class CustomerService : ICustomerService
         if (customer.TotalDue > 0 || hasOpenOrders)
             return ApiResponse<bool>.Fail(
                 ErrorCodes.VALIDATION_ERROR,
-                "لا يمكن حذف عميل لديه ديون أو طلبات مفتوحة");
+                "لا يمكن حذف هذا العميل. لديه رصيد مديون أو طلبات غير مكتملة. يرجى تسوية الديون وإغلاق جميع الطلبات أولاً.");
 
         // Soft delete (using both IsActive and IsDeleted for compatibility)
         customer.IsActive = false;

@@ -177,21 +177,35 @@ public class BranchService : IBranchService
                         && s.BranchId == branch.Id
                         && !s.IsClosed);
 
+        if (hasOpenShifts)
+        {
+            return ApiResponse<bool>.Fail(
+                ErrorCodes.VALIDATION_ERROR,
+                "لا يمكن حذف هذا الفرع. يوجد وردية مفتوحة حالياً. يرجى إغلاق الوردية أولاً.");
+        }
+
         var hasActiveUsers = await _unitOfWork.Users.Query()
             .AnyAsync(u => u.TenantId == tenantId
                         && u.BranchId == branch.Id
                         && u.IsActive);
+
+        if (hasActiveUsers)
+        {
+            return ApiResponse<bool>.Fail(
+                ErrorCodes.VALIDATION_ERROR,
+                "لا يمكن حذف هذا الفرع. يوجد موظفون مرتبطون به. يرجى نقل الموظفين إلى فرع آخر أو تعطيلهم أولاً.");
+        }
 
         var hasInventory = await _unitOfWork.BranchInventories.Query()
             .AnyAsync(bi => bi.TenantId == tenantId
                          && bi.BranchId == branch.Id
                          && bi.Quantity > 0);
 
-        if (hasOpenShifts || hasActiveUsers || hasInventory)
+        if (hasInventory)
         {
             return ApiResponse<bool>.Fail(
                 ErrorCodes.VALIDATION_ERROR,
-                "لا يمكن حذف الفرع لوجود ورديات مفتوحة أو مستخدمين أو مخزون مرتبط به");
+                "لا يمكن حذف هذا الفرع. يوجد مخزون مرتبط به. يرجى تصفية المخزون أولاً.");
         }
 
         branch.IsDeleted = true;

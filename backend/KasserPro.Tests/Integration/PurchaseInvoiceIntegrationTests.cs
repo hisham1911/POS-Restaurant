@@ -69,6 +69,37 @@ public class PurchaseInvoiceIntegrationTests : IClassFixture<CustomWebApplicatio
     }
 
     [Fact]
+    public async Task PreparePurchaseInvoice_ShouldReturnBackendCalculatedTotals()
+    {
+        var testData = await SeedPurchaseInvoiceDataAsync(14m);
+        using var client = CreateAuthenticatedAdminClient(testData);
+
+        var request = new CreatePurchaseInvoiceRequest
+        {
+            SupplierId = testData.SupplierId,
+            InvoiceDate = DateTime.UtcNow,
+            Items = new List<CreatePurchaseInvoiceItemRequest>
+            {
+                new() { ProductId = testData.ProductId, Quantity = 2, PurchasePrice = 250m, SellingPrice = 350m },
+                new() { ProductId = testData.ProductId, Quantity = 1, PurchasePrice = 500m, SellingPrice = 650m }
+            },
+            Notes = "Prepare preview regression"
+        };
+
+        var response = await client.PostAsJsonAsync("/api/purchaseinvoices/prepare", request);
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var result = await DeserializeResponse<PurchaseInvoicePreviewDto>(response);
+        result.Success.Should().BeTrue(because: result.Message);
+        result.Data.Should().NotBeNull();
+        result.Data!.Subtotal.Should().Be(1000m);
+        result.Data.TaxRate.Should().Be(14m);
+        result.Data.TaxAmount.Should().Be(140m);
+        result.Data.Total.Should().Be(1140m);
+    }
+
+    [Fact]
     public async Task CreatePurchaseInvoice_ShouldNotReuseNumberFromSoftDeletedDraft()
     {
         var testData = await SeedPurchaseInvoiceDataAsync(0m);
@@ -216,6 +247,87 @@ public class PurchaseInvoiceIntegrationTests : IClassFixture<CustomWebApplicatio
         deleteResult.ErrorCode.Should().Be("PURCHASE_INVOICE_NOT_EDITABLE");
     }
 
+    [Fact]
+    public async Task PurchaseInvoiceLifecycle_ShouldKeepSupplierTotalDueInSync()
+    {
+        var testData = await SeedPurchaseInvoiceDataAsync(0m);
+        using var client = CreateAuthenticatedAdminClient(testData);
+
+        var invoice = await CreateInvoiceAsync(client, testData.SupplierId, testData.ProductId, 1000m);
+        var invoiceTotal = invoice.AmountDue;
+
+        await ConfirmInvoiceAsync(client, invoice.Id);
+        await AssertSupplierTotalDueAsync(testData.SupplierId, invoiceTotal);
+
+        var addPaymentResponse = await client.PostAsJsonAsync(
+            $"/api/purchaseinvoices/{invoice.Id}/payments",
+            new AddPaymentRequest
+            {
+                Amount = 400m,
+                PaymentDate = DateTime.UtcNow,
+                Method = PaymentMethod.Cash,
+                Notes = "Supplier balance sync test"
+            });
+
+        addPaymentResponse.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var addPaymentResult = await DeserializeResponse<PurchaseInvoicePaymentDto>(addPaymentResponse);
+        addPaymentResult.Success.Should().BeTrue(because: addPaymentResult.Message);
+        addPaymentResult.Data.Should().NotBeNull();
+
+        await AssertSupplierTotalDueAsync(testData.SupplierId, Math.Round(invoiceTotal - 400m, 2));
+
+        var deletePaymentResponse = await client.DeleteAsync(
+            $"/api/purchaseinvoices/{invoice.Id}/payments/{addPaymentResult.Data!.Id}");
+
+        deletePaymentResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        await AssertSupplierTotalDueAsync(testData.SupplierId, invoiceTotal);
+
+        var cancelResponse = await client.PostAsJsonAsync(
+            $"/api/purchaseinvoices/{invoice.Id}/cancel",
+            new CancelInvoiceRequest
+            {
+                Reason = "Supplier debt rollback test",
+                AdjustInventory = false
+            });
+
+        cancelResponse.StatusCode.Should().Be(HttpStatusCode.OK);
+        await AssertSupplierTotalDueAsync(testData.SupplierId, 0m);
+    }
+
+    [Fact]
+    public async Task ConfirmPurchaseInvoice_ShouldRoundWeightedAverageCostToFourDecimals()
+    {
+        var testData = await SeedPurchaseInvoiceDataAsync(0m);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var product = await db.Products.SingleAsync(p => p.Id == testData.ProductId);
+            product.AverageCost = 10m;
+            db.BranchInventories.Add(new BranchInventory
+            {
+                TenantId = testData.TenantId,
+                BranchId = testData.BranchId,
+                ProductId = testData.ProductId,
+                Quantity = 3,
+                ReorderLevel = 1,
+                LastUpdatedAt = DateTime.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var client = CreateAuthenticatedAdminClient(testData);
+        var invoice = await CreateInvoiceAsync(client, testData.SupplierId, testData.ProductId, 10.01m);
+        await ConfirmInvoiceAsync(client, invoice.Id);
+
+        using var verificationScope = _factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var updatedProduct = await verificationDb.Products.SingleAsync(p => p.Id == testData.ProductId);
+
+        updatedProduct.AverageCost.Should().Be(10.0025m);
+    }
+
     private HttpClient CreateAuthenticatedAdminClient(
         (int TenantId, int BranchId, int AdminUserId, int SupplierId, int ProductId) testData)
     {
@@ -293,6 +405,14 @@ public class PurchaseInvoiceIntegrationTests : IClassFixture<CustomWebApplicatio
         var result = JsonSerializer.Deserialize<ApiResponse<T>>(content, _jsonOptions);
         result.Should().NotBeNull(because: $"Response should deserialize successfully. Raw content: {content}");
         return result!;
+    }
+
+    private async Task AssertSupplierTotalDueAsync(int supplierId, decimal expectedTotalDue)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var supplier = await db.Suppliers.SingleAsync(s => s.Id == supplierId);
+        supplier.TotalDue.Should().Be(expectedTotalDue);
     }
 
     private async Task<(int TenantId, int BranchId, int AdminUserId, int SupplierId, int ProductId)> SeedPurchaseInvoiceDataAsync(decimal taxRate)

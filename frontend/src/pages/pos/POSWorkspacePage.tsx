@@ -210,6 +210,8 @@ export const POSWorkspacePage = () => {
     total,
     taxRate,
     isTaxEnabled,
+    serviceChargeAmount,
+    serviceChargeRate,
     addItem,
     clearCart,
     applyDiscount,
@@ -509,6 +511,12 @@ export const POSWorkspacePage = () => {
       const creditLimitExceeded = amountDue > availableCredit;
 
       if (numericAmount < paymentTotal && creditLimitExceeded) {
+        toast.error(
+          `تجاوز حد الائتمان. المتاح بعد رصيد العميل عبر كل الفروع: ${formatCurrency(availableCredit)} ج.م، المطلوب آجلاً: ${formatCurrency(amountDue)} ج.م`,
+          { duration: 5000 },
+        );
+        return;
+
         toast.error(
           `تجاوز حد الائتمان. المتاح: ${formatCurrency(availableCredit)} ج.م، المطلوب: ${formatCurrency(amountDue)} ج.م`,
           { duration: 5000 },
@@ -919,6 +927,12 @@ export const POSWorkspacePage = () => {
               value={formatCurrency(taxAmount)}
             />
           )}
+          {serviceChargeAmount > 0 && (
+            <SummaryLine
+              label={`رسوم الخدمة (${serviceChargeRate}%)`}
+              value={formatCurrency(serviceChargeAmount)}
+            />
+          )}
           <div className="border-t border-slate-200 pt-3">
             <SummaryLine
               label="الإجمالي الحالي"
@@ -926,6 +940,9 @@ export const POSWorkspacePage = () => {
               valueClassName="text-primary-600 text-base font-black"
               icon={<Wallet className="h-4 w-4 text-primary-500" />}
             />
+            <p className="mt-2 text-xs text-slate-400">
+              * الإجمالي تقديري، ويتم تأكيده نهائيًا عند إنشاء الطلب.
+            </p>
           </div>
         </SurfaceCard>
       </div>
@@ -1357,6 +1374,12 @@ export const POSWorkspacePage = () => {
           value={formatCurrency(taxAmount)}
         />
       )}
+      {serviceChargeAmount > 0 && (
+        <SummaryLine
+          label={`رسوم الخدمة (${serviceChargeRate}%)`}
+          value={formatCurrency(serviceChargeAmount)}
+        />
+      )}
       <SummaryLine
         label="طريقة الدفع"
         value={selectedPaymentMethodLabel}
@@ -1370,6 +1393,9 @@ export const POSWorkspacePage = () => {
           valueClassName="text-primary-600 text-base font-black"
           icon={<Wallet className="h-4 w-4 text-primary-500" />}
         />
+        <p className="mt-2 text-xs text-slate-400">
+          * الإجمالي تقديري، ويتم تأكيده نهائيًا عند إنشاء الطلب.
+        </p>
       </div>
     </SurfaceCard>
   );

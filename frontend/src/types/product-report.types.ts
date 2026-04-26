@@ -94,6 +94,18 @@ export interface CogsCategoryBreakdown {
   grossProfitMargin: number;
 }
 
+export interface CogsProductBreakdown {
+  productId: number;
+  productName: string;
+  categoryName?: string;
+  quantitySold: number;
+  revenue: number;
+  unitCost: number;
+  cost: number;
+  grossProfit: number;
+  hasMissingCost?: boolean;
+}
+
 export interface CogsReport {
   fromDate: string;
   toDate: string;
@@ -102,9 +114,11 @@ export interface CogsReport {
   openingInventoryValue: number;
   totalPurchases: number;
   closingInventoryValue: number;
+  productsWithNoCostCount: number;
   costOfGoodsSold: number;
   totalRevenue: number;
   grossProfit: number;
   grossProfitMargin: number;
   categoryBreakdown: CogsCategoryBreakdown[];
+  productBreakdown: CogsProductBreakdown[];
 }

@@ -4,6 +4,7 @@ import { ChevronDown } from "lucide-react";
 import {
   useCreatePurchaseInvoiceMutation,
   useUpdatePurchaseInvoiceMutation,
+  usePreparePurchaseInvoiceMutation,
   useGetPurchaseInvoiceByIdQuery,
 } from "../../api/purchaseInvoiceApi";
 import { useGetCurrentTenantQuery } from "../../api/branchesApi";
@@ -15,7 +16,10 @@ import { Loading } from "../../components/common/Loading";
 import { QuickAddProductModal } from "../../components/purchase-invoices/QuickAddProductModal";
 import { formatCurrency } from "../../utils/formatters";
 import { toast } from "sonner";
-import type { CreatePurchaseInvoiceItemRequest } from "../../types/purchaseInvoice.types";
+import type {
+  CreatePurchaseInvoiceItemRequest,
+  PurchaseInvoicePreview,
+} from "../../types/purchaseInvoice.types";
 import { getApiErrorCode, handleApiError } from "../../utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
 
@@ -44,6 +48,7 @@ export function PurchaseInvoiceFormPage() {
   const [sellingPrice, setSellingPrice] = useState<string>("");
   const [itemNotes, setItemNotes] = useState<string>("");
   const [showQuickAddProduct, setShowQuickAddProduct] = useState(false);
+  const [preview, setPreview] = useState<PurchaseInvoicePreview | null>(null);
 
   const { data: suppliersResponse } = useGetSuppliersQuery();
   const { data: productsResponse } = useGetProductsQuery();
@@ -55,6 +60,8 @@ export function PurchaseInvoiceFormPage() {
     useCreatePurchaseInvoiceMutation();
   const [updateInvoice, { isLoading: isUpdating }] =
     useUpdatePurchaseInvoiceMutation();
+  const [prepareInvoice, { isLoading: isPreparingPreview }] =
+    usePreparePurchaseInvoiceMutation();
 
   const suppliers = suppliersResponse?.data || [];
   const products = productsResponse?.data || [];
@@ -80,6 +87,35 @@ export function PurchaseInvoiceFormPage() {
       );
     }
   }, [invoice, isEditMode]);
+
+  useEffect(() => {
+    if (supplierId <= 0 || items.length === 0) {
+      setPreview(null);
+      return;
+    }
+
+    const requestData = {
+      supplierId,
+      invoiceDate: new Date(invoiceDate).toISOString(),
+      items: items.map((item) => ({
+        productId: item.productId,
+        quantity: item.quantity,
+        purchasePrice: item.purchasePrice,
+        sellingPrice: item.sellingPrice,
+        notes: item.notes,
+      })),
+      notes,
+    };
+
+    void prepareInvoice(requestData)
+      .unwrap()
+      .then((response) => {
+        setPreview(response.data || null);
+      })
+      .catch(() => {
+        setPreview(null);
+      });
+  }, [supplierId, invoiceDate, items, notes, prepareInvoice]);
 
   const handleAddItem = () => {
     const numQuantity = Number(quantity) || 0;
@@ -146,9 +182,10 @@ export function PurchaseInvoiceFormPage() {
     return roundCurrency(calculateSubtotal() + calculateTaxAmount());
   };
 
-  const subtotal = calculateSubtotal();
-  const taxAmount = calculateTaxAmount();
-  const total = calculateTotal();
+  const subtotal = preview?.subtotal ?? calculateSubtotal();
+  const taxAmount = preview?.taxAmount ?? calculateTaxAmount();
+  const total = preview?.total ?? calculateTotal();
+  const appliedTaxRate = preview?.taxRate ?? purchaseTaxRate;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -472,6 +509,11 @@ export function PurchaseInvoiceFormPage() {
                       {formatCurrency(taxAmount)}
                     </span>
                   </div>
+                  <p className="mb-3 text-xs text-gray-500">
+                    {isPreparingPreview
+                      ? "جاري تحديث المعاينة من الباك إند..."
+                      : `المجاميع المعروضة مأخوذة من حساب الباك إند لضمان تطابق الفاتورة (ضريبة ${appliedTaxRate}%)`}
+                  </p>
                   <div className="mt-3 flex justify-between border-t border-gray-200 pt-3">
                     <span className="text-base font-semibold text-gray-900">
                       الإجمالي / المبلغ المستحق:

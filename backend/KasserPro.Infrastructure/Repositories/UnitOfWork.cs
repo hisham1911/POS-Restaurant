@@ -26,6 +26,7 @@ public class UnitOfWork : IUnitOfWork
 
         // Sellable V1: New repositories
         Customers = new GenericRepository<Customer>(context);
+        CustomerBranchBalances = new GenericRepository<CustomerBranchBalance>(context);
         DebtPayments = new GenericRepository<DebtPayment>(context);
         StockMovements = new GenericRepository<StockMovement>(context);
         RefundLogs = new GenericRepository<RefundLog>(context);
@@ -63,6 +64,7 @@ public class UnitOfWork : IUnitOfWork
 
     // Sellable V1: New repository properties
     public IRepository<Customer> Customers { get; }
+    public IRepository<CustomerBranchBalance> CustomerBranchBalances { get; }
     public IRepository<DebtPayment> DebtPayments { get; }
     public IRepository<StockMovement> StockMovements { get; }
     public IRepository<RefundLog> RefundLogs { get; }

@@ -494,10 +494,10 @@ public class ProductService : IProductService
                 CurrentBranchStock = request.InitialStock
             }, "تم إنشاء المنتج بنجاح");
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             await transaction.RollbackAsync();
-            return ApiResponse<ProductDto>.Fail($"حدث خطأ أثناء إنشاء المنتج: {ex.Message}");
+            return ApiResponse<ProductDto>.Fail(ErrorCodes.INTERNAL_ERROR, ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR));
         }
     }
 }

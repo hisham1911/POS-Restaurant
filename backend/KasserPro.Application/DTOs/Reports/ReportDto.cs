@@ -22,6 +22,7 @@ public class DailyReportDto
     public decimal NetSales { get; set; }        // After discounts, before tax
     public decimal TotalTax { get; set; }
     public decimal TotalSales { get; set; }      // Final total (Net + Tax)
+    public decimal ActualTotalSales { get; set; } // Alias for the post-refund tax-inclusive revenue
     public decimal TotalRefunds { get; set; }    // Total refunds from return orders
 
     // Payment Breakdown
@@ -29,6 +30,8 @@ public class DailyReportDto
     public decimal TotalCard { get; set; }
     public decimal TotalFawry { get; set; }
     public decimal TotalOther { get; set; }
+    public decimal TotalCollected { get; set; }
+    public decimal TotalDeferred { get; set; }
 
     // Top Products
     public List<TopProductDto> TopProducts { get; set; } = new();
@@ -47,7 +50,14 @@ public class ShiftSummaryDto
     public decimal TotalCash { get; set; }
     public decimal TotalCard { get; set; }
     public decimal TotalFawry { get; set; }
+    public decimal TotalOther { get; set; }
     public decimal TotalSales { get; set; }
+    public decimal TotalCollected { get; set; }
+    public decimal DeferredAmount { get; set; }
+    public decimal CollectedCash { get; set; }
+    public decimal CollectedCard { get; set; }
+    public decimal CollectedFawry { get; set; }
+    public decimal CollectedOther { get; set; }
     public bool IsForceClosed { get; set; }
     public string? ForceCloseReason { get; set; }
 }

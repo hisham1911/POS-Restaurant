@@ -36,6 +36,9 @@ public class PagedResult<T>
 {
     public List<T> Items { get; set; } = new();
     public int TotalCount { get; set; }
+    public decimal TotalAmount { get; set; }
+    public decimal TotalSpentAmount { get; set; }
+    public decimal TotalDueAmount { get; set; }
     public int Page { get; set; }
     public int PageSize { get; set; }
     public int TotalPages => (int)Math.Ceiling(TotalCount / (double)PageSize);
@@ -44,10 +47,20 @@ public class PagedResult<T>
     
     public PagedResult() { }
     
-    public PagedResult(List<T> items, int totalCount, int page, int pageSize)
+    public PagedResult(
+        List<T> items,
+        int totalCount,
+        int page,
+        int pageSize,
+        decimal totalAmount = 0m,
+        decimal totalSpentAmount = 0m,
+        decimal totalDueAmount = 0m)
     {
         Items = items;
         TotalCount = totalCount;
+        TotalAmount = totalAmount;
+        TotalSpentAmount = totalSpentAmount;
+        TotalDueAmount = totalDueAmount;
         Page = page;
         PageSize = pageSize;
     }

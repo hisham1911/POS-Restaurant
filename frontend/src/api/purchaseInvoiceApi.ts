@@ -1,6 +1,7 @@
 import { baseApi } from './baseApi';
 import type {
   PurchaseInvoice,
+  PurchaseInvoicePreview,
   CreatePurchaseInvoiceRequest,
   UpdatePurchaseInvoiceRequest,
   AddPaymentRequest,
@@ -13,6 +14,7 @@ import type { ApiResponse } from '../types/api.types';
 interface PagedResult<T> {
   items: T[];
   totalCount: number;
+  totalAmount: number;
   page: number;
   pageSize: number;
   totalPages: number;
@@ -51,6 +53,17 @@ export const purchaseInvoiceApi = baseApi.injectEndpoints({
               { type: 'PurchaseInvoice', id: 'LIST' },
             ]
           : [{ type: 'PurchaseInvoice', id: 'LIST' }],
+    }),
+
+    preparePurchaseInvoice: builder.mutation<
+      ApiResponse<PurchaseInvoicePreview>,
+      CreatePurchaseInvoiceRequest
+    >({
+      query: (data) => ({
+        url: '/purchaseinvoices/prepare',
+        method: 'POST',
+        body: data,
+      }),
     }),
 
     // Get purchase invoice by ID
@@ -168,6 +181,7 @@ export const purchaseInvoiceApi = baseApi.injectEndpoints({
 
 export const {
   useGetPurchaseInvoicesQuery,
+  usePreparePurchaseInvoiceMutation,
   useGetPurchaseInvoiceByIdQuery,
   useCreatePurchaseInvoiceMutation,
   useUpdatePurchaseInvoiceMutation,

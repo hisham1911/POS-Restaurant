@@ -23,6 +23,11 @@ public class Tenant : BaseEntity
     /// </summary>
     public bool IsTaxEnabled { get; set; } = true;
 
+    /// <summary>
+    /// نسبة رسوم الخدمة الافتراضية على الطلبات (مثال: 10 = 10%)
+    /// </summary>
+    public decimal ServiceChargeRate { get; set; } = 0m;
+
     // Inventory Settings
     /// <summary>
     /// هل يُسمح بالمخزون السالب؟ إذا كانت false، لن يتم السماح بالبيع عند نفاذ المخزون

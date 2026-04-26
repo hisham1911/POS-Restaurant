@@ -15,6 +15,16 @@ public class ShiftService : IShiftService
     private readonly ICurrentUserService _currentUser;
     private readonly ICashRegisterService _cashRegisterService;
 
+    private readonly record struct ShiftFinancialSnapshot(
+        int TotalOrders,
+        decimal TotalCash,
+        decimal TotalCard,
+        decimal TotalFawry,
+        decimal TotalBankTransfer,
+        decimal TotalSales,
+        decimal TotalCollected,
+        decimal DeferredAmount);
+
     public ShiftService(IUnitOfWork unitOfWork, ICurrentUserService currentUser, ICashRegisterService cashRegisterService)
     {
         _unitOfWork = unitOfWork;
@@ -49,7 +59,7 @@ public class ShiftService : IShiftService
         if (shift == null)
             return ApiResponse<ShiftDto>.Ok(null!, "لا توجد وردية مفتوحة");
 
-        return ApiResponse<ShiftDto>.Ok(MapToDto(shift));
+        return ApiResponse<ShiftDto>.Ok(await MapToDtoAsync(shift));
     }
 
     public async Task<ApiResponse<ShiftDto>> OpenAsync(OpenShiftRequest request, int userId)
@@ -117,11 +127,12 @@ public class ShiftService : IShiftService
                 shiftId: shift.Id
             );
 
+            await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitTransactionAsync();
 
             shift.User = user;
 
-            return ApiResponse<ShiftDto>.Ok(MapToDto(shift), "تم فتح الوردية بنجاح");
+            return ApiResponse<ShiftDto>.Ok(await MapToDtoAsync(shift), "تم فتح الوردية بنجاح");
         }
         catch (Exception ex)
         {
@@ -175,13 +186,13 @@ public class ShiftService : IShiftService
                 return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_ALREADY_CLOSED, "الوردية مغلقة بالفعل");
 
             // FIX C-2/C-3/H-8: Use unified helper for 100% parity with ForceCloseAsync
-            var (totalOrders, totalCash, totalCard, _, _) = CalculateShiftFinancials(shift.Orders);
-            shift.TotalOrders = totalOrders;
-            shift.TotalCash = totalCash;
-            shift.TotalCard = totalCard;
+            var financials = CalculateShiftFinancials(shift.Orders);
+            shift.TotalOrders = financials.TotalOrders;
+            shift.TotalCash = financials.TotalCash;
+            shift.TotalCard = financials.TotalCard;
 
             shift.ClosingBalance = Math.Round(request.ClosingBalance, 2);
-            shift.ExpectedBalance = Math.Round(shift.OpeningBalance + totalCash, 2);
+            shift.ExpectedBalance = await CalculateExpectedBalanceAsync(shift.BranchId, shift.OpeningBalance, financials.TotalCash);
             shift.Difference = Math.Round(shift.ClosingBalance - shift.ExpectedBalance, 2);
             shift.ClosedAt = DateTime.UtcNow;
             shift.IsClosed = true;
@@ -193,7 +204,7 @@ public class ShiftService : IShiftService
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitTransactionAsync();
 
-            return ApiResponse<ShiftDto>.Ok(MapToDto(shift), "تم إغلاق الوردية بنجاح");
+            return ApiResponse<ShiftDto>.Ok(await MapToDtoAsync(shift), "تم إغلاق الوردية بنجاح");
         }
         catch (DbUpdateConcurrencyException)
         {
@@ -230,7 +241,13 @@ public class ShiftService : IShiftService
             .Take(30)
             .ToListAsync();
 
-        return ApiResponse<List<ShiftDto>>.Ok(shifts.Select(MapToDto).ToList());
+        var shiftDtos = new List<ShiftDto>(shifts.Count);
+        foreach (var shift in shifts)
+        {
+            shiftDtos.Add(await MapToDtoAsync(shift));
+        }
+
+        return ApiResponse<List<ShiftDto>>.Ok(shiftDtos);
     }
 
     /// <summary>
@@ -287,15 +304,16 @@ public class ShiftService : IShiftService
                     || o.Status == OrderStatus.Refunded))
                 .ToListAsync();
 
-            var (totalOrders, totalCash, totalCard, _, _) = CalculateShiftFinancials(completedOrders);
+            var financials = CalculateShiftFinancials(completedOrders);
 
             // Set closing values
-            shift.ClosingBalance = request.ActualBalance ?? (shift.OpeningBalance + totalCash);
-            shift.ExpectedBalance = shift.OpeningBalance + totalCash;
+            var expectedBalance = await CalculateExpectedBalanceAsync(shift.BranchId, shift.OpeningBalance, financials.TotalCash);
+            shift.ClosingBalance = request.ActualBalance ?? expectedBalance;
+            shift.ExpectedBalance = expectedBalance;
             shift.Difference = shift.ClosingBalance - shift.ExpectedBalance;
-            shift.TotalCash = totalCash;
-            shift.TotalCard = totalCard;
-            shift.TotalOrders = totalOrders;
+            shift.TotalCash = financials.TotalCash;
+            shift.TotalCard = financials.TotalCard;
+            shift.TotalOrders = financials.TotalOrders;
             shift.ClosedAt = DateTime.UtcNow;
             shift.IsClosed = true;
             shift.IsForceClosed = true;
@@ -309,7 +327,7 @@ public class ShiftService : IShiftService
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitTransactionAsync();
 
-            return ApiResponse<ShiftDto>.Ok(MapToDto(shift), "تم إغلاق الوردية بالقوة بنجاح");
+            return ApiResponse<ShiftDto>.Ok(await MapToDtoAsync(shift), "تم إغلاق الوردية بالقوة بنجاح");
         }
         catch (Exception ex)
         {
@@ -392,7 +410,7 @@ public class ShiftService : IShiftService
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitTransactionAsync();
 
-            return ApiResponse<ShiftDto>.Ok(MapToDto(shift), "تم تسليم الوردية بنجاح");
+            return ApiResponse<ShiftDto>.Ok(await MapToDtoAsync(shift), "تم تسليم الوردية بنجاح");
         }
         catch (Exception ex)
         {
@@ -442,7 +460,13 @@ public class ShiftService : IShiftService
             .OrderBy(s => s.OpenedAt)
             .ToListAsync();
 
-        return ApiResponse<List<ShiftDto>>.Ok(shifts.Select(MapToDto).ToList());
+        var activeShiftDtos = new List<ShiftDto>(shifts.Count);
+        foreach (var shift in shifts)
+        {
+            activeShiftDtos.Add(await MapToDtoAsync(shift));
+        }
+
+        return ApiResponse<List<ShiftDto>>.Ok(activeShiftDtos);
     }
 
     /// <summary>
@@ -532,7 +556,7 @@ public class ShiftService : IShiftService
     /// TotalCard includes Card payments ONLY (excludes Fawry and BankTransfer).
     /// TotalFawry and TotalBankTransfer provide granular breakdown.
     /// </summary>
-    private static (int TotalOrders, decimal TotalCash, decimal TotalCard, decimal TotalFawry, decimal TotalBankTransfer) CalculateShiftFinancials(
+    private static ShiftFinancialSnapshot CalculateShiftFinancials(
         IEnumerable<Order> orders)
     {
         var completedOrders = orders.Where(o =>
@@ -558,23 +582,49 @@ public class ShiftService : IShiftService
         var totalBankTransfer = Math.Round(
             salesPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)
             - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)), 2);
+        var totalSales = Math.Round(
+            salesOrders.Sum(o => o.Total)
+            - Math.Abs(returnOrders.Sum(o => o.Total)), 2);
+        var totalCollected = Math.Round(totalCash + totalCard + totalFawry + totalBankTransfer, 2);
+        var deferredAmount = Math.Round(totalSales - totalCollected, 2);
 
-        return (salesOrders.Count, totalCash, totalCard, totalFawry, totalBankTransfer);
+        return new ShiftFinancialSnapshot(
+            salesOrders.Count,
+            totalCash,
+            totalCard,
+            totalFawry,
+            totalBankTransfer,
+            totalSales,
+            totalCollected,
+            deferredAmount);
     }
 
-    private static ShiftDto MapToDto(Shift shift)
+    private async Task<decimal> CalculateExpectedBalanceAsync(int branchId, decimal openingBalance, decimal totalCash)
+    {
+        var cashRegisterBalanceResponse = await _cashRegisterService.GetCurrentBalanceAsync(branchId);
+        if (cashRegisterBalanceResponse.Success && cashRegisterBalanceResponse.Data is not null)
+        {
+            return Math.Round(cashRegisterBalanceResponse.Data.CurrentBalance, 2);
+        }
+
+        return Math.Round(openingBalance + totalCash, 2);
+    }
+
+    private async Task<ShiftDto> MapToDtoAsync(Shift shift)
     {
         // FIX C-2/C-3/H-8: Use unified helper for DTO calculation too
-        var (calculatedTotalOrders, calculatedTotalCash, calculatedTotalCard, calculatedTotalFawry, calculatedTotalBankTransfer) =
-            CalculateShiftFinancials(shift.Orders ?? new List<Order>());
+        var financials = CalculateShiftFinancials(shift.Orders ?? new List<Order>());
 
         // Use calculated values for open shifts, stored values for closed shifts
-        var totalCash = shift.IsClosed ? shift.TotalCash : calculatedTotalCash;
-        var totalCard = shift.IsClosed ? shift.TotalCard : calculatedTotalCard;
-        var totalOrders = shift.IsClosed ? shift.TotalOrders : calculatedTotalOrders;
+        var totalCash = shift.IsClosed ? shift.TotalCash : financials.TotalCash;
+        var totalCard = shift.IsClosed ? shift.TotalCard : financials.TotalCard;
+        var totalOrders = shift.IsClosed ? shift.TotalOrders : financials.TotalOrders;
         // Fawry/BankTransfer are always computed from orders (not stored separately on entity)
-        var totalFawry = calculatedTotalFawry;
-        var totalBankTransfer = calculatedTotalBankTransfer;
+        var totalFawry = financials.TotalFawry;
+        var totalBankTransfer = financials.TotalBankTransfer;
+        var totalSales = financials.TotalSales;
+        var totalCollected = financials.TotalCollected;
+        var deferredAmount = financials.DeferredAmount;
 
         // Calculate duration
         var endTime = shift.ClosedAt ?? DateTime.UtcNow;
@@ -585,12 +635,16 @@ public class ShiftService : IShiftService
         // Calculate inactive hours
         var inactiveHours = shift.IsClosed ? 0 : (int)(DateTime.UtcNow - shift.LastActivityAt).TotalHours;
 
+        var expectedBalance = shift.IsClosed
+            ? shift.ExpectedBalance
+            : await CalculateExpectedBalanceAsync(shift.BranchId, shift.OpeningBalance, totalCash);
+
         return new ShiftDto
         {
             Id = shift.Id,
             OpeningBalance = shift.OpeningBalance,
             ClosingBalance = shift.ClosingBalance,
-            ExpectedBalance = shift.IsClosed ? shift.ExpectedBalance : Math.Round(shift.OpeningBalance + calculatedTotalCash, 2),
+            ExpectedBalance = expectedBalance,
             Difference = shift.Difference,
             OpenedAt = shift.OpenedAt,
             ClosedAt = shift.ClosedAt,
@@ -600,6 +654,13 @@ public class ShiftService : IShiftService
             TotalCard = totalCard,
             TotalFawry = totalFawry,
             TotalBankTransfer = totalBankTransfer,
+            TotalSales = totalSales,
+            TotalCollected = totalCollected,
+            DeferredAmount = deferredAmount,
+            CollectedCash = totalCash,
+            CollectedCard = totalCard,
+            CollectedFawry = totalFawry,
+            CollectedBankTransfer = totalBankTransfer,
             TotalOrders = totalOrders,
             UserName = shift.User?.Name ?? string.Empty,
 

@@ -43,43 +43,37 @@ public class ExpenseService : IExpenseService
     {
         try
         {
-            var query = _unitOfWork.Expenses.Query()
-                .Where(e => e.TenantId == _currentUserService.TenantId &&
-                           e.BranchId == _currentUserService.BranchId)
+            var filteredQuery = BuildFilteredExpensesQuery(
+                    categoryId,
+                    status,
+                    fromDate,
+                    toDate,
+                    shiftId)
+                .AsNoTracking();
+
+            // Pagination
+            var totalCount = await filteredQuery.CountAsync();
+            var totalAmount = (await filteredQuery
+                .Select(e => e.Amount)
+                .ToListAsync())
+                .Sum();
+            var items = await filteredQuery
                 .Include(e => e.Category)
                 .Include(e => e.Shift)
                 .Include(e => e.Attachments)
-                .AsQueryable();
-
-            // Apply filters
-            if (categoryId.HasValue)
-                query = query.Where(e => e.CategoryId == categoryId.Value);
-
-            if (status.HasValue)
-                query = query.Where(e => e.Status == status.Value);
-
-            if (fromDate.HasValue)
-                query = query.Where(e => e.ExpenseDate >= fromDate.Value);
-
-            if (toDate.HasValue)
-                query = query.Where(e => e.ExpenseDate <= toDate.Value);
-
-            if (shiftId.HasValue)
-                query = query.Where(e => e.ShiftId == shiftId.Value);
-
-            // Order by date descending
-            query = query.OrderByDescending(e => e.ExpenseDate);
-
-            // Pagination
-            var totalCount = await query.CountAsync();
-            var items = await query
+                .OrderByDescending(e => e.ExpenseDate)
                 .Skip((pageNumber - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
 
             var dtos = items.Select(MapToDto).ToList();
 
-            var pagedResult = new PagedResult<ExpenseDto>(dtos, totalCount, pageNumber, pageSize);
+            var pagedResult = new PagedResult<ExpenseDto>(
+                dtos,
+                totalCount,
+                pageNumber,
+                pageSize,
+                Math.Round(totalAmount, 2));
 
             return ApiResponse<PagedResult<ExpenseDto>>.Ok(pagedResult);
         }
@@ -117,6 +111,13 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<ExpenseDto>> CreateAsync(CreateExpenseRequest request)
     {
+        if (request.Amount <= 0)
+            return ApiResponse<ExpenseDto>.Fail(
+                ErrorCodes.EXPENSE_INVALID_AMOUNT,
+                ErrorMessages.Get(ErrorCodes.EXPENSE_INVALID_AMOUNT));
+
+        request.Amount = Math.Round(request.Amount, 2);
+
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
@@ -184,6 +185,13 @@ public class ExpenseService : IExpenseService
 
     public async Task<ApiResponse<ExpenseDto>> UpdateAsync(int id, UpdateExpenseRequest request)
     {
+        if (request.Amount <= 0)
+            return ApiResponse<ExpenseDto>.Fail(
+                ErrorCodes.EXPENSE_INVALID_AMOUNT,
+                ErrorMessages.Get(ErrorCodes.EXPENSE_INVALID_AMOUNT));
+
+        request.Amount = Math.Round(request.Amount, 2);
+
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
@@ -237,6 +245,35 @@ public class ExpenseService : IExpenseService
             _logger.LogError(ex, "Error updating expense {Id}", id);
             return ApiResponse<ExpenseDto>.Fail(ErrorCodes.INTERNAL_ERROR);
         }
+    }
+
+    private IQueryable<Expense> BuildFilteredExpensesQuery(
+        int? categoryId,
+        ExpenseStatus? status,
+        DateTime? fromDate,
+        DateTime? toDate,
+        int? shiftId)
+    {
+        var query = _unitOfWork.Expenses.Query()
+            .Where(e => e.TenantId == _currentUserService.TenantId &&
+                        e.BranchId == _currentUserService.BranchId);
+
+        if (categoryId.HasValue)
+            query = query.Where(e => e.CategoryId == categoryId.Value);
+
+        if (status.HasValue)
+            query = query.Where(e => e.Status == status.Value);
+
+        if (fromDate.HasValue)
+            query = query.Where(e => e.ExpenseDate >= fromDate.Value);
+
+        if (toDate.HasValue)
+            query = query.Where(e => e.ExpenseDate <= toDate.Value);
+
+        if (shiftId.HasValue)
+            query = query.Where(e => e.ShiftId == shiftId.Value);
+
+        return query;
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(int id)
@@ -401,6 +438,14 @@ public class ExpenseService : IExpenseService
             // Can only pay Approved expenses
             if (expense.Status != ExpenseStatus.Approved)
                 return ApiResponse<ExpenseDto>.Fail(ErrorCodes.EXPENSE_NOT_APPROVED);
+
+            if (request.PaymentMethod != PaymentMethod.Cash
+                && string.IsNullOrWhiteSpace(request.PaymentReferenceNumber))
+            {
+                return ApiResponse<ExpenseDto>.Fail(
+                    ErrorCodes.PAYMENT_REFERENCE_REQUIRED,
+                    ErrorMessages.Get(ErrorCodes.PAYMENT_REFERENCE_REQUIRED));
+            }
 
             // Get user name
             var user = await _unitOfWork.Users.Query()

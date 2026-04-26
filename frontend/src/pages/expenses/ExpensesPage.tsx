@@ -39,10 +39,7 @@ export function ExpensesPage() {
   const totalCount = expensesResponse?.data?.totalCount || 0;
   const totalPages = expensesResponse?.data?.totalPages || 1;
   const categories = categoriesResponse?.data || [];
-  const totalAmount = expenses.reduce(
-    (sum, expense) => sum + expense.amount,
-    0,
-  );
+  const totalAmount = expensesResponse?.data?.totalAmount || 0;
   const paidCount = expenses.filter(
     (expense) => expense.status === "Paid",
   ).length;
@@ -126,7 +123,7 @@ export function ExpensesPage() {
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-sm text-gray-600">
-                  إجمالي المصروفات (الصفحة الحالية)
+                  إجمالي المصروفات (كل النتائج المطابقة)
                 </p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">
                   {formatCurrency(totalAmount)}

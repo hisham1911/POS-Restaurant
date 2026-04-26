@@ -38,6 +38,7 @@ interface CartState {
   items: CartItem[];
   taxRate: number;
   isTaxEnabled: boolean;
+  serviceChargeRate: number;
   allowNegativeStock: boolean;
   // Order-level discount
   discountType?: DiscountType;
@@ -48,6 +49,7 @@ const initialState: CartState = {
   items: [],
   taxRate: 0,
   isTaxEnabled: true,
+  serviceChargeRate: 0,
   allowNegativeStock: false, // Default: don't allow selling when stock is 0
   discountType: undefined,
   discountValue: undefined,
@@ -182,14 +184,22 @@ const cartSlice = createSlice({
       action: PayloadAction<{
         taxRate: number;
         isTaxEnabled: boolean;
+        serviceChargeRate?: number;
         allowNegativeStock?: boolean;
       }>,
     ) => {
       state.taxRate = action.payload.taxRate;
       state.isTaxEnabled = action.payload.isTaxEnabled;
+      if (action.payload.serviceChargeRate !== undefined) {
+        state.serviceChargeRate = action.payload.serviceChargeRate;
+      }
       if (action.payload.allowNegativeStock !== undefined) {
         state.allowNegativeStock = action.payload.allowNegativeStock;
       }
+    },
+
+    setServiceChargeRate: (state, action: PayloadAction<number>) => {
+      state.serviceChargeRate = action.payload;
     },
 
     // تطبيق خصم على الطلب
@@ -241,6 +251,7 @@ export const {
   updateNotes,
   clearCart,
   setTaxSettings,
+  setServiceChargeRate,
   setDiscount,
   setItemDiscount,
 } = cartSlice.actions;
@@ -250,6 +261,9 @@ export const selectCartItems = (state: { cart: CartState }) => state.cart.items;
 export const selectTaxRate = (state: { cart: CartState }) => state.cart.taxRate;
 export const selectIsTaxEnabled = (state: { cart: CartState }) =>
   state.cart.isTaxEnabled;
+
+export const selectServiceChargeRate = (state: { cart: CartState }) =>
+  state.cart.serviceChargeRate;
 
 export const selectAllowNegativeStock = (state: { cart: CartState }) =>
   state.cart.allowNegativeStock;
@@ -408,8 +422,42 @@ export const selectTaxAmount = (state: { cart: CartState }) => {
   );
 };
 
+export const selectServiceChargeAmount = (state: { cart: CartState }) => {
+  const subtotal = state.cart.items.reduce(
+    (sum, item) =>
+      sum +
+      getCartItemSubtotal(item, state.cart.taxRate, state.cart.isTaxEnabled),
+    0,
+  );
+
+  const itemDiscounts = state.cart.items.reduce(
+    (sum, item) =>
+      sum +
+      getCartItemDiscountAmount(
+        item,
+        state.cart.taxRate,
+        state.cart.isTaxEnabled,
+      ),
+    0,
+  );
+
+  const afterItemDiscounts = subtotal - itemDiscounts;
+  const orderDiscount = selectDiscountAmount(state);
+  const afterAllDiscounts = afterItemDiscounts - orderDiscount;
+
+  if (state.cart.serviceChargeRate <= 0 || afterAllDiscounts <= 0) {
+    return 0;
+  }
+
+  return (
+    Math.round(
+      afterAllDiscounts * (state.cart.serviceChargeRate / 100) * 100,
+    ) / 100
+  );
+};
+
 /**
- * Total = Subtotal - ItemDiscounts - OrderDiscount + Tax
+ * Total = Subtotal - ItemDiscounts - OrderDiscount + Tax + ServiceCharge
  */
 export const selectTotal = (state: { cart: CartState }) => {
   const subtotal = state.cart.items.reduce(
@@ -444,13 +492,14 @@ export const selectTotal = (state: { cart: CartState }) => {
   }
 
   const afterAllDiscounts = afterItemDiscounts - orderDiscount;
+  const serviceChargeAmount = selectServiceChargeAmount(state);
 
   if (!state.cart.isTaxEnabled) {
-    return Math.round(afterAllDiscounts * 100) / 100;
+    return Math.round((afterAllDiscounts + serviceChargeAmount) * 100) / 100;
   }
 
   const taxAmount = selectTaxAmount(state);
-  return Math.round((afterAllDiscounts + taxAmount) * 100) / 100;
+  return Math.round((afterAllDiscounts + taxAmount + serviceChargeAmount) * 100) / 100;
 };
 
 export default cartSlice.reducer;

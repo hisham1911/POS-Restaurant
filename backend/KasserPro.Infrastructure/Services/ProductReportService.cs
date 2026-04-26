@@ -8,6 +8,7 @@ using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Reports;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Enums;
+using KasserPro.Domain.Entities;
 using KasserPro.Infrastructure.Data;
 using static KasserPro.Application.Common.DateTimeHelper;
 
@@ -49,6 +50,7 @@ public class ProductReportService : IProductReportService
 
             // Get order items in the period (include all completed states, exclude returns)
             var orderItems = await _context.Orders
+                .AsNoTracking()
                 .Where(o => o.TenantId == tenantId
                          && o.BranchId == branchId
                          && (o.Status == OrderStatus.Completed
@@ -296,6 +298,7 @@ public class ProductReportService : IProductReportService
             var cutoffDate = DateTime.UtcNow.AddDays(-daysThreshold);
 
             var products = await _context.Products
+                .AsNoTracking()
                 .Include(p => p.Category)
                 .Include(p => p.BranchInventories)
                 .Where(p => p.TenantId == tenantId && p.IsActive && p.TrackInventory)
@@ -353,7 +356,7 @@ public class ProductReportService : IProductReportService
 
                 var avgDailySales = qtySold > 0 ? (decimal)qtySold / daysThreshold : 0;
                 var daysOfStock = avgDailySales > 0 ? (int)(currentStock / avgDailySales) : 999;
-                var stockValue = currentStock * (product.Cost ?? product.AverageCost ?? product.Price);
+                var stockValue = currentStock * ResolveInventoryUnitCost(product);
 
                 // Fixed thresholds so status stays consistent regardless of filter
                 var status = daysSinceLastSale >= 90 ? "Dead Stock" :
@@ -424,6 +427,7 @@ public class ProductReportService : IProductReportService
 
             // Get return order items for COGS netting
             var returnItemsCogs = await _context.Orders
+                .AsNoTracking()
                 .Where(o => o.TenantId == tenantId
                          && o.BranchId == branchId
                          && (o.Status == OrderStatus.Completed
@@ -439,6 +443,7 @@ public class ProductReportService : IProductReportService
 
             // Get purchases in period
             var purchases = await _context.PurchaseInvoices
+                .AsNoTracking()
                 .Where(pi => pi.TenantId == tenantId
                           && pi.BranchId == branchId
                           && pi.Status != PurchaseInvoiceStatus.Cancelled
@@ -446,24 +451,35 @@ public class ProductReportService : IProductReportService
                           && pi.InvoiceDate < utcTo)
                 .ToListAsync();
 
-            var totalPurchases = purchases.Sum(p => p.Total);
-            var totalRevenue = orderItems.Sum(oi => oi.Total) - Math.Abs(returnItemsCogs.Sum(oi => oi.Total));
+            var totalPurchases = Math.Round(purchases.Sum(p => p.Total), 2);
+            var totalRevenue = Math.Round(
+                orderItems.Sum(oi => oi.Total) - Math.Abs(returnItemsCogs.Sum(oi => oi.Total)),
+                2);
             // Use OrderItem.UnitCost snapshot for historical accuracy
-            var totalCost = orderItems.Sum(oi => (oi.UnitCost ?? 0) * oi.Quantity)
-                          - returnItemsCogs.Sum(oi => (oi.UnitCost ?? 0) * Math.Abs(oi.Quantity));
+            var totalCost = Math.Round(
+                orderItems.Sum(oi => (oi.UnitCost ?? 0) * oi.Quantity)
+                - returnItemsCogs.Sum(oi => (oi.UnitCost ?? 0) * Math.Abs(oi.Quantity)),
+                2);
 
             // Estimate opening & closing inventory values
             var currentInventory = await _context.BranchInventories
+                .AsNoTracking()
                 .Include(bi => bi.Product)
                 .Where(bi => bi.BranchId == branchId && bi.Product.TenantId == tenantId)
                 .ToListAsync();
 
-            var closingInventoryValue = currentInventory.Sum(bi =>
-                bi.Quantity * (bi.Product.Cost ?? bi.Product.AverageCost ?? bi.Product.Price));
-            var openingInventoryValue = closingInventoryValue + totalCost - totalPurchases;
+            var closingInventoryValue = Math.Round(currentInventory.Sum(bi =>
+                bi.Quantity * ResolveInventoryUnitCost(bi.Product)), 2);
+            var productsWithNoCostCount = currentInventory.Count(bi =>
+                bi.Product.AverageCost is null && (bi.Product.Cost ?? 0m) == 0m);
+            var openingInventoryValue = Math.Round(
+                Math.Max(0m, closingInventoryValue + totalCost - totalPurchases),
+                2);
 
-            var cogs = openingInventoryValue + totalPurchases - closingInventoryValue;
-            var grossProfit = totalRevenue - cogs;
+            var cogs = Math.Round(
+                Math.Max(0m, openingInventoryValue + totalPurchases - closingInventoryValue),
+                2);
+            var grossProfit = Math.Round(totalRevenue - cogs, 2);
 
             // Group return items by category for netting
             var returnsByCat = returnItemsCogs
@@ -509,20 +525,74 @@ public class ProductReportService : IProductReportService
                 .OrderByDescending(c => c.Revenue)
                 .ToList();
 
+            var returnsByProduct = returnItemsCogs
+                .Where(oi => oi.Product != null && oi.ProductId.HasValue)
+                .GroupBy(oi => oi.ProductId!.Value)
+                .ToDictionary(
+                    g => g.Key,
+                    g => new
+                    {
+                        Quantity = Math.Abs(g.Sum(oi => oi.Quantity)),
+                        Revenue = Math.Abs(g.Sum(oi => oi.Total)),
+                        Cost = g.Sum(oi => (oi.UnitCost ?? 0m) * Math.Abs(oi.Quantity))
+                    });
+
+            var productBreakdown = orderItems
+                .Where(oi => oi.Product != null && oi.ProductId.HasValue)
+                .GroupBy(oi => new
+                {
+                    ProductId = oi.ProductId!.Value,
+                    oi.Product!.Name,
+                    CategoryName = oi.Product.Category?.Name,
+                    HasMissingCost = oi.Product.AverageCost is null && oi.Product.Cost is null
+                })
+                .Select(g =>
+                {
+                    var quantitySold = g.Sum(oi => oi.Quantity);
+                    var revenue = g.Sum(oi => oi.Total);
+                    var cost = g.Sum(oi => (oi.UnitCost ?? 0m) * oi.Quantity);
+
+                    if (returnsByProduct.TryGetValue(g.Key.ProductId, out var productReturn))
+                    {
+                        quantitySold -= productReturn.Quantity;
+                        revenue -= productReturn.Revenue;
+                        cost -= productReturn.Cost;
+                    }
+
+                    var unitCost = quantitySold > 0 ? Math.Round(cost / quantitySold, 2) : 0m;
+
+                    return new CogsProductBreakdownDto
+                    {
+                        ProductId = g.Key.ProductId,
+                        ProductName = g.Key.Name,
+                        CategoryName = g.Key.CategoryName,
+                        QuantitySold = quantitySold,
+                        Revenue = Math.Round(revenue, 2),
+                        UnitCost = unitCost,
+                        Cost = Math.Round(cost, 2),
+                        GrossProfit = Math.Round(revenue - cost, 2),
+                        HasMissingCost = g.Key.HasMissingCost
+                    };
+                })
+                .OrderByDescending(p => p.Revenue)
+                .ToList();
+
             var report = new CogsReportDto
             {
                 FromDate = fromDate,
                 ToDate = toDate,
                 BranchId = branchId,
                 BranchName = branch?.Name,
-                OpeningInventoryValue = Math.Max(0, openingInventoryValue),
+                OpeningInventoryValue = openingInventoryValue,
                 TotalPurchases = totalPurchases,
                 ClosingInventoryValue = closingInventoryValue,
-                CostOfGoodsSold = Math.Max(0, cogs),
+                ProductsWithNoCostCount = productsWithNoCostCount,
+                CostOfGoodsSold = cogs,
                 TotalRevenue = totalRevenue,
                 GrossProfit = grossProfit,
                 GrossProfitMargin = totalRevenue > 0 ? Math.Round(grossProfit / totalRevenue * 100, 2) : 0,
-                CategoryBreakdown = categoryBreakdown
+                CategoryBreakdown = categoryBreakdown,
+                ProductBreakdown = productBreakdown
             };
 
             return ApiResponse<CogsReportDto>.Ok(report);
@@ -535,4 +605,7 @@ public class ProductReportService : IProductReportService
                 "حدث خطأ في إنشاء تقرير تكلفة البضاعة المباعة");
         }
     }
+
+    private static decimal ResolveInventoryUnitCost(Product product) =>
+        product.AverageCost ?? product.Cost ?? 0m;
 }

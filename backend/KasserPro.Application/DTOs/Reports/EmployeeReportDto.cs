@@ -92,6 +92,8 @@ public class DetailedShiftDto
     public decimal TotalFawry { get; set; }
     public decimal TotalBankTransfer { get; set; }
     public decimal TotalSales { get; set; }
+    public decimal TotalCollected { get; set; }
+    public decimal DeferredAmount { get; set; }
 
     // Status
     public bool IsForceClosed { get; set; }

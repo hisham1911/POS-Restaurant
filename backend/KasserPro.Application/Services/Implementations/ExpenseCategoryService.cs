@@ -115,7 +115,7 @@ public class ExpenseCategoryService : IExpenseCategoryService
 
     public async Task<ApiResponse<ExpenseCategoryDto>> UpdateAsync(int id, UpdateExpenseCategoryRequest request)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
             var category = await _unitOfWork.ExpenseCategories.Query()
@@ -162,7 +162,7 @@ public class ExpenseCategoryService : IExpenseCategoryService
 
     public async Task<ApiResponse<bool>> DeleteAsync(int id)
     {
-        await _unitOfWork.BeginTransactionAsync();
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
             var category = await _unitOfWork.ExpenseCategories.Query()

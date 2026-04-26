@@ -55,6 +55,12 @@ export const CustomerDebtsReportPage = () => {
             {report?.branchName || "المستحقات والديون المتأخرة"}
           </p>
         </div>
+
+      {/* Scope Notice */}
+      <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md p-3">
+        <Info className="w-4 h-4 shrink-0" />
+        <span>المبالغ المعروضة تمثل إجمالي ديون العميل عبر جميع فروع المنشأة</span>
+      </div>
         <div className="flex items-center gap-2 text-gray-600">
           <Calendar className="w-5 h-5" />
           <span className="text-sm">

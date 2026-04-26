@@ -71,10 +71,11 @@ export const RefundModal = ({
     if (refundType === "full") {
       return remainingRefundableAmount;
     }
-    return refundItems.reduce(
-      (sum, item) => sum + item.refundQuantity * item.unitPrice,
-      0,
-    );
+    return refundItems.reduce((sum, item) => {
+      const lineAmount =
+        Math.round(item.refundQuantity * item.unitPrice * 100) / 100;
+      return Math.round((sum + lineAmount) * 100) / 100;
+    }, 0);
   }, [refundType, refundItems, remainingRefundableAmount]);
 
   // Check if any items selected for partial refund
@@ -405,6 +406,11 @@ export const RefundModal = ({
               {refundType === "partial" && !hasSelectedItems && (
                 <p className="text-sm text-danger-500 mt-2">
                   يرجى تحديد كمية واحدة على الأقل
+                </p>
+              )}
+              {refundType === "partial" && hasSelectedItems && (
+                <p className="text-xs text-gray-500 mt-2">
+                  * المبلغ النهائي قد يختلف بمقدار مليمات بسيطة بسبب التقريب.
                 </p>
               )}
             </div>

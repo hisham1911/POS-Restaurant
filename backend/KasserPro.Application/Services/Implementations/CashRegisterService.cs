@@ -357,6 +357,7 @@ public class CashRegisterService : ICashRegisterService
                 BalanceAfter = sourceBalance - request.Amount,
                 TransactionDate = request.TransactionDate,
                 Description = $"Transfer to {targetBranch.Name}: {request.Description}",
+                ReferenceType = "TransferOut",
                 ShiftId = sourceShift?.Id,
                 UserId = _currentUserService.UserId,
                 UserName = user?.Name ?? _currentUserService.Email ?? "Unknown"
@@ -379,6 +380,7 @@ public class CashRegisterService : ICashRegisterService
                 BalanceAfter = targetBalance + request.Amount,
                 TransactionDate = request.TransactionDate,
                 Description = $"Transfer from {sourceBranch.Name}: {request.Description}",
+                ReferenceType = "TransferIn",
                 ShiftId = targetShift?.Id,
                 TransferReferenceId = withdrawalTransaction.Id,
                 UserId = _currentUserService.UserId,
@@ -426,20 +428,23 @@ public class CashRegisterService : ICashRegisterService
             // Get closing balance (balance after last transaction in period)
             var lastTransaction = transactions.OrderByDescending(t => t.TransactionDate).FirstOrDefault();
             var closingBalance = lastTransaction?.BalanceAfter ?? openingBalance;
+            var transferTransactions = transactions
+                .Where(t => t.Type == CashRegisterTransactionType.Transfer)
+                .ToList();
 
             var summary = new CashRegisterSummaryDto
             {
-                OpeningBalance = openingBalance,
-                ClosingBalance = closingBalance,
-                TotalDeposits = transactions.Where(t => t.Type == CashRegisterTransactionType.Deposit).Sum(t => t.Amount),
-                TotalWithdrawals = transactions.Where(t => t.Type == CashRegisterTransactionType.Withdrawal).Sum(t => t.Amount),
-                TotalSales = transactions.Where(t => t.Type == CashRegisterTransactionType.Sale).Sum(t => t.Amount),
-                TotalRefunds = transactions.Where(t => t.Type == CashRegisterTransactionType.Refund).Sum(t => t.Amount),
-                TotalExpenses = transactions.Where(t => t.Type == CashRegisterTransactionType.Expense).Sum(t => t.Amount),
-                TotalSupplierPayments = transactions.Where(t => t.Type == CashRegisterTransactionType.SupplierPayment).Sum(t => t.Amount),
-                TotalAdjustments = transactions.Where(t => t.Type == CashRegisterTransactionType.Adjustment).Sum(t => t.Amount),
-                TotalTransfersIn = transactions.Where(t => t.Type == CashRegisterTransactionType.Transfer && t.Amount > 0).Sum(t => t.Amount),
-                TotalTransfersOut = transactions.Where(t => t.Type == CashRegisterTransactionType.Transfer && t.Amount < 0).Sum(t => Math.Abs(t.Amount)),
+                OpeningBalance = Math.Round(openingBalance, 2),
+                ClosingBalance = Math.Round(closingBalance, 2),
+                TotalDeposits = Math.Round(transactions.Where(t => t.Type == CashRegisterTransactionType.Deposit).Sum(t => t.Amount), 2),
+                TotalWithdrawals = Math.Round(transactions.Where(t => t.Type == CashRegisterTransactionType.Withdrawal).Sum(t => t.Amount), 2),
+                TotalSales = Math.Round(transactions.Where(t => t.Type == CashRegisterTransactionType.Sale).Sum(t => t.Amount), 2),
+                TotalRefunds = Math.Round(transactions.Where(t => t.Type == CashRegisterTransactionType.Refund).Sum(t => t.Amount), 2),
+                TotalExpenses = Math.Round(transactions.Where(t => t.Type == CashRegisterTransactionType.Expense).Sum(t => t.Amount), 2),
+                TotalSupplierPayments = Math.Round(transactions.Where(t => t.Type == CashRegisterTransactionType.SupplierPayment).Sum(t => t.Amount), 2),
+                TotalAdjustments = Math.Round(transactions.Where(t => t.Type == CashRegisterTransactionType.Adjustment).Sum(t => t.Amount), 2),
+                TotalTransfersIn = Math.Round(transferTransactions.Where(t => !t.IsTransferOut).Sum(t => t.Amount), 2),
+                TotalTransfersOut = Math.Round(transferTransactions.Where(t => t.IsTransferOut).Sum(t => t.Amount), 2),
                 TransactionCount = transactions.Count,
                 FromDate = fromDate,
                 ToDate = toDate

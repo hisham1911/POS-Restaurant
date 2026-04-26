@@ -83,6 +83,7 @@ export interface Order {
   currencyCode: string;
   // Totals
   subtotal: number;
+  itemDiscountsTotal?: number;
   discountType?: string;
   discountValue?: number;
   discountAmount: number;

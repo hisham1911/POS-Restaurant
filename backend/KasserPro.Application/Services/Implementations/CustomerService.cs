@@ -43,6 +43,12 @@ public class CustomerService : ICustomerService
         }
 
         var totalCount = await query.CountAsync();
+        var totalSpentAmount = Math.Round(
+            await query.SumAsync(c => (decimal?)c.TotalSpent) ?? 0m,
+            2);
+        var totalDueAmount = Math.Round(
+            await query.SumAsync(c => (decimal?)c.TotalDue) ?? 0m,
+            2);
 
         var customers = await query
             .OrderByDescending(c => c.LastOrderAt ?? c.CreatedAt)
@@ -51,7 +57,13 @@ public class CustomerService : ICustomerService
             .Select(c => MapToDto(c))
             .ToListAsync();
 
-        return new PagedResult<CustomerDto>(customers, totalCount, page, pageSize);
+        return new PagedResult<CustomerDto>(
+            customers,
+            totalCount,
+            page,
+            pageSize,
+            totalSpentAmount: totalSpentAmount,
+            totalDueAmount: totalDueAmount);
     }
 
     public async Task<CustomerDto?> GetByIdAsync(int id)
@@ -249,6 +261,7 @@ public class CustomerService : ICustomerService
 
         // Add to TotalDue (customer owes more money)
         customer.TotalDue += amountDue;
+        await UpsertBranchBalanceAsync(customerId, amountDue);
 
         // NO SaveChangesAsync - parent will save
         // NO Commit - parent will commit
@@ -268,8 +281,16 @@ public class CustomerService : ICustomerService
         if (customer.CreditLimit == 0)
             return true;
 
-        // Check if adding this amount would exceed the credit limit
-        var newTotalDue = customer.TotalDue + additionalAmount;
+        var branchBalance = await _unitOfWork.CustomerBranchBalances.Query()
+            .Where(b => b.CustomerId == customerId
+                     && b.BranchId == _currentUser.BranchId
+                     && b.TenantId == tenantId)
+            .AsNoTracking()
+            .Select(b => (decimal?)b.AmountDue)
+            .FirstOrDefaultAsync() ?? 0m;
+
+        // Check if adding this amount would exceed the credit limit for the current branch
+        var newTotalDue = branchBalance + additionalAmount;
         return newTotalDue <= customer.CreditLimit;
     }
 
@@ -353,7 +374,9 @@ public class CustomerService : ICustomerService
 
         // Validate amount
         if (request.Amount <= 0)
-            return ApiResponse<PayDebtResponse>.Fail("INVALID_AMOUNT", "المبلغ يجب أن يكون أكبر من صفر");
+            return ApiResponse<PayDebtResponse>.Fail(
+                ErrorCodes.PAYMENT_INVALID_AMOUNT,
+                ErrorMessages.Get(ErrorCodes.PAYMENT_INVALID_AMOUNT));
 
         var referenceValidation = ValidateReferenceForNonCashPayment(
             request.PaymentMethod,
@@ -369,7 +392,9 @@ public class CustomerService : ICustomerService
         var user = await _unitOfWork.Users.Query()
             .FirstOrDefaultAsync(u => u.Id == recordedByUserId && u.TenantId == tenantId);
         if (user == null)
-            return ApiResponse<PayDebtResponse>.Fail("USER_NOT_FOUND", "المستخدم غير موجود");
+            return ApiResponse<PayDebtResponse>.Fail(
+                ErrorCodes.USER_NOT_FOUND,
+                ErrorMessages.Get(ErrorCodes.USER_NOT_FOUND));
 
         // BEGIN TRANSACTION - SQLite will acquire EXCLUSIVE lock on first write
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
@@ -383,15 +408,18 @@ public class CustomerService : ICustomerService
             if (customer == null)
             {
                 await _unitOfWork.RollbackTransactionAsync();
-                return ApiResponse<PayDebtResponse>.Fail("CUSTOMER_NOT_FOUND", "العميل غير موجود");
+                return ApiResponse<PayDebtResponse>.Fail(
+                    ErrorCodes.CUSTOMER_NOT_FOUND,
+                    ErrorMessages.Get(ErrorCodes.CUSTOMER_NOT_FOUND));
             }
 
             // FIX: Validate with fresh data inside transaction
             if (request.Amount > customer.TotalDue)
             {
                 await _unitOfWork.RollbackTransactionAsync();
-                return ApiResponse<PayDebtResponse>.Fail("AMOUNT_EXCEEDS_DEBT",
-                    $"المبلغ ({request.Amount:F2}) أكبر من الدين المستحق ({customer.TotalDue:F2})");
+                return ApiResponse<PayDebtResponse>.Fail(
+                    ErrorCodes.PAYMENT_EXCEEDS_DUE,
+                    ErrorMessages.Get(ErrorCodes.PAYMENT_EXCEEDS_DUE));
             }
 
             // Calculate balance with fresh data
@@ -419,6 +447,7 @@ public class CustomerService : ICustomerService
 
             // Reduce customer's TotalDue
             customer.TotalDue = balanceAfter;
+            await UpsertBranchBalanceAsync(customerId, -request.Amount);
 
             await _unitOfWork.SaveChangesAsync();
 
@@ -452,11 +481,12 @@ public class CustomerService : ICustomerService
 
             return ApiResponse<PayDebtResponse>.Ok(response, response.Message);
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             await _unitOfWork.RollbackTransactionAsync();
-            return ApiResponse<PayDebtResponse>.Fail("SYSTEM_ERROR",
-                $"حدث خطأ أثناء تسجيل الدفع: {ex.Message}");
+            return ApiResponse<PayDebtResponse>.Fail(
+                ErrorCodes.SYSTEM_INTERNAL_ERROR,
+                ErrorMessages.Get(ErrorCodes.SYSTEM_INTERNAL_ERROR));
         }
     }
 
@@ -565,6 +595,7 @@ public class CustomerService : ICustomerService
         customer.TotalDue -= amountToReduce;
         if (customer.TotalDue < 0)
             customer.TotalDue = 0;
+        await UpsertBranchBalanceAsync(customerId, -amountToReduce);
 
         // NO SaveChangesAsync - parent will save
         // NO Commit - parent will commit
@@ -601,6 +632,36 @@ public class CustomerService : ICustomerService
     }
 
     #region Private Methods
+
+    private async Task UpsertBranchBalanceAsync(int customerId, decimal delta)
+    {
+        var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
+
+        var balance = await _unitOfWork.CustomerBranchBalances.Query()
+            .FirstOrDefaultAsync(b => b.CustomerId == customerId
+                                   && b.BranchId == branchId
+                                   && b.TenantId == tenantId);
+
+        if (balance == null)
+        {
+            balance = new CustomerBranchBalance
+            {
+                CustomerId = customerId,
+                BranchId = branchId,
+                TenantId = tenantId,
+                AmountDue = 0m
+            };
+
+            await _unitOfWork.CustomerBranchBalances.AddAsync(balance);
+        }
+
+        balance.AmountDue = Math.Round(balance.AmountDue + delta, 2);
+        if (balance.AmountDue < 0)
+        {
+            balance.AmountDue = 0m;
+        }
+    }
 
     private static string NormalizePhone(string phone)
     {

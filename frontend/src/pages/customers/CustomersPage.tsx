@@ -86,8 +86,8 @@ export const CustomersPage = () => {
     return <Loading />;
   }
 
-  const totalDue = customers.reduce((sum, c) => sum + c.totalDue, 0);
-  const totalSpent = customers.reduce((sum, c) => sum + c.totalSpent, 0);
+  const totalDue = data?.data?.totalDueAmount || 0;
+  const totalSpent = data?.data?.totalSpentAmount || 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -127,11 +127,17 @@ export const CustomersPage = () => {
             <p className="text-2xl font-bold text-green-700 mt-1">
               {formatCurrency(totalSpent)}
             </p>
+            <p className="mt-2 text-xs text-gray-500">
+              إجمالي {totalCount} عميل مطابق
+            </p>
           </Card>
           <Card className="border-amber-100">
             <p className="text-sm text-gray-600">إجمالي المستحق</p>
             <p className="text-2xl font-bold text-amber-700 mt-1">
               {formatCurrency(totalDue)}
+            </p>
+            <p className="mt-2 text-xs text-gray-500">
+              رصيد كل العملاء المطابقين
             </p>
           </Card>
         </div>
@@ -198,7 +204,7 @@ export const CustomersPage = () => {
                     إجمالي المشتريات
                   </th>
                   <th className="text-right px-6 py-4 text-sm font-semibold text-gray-600 hidden xl:table-cell">
-                    المبلغ المستحق
+                    المبلغ المستحق (كل الفروع)
                   </th>
                   <th className="text-center px-6 py-4 text-sm font-semibold text-gray-600">
                     الإجراءات
@@ -274,6 +280,9 @@ export const CustomersPage = () => {
                           <div className="flex flex-col gap-1">
                             <span className="font-semibold text-orange-600">
                               {formatCurrency(customer.totalDue)}
+                            </span>
+                            <span className="text-xs text-gray-400">
+                              كل الفروع
                             </span>
                             {customer.creditLimit > 0 && (
                               <span className="text-xs text-gray-500">

@@ -10,6 +10,7 @@ export interface Tenant {
   // Tax Settings
   taxRate: number;
   isTaxEnabled: boolean;
+  serviceChargeRate: number;
   // Inventory Settings
   allowNegativeStock: boolean;
   // Receipt Settings
@@ -42,6 +43,7 @@ export interface UpdateTenantRequest {
   // Tax Settings
   taxRate?: number;
   isTaxEnabled?: boolean;
+  serviceChargeRate?: number;
   // Inventory Settings
   allowNegativeStock?: boolean;
   // Receipt Settings

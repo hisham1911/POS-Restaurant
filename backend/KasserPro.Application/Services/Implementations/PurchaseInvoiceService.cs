@@ -45,6 +45,9 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             query = query.Where(pi => pi.InvoiceDate <= toDate.Value);
 
         var totalCount = await query.CountAsync();
+        var totalAmount = Math.Round(
+            await query.SumAsync(pi => (decimal?)pi.Total) ?? 0m,
+            2);
 
         var invoices = await query
             .OrderByDescending(pi => pi.CreatedAt)
@@ -73,9 +76,90 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             })
             .ToListAsync();
 
-        var result = new PagedResult<PurchaseInvoiceDto>(invoices, totalCount, pageNumber, pageSize);
+        var result = new PagedResult<PurchaseInvoiceDto>(
+            invoices,
+            totalCount,
+            pageNumber,
+            pageSize,
+            totalAmount);
 
         return ApiResponse<PagedResult<PurchaseInvoiceDto>>.Ok(result);
+    }
+
+    public async Task<ApiResponse<PurchaseInvoicePreviewDto>> PrepareAsync(CreatePurchaseInvoiceRequest request)
+    {
+        if (request.Items == null || !request.Items.Any())
+        {
+            return ApiResponse<PurchaseInvoicePreviewDto>.Fail(
+                ErrorCodes.PURCHASE_INVOICE_EMPTY,
+                ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_EMPTY));
+        }
+
+        var tenantId = _currentUser.TenantId;
+
+        var supplierExists = await _unitOfWork.Suppliers.Query()
+            .AnyAsync(s => s.Id == request.SupplierId && s.TenantId == tenantId && !s.IsDeleted);
+
+        if (!supplierExists)
+        {
+            return ApiResponse<PurchaseInvoicePreviewDto>.Fail(
+                ErrorCodes.SUPPLIER_NOT_FOUND,
+                ErrorMessages.Get(ErrorCodes.SUPPLIER_NOT_FOUND));
+        }
+
+        decimal subtotal = 0m;
+
+        foreach (var item in request.Items)
+        {
+            if (item.Quantity <= 0)
+            {
+                return ApiResponse<PurchaseInvoicePreviewDto>.Fail(
+                    ErrorCodes.PURCHASE_INVOICE_INVALID_QUANTITY,
+                    ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_INVALID_QUANTITY));
+            }
+
+            if (item.PurchasePrice < 0)
+            {
+                return ApiResponse<PurchaseInvoicePreviewDto>.Fail(
+                    ErrorCodes.PURCHASE_INVOICE_INVALID_PRICE,
+                    ErrorMessages.Get(ErrorCodes.PURCHASE_INVOICE_INVALID_PRICE));
+            }
+
+            var product = await _unitOfWork.Products.Query()
+                .FirstOrDefaultAsync(p => p.Id == item.ProductId && p.TenantId == tenantId && !p.IsDeleted);
+
+            if (product == null)
+            {
+                return ApiResponse<PurchaseInvoicePreviewDto>.Fail(
+                    ErrorCodes.PRODUCT_NOT_FOUND,
+                    ErrorMessages.Get(ErrorCodes.PRODUCT_NOT_FOUND));
+            }
+
+            if (product.Type == ProductType.Service)
+            {
+                return ApiResponse<PurchaseInvoicePreviewDto>.Fail(
+                    ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE,
+                    ErrorMessages.Get(ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE));
+            }
+
+            subtotal += item.Quantity * item.PurchasePrice;
+        }
+
+        var tenant = await _unitOfWork.Tenants.Query()
+            .FirstOrDefaultAsync(t => t.Id == tenantId);
+
+        var taxRate = tenant?.TaxRate ?? 14m;
+        subtotal = Math.Round(subtotal, 2);
+        var taxAmount = Math.Round(subtotal * (taxRate / 100m), 2);
+        var total = Math.Round(subtotal + taxAmount, 2);
+
+        return ApiResponse<PurchaseInvoicePreviewDto>.Ok(new PurchaseInvoicePreviewDto
+        {
+            Subtotal = subtotal,
+            TaxRate = taxRate,
+            TaxAmount = taxAmount,
+            Total = total
+        });
     }
 
     public async Task<ApiResponse<PurchaseInvoiceDto>> GetByIdAsync(int id)
@@ -364,93 +448,110 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         var user = await _unitOfWork.Users.Query()
             .FirstOrDefaultAsync(u => u.Id == userId);
 
-        // Update invoice status
-        invoice.Status = PurchaseInvoiceStatus.Confirmed;
-        invoice.ConfirmedByUserId = userId;
-        invoice.ConfirmedByUserName = user?.Name;
-        invoice.ConfirmedAt = DateTime.UtcNow;
-        invoice.UpdatedAt = DateTime.UtcNow;
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
 
-        // Update inventory for each item
-        foreach (var item in invoice.Items)
+        try
         {
-            var product = await _unitOfWork.Products.Query()
-                .FirstOrDefaultAsync(p => p.Id == item.ProductId);
+            // Update invoice status
+            invoice.Status = PurchaseInvoiceStatus.Confirmed;
+            invoice.ConfirmedByUserId = userId;
+            invoice.ConfirmedByUserName = user?.Name;
+            invoice.ConfirmedAt = DateTime.UtcNow;
+            invoice.UpdatedAt = DateTime.UtcNow;
 
-            if (product != null)
+            var supplier = await GetSupplierForInvoiceAsync(invoice.SupplierId, invoice.BranchId);
+            if (supplier != null)
             {
-                // Update BranchInventory (the authoritative stock location)
-                var branchInventory = await _unitOfWork.BranchInventories.Query()
-                    .FirstOrDefaultAsync(bi => bi.ProductId == product.Id
-                                            && bi.BranchId == invoice.BranchId
-                                            && bi.TenantId == tenantId);
+                supplier.TotalDue = Math.Round(supplier.TotalDue + invoice.AmountDue, 2);
+            }
 
-                int balanceBefore;
+            // Update inventory for each item
+            foreach (var item in invoice.Items)
+            {
+                var product = await _unitOfWork.Products.Query()
+                    .FirstOrDefaultAsync(p => p.Id == item.ProductId);
 
-                if (branchInventory == null)
+                if (product != null)
                 {
-                    // Create BranchInventory if it doesn't exist
-                    branchInventory = new BranchInventory
+                    // Update BranchInventory (the authoritative stock location)
+                    var branchInventory = await _unitOfWork.BranchInventories.Query()
+                        .FirstOrDefaultAsync(bi => bi.ProductId == product.Id
+                                                && bi.BranchId == invoice.BranchId
+                                                && bi.TenantId == tenantId);
+
+                    int balanceBefore;
+
+                    if (branchInventory == null)
+                    {
+                        // Create BranchInventory if it doesn't exist
+                        branchInventory = new BranchInventory
+                        {
+                            TenantId = tenantId,
+                            BranchId = invoice.BranchId,
+                            ProductId = product.Id,
+                            Quantity = item.Quantity,
+                            ReorderLevel = product.LowStockThreshold ?? 10,
+                            LastUpdatedAt = DateTime.UtcNow
+                        };
+                        await _unitOfWork.BranchInventories.AddAsync(branchInventory);
+                        balanceBefore = 0;
+                    }
+                    else
+                    {
+                        balanceBefore = branchInventory.Quantity;
+                        branchInventory.Quantity += item.Quantity;
+                        branchInventory.LastUpdatedAt = DateTime.UtcNow;
+                        _unitOfWork.BranchInventories.Update(branchInventory);
+                    }
+
+                    // Create stock movement (for both new and existing inventory)
+                    var stockMovement = new StockMovement
                     {
                         TenantId = tenantId,
                         BranchId = invoice.BranchId,
                         ProductId = product.Id,
+                        Type = StockMovementType.Receiving,
                         Quantity = item.Quantity,
-                        ReorderLevel = product.LowStockThreshold ?? 10,
-                        LastUpdatedAt = DateTime.UtcNow
+                        ReferenceId = invoice.Id,
+                        ReferenceType = "PurchaseInvoice",
+                        BalanceBefore = balanceBefore,
+                        BalanceAfter = balanceBefore + item.Quantity,
+                        Reason = $"شراء من {invoice.SupplierName}",
+                        UserId = userId,
+                        CreatedAt = DateTime.UtcNow
                     };
-                    await _unitOfWork.BranchInventories.AddAsync(branchInventory);
-                    balanceBefore = 0;
+                    await _unitOfWork.StockMovements.AddAsync(stockMovement);
+
+                    // Update product metadata (not stock quantity)
+                    product.LastPurchasePrice = item.PurchasePrice;
+                    product.LastPurchaseDate = DateTime.UtcNow;
+                    product.LastStockUpdate = DateTime.UtcNow;
+
+                    // Update average cost using weighted average
+                    var oldStock = balanceBefore;
+                    var oldAvgCost = product.AverageCost ?? product.Cost ?? 0m;
+                    var newStock = balanceBefore + item.Quantity;
+                    if (newStock > 0)
+                    {
+                        var totalOldValue = oldStock * oldAvgCost;
+                        var totalNewValue = item.Quantity * item.PurchasePrice;
+                        product.AverageCost = Math.Round((totalOldValue + totalNewValue) / newStock, 4);
+                    }
+
+                    product.UpdatedAt = DateTime.UtcNow;
+                    _unitOfWork.Products.Update(product);
                 }
-                else
-                {
-                    balanceBefore = branchInventory.Quantity;
-                    branchInventory.Quantity += item.Quantity;
-                    branchInventory.LastUpdatedAt = DateTime.UtcNow;
-                    _unitOfWork.BranchInventories.Update(branchInventory);
-                }
-
-                // Create stock movement (for both new and existing inventory)
-                var stockMovement = new StockMovement
-                {
-                    TenantId = tenantId,
-                    BranchId = invoice.BranchId,
-                    ProductId = product.Id,
-                    Type = StockMovementType.Receiving,
-                    Quantity = item.Quantity,
-                    ReferenceId = invoice.Id,
-                    ReferenceType = "PurchaseInvoice",
-                    BalanceBefore = balanceBefore,
-                    BalanceAfter = balanceBefore + item.Quantity,
-                    Reason = $"شراء من {invoice.SupplierName}",
-                    UserId = userId,
-                    CreatedAt = DateTime.UtcNow
-                };
-                await _unitOfWork.StockMovements.AddAsync(stockMovement);
-
-                // Update product metadata (not stock quantity)
-                product.LastPurchasePrice = item.PurchasePrice;
-                product.LastPurchaseDate = DateTime.UtcNow;
-                product.LastStockUpdate = DateTime.UtcNow;
-
-                // Update average cost using weighted average
-                var oldStock = balanceBefore;
-                var oldAvgCost = product.AverageCost ?? product.Cost ?? 0m;
-                var newStock = balanceBefore + item.Quantity;
-                if (newStock > 0)
-                {
-                    var totalOldValue = oldStock * oldAvgCost;
-                    var totalNewValue = item.Quantity * item.PurchasePrice;
-                    product.AverageCost = (totalOldValue + totalNewValue) / newStock;
-                }
-
-                product.UpdatedAt = DateTime.UtcNow;
-                _unitOfWork.Products.Update(product);
             }
-        }
 
-        _unitOfWork.PurchaseInvoices.Update(invoice);
-        await _unitOfWork.SaveChangesAsync();
+            _unitOfWork.PurchaseInvoices.Update(invoice);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+        }
+        catch
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            throw;
+        }
 
         return await GetByIdAsync(invoice.Id);
     }
@@ -491,62 +592,82 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         var wasConfirmed = invoice.Status == PurchaseInvoiceStatus.Confirmed
             || invoice.Status == PurchaseInvoiceStatus.PartiallyPaid;
 
-        // Update invoice status
-        invoice.Status = PurchaseInvoiceStatus.Cancelled;
-        invoice.CancelledByUserId = userId;
-        invoice.CancelledByUserName = user?.Name;
-        invoice.CancelledAt = DateTime.UtcNow;
-        invoice.CancellationReason = request.Reason;
-        invoice.InventoryAdjustedOnCancellation = request.AdjustInventory;
-        invoice.UpdatedAt = DateTime.UtcNow;
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
 
-        // Adjust inventory if requested and invoice was confirmed
-        if (request.AdjustInventory && wasConfirmed)
+        try
         {
-            foreach (var item in invoice.Items)
+            // Update invoice status
+            invoice.Status = PurchaseInvoiceStatus.Cancelled;
+            invoice.CancelledByUserId = userId;
+            invoice.CancelledByUserName = user?.Name;
+            invoice.CancelledAt = DateTime.UtcNow;
+            invoice.CancellationReason = request.Reason;
+            invoice.InventoryAdjustedOnCancellation = request.AdjustInventory;
+            invoice.UpdatedAt = DateTime.UtcNow;
+
+            if (wasConfirmed)
             {
-                var product = await _unitOfWork.Products.Query()
-                    .FirstOrDefaultAsync(p => p.Id == item.ProductId);
-
-                if (product != null)
+                var supplier = await GetSupplierForInvoiceAsync(invoice.SupplierId, invoice.BranchId);
+                if (supplier != null)
                 {
-                    // Update branch-level inventory
-                    var branchInventory = await _unitOfWork.BranchInventories.Query()
-                        .FirstOrDefaultAsync(bi => bi.ProductId == product.Id
-                                                && bi.BranchId == invoice.BranchId
-                                                && bi.TenantId == tenantId);
+                    supplier.TotalDue = Math.Round(Math.Max(0m, supplier.TotalDue - invoice.AmountDue), 2);
+                }
+            }
 
-                    if (branchInventory != null)
+            // Adjust inventory if requested and invoice was confirmed
+            if (request.AdjustInventory && wasConfirmed)
+            {
+                foreach (var item in invoice.Items)
+                {
+                    var product = await _unitOfWork.Products.Query()
+                        .FirstOrDefaultAsync(p => p.Id == item.ProductId);
+
+                    if (product != null)
                     {
-                        var balanceBefore = branchInventory.Quantity;
-                        branchInventory.Quantity -= item.Quantity;
-                        branchInventory.LastUpdatedAt = DateTime.UtcNow;
-                        _unitOfWork.BranchInventories.Update(branchInventory);
+                        // Update branch-level inventory
+                        var branchInventory = await _unitOfWork.BranchInventories.Query()
+                            .FirstOrDefaultAsync(bi => bi.ProductId == product.Id
+                                                    && bi.BranchId == invoice.BranchId
+                                                    && bi.TenantId == tenantId);
 
-                        // Create stock movement
-                        var stockMovement = new StockMovement
+                        if (branchInventory != null)
                         {
-                            TenantId = tenantId,
-                            BranchId = invoice.BranchId,
-                            ProductId = product.Id,
-                            Type = StockMovementType.Adjustment,
-                            Quantity = -item.Quantity,
-                            ReferenceId = invoice.Id,
-                            ReferenceType = "PurchaseInvoice",
-                            BalanceBefore = balanceBefore,
-                            BalanceAfter = branchInventory.Quantity,
-                            Reason = $"إلغاء فاتورة شراء: {request.Reason}",
-                            UserId = userId,
-                            CreatedAt = DateTime.UtcNow
-                        };
-                        await _unitOfWork.StockMovements.AddAsync(stockMovement);
+                            var balanceBefore = branchInventory.Quantity;
+                            branchInventory.Quantity -= item.Quantity;
+                            branchInventory.LastUpdatedAt = DateTime.UtcNow;
+                            _unitOfWork.BranchInventories.Update(branchInventory);
+
+                            // Create stock movement
+                            var stockMovement = new StockMovement
+                            {
+                                TenantId = tenantId,
+                                BranchId = invoice.BranchId,
+                                ProductId = product.Id,
+                                Type = StockMovementType.Adjustment,
+                                Quantity = -item.Quantity,
+                                ReferenceId = invoice.Id,
+                                ReferenceType = "PurchaseInvoice",
+                                BalanceBefore = balanceBefore,
+                                BalanceAfter = branchInventory.Quantity,
+                                Reason = $"إلغاء فاتورة شراء: {request.Reason}",
+                                UserId = userId,
+                                CreatedAt = DateTime.UtcNow
+                            };
+                            await _unitOfWork.StockMovements.AddAsync(stockMovement);
+                        }
                     }
                 }
             }
-        }
 
-        _unitOfWork.PurchaseInvoices.Update(invoice);
-        await _unitOfWork.SaveChangesAsync();
+            _unitOfWork.PurchaseInvoices.Update(invoice);
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+        }
+        catch
+        {
+            await _unitOfWork.RollbackTransactionAsync();
+            throw;
+        }
 
         return await GetByIdAsync(invoice.Id);
     }
@@ -607,6 +728,12 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             invoice.AmountDue = Math.Round(invoice.Total - invoice.AmountPaid, 2);
             RecalculateInvoiceStatus(invoice);
             invoice.UpdatedAt = DateTime.UtcNow;
+
+            var supplier = await GetSupplierForInvoiceAsync(invoice.SupplierId, invoice.BranchId);
+            if (supplier != null)
+            {
+                supplier.TotalDue = Math.Round(Math.Max(0m, supplier.TotalDue - request.Amount), 2);
+            }
 
             _unitOfWork.PurchaseInvoices.Update(invoice);
             await _unitOfWork.SaveChangesAsync();
@@ -684,6 +811,12 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             }
             invoice.UpdatedAt = DateTime.UtcNow;
 
+            var supplier = await GetSupplierForInvoiceAsync(invoice.SupplierId, invoice.BranchId);
+            if (supplier != null)
+            {
+                supplier.TotalDue = Math.Round(supplier.TotalDue + payment.Amount, 2);
+            }
+
             _unitOfWork.PurchaseInvoices.Update(invoice);
             _unitOfWork.PurchaseInvoicePayments.Delete(payment);
             await _unitOfWork.SaveChangesAsync();
@@ -729,6 +862,16 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         }
 
         return (true, null);
+    }
+
+    private Task<Supplier?> GetSupplierForInvoiceAsync(int supplierId, int branchId)
+    {
+        var tenantId = _currentUser.TenantId;
+
+        return _unitOfWork.Suppliers.Query()
+            .FirstOrDefaultAsync(s => s.Id == supplierId
+                                   && s.TenantId == tenantId
+                                   && s.BranchId == branchId);
     }
 
     private async Task<string> GenerateInvoiceNumberAsync(int tenantId)

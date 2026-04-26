@@ -5,6 +5,7 @@ import {
   setTaxSettings,
   selectTaxRate,
   selectIsTaxEnabled,
+  selectServiceChargeRate,
   selectAllowNegativeStock,
 } from "@/store/slices/cartSlice";
 import { selectIsAuthenticated, selectCurrentUser } from "@/store/slices/authSlice";
@@ -19,6 +20,7 @@ export const TaxSettingsSync = () => {
   const user = useAppSelector(selectCurrentUser);
   const currentTaxRate = useAppSelector(selectTaxRate);
   const currentIsTaxEnabled = useAppSelector(selectIsTaxEnabled);
+  const currentServiceChargeRate = useAppSelector(selectServiceChargeRate);
   const currentAllowNegativeStock = useAppSelector(selectAllowNegativeStock);
 
   // Only fetch tenant data when authenticated and user is not SystemOwner
@@ -34,6 +36,7 @@ export const TaxSettingsSync = () => {
       const needsUpdate =
         tenant.taxRate !== currentTaxRate ||
         tenant.isTaxEnabled !== currentIsTaxEnabled ||
+        (tenant.serviceChargeRate ?? 0) !== currentServiceChargeRate ||
         tenant.allowNegativeStock !== currentAllowNegativeStock;
 
       if (needsUpdate) {
@@ -41,6 +44,7 @@ export const TaxSettingsSync = () => {
           setTaxSettings({
             taxRate: tenant.taxRate,
             isTaxEnabled: tenant.isTaxEnabled,
+            serviceChargeRate: tenant.serviceChargeRate ?? 0,
             allowNegativeStock: tenant.allowNegativeStock,
           })
         );
@@ -50,6 +54,7 @@ export const TaxSettingsSync = () => {
     tenant,
     currentTaxRate,
     currentIsTaxEnabled,
+    currentServiceChargeRate,
     currentAllowNegativeStock,
     dispatch,
   ]);

@@ -69,7 +69,7 @@ public class InventoryReportService : IInventoryReportService
                 ReorderLevel = bi.ReorderLevel,
                 IsLowStock = bi.Quantity <= bi.ReorderLevel,
                 AverageCost = bi.Product.AverageCost,
-                TotalValue = bi.Quantity * (bi.Product.AverageCost ?? 0),
+                TotalValue = Math.Round(bi.Quantity * (bi.Product.AverageCost ?? 0m), 2),
                 LastUpdatedAt = bi.LastUpdatedAt
             }).ToList();
 
@@ -80,7 +80,7 @@ public class InventoryReportService : IInventoryReportService
                 TotalProducts = items.Count,
                 TotalQuantity = items.Sum(i => i.Quantity),
                 LowStockCount = items.Count(i => i.IsLowStock),
-                TotalValue = items.Sum(i => i.TotalValue ?? 0),
+                TotalValue = Math.Round(items.Sum(i => i.TotalValue ?? 0), 2),
                 Items = items
             };
 
@@ -152,7 +152,7 @@ public class InventoryReportService : IInventoryReportService
                     CategoryName = product.Category?.Name,
                     TotalQuantity = totalQuantity,
                     AverageCost = product.AverageCost,
-                    TotalValue = totalQuantity * (product.AverageCost ?? 0),
+                    TotalValue = Math.Round(totalQuantity * (product.AverageCost ?? 0m), 2),
                     BranchCount = productInventories.Count,
                     LowStockBranchCount = lowStockBranchCount,
                     BranchStocks = branchStocks
@@ -341,7 +341,7 @@ public class InventoryReportService : IInventoryReportService
                     TotalReorderLevel = totalReorderLevel,
                     Shortage = shortage,
                     AverageCost = product.AverageCost,
-                    EstimatedRestockCost = shortage * (product.AverageCost ?? 0),
+                    EstimatedRestockCost = Math.Round(shortage * (product.AverageCost ?? 0m), 2),
                     BranchDetails = branchDetails
                 });
             }
@@ -352,8 +352,8 @@ public class InventoryReportService : IInventoryReportService
             {
                 var branch = g.First().Branch;
                 var criticalCount = g.Count(bi => bi.Quantity == 0);
-                var estimatedValue = g.Sum(bi =>
-                    Math.Max(0, bi.ReorderLevel - bi.Quantity) * (bi.Product.AverageCost ?? 0));
+                var estimatedValue = Math.Round(g.Sum(bi =>
+                    Math.Max(0, bi.ReorderLevel - bi.Quantity) * (bi.Product.AverageCost ?? 0m)), 2);
 
                 return new BranchLowStockStatsDto
                 {
@@ -370,7 +370,7 @@ public class InventoryReportService : IInventoryReportService
                 TotalLowStockItems = items.Count,
                 AffectedBranches = branchStats.Count,
                 CriticalItems = items.Count(i => i.BranchDetails.Any(bd => bd.IsCritical)),
-                EstimatedRestockValue = items.Sum(i => i.EstimatedRestockCost ?? 0),
+                EstimatedRestockValue = Math.Round(items.Sum(i => i.EstimatedRestockCost ?? 0), 2),
                 Items = items,
                 BranchStats = branchStats
             };

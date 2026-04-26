@@ -56,8 +56,8 @@ public class SupplierReportService : ISupplierReportService
                 })
                 .Select(g =>
                 {
-                    var totalPurchases = g.Sum(pi => pi.Total);
-                    var totalPaid = g.Sum(pi => pi.AmountPaid);
+                    var totalPurchases = Math.Round(g.Sum(pi => pi.Total), 2);
+                    var totalPaid = Math.Round(g.Sum(pi => pi.AmountPaid), 2);
                     var productIds = g.SelectMany(pi => pi.Items).Select(i => i.ProductId).Distinct().Count();
 
                     return new SupplierPurchaseDetailDto
@@ -68,7 +68,7 @@ public class SupplierReportService : ISupplierReportService
                         InvoiceCount = g.Count(),
                         TotalPurchases = totalPurchases,
                         TotalPaid = totalPaid,
-                        Outstanding = totalPurchases - totalPaid,
+                        Outstanding = Math.Round(Math.Max(0m, totalPurchases - totalPaid), 2),
                         LastPurchaseDate = g.Max(pi => pi.InvoiceDate),
                         ProductCount = productIds
                     };
@@ -86,9 +86,9 @@ public class SupplierReportService : ISupplierReportService
                 BranchName = branch?.Name,
                 TotalSuppliers = supplierDetails.Count,
                 ActiveSuppliers = activeSupplierIds,
-                TotalPurchases = supplierDetails.Sum(s => s.TotalPurchases),
-                TotalPaid = supplierDetails.Sum(s => s.TotalPaid),
-                TotalOutstanding = supplierDetails.Sum(s => s.Outstanding),
+                TotalPurchases = Math.Round(supplierDetails.Sum(s => s.TotalPurchases), 2),
+                TotalPaid = Math.Round(supplierDetails.Sum(s => s.TotalPaid), 2),
+                TotalOutstanding = Math.Round(supplierDetails.Sum(s => s.Outstanding), 2),
                 TotalInvoices = invoices.Count,
                 SupplierDetails = supplierDetails
             };

@@ -13,6 +13,8 @@ export const OrderSummary = () => {
     total,
     taxRate,
     isTaxEnabled,
+    serviceChargeAmount,
+    serviceChargeRate,
   } = useCart();
 
   return (
@@ -60,6 +62,17 @@ export const OrderSummary = () => {
         </div>
       )}
 
+      {serviceChargeAmount > 0 && (
+        <div className="flex justify-between items-center">
+          <span className="text-sm text-gray-600">
+            رسوم الخدمة ({serviceChargeRate}%)
+          </span>
+          <span className="text-sm font-semibold text-gray-900">
+            {formatCurrency(serviceChargeAmount)}
+          </span>
+        </div>
+      )}
+
       {/* Total */}
       <div className="flex justify-between items-center pt-2.5 border-t-2 border-gray-200">
         <span className="text-base font-bold text-gray-900">الإجمالي</span>
@@ -67,6 +80,10 @@ export const OrderSummary = () => {
           {formatCurrency(total)}
         </span>
       </div>
+
+      <p className="text-xs text-gray-400">
+        * الإجمالي تقديري، ويتم تأكيده نهائيًا عند إنشاء الطلب.
+      </p>
     </div>
   );
 };

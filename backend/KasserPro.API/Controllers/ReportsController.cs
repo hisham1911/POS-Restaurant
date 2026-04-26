@@ -106,8 +106,7 @@ public class ReportsController : ControllerBase
             if (report.TotalOther > 0)
                 receiptItems.Add(new { Name = "أخرى",  Quantity = 0, UnitPrice = 0m, TotalPrice = report.TotalOther });
             // Deferred / credit: whatever wasn't covered by the above methods
-            var totalPaid = report.TotalCash + report.TotalCard + report.TotalFawry + report.TotalOther;
-            var totalDeferred = report.TotalSales - totalPaid;
+            var totalDeferred = report.TotalDeferred;
             if (totalDeferred > 0.01m)
                 receiptItems.Add(new { Name = "آجل (دين)", Quantity = 0, UnitPrice = 0m, TotalPrice = totalDeferred });
 

@@ -40,6 +40,17 @@ public class PurchaseInvoicesController : ControllerBase
         return Ok(result);
     }
 
+    [HttpPost("prepare")]
+    public async Task<IActionResult> Prepare([FromBody] CreatePurchaseInvoiceRequest request)
+    {
+        var result = await _purchaseInvoiceService.PrepareAsync(request);
+
+        if (!result.Success)
+            return BadRequest(result);
+
+        return Ok(result);
+    }
+
     [HttpGet("{id}")]
     public async Task<IActionResult> GetById(int id)
     {

@@ -19,6 +19,10 @@ public class CustomerDto
     public DateTime CreatedAt { get; set; }
     
     // Credit Sales Fields
+    /// <summary>
+    /// إجمالي مديونية العميل عبر جميع فروع المنشأة — وليس الفرع الحالي فقط.
+    /// Tenant-wide, not branch-scoped.
+    /// </summary>
     public decimal TotalDue { get; set; }
     public decimal CreditLimit { get; set; }
 }
@@ -76,6 +80,10 @@ public class CustomerSummaryDto
     public string Phone { get; set; } = string.Empty;
     public string? Name { get; set; }
     public int LoyaltyPoints { get; set; }
+    /// <summary>
+    /// إجمالي مديونية العميل عبر جميع فروع المنشأة — وليس الفرع الحالي فقط.
+    /// Tenant-wide, not branch-scoped.
+    /// </summary>
     public decimal TotalDue { get; set; }
     public decimal CreditLimit { get; set; }
 }

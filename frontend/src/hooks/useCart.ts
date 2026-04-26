@@ -12,6 +12,8 @@ import {
   selectTotal,
   selectTaxRate,
   selectIsTaxEnabled,
+  selectServiceChargeAmount,
+  selectServiceChargeRate,
   selectDiscountAmount,
   selectDiscountType,
   selectDiscountValue,
@@ -37,6 +39,8 @@ export const useCart = () => {
   const total = useAppSelector(selectTotal);
   const taxRate = useAppSelector(selectTaxRate);
   const isTaxEnabled = useAppSelector(selectIsTaxEnabled);
+  const serviceChargeRate = useAppSelector(selectServiceChargeRate);
+  const serviceChargeAmount = useAppSelector(selectServiceChargeAmount);
 
   const add = (product: Product, quantity = 1) => {
     dispatch(addItem({ product, quantity }));
@@ -86,6 +90,8 @@ export const useCart = () => {
     total,
     taxRate,
     isTaxEnabled,
+    serviceChargeRate,
+    serviceChargeAmount,
     addItem: add,
     removeItem: remove,
     updateQuantity: setQuantity,

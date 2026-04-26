@@ -65,6 +65,14 @@ public class TenantService : ITenantService
             tenant.IsTaxEnabled = dto.IsTaxEnabled.Value;
         }
 
+        if (dto.ServiceChargeRate.HasValue)
+        {
+            if (dto.ServiceChargeRate.Value < 0 || dto.ServiceChargeRate.Value > 100)
+                return ApiResponse<TenantDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
+
+            tenant.ServiceChargeRate = Math.Round(dto.ServiceChargeRate.Value, 2);
+        }
+
         // Update inventory settings if provided
         if (dto.AllowNegativeStock.HasValue)
         {
@@ -190,6 +198,7 @@ public class TenantService : ITenantService
                 IsActive = true,
                 TaxRate = 14.0m,
                 IsTaxEnabled = true,
+                ServiceChargeRate = 0m,
                 AllowNegativeStock = false,
                 Currency = "EGP",
                 Timezone = "Africa/Cairo"
@@ -387,6 +396,7 @@ public class TenantService : ITenantService
         IsActive = tenant.IsActive,
         TaxRate = tenant.TaxRate,
         IsTaxEnabled = tenant.IsTaxEnabled,
+        ServiceChargeRate = tenant.ServiceChargeRate,
         AllowNegativeStock = tenant.AllowNegativeStock,
         ReceiptPaperSize = tenant.ReceiptPaperSize,
         ReceiptCustomWidth = tenant.ReceiptCustomWidth,

@@ -112,6 +112,7 @@ public class OrderService : IOrderService
             CurrencyCode = branch.CurrencyCode,
             // Tax Rate from Tenant (dynamic)
             TaxRate = tenantTaxRate,
+            ServiceChargePercent = tenant.ServiceChargeRate,
             // Order-level discount
             DiscountType = NormalizeDiscountType(request.DiscountType),
             DiscountValue = request.DiscountValue
@@ -882,7 +883,7 @@ public class OrderService : IOrderService
 
                     // Calculate refund amount for this item (proportional)
                     var unitPriceWithTax = orderItem.Total / orderItem.Quantity;
-                    var itemRefundAmount = unitPriceWithTax * refundItem.Quantity;
+                    var itemRefundAmount = Math.Round(unitPriceWithTax * refundItem.Quantity, 2);
                     totalRefundAmount += itemRefundAmount;
 
                     // Add NEGATIVE item to return order
@@ -904,7 +905,7 @@ public class OrderService : IOrderService
                         DiscountAmount = -Math.Round((orderItem.DiscountAmount / orderItem.Quantity) * refundItem.Quantity, 2),
                         TaxAmount = -Math.Round((orderItem.TaxAmount / orderItem.Quantity) * refundItem.Quantity, 2),
                         Subtotal = -Math.Round((orderItem.Subtotal / orderItem.Quantity) * refundItem.Quantity, 2),
-                        Total = -Math.Round(itemRefundAmount, 2),
+                        Total = -itemRefundAmount,
                         Notes = refundItem.Reason ?? refundReason
                     };
                     returnOrder.Items.Add(returnItem);
@@ -1194,10 +1195,10 @@ public class OrderService : IOrderService
     private static ApiResponse<bool> ValidateStateTransition(OrderStatus currentStatus, OrderStatus newStatus)
     {
         if (!ValidTransitions.TryGetValue(currentStatus, out var validNextStates))
-            return ApiResponse<bool>.Fail($"حالة الطلب غير معروفة: {currentStatus}");
+            return ApiResponse<bool>.Fail(ErrorCodes.ORDER_INVALID_STATE_TRANSITION, ErrorMessages.Get(ErrorCodes.ORDER_INVALID_STATE_TRANSITION));
 
         if (!validNextStates.Contains(newStatus))
-            return ApiResponse<bool>.Fail($"لا يمكن تغيير حالة الطلب من {currentStatus} إلى {newStatus}");
+            return ApiResponse<bool>.Fail(ErrorCodes.ORDER_INVALID_STATE_TRANSITION, ErrorMessages.Get(ErrorCodes.ORDER_INVALID_STATE_TRANSITION));
 
         return ApiResponse<bool>.Ok(true);
     }

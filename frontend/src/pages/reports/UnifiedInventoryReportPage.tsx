@@ -30,10 +30,14 @@ export const UnifiedInventoryReportPage = () => {
 
   const reports = data?.data || [];
   const categories = categoriesData?.data || [];
+  const roundCurrency = (value: number) => Math.round(value * 100) / 100;
 
   const totalProducts = reports.length;
   const totalQuantity = reports.reduce((sum, r) => sum + r.totalQuantity, 0);
-  const totalValue = reports.reduce((sum, r) => sum + (r.totalValue || 0), 0);
+  const totalValue = reports.reduce(
+    (sum, r) => roundCurrency(sum + (r.totalValue || 0)),
+    0,
+  );
   const lowStockProducts = reports.filter(
     (r) => r.lowStockBranchCount > 0,
   ).length;

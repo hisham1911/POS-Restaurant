@@ -57,8 +57,9 @@ const generateDailyReportReceiptHtml = (
         </div>
         <div class="shift-payments">
           <span>نقدي: ${fmt(s.totalCash)}</span>
-          <span>إلكتروني: ${fmt(s.totalCard)}</span>
+          <span>بطاقة: ${fmt(s.totalCard)}</span>
           ${s.totalFawry > 0 ? `<span>فوري: ${fmt(s.totalFawry)}</span>` : ""}
+          ${s.totalOther > 0 ? `<span>تحويل: ${fmt(s.totalOther)}</span>` : ""}
         </div>
       </div>
     `,
@@ -233,7 +234,9 @@ const generateDailyReportReceiptHtml = (
   <div class="row"><span>💵 نقدي</span><span class="value">${fmt(report.totalCash)} ج.م</span></div>
   <div class="row"><span>💳 بطاقة</span><span class="value">${fmt(report.totalCard)} ج.م</span></div>
   ${report.totalFawry > 0 ? `<div class="row"><span>📱 فوري</span><span class="value">${fmt(report.totalFawry)} ج.م</span></div>` : ""}
-  ${report.totalOther > 0 ? `<div class="row"><span>أخرى</span><span class="value">${fmt(report.totalOther)} ج.م</span></div>` : ""}
+  ${report.totalOther > 0 ? `<div class="row"><span>🏦 تحويل</span><span class="value">${fmt(report.totalOther)} ج.م</span></div>` : ""}
+  <div class="row"><span>إجمالي التحصيل</span><span class="value">${fmt(report.totalCollected)} ج.م</span></div>
+  <div class="row"><span>الآجل / فرق التحصيل</span><span class="value">${fmt(report.totalDeferred)} ج.م</span></div>
 
   <div class="double-line"></div>
 
@@ -541,7 +544,7 @@ export const DailyReportPage = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm text-gray-600">إلكتروني:</span>
+                    <span className="text-sm text-gray-600">بطاقة:</span>
                     <span className="text-sm font-medium text-blue-600">
                       {formatCurrency(shift.totalCard)}
                     </span>
@@ -551,6 +554,15 @@ export const DailyReportPage = () => {
                       <span className="text-sm text-gray-600">فوري:</span>
                       <span className="text-sm font-medium text-purple-600">
                         {formatCurrency(shift.totalFawry)}
+                      </span>
+                    </div>
+                  )}
+                  {shift.totalOther > 0 && (
+                    <div className="flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-slate-600" />
+                      <span className="text-sm text-gray-600">تحويل:</span>
+                      <span className="text-sm font-medium text-slate-700">
+                        {formatCurrency(shift.totalOther)}
                       </span>
                     </div>
                   )}
@@ -638,7 +650,7 @@ export const DailyReportPage = () => {
       </div>
 
       {/* Payment Methods Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-4">
         <Card>
           <div className="flex items-center gap-3">
             <Banknote className="w-8 h-8 text-green-600" />
@@ -674,11 +686,33 @@ export const DailyReportPage = () => {
         </Card>
         <Card>
           <div className="flex items-center gap-3">
-            <TrendingUp className="w-8 h-8 text-purple-600" />
+            <Building2 className="w-8 h-8 text-slate-600" />
             <div>
-              <p className="text-sm text-gray-500">الخصومات</p>
-              <p className="text-xl font-bold text-purple-600">
-                {formatCurrency(report?.totalDiscount || 0)}
+              <p className="text-sm text-gray-500">تحويل</p>
+              <p className="text-xl font-bold text-slate-700">
+                {formatCurrency(report?.totalOther || 0)}
+              </p>
+            </div>
+          </div>
+        </Card>
+        <Card>
+          <div className="flex items-center gap-3">
+            <DollarSign className="w-8 h-8 text-primary-600" />
+            <div>
+              <p className="text-sm text-gray-500">التحصيل</p>
+              <p className="text-xl font-bold text-primary-700">
+                {formatCurrency(report?.totalCollected || 0)}
+              </p>
+            </div>
+          </div>
+        </Card>
+        <Card>
+          <div className="flex items-center gap-3">
+            <Users className="w-8 h-8 text-amber-600" />
+            <div>
+              <p className="text-sm text-gray-500">الآجل / الفرق</p>
+              <p className="text-xl font-bold text-amber-700">
+                {formatCurrency(report?.totalDeferred || 0)}
               </p>
             </div>
           </div>
@@ -709,8 +743,13 @@ export const DailyReportPage = () => {
                 value: report?.totalFawry || 0,
                 color: "bg-orange-500",
               },
+              {
+                label: "تحويل",
+                value: report?.totalOther || 0,
+                color: "bg-slate-500",
+              },
             ].map((item) => {
-              const total = report?.totalSales || 1;
+              const total = report?.actualTotalSales || report?.totalSales || 1;
               const percentage = (item.value / total) * 100;
               return (
                 <div key={item.label}>

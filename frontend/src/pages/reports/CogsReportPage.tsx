@@ -117,6 +117,16 @@ export const CogsReportPage = () => {
               {formatCurrency(report?.costOfGoodsSold || 0)}
             </p>
           </div>
+          {(report?.productsWithNoCostCount || 0) > 0 && (
+            <div className="mt-4 flex items-start gap-2 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
+              <Info className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                {report?.productsWithNoCostCount} منتجات بدون تكلفة مسجلة.
+                تم تقييم مخزونها بصفر حتى لا يتم تضخيم قيمة المخزون أو تكلفة
+                المبيعات.
+              </p>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -237,6 +247,97 @@ export const CogsReportPage = () => {
                 <tr>
                   <td
                     colSpan={5}
+                    className="px-4 py-8 text-center text-gray-400"
+                  >
+                    لا توجد بيانات
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Card>
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <h3 className="text-lg font-bold text-gray-800">
+            تفاصيل حسب المنتج
+          </h3>
+          <div className="text-sm text-gray-500">
+            {report?.productsWithNoCostCount || 0}{" "}
+            بدون بيانات تكلفة
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[840px]">
+            <thead>
+              <tr className="border-b">
+                <th className="px-4 py-3 text-right font-semibold text-gray-600">
+                  المنتج
+                </th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-600">
+                  الكمية
+                </th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-600">
+                  الإيراد
+                </th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-600">
+                  تكلفة الوحدة
+                </th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-600">
+                  إجمالي التكلفة
+                </th>
+                <th className="px-4 py-3 text-right font-semibold text-gray-600">
+                  الربح
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {report?.productBreakdown && report.productBreakdown.length > 0 ? (
+                report.productBreakdown.map((item) => (
+                  <tr
+                    key={item.productId}
+                    className="border-b hover:bg-gray-50"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        {item.hasMissingCost ? (
+                          <AlertCircle
+                            className="w-4 h-4 text-amber-500 flex-shrink-0"
+                            title="بيانات التكلفة غير متوفرة"
+                          />
+                        ) : null}
+                        <div>
+                          <div className="font-medium text-gray-800">
+                            {item.productName}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {item.categoryName || "بدون تصنيف"}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {item.quantitySold}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {formatCurrency(item.revenue)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {formatCurrency(item.unitCost)}
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {formatCurrency(item.cost)}
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-success-600">
+                      {formatCurrency(item.grossProfit)}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan={6}
                     className="px-4 py-8 text-center text-gray-400"
                   >
                     لا توجد بيانات

@@ -11,6 +11,7 @@ import { useGetExpenseCategoriesQuery } from "../../api/expenseCategoriesApi";
 import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
 import { Loading } from "../../components/common/Loading";
+import { toast } from "sonner";
 import type {
   CreateExpenseRequest,
   UpdateExpenseRequest,
@@ -86,15 +87,15 @@ export function ExpenseFormPage() {
 
     // Validation
     if (!formData.categoryId) {
-      alert("يرجى اختيار التصنيف");
+      toast.error("يرجى اختيار التصنيف");
       return;
     }
     if (numAmount <= 0) {
-      alert("يرجى إدخال مبلغ صحيح");
+      toast.error("المبلغ يجب أن يكون أكبر من صفر");
       return;
     }
     if (!formData.description.trim()) {
-      alert("يرجى إدخال الوصف");
+      toast.error("يرجى إدخال الوصف");
       return;
     }
 
@@ -127,7 +128,7 @@ export function ExpenseFormPage() {
       navigate(`/expenses/${expenseId}`);
     } catch (error) {
       console.error("Failed to save expense:", error);
-      alert("حدث خطأ أثناء حفظ المصروف");
+      toast.error("حدث خطأ أثناء حفظ المصروف");
     }
   };
 
@@ -190,7 +191,7 @@ export function ExpenseFormPage() {
               <input
                 type="number"
                 step="0.01"
-                min="0"
+                min="0.01"
                 value={formData.amount}
                 onChange={(e) => handleChange("amount", e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"

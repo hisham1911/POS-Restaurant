@@ -162,6 +162,12 @@ export const PaymentModal = ({
     // Validate credit limit
     if (numericAmount < total && creditLimitExceeded) {
       toast.error(
+        `تجاوز حد الائتمان. المتاح بعد رصيد العميل عبر كل الفروع: ${formatCurrency(availableCredit)} ج.م، المطلوب آجلاً: ${formatCurrency(amountDue)} ج.م`,
+        { duration: 5000 },
+      );
+      return;
+
+      toast.error(
         `تجاوز حد الائتمان. المتاح: ${formatCurrency(availableCredit)} ج.م، المطلوب: ${formatCurrency(amountDue)} ج.م`,
         { duration: 5000 },
       );

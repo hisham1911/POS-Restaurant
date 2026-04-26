@@ -78,9 +78,13 @@ public class EmployeeReportService : IEmployeeReportService
 
                 var cancelledOrders = userOrders.Count(o => o.Status == OrderStatus.Cancelled);
                 var refundedOrders = userOrders.Count(o => o.Status == OrderStatus.Refunded || o.Status == OrderStatus.PartiallyRefunded);
-                var totalRevenue = salesOrders.Sum(o => o.Total) - Math.Abs(returnOrdersCashier.Sum(o => o.Total));
+                var totalRevenue = Math.Round(
+                    salesOrders.Sum(o => o.Total) - Math.Abs(returnOrdersCashier.Sum(o => o.Total)),
+                    2);
                 var totalOrders = salesOrders.Count;
-                var avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+                var avgOrderValue = totalOrders > 0
+                    ? Math.Round(totalRevenue / totalOrders, 2)
+                    : 0m;
 
                 var totalShiftHours = userShifts
                     .Where(s => s.ClosedAt.HasValue)
@@ -91,15 +95,15 @@ public class EmployeeReportService : IEmployeeReportService
                 // Calculate payment method breakdown from actual Payment records
                 var salesPayments = salesOrders.SelectMany(o => o.Payments ?? Enumerable.Empty<Domain.Entities.Payment>()).ToList();
                 var returnPayments = returnOrdersCashier.SelectMany(o => o.Payments ?? Enumerable.Empty<Domain.Entities.Payment>()).ToList();
-                var cashSales = Math.Max(0,
+                var cashSales = Math.Round(Math.Max(0,
                     salesPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)
-                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)));
-                var cardSales = Math.Max(0,
+                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount))), 2);
+                var cardSales = Math.Round(Math.Max(0,
                     salesPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)
-                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)));
-                var fawrySales = Math.Max(0,
+                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount))), 2);
+                var fawrySales = Math.Round(Math.Max(0,
                     salesPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)
-                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)));
+                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount))), 2);
 
                 var completedShifts = userShifts.Count(s => s.IsClosed && !s.IsForceClosed);
                 var forceClosedShifts = userShifts.Count(s => s.IsForceClosed);
@@ -127,7 +131,7 @@ public class EmployeeReportService : IEmployeeReportService
                     AverageShiftDuration = Math.Round((decimal)avgShiftDuration, 2),
                     TotalOrders = totalOrders,
                     TotalRevenue = totalRevenue,
-                    AverageOrderValue = Math.Round(avgOrderValue, 2),
+                    AverageOrderValue = avgOrderValue,
                     OrdersPerHour = Math.Round(ordersPerHour, 2),
                     CompletedOrders = salesOrders.Count,
                     CancelledOrders = cancelledOrders,
@@ -149,7 +153,7 @@ public class EmployeeReportService : IEmployeeReportService
                 BranchName = branch?.Name,
                 TotalCashiers = userIds.Count,
                 TotalShifts = shifts.Count,
-                TotalRevenue = cashierPerformance.Sum(c => c.TotalRevenue),
+                TotalRevenue = Math.Round(cashierPerformance.Sum(c => c.TotalRevenue), 2),
                 TotalOrders = cashierPerformance.Sum(c => c.TotalOrders),
                 CashierPerformance = cashierPerformance.OrderByDescending(c => c.TotalRevenue).ToList()
             };
@@ -191,17 +195,43 @@ public class EmployeeReportService : IEmployeeReportService
 
             var detailedShifts = shifts.Select(s =>
             {
-                // Compute payment breakdown from actual Payment records
-                var shiftPayments = (s.Orders ?? new List<Domain.Entities.Order>())
+                var completedOrders = (s.Orders ?? new List<Domain.Entities.Order>())
                     .Where(o => o.Status == OrderStatus.Completed
                              || o.Status == OrderStatus.PartiallyRefunded
                              || o.Status == OrderStatus.Refunded)
+                    .ToList();
+                var salesOrders = completedOrders.Where(o => o.OrderType != OrderType.Return).ToList();
+                var returnOrders = completedOrders.Where(o => o.OrderType == OrderType.Return).ToList();
+                var salesPayments = salesOrders
                     .SelectMany(o => o.Payments ?? new List<Domain.Entities.Payment>())
                     .ToList();
-                var shiftCash = Math.Round(shiftPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount), 2);
-                var shiftCard = Math.Round(shiftPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount), 2);
-                var shiftFawry = Math.Round(shiftPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount), 2);
-                var shiftBankTransfer = Math.Round(shiftPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount), 2);
+                var returnPayments = returnOrders
+                    .SelectMany(o => o.Payments ?? new List<Domain.Entities.Payment>())
+                    .ToList();
+
+                var shiftCash = Math.Round(
+                    salesPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)
+                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)),
+                    2);
+                var shiftCard = Math.Round(
+                    salesPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)
+                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)),
+                    2);
+                var shiftFawry = Math.Round(
+                    salesPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)
+                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)),
+                    2);
+                var shiftBankTransfer = Math.Round(
+                    salesPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)
+                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)),
+                    2);
+                var totalSales = Math.Round(
+                    salesOrders.Sum(o => o.Total) - Math.Abs(returnOrders.Sum(o => o.Total)),
+                    2);
+                var totalCollected = Math.Round(
+                    shiftCash + shiftCard + shiftFawry + shiftBankTransfer,
+                    2);
+                var deferredAmount = Math.Round(totalSales - totalCollected, 2);
 
                 return new DetailedShiftDto
                 {
@@ -221,7 +251,9 @@ public class EmployeeReportService : IEmployeeReportService
                     TotalCard = shiftCard,
                     TotalFawry = shiftFawry,
                     TotalBankTransfer = shiftBankTransfer,
-                    TotalSales = shiftCash + shiftCard + shiftFawry + shiftBankTransfer,
+                    TotalSales = totalSales,
+                    TotalCollected = totalCollected,
+                    DeferredAmount = deferredAmount,
                     IsForceClosed = s.IsForceClosed,
                     ForceCloseReason = s.ForceCloseReason,
                     ClosedByUserName = s.IsForceClosed ? s.ForceClosedByUserName : s.User.Name
@@ -230,7 +262,7 @@ public class EmployeeReportService : IEmployeeReportService
 
             var completedShifts = shifts.Count(s => s.IsClosed && !s.IsForceClosed);
             var forceClosedShifts = shifts.Count(s => s.IsForceClosed);
-            var totalRevenue = detailedShifts.Sum(s => s.TotalSales);
+            var totalRevenue = Math.Round(detailedShifts.Sum(s => s.TotalSales), 2);
 
             var report = new DetailedShiftsReportDto
             {

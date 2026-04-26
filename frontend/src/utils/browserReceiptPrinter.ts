@@ -244,7 +244,11 @@ export const printOrderReceiptFallback = (
   const amountPaid = Math.abs(order.amountPaid || 0);
   const changeAmount = Math.abs(order.changeAmount || 0);
   const amountDue = Math.abs(order.amountDue || 0);
-  const discountAmount = Math.abs(netTotal - totalAmount + taxAmount);
+  const itemDiscountsTotal = Math.abs(
+    order.itemDiscountsTotal ??
+      order.items.reduce((sum, item) => sum + (item.discountAmount || 0), 0),
+  );
+  const discountAmount = Math.abs(order.discountAmount || 0);
 
   const itemsRows = order.items
     .map(
@@ -307,8 +311,13 @@ export const printOrderReceiptFallback = (
       : ""
   }
   ${
+    itemDiscountsTotal > 0
+      ? `<div class="line-item"><span>خصومات المنتجات</span><span>-${formatMoney(itemDiscountsTotal)}</span></div>`
+      : ""
+  }
+  ${
     discountAmount > 0
-      ? `<div class="line-item"><span>الخصم</span><span>-${formatMoney(discountAmount)}</span></div>`
+      ? `<div class="line-item"><span>خصم الطلب</span><span>-${formatMoney(discountAmount)}</span></div>`
       : ""
   }
 

@@ -69,6 +69,9 @@ export interface LoyaltyPointsRequest {
 export interface CustomersPagedResult {
   items: Customer[];
   totalCount: number;
+  totalAmount: number;
+  totalSpentAmount: number;
+  totalDueAmount: number;
   page: number;
   pageSize: number;
   totalPages: number;

@@ -76,4 +76,5 @@ public class Customer : BaseEntity
     // Navigation
     public Tenant Tenant { get; set; } = null!;
     public ICollection<Order> Orders { get; set; } = new List<Order>();
+    public ICollection<CustomerBranchBalance> BranchBalances { get; set; } = new List<CustomerBranchBalance>();
 }

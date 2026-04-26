@@ -40,6 +40,10 @@ public class TenantConfiguration : IEntityTypeConfiguration<Tenant>
         builder.Property(t => t.IsTaxEnabled)
             .HasDefaultValue(true);
 
+        builder.Property(t => t.ServiceChargeRate)
+            .HasPrecision(5, 2)
+            .HasDefaultValue(0m);
+
         // Receipt Settings
         builder.Property(t => t.ReceiptPaperSize)
             .HasMaxLength(10)

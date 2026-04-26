@@ -333,6 +333,74 @@ public class OrderCreationFlowTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task CreateOrder_ShouldApplyTenantServiceChargeToTotals()
+    {
+        var (testUserId, testProductId, branch1Id, _) = await SeedTestDataAsync();
+
+        int tenantId;
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var branch = await db.Branches.SingleAsync(b => b.Id == branch1Id);
+            tenantId = branch.TenantId;
+
+            var tenant = await db.Tenants.SingleAsync(t => t.Id == tenantId);
+            tenant.ServiceChargeRate = 10m;
+            await db.SaveChangesAsync();
+        }
+
+        var token = TestHelpers.GenerateTestToken(
+            userId: testUserId,
+            tenantId: tenantId,
+            branchId: branch1Id,
+            email: "cashier@test.com",
+            name: "Test Cashier",
+            role: "Cashier"
+        );
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var createOrderRequest = new CreateOrderRequest
+        {
+            OrderType = OrderType.DineIn,
+            Items = new List<CreateOrderItemRequest>
+            {
+                new() { ProductId = testProductId, Quantity = 1 }
+            }
+        };
+
+        var response = await client.PostAsJsonAsync("/api/orders", createOrderRequest);
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var content = await response.Content.ReadAsStringAsync();
+        var apiResponse = JsonSerializer.Deserialize<ApiResponse<OrderDto>>(content, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        apiResponse.Should().NotBeNull();
+        apiResponse!.Success.Should().BeTrue(because: apiResponse.Message);
+        apiResponse.Data.Should().NotBeNull();
+
+        var createdOrder = apiResponse.Data!;
+        createdOrder.ServiceChargePercent.Should().Be(10m);
+        createdOrder.ServiceChargeAmount.Should().Be(10m);
+        createdOrder.Total.Should().Be(124m);
+
+        using var verificationScope = _factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var persistedOrder = await verificationDb.Orders.SingleAsync(o => o.Id == createdOrder.Id);
+
+        persistedOrder.ServiceChargePercent.Should().Be(10m);
+        persistedOrder.ServiceChargeAmount.Should().Be(10m);
+        persistedOrder.Total.Should().Be(124m);
+
+        await CleanupOrderAsync(createdOrder.Id);
+    }
+
+    [Fact]
     public async Task CreateOrder_WithTaxInclusiveProduct_ShouldPersistNetUnitPriceAndExpectedTotals()
     {
         var (testUserId, testProductId, branch1Id, _) = await SeedTestDataAsync();

@@ -41,6 +41,7 @@ public class FinancialReportService : IFinancialReportService
 
             // Get completed orders (excluding returns)
             var orders = await _context.Orders
+                .AsNoTracking()
                 .Include(o => o.Items)
                 .Where(o => o.TenantId == tenantId
                          && o.BranchId == branchId
@@ -54,6 +55,7 @@ public class FinancialReportService : IFinancialReportService
 
             // Get return orders for refunds calculation
             var returnOrders = await _context.Orders
+                .AsNoTracking()
                 .Include(o => o.Items)
                 .Where(o => o.TenantId == tenantId
                          && o.BranchId == branchId
@@ -66,36 +68,45 @@ public class FinancialReportService : IFinancialReportService
                 .ToListAsync();
 
             // Calculate revenue
-            var grossSales = orders.Sum(o => o.Subtotal);
+            var grossSales = Math.Round(orders.Sum(o => o.Subtotal), 2);
             // Include BOTH item-level and order-level discounts for complete discount reporting
-            var totalItemDiscounts = orders.SelectMany(o => o.Items).Sum(i => i.DiscountAmount);
-            var totalOrderDiscounts = orders.Sum(o => o.DiscountAmount);
-            var totalDiscount = totalItemDiscounts + totalOrderDiscounts;
-            var netSales = grossSales - totalDiscount;
-            var totalTax = orders.Sum(o => o.TaxAmount);
-            var totalRevenue = orders.Sum(o => o.Total);
-            var refundsAmount = Math.Abs(returnOrders.Sum(o => o.Total));
+            var totalItemDiscounts = Math.Round(orders.SelectMany(o => o.Items).Sum(i => i.DiscountAmount), 2);
+            var totalOrderDiscounts = Math.Round(orders.Sum(o => o.DiscountAmount), 2);
+            var totalDiscount = Math.Round(totalItemDiscounts + totalOrderDiscounts, 2);
+            var netSales = Math.Round(grossSales - totalDiscount, 2);
+            var totalTax = Math.Round(orders.Sum(o => o.TaxAmount), 2);
+            var totalRevenue = Math.Round(orders.Sum(o => o.Total), 2);
 
-            // FIX: Subtract refunds from revenue to get ACTUAL net figures
-            var actualNetSales = netSales - refundsAmount;
-            var actualTotalRevenue = totalRevenue - refundsAmount;
+            var returnGrossSales = Math.Round(Math.Abs(returnOrders.Sum(o => o.Subtotal)), 2);
+            var returnItemDiscounts = Math.Round(Math.Abs(returnOrders.SelectMany(o => o.Items).Sum(i => i.DiscountAmount)), 2);
+            var returnOrderDiscounts = Math.Round(Math.Abs(returnOrders.Sum(o => o.DiscountAmount)), 2);
+            var returnNetSales = Math.Round(Math.Max(0m, returnGrossSales - returnItemDiscounts - returnOrderDiscounts), 2);
+            var returnRevenue = Math.Round(Math.Abs(returnOrders.Sum(o => o.Total)), 2);
+            var returnTax = Math.Round(Math.Abs(returnOrders.Sum(o => o.TaxAmount)), 2);
+
+            var actualNetSales = Math.Round(netSales - returnNetSales, 2);
+            var actualTotalRevenue = Math.Round(totalRevenue - returnRevenue, 2);
+            var actualTotalTax = Math.Round(totalTax - returnTax, 2);
 
             // Calculate COGS (Cost of Goods Sold)
-            var totalCost = orders
+            var totalCost = Math.Round(orders
                 .SelectMany(o => o.Items)
-                .Sum(i => (i.UnitCost ?? 0) * i.Quantity);
+                .Sum(i => (i.UnitCost ?? 0) * i.Quantity), 2);
 
             // FIX: Subtract returned items COGS
-            var returnedCost = returnOrders
+            var returnedCost = Math.Round(returnOrders
                 .SelectMany(o => o.Items)
-                .Sum(i => (i.UnitCost ?? 0) * Math.Abs(i.Quantity));
-            var netCost = totalCost - returnedCost;
+                .Sum(i => (i.UnitCost ?? 0) * Math.Abs(i.Quantity)), 2);
+            var netCost = Math.Round(totalCost - returnedCost, 2);
 
-            var grossProfit = actualNetSales - netCost;
-            var grossProfitMargin = actualNetSales > 0 ? (grossProfit / actualNetSales) * 100 : 0;
+            var grossProfit = Math.Round(actualNetSales - netCost, 2);
+            var grossProfitMargin = actualNetSales > 0
+                ? Math.Round((grossProfit / actualNetSales) * 100, 2)
+                : 0m;
 
             // Get expenses
             var expenses = await _context.Expenses
+                .AsNoTracking()
                 .Include(e => e.Category)
                 .Where(e => e.TenantId == tenantId
                          && e.BranchId == branchId
@@ -104,7 +115,7 @@ public class FinancialReportService : IFinancialReportService
                          && e.ExpenseDate < toDate.Date.AddDays(1))
                 .ToListAsync();
 
-            var totalExpenses = expenses.Sum(e => e.Amount);
+            var totalExpenses = Math.Round(expenses.Sum(e => e.Amount), 2);
 
             // Expenses by category
             var expensesByCategory = expenses
@@ -113,16 +124,20 @@ public class FinancialReportService : IFinancialReportService
                 {
                     CategoryId = g.Key.CategoryId,
                     CategoryName = g.Key.Name,
-                    TotalAmount = g.Sum(e => e.Amount),
+                    TotalAmount = Math.Round(g.Sum(e => e.Amount), 2),
                     ExpenseCount = g.Count(),
-                    Percentage = totalExpenses > 0 ? (g.Sum(e => e.Amount) / totalExpenses) * 100 : 0
+                    Percentage = totalExpenses > 0
+                        ? Math.Round((g.Sum(e => e.Amount) / totalExpenses) * 100, 2)
+                        : 0
                 })
                 .OrderByDescending(e => e.TotalAmount)
                 .ToList();
 
             // Calculate net profit
-            var netProfit = grossProfit - totalExpenses;
-            var netProfitMargin = actualTotalRevenue > 0 ? (netProfit / actualTotalRevenue) * 100 : 0;
+            var netProfit = Math.Round(grossProfit - totalExpenses, 2);
+            var netProfitMargin = actualTotalRevenue > 0
+                ? Math.Round((netProfit / actualTotalRevenue) * 100, 2)
+                : 0m;
 
             var report = new ProfitLossReportDto
             {
@@ -135,13 +150,13 @@ public class FinancialReportService : IFinancialReportService
                 GrossSales = grossSales,
                 TotalDiscount = totalDiscount,
                 NetSales = actualNetSales,
-                TotalTax = totalTax,
+                TotalTax = actualTotalTax,
                 TotalRevenue = actualTotalRevenue,
 
                 // COGS
                 TotalCost = netCost,
                 GrossProfit = grossProfit,
-                GrossProfitMargin = Math.Round(grossProfitMargin, 2),
+                GrossProfitMargin = grossProfitMargin,
 
                 // Expenses
                 TotalExpenses = totalExpenses,
@@ -149,14 +164,16 @@ public class FinancialReportService : IFinancialReportService
 
                 // Net Profit
                 NetProfit = netProfit,
-                NetProfitMargin = Math.Round(netProfitMargin, 2),
+                NetProfitMargin = netProfitMargin,
 
                 // Additional Metrics (exclude fully refunded orders from AOV denominator)
                 TotalOrders = orders.Count,
                 AverageOrderValue = orders.Count(o => o.Status != OrderStatus.Refunded) > 0
-                    ? actualTotalRevenue / orders.Count(o => o.Status != OrderStatus.Refunded)
+                    ? Math.Round(
+                        actualTotalRevenue / orders.Count(o => o.Status != OrderStatus.Refunded),
+                        2)
                     : 0,
-                RefundsAmount = refundsAmount
+                RefundsAmount = returnRevenue
             };
 
             return ApiResponse<ProfitLossReportDto>.Ok(report);

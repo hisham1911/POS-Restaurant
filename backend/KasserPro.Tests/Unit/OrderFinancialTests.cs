@@ -532,6 +532,29 @@ public class OrderFinancialTests
         Assert.Equal(order.Total, totalRefund * 2);
     }
 
+    [Fact]
+    public void PartialRefund_MultipleLines_UsesRoundedLineTotals()
+    {
+        var originalItems = new[]
+        {
+            new OrderItem { Total = 100m, Quantity = 3 },
+            new OrderItem { Total = 100m, Quantity = 3 }
+        };
+
+        decimal totalRefund = 0m;
+        foreach (var item in originalItems)
+        {
+            var unitPriceWithTax = item.Total / item.Quantity;
+            var lineRefundAmount = Math.Round(unitPriceWithTax * 1, 2);
+            totalRefund += lineRefundAmount;
+        }
+
+        Assert.Equal(66.66m, totalRefund);
+        Assert.NotEqual(
+            Math.Round(originalItems.Sum(i => (i.Total / i.Quantity) * 1), 2),
+            totalRefund);
+    }
+
     #endregion
 
     #region Helper Methods (Exact mirror of OrderService production logic)

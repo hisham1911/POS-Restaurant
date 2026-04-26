@@ -93,7 +93,8 @@ export interface RejectExpenseRequest {
 }
 
 export interface PayExpenseRequest {
-  paymentMethod: string; // 'Cash' | 'Card' | 'BankTransfer'
+  paymentMethod: "Cash" | "Card" | "Fawry";
+  paymentReferenceNumber?: string;
   notes?: string;
 }
 
@@ -120,4 +121,13 @@ export interface ExpenseFilters {
   branchId?: number;
   pageNumber?: number;
   pageSize?: number;
+}
+
+export interface PagedExpensesResult {
+  items: Expense[];
+  totalCount: number;
+  totalAmount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }

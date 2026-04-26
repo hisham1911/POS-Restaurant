@@ -20,7 +20,14 @@ export interface ShiftSummary {
   totalCash: number;
   totalCard: number;
   totalFawry: number;
+  totalOther: number;
   totalSales: number;
+  totalCollected: number;
+  deferredAmount: number;
+  collectedCash: number;
+  collectedCard: number;
+  collectedFawry: number;
+  collectedOther: number;
   isForceClosed: boolean;
   forceCloseReason?: string;
 }
@@ -43,12 +50,15 @@ export interface DailyReport {
   netSales: number;
   totalTax: number;
   totalSales: number;
+  actualTotalSales: number;
   totalRefunds: number;
   // Payment Breakdown
   totalCash: number;
   totalCard: number;
   totalFawry: number;
   totalOther: number;
+  totalCollected: number;
+  totalDeferred: number;
   // Details
   topProducts: TopProduct[];
   hourlySales: HourlySales[];

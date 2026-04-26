@@ -78,7 +78,7 @@ export function PurchaseInvoicesPage() {
 
   if (isLoading) return <Loading />;
 
-  const totalAmount = invoices.reduce((sum, inv) => sum + inv.total, 0);
+  const totalAmount = invoicesResponse?.data?.totalAmount || 0;
   const paidCount = invoices.filter((inv) => inv.status === "Paid").length;
 
   return (
@@ -109,13 +109,16 @@ export function PurchaseInvoicesPage() {
           <Card className="border-violet-100">
             <p className="text-sm text-gray-600">إجمالي الفواتير</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">
-              {invoices.length}
+              {invoicesResponse?.data?.totalCount || 0}
             </p>
           </Card>
           <Card className="border-blue-100">
             <p className="text-sm text-gray-600">المبلغ الإجمالي</p>
             <p className="text-2xl font-bold text-blue-700 mt-1">
               {formatCurrency(totalAmount)}
+            </p>
+            <p className="mt-2 text-xs text-gray-500">
+              إجمالي {invoicesResponse?.data?.totalCount || 0} فاتورة مطابقة
             </p>
           </Card>
           <Card className="border-green-100">

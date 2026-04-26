@@ -177,7 +177,7 @@ export const ShiftPage = () => {
       {/* Shift Stats */}
       {currentShift && hasActiveShift && (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <Card>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
@@ -214,10 +214,23 @@ export const ShiftPage = () => {
                 <div>
                   <p className="text-sm text-gray-500">إجمالي المبيعات</p>
                   <p className="text-xl font-bold text-gray-800">
-                    {formatCurrency(
-                      currentShift.totalCash + currentShift.totalCard,
-                    )}
+                    {formatCurrency(currentShift.totalSales)}
                   </p>
+                </div>
+              </div>
+            </Card>
+
+            <Card>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <CreditCard className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Ø§Ù„Ù…Ø­ØµÙ„</p>
+                  <p className="text-xl font-bold text-gray-800">
+                    {formatCurrency(currentShift.totalCollected)}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">Collected</p>
                 </div>
               </div>
             </Card>
@@ -233,8 +246,9 @@ export const ShiftPage = () => {
                 <div>
                   <p className="text-sm text-gray-500">المبيعات النقدية</p>
                   <p className="text-xl font-bold text-gray-800">
-                    {formatCurrency(currentShift.totalCash)}
+                    {formatCurrency(currentShift.deferredAmount)}
                   </p>
+                  <p className="text-xs text-gray-400 mt-1">Deferred</p>
                 </div>
               </div>
             </Card>
@@ -247,26 +261,25 @@ export const ShiftPage = () => {
                 <div>
                   <p className="text-sm text-gray-500">مبيعات إلكترونية</p>
                   <p className="text-xl font-bold text-gray-800">
-                    {formatCurrency(currentShift.totalCard)}
+                    {formatCurrency(currentShift.totalCollected)}
                   </p>
-                  {(currentShift.totalFawry > 0 ||
-                    currentShift.totalBankTransfer > 0) && (
+                  <p className="text-xs text-gray-400 mt-1">
+                    Cash and non-cash collections
+                  </p>
+                  {(currentShift.collectedFawry > 0 ||
+                    currentShift.collectedBankTransfer > 0) && (
                     <div className="text-xs text-gray-400 mt-1 space-y-0.5">
                       <p>
                         بطاقة:{" "}
-                        {formatCurrency(
-                          currentShift.totalCard -
-                            currentShift.totalFawry -
-                            currentShift.totalBankTransfer,
-                        )}
+                        {formatCurrency(currentShift.collectedCard)}
                       </p>
-                      {currentShift.totalFawry > 0 && (
-                        <p>فوري: {formatCurrency(currentShift.totalFawry)}</p>
+                      {currentShift.collectedFawry > 0 && (
+                        <p>فوري: {formatCurrency(currentShift.collectedFawry)}</p>
                       )}
-                      {currentShift.totalBankTransfer > 0 && (
+                      {currentShift.collectedBankTransfer > 0 && (
                         <p>
                           تحويل بنكي:{" "}
-                          {formatCurrency(currentShift.totalBankTransfer)}
+                          {formatCurrency(currentShift.collectedBankTransfer)}
                         </p>
                       )}
                     </div>
@@ -375,7 +388,7 @@ export const ShiftPage = () => {
               <div className="flex justify-between">
                 <span className="text-gray-500">المبيعات النقدية:</span>
                 <span className="font-medium">
-                  {formatCurrency(currentShift.totalCash)}
+                  {formatCurrency(currentShift.collectedCash)}
                 </span>
               </div>
               <div className="flex justify-between border-t pt-2">
@@ -383,9 +396,7 @@ export const ShiftPage = () => {
                   الرصيد المتوقع:
                 </span>
                 <span className="font-bold text-primary-600">
-                  {formatCurrency(
-                    currentShift.openingBalance + currentShift.totalCash,
-                  )}
+                  {formatCurrency(currentShift.expectedBalance)}
                 </span>
               </div>
             </div>

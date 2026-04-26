@@ -176,6 +176,7 @@ export const SettingsPage = () => {
   // Form state
   const [taxRate, setTaxRate] = useState<number>(0);
   const [isTaxEnabled, setIsTaxEnabled] = useState<boolean>(true);
+  const [serviceChargeRate, setServiceChargeRate] = useState<number>(0);
   const [name, setName] = useState<string>("");
   const [nameEn, setNameEn] = useState<string>("");
   const [currency, setCurrency] = useState<string>("EGP");
@@ -212,6 +213,7 @@ export const SettingsPage = () => {
     if (tenant) {
       setTaxRate(tenant.taxRate);
       setIsTaxEnabled(tenant.isTaxEnabled);
+      setServiceChargeRate(tenant.serviceChargeRate ?? 0);
       setName(tenant.name);
       setNameEn(tenant.nameEn || "");
       setCurrency(tenant.currency);
@@ -244,6 +246,10 @@ export const SettingsPage = () => {
       toast.error("نسبة الضريبة يجب أن تكون بين 0 و 100");
       return;
     }
+    if (serviceChargeRate < 0 || serviceChargeRate > 100) {
+      toast.error("Ù†Ø³Ø¨Ø© Ø±Ø³ÙˆÙ… Ø§Ù„Ø®Ø¯Ù…Ø© ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø¨ÙŠÙ† 0 Ùˆ 100");
+      return;
+    }
     try {
       const response = await updateTenant({
         name,
@@ -253,6 +259,7 @@ export const SettingsPage = () => {
         timezone,
         taxRate,
         isTaxEnabled,
+        serviceChargeRate,
         allowNegativeStock,
         receiptPaperSize,
         receiptCustomWidth,
@@ -278,7 +285,14 @@ export const SettingsPage = () => {
         "تعذر حفظ الإعدادات",
       );
 
-      dispatch(setTaxSettings({ taxRate, isTaxEnabled, allowNegativeStock }));
+      dispatch(
+        setTaxSettings({
+          taxRate,
+          isTaxEnabled,
+          serviceChargeRate,
+          allowNegativeStock,
+        }),
+      );
       toast.success("تم حفظ الإعدادات بنجاح");
       refetch();
     } catch (error) {
@@ -308,6 +322,14 @@ export const SettingsPage = () => {
         ? "online"
         : "offline";
   const isOnline = networkStatus === "online";
+  const previewSubtotal = 100;
+  const previewTaxAmount = isTaxEnabled
+    ? (previewSubtotal * taxRate) / 100
+    : 0;
+  const previewServiceChargeAmount =
+    serviceChargeRate > 0 ? (previewSubtotal * serviceChargeRate) / 100 : 0;
+  const previewTotal =
+    previewSubtotal + previewTaxAmount + previewServiceChargeAmount;
 
   if (isLoading) {
     return (
@@ -697,8 +719,40 @@ export const SettingsPage = () => {
             </p>
           </div>
 
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              نسبة رسوم الخدمة (%)
+            </label>
+            <div className="relative">
+              <input
+                type="number"
+                min="0"
+                max="100"
+                step="0.01"
+                value={serviceChargeRate}
+                onChange={(e) => {
+                  const nextServiceChargeRate = parseFloat(e.target.value);
+                  setServiceChargeRate(
+                    Number.isNaN(nextServiceChargeRate)
+                      ? 0
+                      : nextServiceChargeRate,
+                  );
+                }}
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-lg"
+                placeholder="0"
+              />
+              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                %
+              </span>
+            </div>
+            <p className="mt-2 text-sm text-gray-500">
+              رسوم اختيارية تضاف على صافي الطلب بعد الخصومات، ثم تظهر في معاينة
+              السلة والإجمالي النهائي.
+            </p>
+          </div>
+
           {/* Tax Preview */}
-          {isTaxEnabled && (
+          {(isTaxEnabled || serviceChargeRate > 0) && (
             <div className="p-4 bg-primary-50 rounded-lg border border-primary-200">
               <p className="text-sm font-medium text-primary-800 mb-2">
                 معاينة الحساب (ضريبة مضافة):
@@ -1160,7 +1214,16 @@ export const SettingsPage = () => {
                   style={{ fontSize: `${receiptBodyFontSize}px` }}
                 >
                   <span>الضريبة ({taxRate}%)</span>
-                  <span>{((100 * taxRate) / 100).toFixed(2)} ج.م</span>
+                  <span>{previewTaxAmount.toFixed(2)} ج.م</span>
+                </div>
+              )}
+              {serviceChargeRate > 0 && (
+                <div
+                  className="flex justify-between"
+                  style={{ fontSize: `${receiptBodyFontSize}px` }}
+                >
+                  <span>رسوم الخدمة ({serviceChargeRate}%)</span>
+                  <span>{previewServiceChargeAmount.toFixed(2)} ج.م</span>
                 </div>
               )}
               <div className="border-t border-dashed border-gray-400 my-1" />
@@ -1169,12 +1232,7 @@ export const SettingsPage = () => {
                 style={{ fontSize: `${receiptTotalFontSize}px` }}
               >
                 <span>الإجمالي</span>
-                <span>
-                  {isTaxEnabled
-                    ? (100 + (100 * taxRate) / 100).toFixed(2)
-                    : "100.00"}{" "}
-                  ج.م
-                </span>
+                <span>{previewTotal.toFixed(2)} ج.م</span>
               </div>
               <div className="border-t border-dashed border-gray-400 my-1" />
               <div
@@ -1189,12 +1247,7 @@ export const SettingsPage = () => {
                 style={{ fontSize: `${receiptBodyFontSize}px` }}
               >
                 <span>الباقي</span>
-                <span>
-                  {isTaxEnabled
-                    ? (200 - (100 + (100 * taxRate) / 100)).toFixed(2)
-                    : "50.00"}{" "}
-                  ج.م
-                </span>
+                <span>{(200 - previewTotal).toFixed(2)} ج.م</span>
               </div>
               {receiptShowThankYou && (
                 <p

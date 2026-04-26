@@ -331,6 +331,9 @@ export const OrdersPage = () => {
                   }, 0),
               )}
             </p>
+            <p className="mt-2 text-xs text-gray-500">
+              = المبيعات - المرتجعات المعالجة
+            </p>
           </Card>
           <Card>
             <p className="text-sm text-gray-500">المرتجعات</p>
@@ -342,6 +345,9 @@ export const OrdersPage = () => {
                     .reduce((sum, o) => sum + o.total, 0),
                 ),
               )}
+            </p>
+            <p className="mt-2 text-xs text-gray-500">
+              مشمولة في الطرح أعلاه
             </p>
           </Card>
         </div>

@@ -24,18 +24,18 @@ import { Loading } from "../../components/common/Loading";
 import { Modal } from "../../components/common/Modal";
 import { formatDateOnly, formatDateTimeFull } from "../../utils/formatters";
 import { handleApiError } from "../../utils/errorHandler";
-import type { ExpenseStatus } from "../../types/expense.types";
+import type { ExpenseStatus, PayExpenseRequest } from "../../types/expense.types";
 
 const getPaymentMethodLabel = (method?: string) => {
   switch (method) {
     case "Cash":
       return "نقدي";
     case "Card":
-      return "بطاقة";
+      return "فيزا";
     case "BankTransfer":
       return "تحويل بنكي";
     case "Fawry":
-      return "فوري";
+      return "فودافون كاش";
     default:
       return method || "غير محدد";
   }
@@ -48,7 +48,10 @@ export function ExpenseDetailsPage() {
   const [showRejectModal, setShowRejectModal] = useState(false);
   const [showPayModal, setShowPayModal] = useState(false);
   const [rejectReason, setRejectReason] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("Cash");
+  const [paymentMethod, setPaymentMethod] = useState<
+    PayExpenseRequest["paymentMethod"]
+  >("Cash");
+  const [paymentReferenceNumber, setPaymentReferenceNumber] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
   const [approveNotes, setApproveNotes] = useState("");
 
@@ -65,9 +68,11 @@ export function ExpenseDetailsPage() {
   const [deleteAttachment] = useDeleteAttachmentMutation();
 
   const expense = response?.data;
+  const requiresPaymentReference = paymentMethod !== "Cash";
 
   const openPayModal = () => {
     setPaymentMethod("Cash");
+    setPaymentReferenceNumber("");
     setPaymentNotes("");
     setShowPayModal(true);
   };
@@ -75,15 +80,24 @@ export function ExpenseDetailsPage() {
   const closePayModal = () => {
     setShowPayModal(false);
     setPaymentMethod("Cash");
+    setPaymentReferenceNumber("");
     setPaymentNotes("");
   };
 
   const handleApprove = async () => {
+    if (requiresPaymentReference && !paymentReferenceNumber.trim()) {
+      toast.error("رقم المعاملة مطلوب عند الدفع بفودافون كاش أو فيزا");
+      return;
+    }
+
     try {
       await approveExpense({
         id: Number(id),
         request: { notes: approveNotes || undefined },
       }).unwrap();
+          paymentReferenceNumber: requiresPaymentReference
+            ? paymentReferenceNumber.trim()
+            : undefined,
       setShowApproveModal(false);
       setApproveNotes("");
     } catch (error) {
@@ -498,16 +512,32 @@ export function ExpenseDetailsPage() {
             <div className="relative">
               <select
                 value={paymentMethod}
-                onChange={(e) => setPaymentMethod(e.target.value)}
+                onChange={(e) =>
+                  setPaymentMethod(e.target.value as PayExpenseRequest["paymentMethod"])
+                }
                 className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
               >
                 <option value="Cash">نقدي</option>
-                <option value="Card">بطاقة</option>
-                <option value="BankTransfer">تحويل بنكي</option>
+                <option value="Fawry">فودافون كاش</option>
+                <option value="Card">فيزا</option>
               </select>
               <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
             </div>
           </div>
+          {requiresPaymentReference && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                رقم المعاملة <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={paymentReferenceNumber}
+                onChange={(e) => setPaymentReferenceNumber(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="اكتب رقم العملية من فودافون كاش أو الفيزا"
+              />
+            </div>
+          )}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               ملاحظات (اختياري)
@@ -527,7 +557,7 @@ export function ExpenseDetailsPage() {
             </p>
             {paymentMethod !== "Cash" && (
               <p className="text-sm text-blue-800 mt-1">
-                الدفعات غير النقدية لا تُسجل في معاملات الخزينة.
+                دفعات فودافون كاش والفيزا لا تُسجل في معاملات الخزينة.
               </p>
             )}
           </div>

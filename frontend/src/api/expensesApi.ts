@@ -7,22 +7,14 @@ import type {
   RejectExpenseRequest,
   PayExpenseRequest,
   ExpenseFilters,
+  PagedExpensesResult,
 } from '../types/expense.types';
 import type { ApiResponse } from '../types/api.types';
-
-// Define PagedResult locally if not exported from api.types
-interface PagedResult<T> {
-  items: T[];
-  totalCount: number;
-  pageNumber: number;
-  pageSize: number;
-  totalPages: number;
-}
 
 export const expensesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
     // Get all expenses with filters and pagination
-    getExpenses: builder.query<ApiResponse<PagedResult<Expense>>, ExpenseFilters>({
+    getExpenses: builder.query<ApiResponse<PagedExpensesResult>, ExpenseFilters>({
       query: (filters) => ({
         url: '/expenses',
         params: {

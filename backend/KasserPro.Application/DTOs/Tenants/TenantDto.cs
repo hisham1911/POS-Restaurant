@@ -23,6 +23,11 @@ public class TenantDto
     public bool IsTaxEnabled { get; set; } = true;
 
     /// <summary>
+    /// نسبة رسوم الخدمة الافتراضية على الطلبات (0-100)
+    /// </summary>
+    public decimal ServiceChargeRate { get; set; } = 0m;
+
+    /// <summary>
     /// هل يُسمح بالمخزون السالب؟
     /// </summary>
     public bool AllowNegativeStock { get; set; } = false;
@@ -68,6 +73,11 @@ public class UpdateTenantDto
     /// هل الضريبة مفعلة؟
     /// </summary>
     public bool? IsTaxEnabled { get; set; }
+
+    /// <summary>
+    /// نسبة رسوم الخدمة الافتراضية على الطلبات (0-100)
+    /// </summary>
+    public decimal? ServiceChargeRate { get; set; }
 
     /// <summary>
     /// هل يُسمح بالمخزون السالب؟

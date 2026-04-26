@@ -2,6 +2,7 @@ namespace KasserPro.Domain.Entities;
 
 using KasserPro.Domain.Common;
 using KasserPro.Domain.Enums;
+using System.ComponentModel.DataAnnotations.Schema;
 
 /// <summary>
 /// Tracks all cash register transactions for complete audit trail
@@ -65,6 +66,11 @@ public class CashRegisterTransaction : BaseEntity
     /// For transfer transactions, links the two transactions together
     /// </summary>
     public int? TransferReferenceId { get; set; }
+
+    [NotMapped]
+    public bool IsTransferOut =>
+        Type == CashRegisterTransactionType.Transfer &&
+        string.Equals(ReferenceType, "TransferOut", StringComparison.OrdinalIgnoreCase);
     
     // Audit trail
     public int UserId { get; set; }

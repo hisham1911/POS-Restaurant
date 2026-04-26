@@ -17,6 +17,13 @@ public class ShiftDto
     public decimal TotalCard { get; set; }
     public decimal TotalFawry { get; set; }
     public decimal TotalBankTransfer { get; set; }
+    public decimal TotalSales { get; set; }
+    public decimal TotalCollected { get; set; }
+    public decimal DeferredAmount { get; set; }
+    public decimal CollectedCash { get; set; }
+    public decimal CollectedCard { get; set; }
+    public decimal CollectedFawry { get; set; }
+    public decimal CollectedBankTransfer { get; set; }
     public int TotalOrders { get; set; }
     public string UserName { get; set; } = string.Empty;
 

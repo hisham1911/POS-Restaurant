@@ -49,7 +49,10 @@ export interface DetailedShift {
   totalCash: number;
   totalCard: number;
   totalFawry: number;
+  totalBankTransfer: number;
   totalSales: number;
+  totalCollected: number;
+  deferredAmount: number;
   isForceClosed: boolean;
   forceCloseReason?: string;
   closedByUserName?: string;

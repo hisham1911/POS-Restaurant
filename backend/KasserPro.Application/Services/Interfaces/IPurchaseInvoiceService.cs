@@ -14,6 +14,8 @@ public interface IPurchaseInvoiceService
         DateTime? toDate = null,
         int pageNumber = 1,
         int pageSize = 20);
+
+    Task<ApiResponse<PurchaseInvoicePreviewDto>> PrepareAsync(CreatePurchaseInvoiceRequest request);
     
     Task<ApiResponse<PurchaseInvoiceDto>> GetByIdAsync(int id);
     

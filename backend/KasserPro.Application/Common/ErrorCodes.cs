@@ -29,6 +29,7 @@ public static class ErrorCodes
     public const string USER_INACTIVE = "USER_INACTIVE";
     public const string INVALID_CREDENTIALS = "INVALID_CREDENTIALS";
     public const string INVALID_PIN = "INVALID_PIN";
+    public const string INSUFFICIENT_PRIVILEGES = "INSUFFICIENT_PRIVILEGES";
 
     // Product Errors (1400-1499)
     public const string PRODUCT_NOT_FOUND = "PRODUCT_NOT_FOUND";
@@ -190,6 +191,7 @@ public static class ErrorMessages
         { ErrorCodes.USER_INACTIVE, "المستخدم غير نشط" },
         { ErrorCodes.INVALID_CREDENTIALS, "بيانات الدخول غير صحيحة" },
         { ErrorCodes.INVALID_PIN, "رمز PIN غير صحيح" },
+        { ErrorCodes.INSUFFICIENT_PRIVILEGES, "ليس لديك صلاحية كافية لهذا الإجراء" },
 
         // Product
         { ErrorCodes.PRODUCT_NOT_FOUND, "المنتج غير موجود" },
@@ -278,7 +280,7 @@ public static class ErrorMessages
         { ErrorCodes.EXPENSE_ALREADY_PAID, "المصروف مدفوع بالفعل" },
         { ErrorCodes.EXPENSE_ALREADY_REJECTED, "المصروف مرفوض بالفعل" },
         { ErrorCodes.EXPENSE_NOT_APPROVED, "المصروف غير موافق عليه" },
-        { ErrorCodes.EXPENSE_INVALID_AMOUNT, "مبلغ المصروف غير صحيح" },
+        { ErrorCodes.EXPENSE_INVALID_AMOUNT, "مبلغ المصروف يجب أن يكون أكبر من صفر" },
         { ErrorCodes.EXPENSE_REJECTION_REASON_REQUIRED, "يجب إدخال سبب الرفض" },
         { ErrorCodes.EXPENSE_ATTACHMENT_TOO_LARGE, "حجم الملف كبير جداً (الحد الأقصى 5 ميجابايت)" },
         { ErrorCodes.EXPENSE_ATTACHMENT_INVALID_TYPE, "نوع الملف غير مسموح (JPG, PNG, PDF فقط)" },

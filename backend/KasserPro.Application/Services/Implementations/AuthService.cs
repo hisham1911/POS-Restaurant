@@ -103,7 +103,7 @@ public class AuthService : IAuthService
                 _logger.LogWarning(
                     "Role escalation attempt: Admin {UserId} tried to create SystemOwner account",
                     _currentUserService.UserId);
-                return ApiResponse<bool>.Fail("INSUFFICIENT_PRIVILEGES", "ليس لديك صلاحية إنشاء حساب مالك النظام");
+                return ApiResponse<bool>.Fail(ErrorCodes.INSUFFICIENT_PRIVILEGES, "ليس لديك صلاحية إنشاء حساب مالك النظام");
             }
 
             // Admin can only create Admin or Cashier
@@ -114,7 +114,7 @@ public class AuthService : IAuthService
                 _logger.LogWarning(
                     "Role escalation attempt: Admin {UserId} tried to create {Role} account",
                     _currentUserService.UserId, requestedRole);
-                return ApiResponse<bool>.Fail("INSUFFICIENT_PRIVILEGES", "يمكنك فقط إنشاء حسابات مدير أو كاشير");
+                return ApiResponse<bool>.Fail(ErrorCodes.INSUFFICIENT_PRIVILEGES, "يمكنك فقط إنشاء حسابات مدير أو كاشير");
             }
         }
 

@@ -29,6 +29,14 @@ public class PurchaseInvoiceDto
     public List<PurchaseInvoicePaymentDto> Payments { get; set; } = new();
 }
 
+public class PurchaseInvoicePreviewDto
+{
+    public decimal Subtotal { get; set; }
+    public decimal TaxRate { get; set; }
+    public decimal TaxAmount { get; set; }
+    public decimal Total { get; set; }
+}
+
 public class PurchaseInvoiceItemDto
 {
     public int Id { get; set; }

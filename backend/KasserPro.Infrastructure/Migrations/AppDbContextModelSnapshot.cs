@@ -455,6 +455,41 @@ namespace KasserPro.Infrastructure.Migrations
                     b.ToTable("Customers");
                 });
 
+            modelBuilder.Entity("KasserPro.Domain.Entities.CustomerBranchBalance", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("AmountDue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CustomerId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CustomerId", "BranchId", "TenantId")
+                        .IsUnique();
+
+                    b.ToTable("CustomerBranchBalances");
+                });
+
             modelBuilder.Entity("KasserPro.Domain.Entities.DebtPayment", b =>
                 {
                     b.Property<int>("Id")
@@ -1724,9 +1759,6 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<int>("UserId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int?>("UserId1")
-                        .HasColumnType("INTEGER");
-
                     b.Property<string>("VarianceReason")
                         .HasColumnType("TEXT");
 
@@ -1747,8 +1779,6 @@ namespace KasserPro.Infrastructure.Migrations
                     b.HasIndex("ReconciledByUserId");
 
                     b.HasIndex("UserId");
-
-                    b.HasIndex("UserId1");
 
                     b.HasIndex("TenantId", "BranchId");
 
@@ -2065,6 +2095,12 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasColumnType("INTEGER")
                         .HasDefaultValue(11);
 
+                    b.Property<decimal>("ServiceChargeRate")
+                        .ValueGeneratedOnAdd()
+                        .HasPrecision(5, 2)
+                        .HasColumnType("TEXT")
+                        .HasDefaultValue(0m);
+
                     b.Property<string>("Slug")
                         .IsRequired()
                         .HasMaxLength(100)
@@ -2330,6 +2366,17 @@ namespace KasserPro.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.CustomerBranchBalance", b =>
+                {
+                    b.HasOne("KasserPro.Domain.Entities.Customer", "Customer")
+                        .WithMany("BranchBalances")
+                        .HasForeignKey("CustomerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Customer");
                 });
 
             modelBuilder.Entity("KasserPro.Domain.Entities.DebtPayment", b =>
@@ -2789,15 +2836,11 @@ namespace KasserPro.Infrastructure.Migrations
                         .IsRequired();
 
                     b.HasOne("KasserPro.Domain.Entities.User", "User")
-                        .WithMany()
+                        .WithMany("Shifts")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("FK_Shifts_Users_UserId");
-
-                    b.HasOne("KasserPro.Domain.Entities.User", null)
-                        .WithMany("Shifts")
-                        .HasForeignKey("UserId1");
 
                     b.Navigation("Branch");
 
@@ -2939,6 +2982,8 @@ namespace KasserPro.Infrastructure.Migrations
 
             modelBuilder.Entity("KasserPro.Domain.Entities.Customer", b =>
                 {
+                    b.Navigation("BranchBalances");
+
                     b.Navigation("Orders");
                 });
 

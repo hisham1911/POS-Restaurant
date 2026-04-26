@@ -13,6 +13,13 @@ export interface Shift {
   totalCard: number;
   totalFawry: number;
   totalBankTransfer: number;
+  totalSales: number;
+  totalCollected: number;
+  deferredAmount: number;
+  collectedCash: number;
+  collectedCard: number;
+  collectedFawry: number;
+  collectedBankTransfer: number;
   totalOrders: number;
   userName?: string;
   orders?: ShiftOrder[];

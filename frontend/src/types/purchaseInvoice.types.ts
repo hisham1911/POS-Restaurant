@@ -57,6 +57,13 @@ export interface PurchaseInvoice {
   payments: PurchaseInvoicePayment[];
 }
 
+export interface PurchaseInvoicePreview {
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
+  total: number;
+}
+
 export interface CreatePurchaseInvoiceItemRequest {
   productId: number;
   quantity: number;

@@ -18,6 +18,7 @@ public interface IUnitOfWork : IDisposable
 
     // Sellable V1: New repositories
     IRepository<Customer> Customers { get; }
+    IRepository<CustomerBranchBalance> CustomerBranchBalances { get; }
     IRepository<DebtPayment> DebtPayments { get; }
     IRepository<StockMovement> StockMovements { get; }
     IRepository<RefundLog> RefundLogs { get; }

@@ -127,6 +127,7 @@ public class CogsReportDto
     
     // Closing Inventory
     public decimal ClosingInventoryValue { get; set; }
+    public int ProductsWithNoCostCount { get; set; }
     
     // COGS Calculation
     public decimal CostOfGoodsSold { get; set; } // Opening + Purchases - Closing
@@ -138,6 +139,9 @@ public class CogsReportDto
     
     // Breakdown by Category
     public List<CogsCategoryBreakdownDto> CategoryBreakdown { get; set; } = new();
+
+    // Breakdown by Product
+    public List<CogsProductBreakdownDto> ProductBreakdown { get; set; } = new();
 }
 
 public class CogsCategoryBreakdownDto
@@ -151,4 +155,17 @@ public class CogsCategoryBreakdownDto
     public decimal Revenue { get; set; }
     public decimal GrossProfit { get; set; }
     public decimal GrossProfitMargin { get; set; }
+}
+
+public class CogsProductBreakdownDto
+{
+    public int ProductId { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+    public string? CategoryName { get; set; }
+    public int QuantitySold { get; set; }
+    public decimal Revenue { get; set; }
+    public decimal UnitCost { get; set; }
+    public decimal Cost { get; set; }
+    public decimal GrossProfit { get; set; }
+    public bool HasMissingCost { get; set; }
 }

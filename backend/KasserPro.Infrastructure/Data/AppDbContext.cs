@@ -27,6 +27,7 @@ public class AppDbContext : DbContext
 
     // Sellable V1: New entities
     public DbSet<Customer> Customers => Set<Customer>();
+    public DbSet<CustomerBranchBalance> CustomerBranchBalances => Set<CustomerBranchBalance>();
     public DbSet<DebtPayment> DebtPayments => Set<DebtPayment>();
     public DbSet<StockMovement> StockMovements => Set<StockMovement>();
     public DbSet<RefundLog> RefundLogs => Set<RefundLog>();
@@ -71,6 +72,7 @@ public class AppDbContext : DbContext
 
         // Sellable V1: Soft delete filters for new entities
         modelBuilder.Entity<Customer>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<CustomerBranchBalance>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<DebtPayment>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<StockMovement>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<RefundLog>().HasQueryFilter(e => !e.IsDeleted);
@@ -226,9 +228,25 @@ public class AppDbContext : DbContext
             .HasForeignKey(o => o.CustomerId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        modelBuilder.Entity<Customer>()
+            .HasMany(c => c.BranchBalances)
+            .WithOne(cb => cb.Customer)
+            .HasForeignKey(cb => cb.CustomerId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // Customer indexes (phone lookup is primary use case)
         modelBuilder.Entity<Customer>()
             .HasIndex(c => new { c.TenantId, c.Phone })
+            .IsUnique();
+
+        modelBuilder.Entity<CustomerBranchBalance>()
+            .HasOne(cb => cb.Customer)
+            .WithMany(c => c.BranchBalances)
+            .HasForeignKey(cb => cb.CustomerId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<CustomerBranchBalance>()
+            .HasIndex(cb => new { cb.CustomerId, cb.BranchId, cb.TenantId })
             .IsUnique();
 
         // DebtPayment relationships

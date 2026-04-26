@@ -14,6 +14,14 @@ public class ReportService : IReportService
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
     private readonly ILogger<ReportService> _logger;
+    private readonly record struct ShiftSummaryFinancials(
+        decimal CollectedCash,
+        decimal CollectedCard,
+        decimal CollectedFawry,
+        decimal CollectedOther,
+        decimal TotalSales,
+        decimal TotalCollected,
+        decimal DeferredAmount);
 
     public ReportService(IUnitOfWork unitOfWork, ICurrentUserService currentUser, ILogger<ReportService> logger)
     {
@@ -80,12 +88,12 @@ public class ReportService : IReportService
                                                               && p.Method != PaymentMethod.Fawry).Sum(p => p.Amount));
 
         // FIX H-4: Ensure payment breakdown doesn't go negative (display as 0 minimum)
-        var totalCash = Math.Max(0, allPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount) - refundedCash);
-        var totalCard = Math.Max(0, allPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount) - refundedCard);
-        var totalFawry = Math.Max(0, allPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount) - refundedFawry);
-        var totalOther = Math.Max(0, allPayments.Where(p => p.Method != PaymentMethod.Cash
+        var totalCash = Math.Round(Math.Max(0, allPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount) - refundedCash), 2);
+        var totalCard = Math.Round(Math.Max(0, allPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount) - refundedCard), 2);
+        var totalFawry = Math.Round(Math.Max(0, allPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount) - refundedFawry), 2);
+        var totalOther = Math.Round(Math.Max(0, allPayments.Where(p => p.Method != PaymentMethod.Cash
                                               && p.Method != PaymentMethod.Card
-                                              && p.Method != PaymentMethod.Fawry).Sum(p => p.Amount) - refundedOther);
+                                              && p.Method != PaymentMethod.Fawry).Sum(p => p.Amount) - refundedOther), 2);
 
         // Calculate sales totals (INCLUDING refund adjustments)
         var grossSales = completedOrders.Sum(o => o.Subtotal);
@@ -95,19 +103,21 @@ public class ReportService : IReportService
         var totalOrderDiscounts = completedOrders.Sum(o => o.DiscountAmount);
         var returnItemDiscounts = Math.Abs(returnOrders.SelectMany(o => o.Items).Sum(i => i.DiscountAmount));
         var returnOrderDiscounts = Math.Abs(returnOrders.Sum(o => o.DiscountAmount));
-        var totalDiscount = (totalItemDiscounts + totalOrderDiscounts) - (returnItemDiscounts + returnOrderDiscounts);
-        var totalTax = completedOrders.Sum(o => o.TaxAmount);
-        var totalSales = completedOrders.Sum(o => o.Total);
-        var netSales = grossSales - totalDiscount;
+        var totalDiscount = Math.Round((totalItemDiscounts + totalOrderDiscounts) - (returnItemDiscounts + returnOrderDiscounts), 2);
+        var totalTax = Math.Round(completedOrders.Sum(o => o.TaxAmount), 2);
+        var totalSales = Math.Round(completedOrders.Sum(o => o.Total), 2);
+        var netSales = Math.Round(grossSales - totalDiscount, 2);
 
         // Calculate refunds from return orders
-        var totalRefunds = Math.Abs(returnOrders.Sum(o => o.Total)); // Make positive for display
+        var totalRefunds = Math.Round(Math.Abs(returnOrders.Sum(o => o.Total)), 2); // Make positive for display
 
         // Adjust sales totals by subtracting refunds for ACTUAL sales
-        var actualGrossSales = grossSales - Math.Abs(returnOrders.Sum(o => o.Subtotal));
-        var actualTotalTax = totalTax - Math.Abs(returnOrders.Sum(o => o.TaxAmount));
-        var actualTotalSales = totalSales - totalRefunds;
-        var actualNetSales = netSales - Math.Abs(returnOrders.Sum(o => o.Subtotal - o.DiscountAmount));
+        var actualGrossSales = Math.Round(grossSales - Math.Abs(returnOrders.Sum(o => o.Subtotal)), 2);
+        var actualTotalTax = Math.Round(totalTax - Math.Abs(returnOrders.Sum(o => o.TaxAmount)), 2);
+        var actualTotalSales = Math.Round(totalSales - totalRefunds, 2);
+        var actualNetSales = Math.Round(netSales - Math.Abs(returnOrders.Sum(o => o.Subtotal - o.DiscountAmount)), 2);
+        var totalCollected = Math.Round(totalCash + totalCard + totalFawry + totalOther, 2);
+        var totalDeferred = Math.Round(actualTotalSales - totalCollected, 2);
 
         // Top products - Calculate NET quantities (sales - returns)
         var allSalesItems = completedOrders.SelectMany(o => o.Items).ToList();
@@ -171,16 +181,7 @@ public class ReportService : IReportService
         // Shift summaries - compute payment breakdown from actual Payment records for accuracy
         var shiftSummaries = shifts.Select(s =>
         {
-            var shiftPayments = (s.Orders ?? new List<Domain.Entities.Order>())
-                .Where(o => o.Status == OrderStatus.Completed
-                    || o.Status == OrderStatus.PartiallyRefunded
-                    || o.Status == OrderStatus.Refunded)
-                .SelectMany(o => o.Payments ?? new List<Domain.Entities.Payment>())
-                .ToList();
-            var shiftCash = Math.Round(shiftPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount), 2);
-            var shiftCard = Math.Round(shiftPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount), 2);
-            var shiftFawry = Math.Round(shiftPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount), 2);
-            var shiftOther = Math.Round(shiftPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount), 2);
+            var financials = CalculateShiftSummaryFinancials(s.Orders ?? new List<Domain.Entities.Order>());
 
             return new ShiftSummaryDto
             {
@@ -189,10 +190,17 @@ public class ReportService : IReportService
                 OpenedAt = s.OpenedAt,
                 ClosedAt = s.ClosedAt!.Value,
                 TotalOrders = s.TotalOrders,
-                TotalCash = shiftCash,
-                TotalCard = shiftCard,
-                TotalFawry = shiftFawry,
-                TotalSales = shiftCash + shiftCard + shiftFawry + shiftOther,
+                TotalCash = financials.CollectedCash,
+                TotalCard = financials.CollectedCard,
+                TotalFawry = financials.CollectedFawry,
+                TotalOther = financials.CollectedOther,
+                TotalSales = financials.TotalSales,
+                TotalCollected = financials.TotalCollected,
+                DeferredAmount = financials.DeferredAmount,
+                CollectedCash = financials.CollectedCash,
+                CollectedCard = financials.CollectedCard,
+                CollectedFawry = financials.CollectedFawry,
+                CollectedOther = financials.CollectedOther,
                 IsForceClosed = s.IsForceClosed,
                 ForceCloseReason = s.ForceCloseReason
             };
@@ -220,6 +228,7 @@ public class ReportService : IReportService
             NetSales = actualNetSales,
             TotalTax = actualTotalTax,
             TotalSales = actualTotalSales,
+            ActualTotalSales = actualTotalSales,
             TotalRefunds = totalRefunds,
 
             // Payment Breakdown
@@ -227,6 +236,8 @@ public class ReportService : IReportService
             TotalCard = totalCard,
             TotalFawry = totalFawry,
             TotalOther = totalOther,
+            TotalCollected = totalCollected,
+            TotalDeferred = totalDeferred,
 
             // Details
             TopProducts = topProducts,
@@ -234,6 +245,57 @@ public class ReportService : IReportService
         };
 
         return ApiResponse<DailyReportDto>.Ok(report);
+    }
+
+    private static ShiftSummaryFinancials CalculateShiftSummaryFinancials(
+        IEnumerable<Domain.Entities.Order> orders)
+    {
+        var completedOrders = orders
+            .Where(o => o.Status == OrderStatus.Completed
+                     || o.Status == OrderStatus.PartiallyRefunded
+                     || o.Status == OrderStatus.Refunded)
+            .ToList();
+
+        var salesOrders = completedOrders
+            .Where(o => o.OrderType != OrderType.Return)
+            .ToList();
+        var returnOrders = completedOrders
+            .Where(o => o.OrderType == OrderType.Return)
+            .ToList();
+
+        var salesPayments = salesOrders
+            .SelectMany(o => o.Payments ?? new List<Domain.Entities.Payment>())
+            .ToList();
+        var returnPayments = returnOrders
+            .SelectMany(o => o.Payments ?? new List<Domain.Entities.Payment>())
+            .ToList();
+
+        var collectedCash = Math.Round(
+            salesPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)
+            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)), 2);
+        var collectedCard = Math.Round(
+            salesPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)
+            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)), 2);
+        var collectedFawry = Math.Round(
+            salesPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)
+            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)), 2);
+        var collectedOther = Math.Round(
+            salesPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)
+            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)), 2);
+        var totalSales = Math.Round(
+            salesOrders.Sum(o => o.Total)
+            - Math.Abs(returnOrders.Sum(o => o.Total)), 2);
+        var totalCollected = Math.Round(collectedCash + collectedCard + collectedFawry + collectedOther, 2);
+        var deferredAmount = Math.Round(totalSales - totalCollected, 2);
+
+        return new ShiftSummaryFinancials(
+            collectedCash,
+            collectedCard,
+            collectedFawry,
+            collectedOther,
+            totalSales,
+            totalCollected,
+            deferredAmount);
     }
 
     public async Task<ApiResponse<SalesReportDto>> GetSalesReportAsync(DateTime fromDate, DateTime toDate)
@@ -258,16 +320,16 @@ public class ReportService : IReportService
         var salesOrders = allOrders.Where(o => o.OrderType != OrderType.Return).ToList();
         var returnOrders = allOrders.Where(o => o.OrderType == OrderType.Return).ToList();
 
-        var grossSales = salesOrders.Sum(o => o.Total);
-        var totalRefunds = Math.Abs(returnOrders.Sum(o => o.Total));
-        var totalSales = grossSales - totalRefunds;
+        var grossSales = Math.Round(salesOrders.Sum(o => o.Total), 2);
+        var totalRefunds = Math.Round(Math.Abs(returnOrders.Sum(o => o.Total)), 2);
+        var totalSales = Math.Round(grossSales - totalRefunds, 2);
 
-        var totalCost = salesOrders.SelectMany(o => o.Items)
-            .Sum(i => (i.UnitCost ?? 0) * i.Quantity);
+        var totalCost = Math.Round(salesOrders.SelectMany(o => o.Items)
+            .Sum(i => (i.UnitCost ?? 0) * i.Quantity), 2);
         // Subtract COGS for returned items
-        var returnedCost = returnOrders.SelectMany(o => o.Items)
-            .Sum(i => (i.UnitCost ?? 0) * Math.Abs(i.Quantity));
-        var netCost = totalCost - returnedCost;
+        var returnedCost = Math.Round(returnOrders.SelectMany(o => o.Items)
+            .Sum(i => (i.UnitCost ?? 0) * Math.Abs(i.Quantity)), 2);
+        var netCost = Math.Round(totalCost - returnedCost, 2);
 
         // FIX C-8: Include return orders in daily breakdown so daily sum matches monthly total.
         // Group sales and returns by day, then compute net per day.
@@ -287,7 +349,7 @@ public class ReportService : IReportService
             return new DailySalesDto
             {
                 Date = day,
-                Sales = daySales - dayReturns,
+                Sales = Math.Round(daySales - dayReturns, 2),
                 Orders = dayOrders
             };
         }).ToList();
@@ -298,9 +360,11 @@ public class ReportService : IReportService
             ToDate = toDate,
             TotalSales = totalSales,
             TotalCost = netCost,
-            GrossProfit = totalSales - netCost,
+            GrossProfit = Math.Round(totalSales - netCost, 2),
             TotalOrders = salesOrders.Count,
-            AverageOrderValue = salesOrders.Count > 0 ? totalSales / salesOrders.Count : 0,
+            AverageOrderValue = salesOrders.Count > 0
+                ? Math.Round(totalSales / salesOrders.Count, 2)
+                : 0m,
             DailySales = dailySales
         };
 

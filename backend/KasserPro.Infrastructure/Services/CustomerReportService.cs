@@ -42,6 +42,7 @@ public class CustomerReportService : ICustomerReportService
 
             // Get orders with customers in date range (all completed states, exclude returns)
             var ordersWithCustomers = await _context.Orders
+                .AsNoTracking()
                 .Include(o => o.Customer)
                 .Where(o => o.TenantId == tenantId
                          && o.BranchId == branchId
@@ -56,6 +57,7 @@ public class CustomerReportService : ICustomerReportService
 
             // Get return orders for refund netting
             var returnOrdersCustomer = await _context.Orders
+                .AsNoTracking()
                 .Where(o => o.TenantId == tenantId
                          && o.BranchId == branchId
                          && o.CustomerId != null
@@ -78,6 +80,13 @@ public class CustomerReportService : ICustomerReportService
                 .Select(o => o.CustomerId!.Value)
                 .Distinct()
                 .ToList();
+
+            var branchBalancesByCustomer = await _context.CustomerBranchBalances
+                .AsNoTracking()
+                .Where(cb => cb.TenantId == tenantId
+                          && cb.BranchId == branchId
+                          && customerIds.Contains(cb.CustomerId))
+                .ToDictionaryAsync(cb => cb.CustomerId, cb => cb.AmountDue);
 
             var totalCustomers = customerIds.Count;
             var totalRefundsForCustomers = returnsByCustomer.Values.Sum();
@@ -114,18 +123,20 @@ public class CustomerReportService : ICustomerReportService
                     // Net out returns for this customer
                     if (returnsByCustomer.TryGetValue(g.Key.CustomerId, out var custRefunds))
                         spent -= custRefunds;
-                    return new TopCustomerDto
-                    {
-                        CustomerId = g.Key.CustomerId,
+                     return new TopCustomerDto
+                     {
+                         CustomerId = g.Key.CustomerId,
                         CustomerName = g.Key.Name ?? "عميل",
                         Phone = g.Key.Phone,
-                        TotalOrders = g.Count(),
-                        TotalSpent = spent,
-                        AverageOrderValue = g.Count() > 0 ? spent / g.Count() : 0,
-                        LastOrderDate = g.Max(o => o.CompletedAt),
-                        OutstandingBalance = g.First().Customer!.TotalDue
-                    };
-                })
+                         TotalOrders = g.Count(),
+                         TotalSpent = spent,
+                         AverageOrderValue = g.Count() > 0 ? spent / g.Count() : 0,
+                         LastOrderDate = g.Max(o => o.CompletedAt),
+                         OutstandingBalance = branchBalancesByCustomer.TryGetValue(g.Key.CustomerId, out var branchBalance)
+                             ? branchBalance
+                             : 0m
+                     };
+                 })
                 .OrderByDescending(c => c.TotalSpent)
                 .Take(topCount)
                 .ToList();
@@ -166,20 +177,26 @@ public class CustomerReportService : ICustomerReportService
 
             var branch = await _context.Branches.FindAsync(branchId);
 
-            // Get customers with outstanding balance
-            var customersWithDebt = await _context.Customers
-                .Where(c => c.TenantId == tenantId
-                         && c.IsActive
-                         && c.TotalDue > 0)
+            // Branch-specific balances are the source of truth for this report.
+            var branchBalances = await _context.CustomerBranchBalances
+                .AsNoTracking()
+                .Include(cb => cb.Customer)
+                .Where(cb => cb.TenantId == tenantId
+                          && cb.BranchId == branchId
+                          && cb.AmountDue > 0
+                          && cb.Customer != null
+                          && cb.Customer.IsActive)
                 .ToListAsync();
 
-            var totalOutstandingAmount = customersWithDebt.Sum(c => c.TotalDue);
+            var totalOutstandingAmount = branchBalances.Sum(cb => cb.AmountDue);
 
             // Batch-fetch order data for all customers with debt (eliminates N+1)
-            var debtCustomerIds = customersWithDebt.Select(c => c.Id).ToList();
+            var debtCustomerIds = branchBalances.Select(cb => cb.CustomerId).ToList();
 
             var lastOrderByCustomer = await _context.Orders
+                .AsNoTracking()
                 .Where(o => o.TenantId == tenantId
+                         && o.BranchId == branchId
                          && o.CustomerId != null
                          && debtCustomerIds.Contains(o.CustomerId!.Value)
                          && (o.Status == OrderStatus.Completed
@@ -191,7 +208,9 @@ public class CustomerReportService : ICustomerReportService
                 .ToDictionaryAsync(x => x.CustomerId, x => x.LastDate);
 
             var oldestUnpaidByCustomer = await _context.Orders
+                .AsNoTracking()
                 .Where(o => o.TenantId == tenantId
+                         && o.BranchId == branchId
                          && o.CustomerId != null
                          && debtCustomerIds.Contains(o.CustomerId!.Value)
                          && (o.Status == OrderStatus.Completed
@@ -204,7 +223,9 @@ public class CustomerReportService : ICustomerReportService
                 .ToDictionaryAsync(x => x.CustomerId, x => x.OldestDate);
 
             var unpaidCountByCustomer = await _context.Orders
+                .AsNoTracking()
                 .Where(o => o.TenantId == tenantId
+                         && o.BranchId == branchId
                          && o.CustomerId != null
                          && debtCustomerIds.Contains(o.CustomerId!.Value)
                          && (o.Status == OrderStatus.Completed
@@ -216,8 +237,9 @@ public class CustomerReportService : ICustomerReportService
                 .Select(g => new { CustomerId = g.Key, Count = g.Count() })
                 .ToDictionaryAsync(x => x.CustomerId, x => x.Count);
 
-            var customerDebts = customersWithDebt.Select(customer =>
+            var customerDebts = branchBalances.Select(branchBalance =>
             {
+                var customer = branchBalance.Customer!;
                 lastOrderByCustomer.TryGetValue(customer.Id, out var lastDate);
                 oldestUnpaidByCustomer.TryGetValue(customer.Id, out var oldestDate);
                 unpaidCountByCustomer.TryGetValue(customer.Id, out var unpaidCount);
@@ -231,13 +253,13 @@ public class CustomerReportService : ICustomerReportService
                     CustomerId = customer.Id,
                     CustomerName = customer.Name ?? "عميل",
                     Phone = customer.Phone,
-                    TotalDue = customer.TotalDue,
+                    TotalDue = branchBalance.AmountDue,
                     CreditLimit = customer.CreditLimit,
                     DaysSinceLastOrder = daysSinceLastOrder,
                     LastOrderDate = lastDate,
                     OldestUnpaidOrderDate = oldestDate,
                     UnpaidOrdersCount = unpaidCount,
-                    IsOverLimit = customer.CreditLimit > 0 && customer.TotalDue > customer.CreditLimit
+                    IsOverLimit = customer.CreditLimit > 0 && branchBalance.AmountDue > customer.CreditLimit
                 };
             }).ToList();
 
@@ -297,7 +319,7 @@ public class CustomerReportService : ICustomerReportService
                 BranchId = branchId,
                 BranchName = branch?.Name,
 
-                TotalCustomersWithDebt = customersWithDebt.Count,
+                TotalCustomersWithDebt = branchBalances.Count,
                 TotalOutstandingAmount = totalOutstandingAmount,
                 TotalOverdueAmount = overdueCustomers.Sum(c => c.TotalDue),
                 OverdueCustomersCount = overdueCustomers.Count,

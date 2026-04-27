@@ -13,7 +13,7 @@ import {
 } from "@/api/productsApi";
 import { useGetBranchInventoryQuery } from "@/api/inventoryApi";
 import { useCategories } from "@/hooks/useProducts";
-import { Button } from "@/components/common/Button";
+import { Button, ConfirmDialog } from "@/components/common";
 import { Input } from "@/components/common/Input";
 import { Card } from "@/components/common/Card";
 import { Loading } from "@/components/common/Loading";
@@ -37,6 +37,7 @@ export const ProductsPage = () => {
   const [showLowStockOnly, setShowLowStockOnly] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [deletingProductId, setDeletingProductId] = useState<number | null>(null);
 
   const { categories } = useCategories();
   const { hasPermission } = usePermission();
@@ -123,19 +124,22 @@ export const ProductsPage = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDeleteClick = (id: number) => {
     if (!canManageProducts) {
       toast.error("ليس لديك صلاحية إدارة المنتجات");
       return;
     }
+    setDeletingProductId(id);
+  };
 
-    if (confirm("هل أنت متأكد من حذف هذا المنتج؟")) {
-      try {
-        await deleteMutation(id).unwrap();
-        toast.success("تم حذف المنتج بنجاح");
-      } catch (error) {
-        toast.error("فشل في حذف المنتج");
-      }
+  const handleConfirmDelete = async () => {
+    if (deletingProductId === null) return;
+    try {
+      await deleteMutation(deletingProductId).unwrap();
+      toast.success("تم حذف المنتج بنجاح");
+      setDeletingProductId(null);
+    } catch {
+      setDeletingProductId(null);
     }
   };
 
@@ -360,7 +364,7 @@ export const ProductsPage = () => {
                                 <Edit2 className="w-4 h-4 text-gray-500" />
                               </button>
                               <button
-                                onClick={() => handleDelete(product.id)}
+                                onClick={() => handleDeleteClick(product.id)}
                                 disabled={isDeleting}
                                 className="p-2 hover:bg-danger-50 rounded-lg transition-colors"
                               >
@@ -395,6 +399,15 @@ export const ProductsPage = () => {
             onClose={handleCloseForm}
           />
         )}
+
+        <ConfirmDialog
+          open={deletingProductId !== null}
+          onOpenChange={(open) => !open && setDeletingProductId(null)}
+          onConfirm={handleConfirmDelete}
+          title="حذف المنتج"
+          description="هل أنت متأكد من حذف هذا المنتج؟"
+          isLoading={isDeleting}
+        />
       </div>
     </div>
   );

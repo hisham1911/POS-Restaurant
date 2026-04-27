@@ -12,7 +12,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { useOrders } from "@/hooks/useOrders";
-import { Button } from "@/components/common/Button";
+import { Button, ConfirmDialog } from "@/components/common";
 import { Input } from "@/components/common/Input";
 import { Card } from "@/components/common/Card";
 import { Loading } from "@/components/common/Loading";
@@ -27,6 +27,7 @@ export const OrdersPage = () => {
   const { todayOrders, isLoadingOrders, cancelOrder } = useOrders();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"today" | "all" | "date">("today");
   const [selectedDate, setSelectedDate] = useState<string>("");
 
@@ -98,10 +99,14 @@ export const OrdersPage = () => {
 
   const isReturnOrder = (order: Order) => order.orderType === "Return";
 
-  const handleCancel = async (orderId: number) => {
-    if (window.confirm("هل أنت متأكد من إلغاء هذا الطلب؟")) {
-      await cancelOrder(orderId, "إلغاء من المستخدم");
-    }
+  const handleCancelClick = (orderId: number) => {
+    setCancellingOrderId(orderId);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (cancellingOrderId === null) return;
+    await cancelOrder(cancellingOrderId, "إلغاء من المستخدم");
+    setCancellingOrderId(null);
   };
 
   const handleFilterChange = <K extends keyof OrdersQueryParams>(
@@ -472,7 +477,7 @@ export const OrdersPage = () => {
                           </button>
                           {order.status === "Pending" && (
                             <button
-                              onClick={() => handleCancel(order.id)}
+                              onClick={() => handleCancelClick(order.id)}
                               className="p-2 hover:bg-danger-50 rounded-lg transition-colors"
                             >
                               <XCircle className="w-4 h-4 text-danger-500" />
@@ -575,6 +580,16 @@ export const OrdersPage = () => {
           </ul>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={cancellingOrderId !== null}
+        onOpenChange={(open) => !open && setCancellingOrderId(null)}
+        onConfirm={handleConfirmCancel}
+        title="إلغاء الطلب"
+        description="هل أنت متأكد من إلغاء هذا الطلب؟"
+        confirmText="إلغاء"
+        cancelText="تراجع"
+      />
     </div>
   );
 };

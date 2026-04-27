@@ -18,12 +18,11 @@ import {
   usePayExpenseMutation,
   useDeleteAttachmentMutation,
 } from "../../api/expensesApi";
-import { Button } from "../../components/common/Button";
+import { Button, ConfirmDialog } from "../../components/common";
 import { Card } from "../../components/common/Card";
 import { Loading } from "../../components/common/Loading";
 import { Modal } from "../../components/common/Modal";
 import { formatDateOnly, formatDateTimeFull } from "../../utils/formatters";
-import { handleApiError } from "../../utils/errorHandler";
 import type {
   ExpenseStatus,
   PayExpenseRequest,
@@ -56,6 +55,7 @@ export function ExpenseDetailsPage() {
   const [paymentReferenceNumber, setPaymentReferenceNumber] = useState("");
   const [paymentNotes, setPaymentNotes] = useState("");
   const [approveNotes, setApproveNotes] = useState("");
+  const [deletingAttachmentId, setDeletingAttachmentId] = useState<number | null>(null);
 
   const {
     data: response,
@@ -67,7 +67,8 @@ export function ExpenseDetailsPage() {
   const [rejectExpense, { isLoading: isRejecting }] =
     useRejectExpenseMutation();
   const [payExpense, { isLoading: isPaying }] = usePayExpenseMutation();
-  const [deleteAttachment] = useDeleteAttachmentMutation();
+  const [deleteAttachment, { isLoading: isDeletingAttachment }] =
+    useDeleteAttachmentMutation();
 
   const expense = response?.data;
   const requiresPaymentReference = paymentMethod !== "Cash";
@@ -97,19 +98,16 @@ export function ExpenseDetailsPage() {
         id: Number(id),
         request: { notes: approveNotes || undefined },
       }).unwrap();
-      paymentReferenceNumber: (requiresPaymentReference
-        ? paymentReferenceNumber.trim()
-        : undefined,
-        setShowApproveModal(false));
+      setShowApproveModal(false);
       setApproveNotes("");
-    } catch (error) {
-      console.error("Failed to approve expense:", error);
+    } catch {
+      setShowApproveModal(false);
     }
   };
 
   const handleReject = async () => {
     if (!rejectReason.trim()) {
-      alert("يرجى إدخال سبب الرفض");
+      toast.error("يرجى إدخال سبب الرفض");
       return;
     }
     try {
@@ -119,8 +117,8 @@ export function ExpenseDetailsPage() {
       }).unwrap();
       setShowRejectModal(false);
       setRejectReason("");
-    } catch (error) {
-      console.error("Failed to reject expense:", error);
+    } catch {
+      setShowRejectModal(false);
     }
   };
 
@@ -144,22 +142,25 @@ export function ExpenseDetailsPage() {
       }
 
       closePayModal();
-    } catch (error) {
-      toast.error(handleApiError(error));
-      console.error("Failed to pay expense:", error);
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 
-  const handleDeleteAttachment = async (attachmentId: number) => {
-    if (window.confirm("هل أنت متأكد من حذف هذا المرفق؟")) {
-      try {
-        await deleteAttachment({
-          expenseId: Number(id),
-          attachmentId,
-        }).unwrap();
-      } catch (error) {
-        console.error("Failed to delete attachment:", error);
-      }
+  const handleDeleteAttachmentClick = (attachmentId: number) => {
+    setDeletingAttachmentId(attachmentId);
+  };
+
+  const handleConfirmDeleteAttachment = async () => {
+    if (deletingAttachmentId === null) return;
+    try {
+      await deleteAttachment({
+        expenseId: Number(id),
+        attachmentId: deletingAttachmentId,
+      }).unwrap();
+      setDeletingAttachmentId(null);
+    } catch {
+      setDeletingAttachmentId(null);
     }
   };
 
@@ -417,8 +418,9 @@ export function ExpenseDetailsPage() {
                     </a>
                     {expense.status === "Draft" && (
                       <button
-                        onClick={() => handleDeleteAttachment(attachment.id)}
-                        className="text-red-600 hover:text-red-900"
+                        onClick={() => handleDeleteAttachmentClick(attachment.id)}
+                        disabled={isDeletingAttachment}
+                        className="text-red-600 hover:text-red-900 disabled:opacity-50"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -503,6 +505,15 @@ export function ExpenseDetailsPage() {
           </div>
         </div>
       </Modal>
+
+      <ConfirmDialog
+        open={deletingAttachmentId !== null}
+        onOpenChange={(open) => !open && setDeletingAttachmentId(null)}
+        onConfirm={handleConfirmDeleteAttachment}
+        title="حذف المرفق"
+        description="هل أنت متأكد من حذف هذا المرفق؟"
+        isLoading={isDeletingAttachment}
+      />
 
       {/* Pay Modal */}
       <Modal isOpen={showPayModal} onClose={closePayModal} title="دفع المصروف">

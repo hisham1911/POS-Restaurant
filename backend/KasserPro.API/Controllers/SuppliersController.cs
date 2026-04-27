@@ -2,6 +2,7 @@ namespace KasserPro.API.Controllers;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using KasserPro.Application.Common;
 using KasserPro.Application.DTOs.Suppliers;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Enums;
@@ -62,7 +63,13 @@ public class SuppliersController : ControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] UpdateSupplierRequest request)
     {
         var result = await _supplierService.UpdateAsync(id, request);
-        return result.Success ? Ok(result) : NotFound(result);
+        if (!result.Success)
+        {
+            if (result.ErrorCode == ErrorCodes.SUPPLIER_NOT_FOUND)
+                return NotFound(result);
+            return BadRequest(result);
+        }
+        return Ok(result);
     }
 
     /// <summary>
@@ -74,6 +81,12 @@ public class SuppliersController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var result = await _supplierService.DeleteAsync(id);
-        return result.Success ? Ok(result) : NotFound(result);
+        if (!result.Success)
+        {
+            if (result.ErrorCode == ErrorCodes.SUPPLIER_NOT_FOUND)
+                return NotFound(result);
+            return BadRequest(result);
+        }
+        return Ok(result);
     }
 }

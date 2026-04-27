@@ -6,13 +6,12 @@ import {
   useDeletePurchaseInvoiceMutation,
 } from "../../api/purchaseInvoiceApi";
 import { useGetSuppliersQuery } from "../../api/suppliersApi";
-import { Button } from "../../components/common/Button";
+import { Button, ConfirmDialog } from "../../components/common";
 import { Card } from "../../components/common/Card";
 import { Loading } from "../../components/common/Loading";
 import { formatCurrency, formatDateOnly } from "../../utils/formatters";
 import { PurchaseInvoiceStatus } from "../../types/purchaseInvoice.types";
 import { toast } from "sonner";
-import { handleApiError } from "../../utils/errorHandler";
 
 export function PurchaseInvoicesPage() {
   const navigate = useNavigate();
@@ -21,6 +20,10 @@ export function PurchaseInvoicesPage() {
   const [status, setStatus] = useState<PurchaseInvoiceStatus | undefined>();
   const [fromDate, setFromDate] = useState<string>("");
   const [toDate, setToDate] = useState<string>("");
+  const [deletingInvoice, setDeletingInvoice] = useState<{
+    id: number;
+    invoiceNumber: string;
+  } | null>(null);
 
   const { data: invoicesResponse, isLoading } = useGetPurchaseInvoicesQuery({
     supplierId,
@@ -32,21 +35,25 @@ export function PurchaseInvoicesPage() {
   });
 
   const { data: suppliersResponse } = useGetSuppliersQuery();
-  const [deletePurchaseInvoice] = useDeletePurchaseInvoiceMutation();
+  const [deletePurchaseInvoice, { isLoading: isDeleting }] =
+    useDeletePurchaseInvoiceMutation();
 
   const invoices = invoicesResponse?.data?.items || [];
   const totalPages = invoicesResponse?.data?.totalPages || 1;
   const suppliers = suppliersResponse?.data || [];
 
-  const handleDelete = async (id: number, invoiceNumber: string) => {
-    if (!confirm(`هل أنت متأكد من حذف الفاتورة ${invoiceNumber}؟`)) return;
+  const handleDeleteClick = (id: number, invoiceNumber: string) => {
+    setDeletingInvoice({ id, invoiceNumber });
+  };
 
+  const handleConfirmDelete = async () => {
+    if (!deletingInvoice) return;
     try {
-      await deletePurchaseInvoice(id).unwrap();
+      await deletePurchaseInvoice(deletingInvoice.id).unwrap();
       toast.success("تم حذف الفاتورة بنجاح");
-    } catch (error) {
-      console.error("Error deleting invoice:", error);
-      toast.error(handleApiError(error));
+      setDeletingInvoice(null);
+    } catch {
+      setDeletingInvoice(null);
     }
   };
 
@@ -295,7 +302,7 @@ export function PurchaseInvoicesPage() {
                               </button>
                               <button
                                 onClick={() =>
-                                  handleDelete(
+                                  handleDeleteClick(
                                     invoice.id,
                                     invoice.invoiceNumber,
                                   )
@@ -342,6 +349,19 @@ export function PurchaseInvoicesPage() {
             </div>
           )}
         </Card>
+
+        <ConfirmDialog
+          open={deletingInvoice !== null}
+          onOpenChange={(open) => !open && setDeletingInvoice(null)}
+          onConfirm={handleConfirmDelete}
+          title="حذف الفاتورة"
+          description={
+            deletingInvoice
+              ? `هل أنت متأكد من حذف الفاتورة ${deletingInvoice.invoiceNumber}؟`
+              : ""
+          }
+          isLoading={isDeleting}
+        />
 
         {/* Help Section */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">

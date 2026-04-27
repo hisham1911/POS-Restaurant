@@ -2,6 +2,7 @@ namespace KasserPro.API.Controllers;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using KasserPro.Application.Common;
 using KasserPro.Application.DTOs.Branches;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Enums;
@@ -45,7 +46,13 @@ public class BranchesController : ControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] UpdateBranchDto dto)
     {
         var result = await _branchService.UpdateAsync(id, dto);
-        return result.Success ? Ok(result) : NotFound(result);
+        if (!result.Success)
+        {
+            if (result.ErrorCode == ErrorCodes.BRANCH_NOT_FOUND)
+                return NotFound(result);
+            return BadRequest(result);
+        }
+        return Ok(result);
     }
 
     [HttpDelete("{id}")]
@@ -53,6 +60,12 @@ public class BranchesController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var result = await _branchService.DeleteAsync(id);
-        return result.Success ? Ok(result) : NotFound(result);
+        if (!result.Success)
+        {
+            if (result.ErrorCode == ErrorCodes.BRANCH_NOT_FOUND)
+                return NotFound(result);
+            return BadRequest(result);
+        }
+        return Ok(result);
     }
 }

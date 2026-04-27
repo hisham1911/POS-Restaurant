@@ -6,7 +6,7 @@ import {
   useUpdateCategoryMutation,
   useDeleteCategoryMutation,
 } from "@/api/categoriesApi";
-import { Button } from "@/components/common/Button";
+import { Button, ConfirmDialog } from "@/components/common";
 import { Input } from "@/components/common/Input";
 import { Card } from "@/components/common/Card";
 import { Modal } from "@/components/common/Modal";
@@ -46,8 +46,10 @@ const isImageSource = (value?: string): boolean => {
 };
 
 export const CategoriesPage = () => {
-  const [showForm, setShowForm] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<number | null>(null);
   const [formData, setFormData] = useState({
     name: "",
     nameEn: "",
@@ -83,14 +85,18 @@ export const CategoriesPage = () => {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm("هل أنت متأكد من حذف هذا التصنيف؟")) {
-      try {
-        await deleteCategory(id).unwrap();
-        toast.success("تم حذف التصنيف بنجاح");
-      } catch {
-        toast.error("فشل في حذف التصنيف");
-      }
+  const handleDeleteClick = (id: number) => {
+    setDeletingCategoryId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deletingCategoryId === null) return;
+    try {
+      await deleteCategory(deletingCategoryId).unwrap();
+      toast.success("تم حذف التصنيف بنجاح");
+      setDeletingCategoryId(null);
+    } catch {
+      setDeletingCategoryId(null);
     }
   };
 
@@ -231,7 +237,7 @@ export const CategoriesPage = () => {
                     <Edit2 className="w-4 h-4 text-gray-500" />
                   </button>
                   <button
-                    onClick={() => handleDelete(category.id)}
+                    onClick={() => handleDeleteClick(category.id)}
                     disabled={isDeleting}
                     className="p-2 hover:bg-danger-50 rounded-lg transition-colors"
                   >
@@ -417,6 +423,15 @@ export const CategoriesPage = () => {
             </div>
           </form>
         </Modal>
+
+        <ConfirmDialog
+          open={deletingCategoryId !== null}
+          onOpenChange={(open) => !open && setDeletingCategoryId(null)}
+          onConfirm={handleConfirmDelete}
+          title="حذف التصنيف"
+          description="هل أنت متأكد من حذف هذا التصنيف؟"
+          isLoading={isDeleting}
+        />
 
         {/* Help Section */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">

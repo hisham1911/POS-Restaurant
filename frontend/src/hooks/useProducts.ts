@@ -13,7 +13,7 @@ import {
   UpdateProductRequest,
 } from "../types/product.types";
 import { toast } from "sonner";
-import { getApiErrorCode, handleApiError } from "../utils/errorHandler";
+import { handleApiError } from "../utils/errorHandler";
 
 export const useProducts = () => {
   const {
@@ -33,12 +33,6 @@ export const useProducts = () => {
   const products = productsData?.data || [];
 
   const showMutationError = (error: unknown) => {
-    const errorCode = getApiErrorCode(error);
-    if (errorCode) {
-      toast.error(handleApiError({ data: { errorCode } }));
-      return;
-    }
-
     toast.error(handleApiError(error));
   };
 

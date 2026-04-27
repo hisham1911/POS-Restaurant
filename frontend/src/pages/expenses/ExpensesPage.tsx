@@ -15,7 +15,7 @@ import {
 } from "@/api/expensesApi";
 import { useGetExpenseCategoriesQuery } from "@/api/expenseCategoriesApi";
 import type { ExpenseStatus, ExpenseFilters } from "@/types/expense.types";
-import { Button } from "@/components/common/Button";
+import { Button, ConfirmDialog } from "@/components/common";
 import { Card } from "@/components/common/Card";
 import { Loading } from "@/components/common/Loading";
 import { formatCurrency, formatDateOnly } from "@/utils/formatters";
@@ -26,6 +26,7 @@ export function ExpensesPage() {
     pageNumber: 1,
     pageSize: 20,
   });
+  const [deletingExpenseId, setDeletingExpenseId] = useState<number | null>(null);
 
   const {
     data: expensesResponse,
@@ -58,15 +59,18 @@ export function ExpensesPage() {
     setFilters((prev) => ({ ...prev, pageNumber: page }));
   };
 
-  const handleDelete = async (id: number) => {
-    if (window.confirm("هل أنت متأكد من حذف هذا المصروف؟")) {
-      try {
-        await deleteExpense(id).unwrap();
-        toast.success("تم حذف المصروف بنجاح");
-      } catch (error) {
-        console.error("Failed to delete expense:", error);
-        toast.error("فشل في حذف المصروف");
-      }
+  const handleDeleteClick = (id: number) => {
+    setDeletingExpenseId(id);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (deletingExpenseId === null) return;
+    try {
+      await deleteExpense(deletingExpenseId).unwrap();
+      toast.success("تم حذف المصروف بنجاح");
+      setDeletingExpenseId(null);
+    } catch {
+      setDeletingExpenseId(null);
     }
   };
 
@@ -372,6 +376,15 @@ export function ExpensesPage() {
             </div>
           )}
         </Card>
+
+        <ConfirmDialog
+          open={deletingExpenseId !== null}
+          onOpenChange={(open) => !open && setDeletingExpenseId(null)}
+          onConfirm={handleConfirmDelete}
+          title="حذف المصروف"
+          description="هل أنت متأكد من حذف هذا المصروف؟"
+          isLoading={isDeleting}
+        />
 
         {/* Help Section */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">

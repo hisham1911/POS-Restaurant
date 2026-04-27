@@ -11,8 +11,6 @@ import {
 } from "../types/shift.types";
 import { toast } from "sonner";
 import {
-  ApiError,
-  getApiErrorCode,
   handleApiError,
 } from "../utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
@@ -48,15 +46,7 @@ export const useShift = () => {
       refetch();
       return shift;
     } catch (error) {
-      const apiError = error as ApiError;
-      if (
-        !getApiErrorCode(error) &&
-        apiError.status !== 400 &&
-        apiError.status !== 403 &&
-        apiError.status !== 409
-      ) {
-        toast.error(handleApiError(error));
-      }
+      toast.error(handleApiError(error));
       return null;
     }
   };
@@ -74,15 +64,7 @@ export const useShift = () => {
       refetch();
       return shift;
     } catch (error) {
-      const apiError = error as ApiError;
-      if (
-        !getApiErrorCode(error) &&
-        apiError.status !== 400 &&
-        apiError.status !== 403 &&
-        apiError.status !== 409
-      ) {
-        toast.error(handleApiError(error));
-      }
+      toast.error(handleApiError(error));
       refetch();
       return null;
     }

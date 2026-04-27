@@ -52,6 +52,13 @@ const getLocalizedErrorMessage = (
   }
 
   if (errorData.errorCode && ERROR_MESSAGES[errorData.errorCode]) {
+    // Special case: VALIDATION_ERROR may contain a specific business rule message from the server
+    if (
+      errorData.errorCode === "VALIDATION_ERROR" &&
+      errorData.message?.trim()
+    ) {
+      return errorData.message;
+    }
     return ERROR_MESSAGES[errorData.errorCode];
   }
 

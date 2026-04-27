@@ -19,6 +19,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { toast } from "sonner";
+import { ConfirmDialog } from "../../components/common";
 import type { TransferStatus } from "../../types/inventory.types";
 import { formatDateTimeFull } from "../../utils/formatters";
 import { handleApiError } from "../../utils/errorHandler";
@@ -36,6 +37,8 @@ export default function InventoryTransferList() {
   const [pageNumber, setPageNumber] = useState(1);
   const [cancelReason, setCancelReason] = useState("");
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [approvingId, setApprovingId] = useState<number | null>(null);
+  const [receivingId, setReceivingId] = useState<number | null>(null);
 
   const { data: transfersData, isLoading } = useGetTransfersQuery({
     ...filters,
@@ -47,25 +50,33 @@ export default function InventoryTransferList() {
   const [receiveTransfer] = useReceiveTransferMutation();
   const [cancelTransfer] = useCancelTransferMutation();
 
-  const handleApprove = async (id: number) => {
-    if (!confirm("هل تريد الموافقة على طلب النقل؟")) return;
+  const handleApproveClick = (id: number) => {
+    setApprovingId(id);
+  };
 
+  const handleConfirmApprove = async () => {
+    if (approvingId === null) return;
     try {
-      await approveTransfer(id).unwrap();
+      await approveTransfer(approvingId).unwrap();
       toast.success("تمت الموافقة على طلب النقل");
-    } catch (error: unknown) {
-      toast.error(handleApiError(error));
+      setApprovingId(null);
+    } catch {
+      setApprovingId(null);
     }
   };
 
-  const handleReceive = async (id: number) => {
-    if (!confirm("هل تم استلام المخزون؟ سيتم تحديث المخزون تلقائياً")) return;
+  const handleReceiveClick = (id: number) => {
+    setReceivingId(id);
+  };
 
+  const handleConfirmReceive = async () => {
+    if (receivingId === null) return;
     try {
-      await receiveTransfer(id).unwrap();
+      await receiveTransfer(receivingId).unwrap();
       toast.success("تم استلام المخزون بنجاح");
-    } catch (error: unknown) {
-      toast.error(handleApiError(error));
+      setReceivingId(null);
+    } catch {
+      setReceivingId(null);
     }
   };
 
@@ -345,7 +356,7 @@ export default function InventoryTransferList() {
                       {transfer.status === "Pending" && (
                         <>
                           <button
-                            onClick={() => handleApprove(transfer.id)}
+                            onClick={() => handleApproveClick(transfer.id)}
                             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm"
                           >
                             <Check className="w-4 h-4" />
@@ -364,7 +375,7 @@ export default function InventoryTransferList() {
                       {transfer.status === "Approved" && (
                         <>
                           <button
-                            onClick={() => handleReceive(transfer.id)}
+                            onClick={() => handleReceiveClick(transfer.id)}
                             className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm"
                           >
                             <Package className="w-4 h-4" />
@@ -459,6 +470,26 @@ export default function InventoryTransferList() {
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        open={approvingId !== null}
+        onOpenChange={(open) => !open && setApprovingId(null)}
+        onConfirm={handleConfirmApprove}
+        title="موافقة على طلب النقل"
+        description="هل تريد الموافقة على طلب النقل؟"
+        confirmText="موافقة"
+        variant="primary"
+      />
+
+      <ConfirmDialog
+        open={receivingId !== null}
+        onOpenChange={(open) => !open && setReceivingId(null)}
+        onConfirm={handleConfirmReceive}
+        title="استلام المخزون"
+        description="هل تم استلام المخزون؟ سيتم تحديث المخزون تلقائياً."
+        confirmText="استلام"
+        variant="primary"
+      />
     </div>
   );
 }

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { formatDateOnly } from "../../utils/formatters";
 import { handleApiError } from "../../utils/errorHandler";
+import { ConfirmDialog } from "../../components/common";
 
 const strongPasswordRegex =
   /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^\w\s]).{8,100}$/;
@@ -48,6 +49,12 @@ export default function TenantCreationPage() {
   const [statusFilter, setStatusFilter] = useState<
     "all" | "active" | "inactive"
   >("all");
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [toggleDialogTenant, setToggleDialogTenant] = useState<{
+    id: number;
+    currentStatus: boolean;
+  } | null>(null);
+  const [showSeedDialog, setShowSeedDialog] = useState(false);
 
   const tenants = tenantsResponse?.data ?? [];
   const activeCount = tenants.filter((tenant) => tenant.isActive).length;
@@ -93,7 +100,7 @@ export default function TenantCreationPage() {
     return "";
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setSuccess("");
@@ -104,13 +111,10 @@ export default function TenantCreationPage() {
       return;
     }
 
-    const confirmed = window.confirm(
-      "هل أنت متأكد من إنشاء شركة جديدة؟ لا يمكن التراجع عن هذه العملية بسهولة.",
-    );
-    if (!confirmed) {
-      return;
-    }
+    setShowCreateDialog(true);
+  };
 
+  const handleConfirmCreate = async () => {
     try {
       const payload = {
         tenantName: formData.tenantName.trim(),
@@ -128,48 +132,47 @@ export default function TenantCreationPage() {
         adminPassword: "",
         branchName: "",
       });
+      setShowCreateDialog(false);
     } catch (err: unknown) {
       console.error("Create tenant error:", err);
       setError(handleApiError(err));
+      setShowCreateDialog(false);
     }
   };
 
-  const handleToggleTenantStatus = async (
+  const handleToggleTenantStatus = (
     tenantId: number,
     currentStatus: boolean,
   ) => {
-    const confirmed = window.confirm(
-      currentStatus
-        ? "هل أنت متأكد من تعطيل هذه الشركة؟"
-        : "هل أنت متأكد من تفعيل هذه الشركة؟",
-    );
+    setToggleDialogTenant({ id: tenantId, currentStatus });
+  };
 
-    if (!confirmed) return;
-
+  const handleConfirmToggleTenantStatus = async () => {
+    if (!toggleDialogTenant) return;
     try {
       const result = await setTenantStatus({
-        tenantId,
-        body: { isActive: !currentStatus },
+        tenantId: toggleDialogTenant.id,
+        body: { isActive: !toggleDialogTenant.currentStatus },
       }).unwrap();
 
       setSuccess(result.message || "تم تحديث حالة الشركة");
       setError("");
       await refetch();
+      setToggleDialogTenant(null);
     } catch (err: unknown) {
       setError(handleApiError(err));
       setSuccess("");
+      setToggleDialogTenant(null);
     }
   };
 
-  const handleRunSeedPipeline = async () => {
+  const handleRunSeedPipeline = () => {
     setError("");
     setSuccess("");
+    setShowSeedDialog(true);
+  };
 
-    const confirmed = window.confirm(
-      "سيتم تشغيل نفس السيدر داتا الحالية كما هي. قد تستغرق العملية عدة دقائق حسب حجم البيانات. هل تريد المتابعة؟",
-    );
-    if (!confirmed) return;
-
+  const handleConfirmSeedPipeline = async () => {
     try {
       const result = await runSeedPipeline().unwrap();
       const warningsCount = result.data?.optionalWarnings?.length ?? 0;
@@ -182,9 +185,11 @@ export default function TenantCreationPage() {
       );
 
       await refetch();
+      setShowSeedDialog(false);
     } catch (err: unknown) {
       setError(handleApiError(err));
       setSuccess("");
+      setShowSeedDialog(false);
     }
   };
 
@@ -605,6 +610,37 @@ export default function TenantCreationPage() {
             <li>• يمكن للمدير تسجيل الدخول فوراً بعد الإنشاء</li>
           </ul>
         </div>
+
+        <ConfirmDialog
+          open={showCreateDialog}
+          onOpenChange={(open) => !open && setShowCreateDialog(false)}
+          onConfirm={handleConfirmCreate}
+          title="إنشاء شركة جديدة"
+          description="هل أنت متأكد من إنشاء شركة جديدة؟ لا يمكن التراجع عن هذه العملية بسهولة."
+          isLoading={isLoading}
+        />
+
+        <ConfirmDialog
+          open={toggleDialogTenant !== null}
+          onOpenChange={(open) => !open && setToggleDialogTenant(null)}
+          onConfirm={handleConfirmToggleTenantStatus}
+          title={toggleDialogTenant?.currentStatus ? "تعطيل الشركة" : "تفعيل الشركة"}
+          description={
+            toggleDialogTenant?.currentStatus
+              ? "هل أنت متأكد من تعطيل هذه الشركة؟"
+              : "هل أنت متأكد من تفعيل هذه الشركة؟"
+          }
+          isLoading={isUpdatingStatus}
+        />
+
+        <ConfirmDialog
+          open={showSeedDialog}
+          onOpenChange={(open) => !open && setShowSeedDialog(false)}
+          onConfirm={handleConfirmSeedPipeline}
+          title="تشغيل السيدر"
+          description="سيتم تشغيل نفس السيدر داتا الحالية كما هي. قد تستغرق العملية عدة دقائق حسب حجم البيانات. هل تريد المتابعة؟"
+          isLoading={isSeeding}
+        />
       </div>
     </div>
   );

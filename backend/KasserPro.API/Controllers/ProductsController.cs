@@ -2,6 +2,7 @@ namespace KasserPro.API.Controllers;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using KasserPro.Application.Common;
 using KasserPro.Application.DTOs.Products;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Enums;
@@ -53,7 +54,13 @@ public class ProductsController : ControllerBase
     public async Task<IActionResult> Update(int id, [FromBody] UpdateProductRequest request)
     {
         var result = await _productService.UpdateAsync(id, request);
-        return result.Success ? Ok(result) : NotFound(result);
+        if (!result.Success)
+        {
+            if (result.ErrorCode == ErrorCodes.PRODUCT_NOT_FOUND)
+                return NotFound(result);
+            return BadRequest(result);
+        }
+        return Ok(result);
     }
 
     [HttpDelete("{id}")]
@@ -62,7 +69,13 @@ public class ProductsController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var result = await _productService.DeleteAsync(id);
-        return result.Success ? Ok(result) : NotFound(result);
+        if (!result.Success)
+        {
+            if (result.ErrorCode == ErrorCodes.PRODUCT_NOT_FOUND)
+                return NotFound(result);
+            return BadRequest(result);
+        }
+        return Ok(result);
     }
 
     [HttpPost("{id}/adjust-stock")]

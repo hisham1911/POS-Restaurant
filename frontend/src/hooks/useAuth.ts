@@ -13,8 +13,6 @@ import { useLoginMutation } from "../api/authApi";
 import { LoginRequest } from "../types/auth.types";
 import { toast } from "sonner";
 import {
-  ApiError,
-  getApiErrorCode,
   handleApiError,
 } from "../utils/errorHandler";
 import { baseApi } from "../api/baseApi";
@@ -61,16 +59,7 @@ export const useAuth = () => {
       toast.success("تم تسجيل الدخول بنجاح");
       navigate("/home");
     } catch (error: unknown) {
-      const apiError = error as ApiError;
-      const errorCode = getApiErrorCode(error);
-      if (
-        !errorCode &&
-        apiError.status !== 400 &&
-        apiError.status !== 403 &&
-        apiError.status !== 409
-      ) {
-        toast.error(handleApiError(error));
-      }
+      toast.error(handleApiError(error));
     }
   };
 

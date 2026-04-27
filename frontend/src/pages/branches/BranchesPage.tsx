@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Plus, Edit, Trash2, Building2 } from "lucide-react";
-import { Button } from "@/components/common/Button";
+import { Button, ConfirmDialog } from "@/components/common";
 import { Card } from "@/components/common/Card";
 import { Loading } from "@/components/common/Loading";
 import {
@@ -12,11 +12,11 @@ import type { Branch } from "@/types/branch.types";
 import { formatDateTime } from "@/utils/formatters";
 import { toast } from "react-hot-toast";
 import clsx from "clsx";
-import { handleApiError } from "@/utils/errorHandler";
 
 export const BranchesPage = () => {
   const [showFormModal, setShowFormModal] = useState(false);
   const [selectedBranch, setSelectedBranch] = useState<Branch | undefined>();
+  const [deletingBranch, setDeletingBranch] = useState<Branch | null>(null);
 
   const { data: branchesData, isLoading } = useGetBranchesQuery();
   const [deleteBranch, { isLoading: isDeleting }] = useDeleteBranchMutation();
@@ -28,21 +28,14 @@ export const BranchesPage = () => {
     setShowFormModal(true);
   };
 
-  const handleDelete = async (branch: Branch) => {
-    if (
-      !window.confirm(
-        `هل أنت متأكد من حذف الفرع "${branch.name}"؟\n\nملاحظة: لن يتم حذف البيانات المرتبطة بهذا الفرع.`,
-      )
-    ) {
-      return;
-    }
+  const handleDeleteClick = (branch: Branch) => {
+    setDeletingBranch(branch);
+  };
 
-    try {
-      await deleteBranch(branch.id).unwrap();
-      toast.success("تم حذف الفرع بنجاح");
-    } catch (error) {
-      toast.error(handleApiError(error));
-    }
+  const handleConfirmDelete = () => {
+    if (!deletingBranch) return;
+    deleteBranch(deletingBranch.id);
+    setDeletingBranch(null);
   };
 
   const handleCloseModal = () => {
@@ -196,7 +189,7 @@ export const BranchesPage = () => {
                             <Edit className="w-4 h-4 text-blue-600 group-hover:text-blue-700" />
                           </button>
                           <button
-                            onClick={() => handleDelete(branch)}
+                            onClick={() => handleDeleteClick(branch)}
                             disabled={isDeleting}
                             className="p-2 hover:bg-red-50 rounded-lg transition-colors group disabled:opacity-50"
                             title="حذف"
@@ -216,6 +209,20 @@ export const BranchesPage = () => {
         {showFormModal && (
           <BranchFormModal branch={selectedBranch} onClose={handleCloseModal} />
         )}
+
+        <ConfirmDialog
+          open={deletingBranch !== null}
+          onOpenChange={(open) => !open && setDeletingBranch(null)}
+          onConfirm={handleConfirmDelete}
+          title="حذف الفرع"
+          description={
+            deletingBranch
+              ? `هل أنت متأكد من حذف الفرع "${deletingBranch.name}"؟`
+              : ""
+          }
+          warning="ملاحظة: لن يتم حذف البيانات المرتبطة بهذا الفرع."
+          isLoading={isDeleting}
+        />
 
         {/* Help Section */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">

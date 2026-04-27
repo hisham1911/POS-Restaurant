@@ -11,8 +11,6 @@ import { toast } from "sonner";
 import { useAppSelector } from "../store/hooks";
 import { selectCurrentBranch } from "../store/slices/branchSlice";
 import {
-  ApiError,
-  getApiErrorCode,
   handleApiError,
 } from "../utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
@@ -82,15 +80,7 @@ export const useOrders = () => {
         "تعذر إنشاء الطلب",
       );
     } catch (error) {
-      const apiError = error as ApiError;
-      if (
-        !getApiErrorCode(error) &&
-        apiError.status !== 400 &&
-        apiError.status !== 403 &&
-        apiError.status !== 409
-      ) {
-        toast.error(handleApiError(error));
-      }
+      toast.error(handleApiError(error));
       return null;
     }
   };
@@ -157,14 +147,7 @@ export const useOrders = () => {
       toast.success("تم إكمال الطلب بنجاح");
       return order;
     } catch (error) {
-      const apiError = error as ApiError;
-      if (
-        !getApiErrorCode(error) &&
-        apiError.status !== 400 &&
-        apiError.status !== 409
-      ) {
-        toast.error(handleApiError(error));
-      }
+      toast.error(handleApiError(error));
       return null;
     }
   };
@@ -189,14 +172,7 @@ export const useOrders = () => {
 
       return true;
     } catch (error) {
-      const apiError = error as ApiError;
-      if (
-        !getApiErrorCode(error) &&
-        apiError.status !== 400 &&
-        apiError.status !== 403 &&
-        apiError.status !== 409 &&
-        !options?.silent
-      ) {
+      if (!options?.silent) {
         toast.error(handleApiError(error));
       }
       return false;

@@ -52,7 +52,7 @@ export const ERROR_CODES = {
 // Arabic error messages
 export const ERROR_MESSAGES: Record<string, string> = {
   // General
-  [ERROR_CODES.VALIDATION_ERROR]: "البيانات المدخلة غير صحيحة",
+  [ERROR_CODES.VALIDATION_ERROR]: "البيانات المدخلة غير صحيحة. يرجى التحقق من البيانات المدخلة.",
   [ERROR_CODES.NOT_FOUND]: "العنصر غير موجود",
   [ERROR_CODES.UNAUTHORIZED]: "يجب تسجيل الدخول أولاً",
   [ERROR_CODES.FORBIDDEN]: "ليس لديك صلاحية للقيام بهذا الإجراء",
@@ -142,6 +142,14 @@ export function handleApiError(error: unknown): string {
   const apiError = error as ApiError;
 
   if (apiError.data?.errorCode) {
+    // Special case: VALIDATION_ERROR may contain a specific business rule message from the server
+    if (
+      apiError.data.errorCode === ERROR_CODES.VALIDATION_ERROR &&
+      apiError.data.message?.trim()
+    ) {
+      return apiError.data.message;
+    }
+
     const message = ERROR_MESSAGES[apiError.data.errorCode];
     if (message) {
       return message;

@@ -6,7 +6,7 @@ import {
   useDeleteSupplierMutation,
 } from "../../api/suppliersApi";
 import { Supplier } from "../../types/supplier.types";
-import { Button } from "../../components/common/Button";
+import { Button, ConfirmDialog } from "../../components/common";
 import { Card } from "../../components/common/Card";
 import { Loading } from "../../components/common/Loading";
 import { Input } from "../../components/common/Input";
@@ -19,9 +19,13 @@ export default function SuppliersPage() {
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(
     null,
   );
+  const [deletingSupplier, setDeletingSupplier] = useState<Supplier | null>(
+    null,
+  );
 
   const { data: response, isLoading } = useGetSuppliersQuery();
-  const [deleteSupplier] = useDeleteSupplierMutation();
+  const [deleteSupplier, { isLoading: isDeleting }] =
+    useDeleteSupplierMutation();
 
   const suppliers = response?.data || [];
 
@@ -44,16 +48,18 @@ export default function SuppliersPage() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteSupplier = async (id: number, name: string) => {
-    if (!confirm(`هل أنت متأكد من حذف المورد "${name}"؟`)) {
-      return;
-    }
+  const handleDeleteClick = (supplier: Supplier) => {
+    setDeletingSupplier(supplier);
+  };
 
+  const handleConfirmDelete = async () => {
+    if (!deletingSupplier) return;
     try {
-      await deleteSupplier(id).unwrap();
+      await deleteSupplier(deletingSupplier.id).unwrap();
       toast.success("تم حذف المورد بنجاح");
-    } catch (error) {
-      toast.error(handleApiError(error));
+      setDeletingSupplier(null);
+    } catch {
+      setDeletingSupplier(null);
     }
   };
 
@@ -190,10 +196,9 @@ export default function SuppliersPage() {
                             <Edit className="w-4 h-4" />
                           </button>
                           <button
-                            onClick={() =>
-                              handleDeleteSupplier(supplier.id, supplier.name)
-                            }
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            onClick={() => handleDeleteClick(supplier)}
+                            disabled={isDeleting}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                             title="حذف"
                           >
                             <Trash2 className="w-4 h-4" />
@@ -217,8 +222,20 @@ export default function SuppliersPage() {
             }}
           />
         )}
+
+        <ConfirmDialog
+          open={deletingSupplier !== null}
+          onOpenChange={(open) => !open && setDeletingSupplier(null)}
+          onConfirm={handleConfirmDelete}
+          title="حذف المورد"
+          description={
+            deletingSupplier
+              ? `هل أنت متأكد من حذف المورد "${deletingSupplier.name}"؟`
+              : ""
+          }
+          isLoading={isDeleting}
+        />
       </div>
     </div>
   );
 }
-

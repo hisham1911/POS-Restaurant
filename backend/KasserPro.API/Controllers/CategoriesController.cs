@@ -2,6 +2,7 @@ namespace KasserPro.API.Controllers;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using KasserPro.Application.Common;
 using KasserPro.Application.DTOs.Categories;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Enums;
@@ -56,6 +57,12 @@ public class CategoriesController : ControllerBase
     public async Task<IActionResult> Delete(int id)
     {
         var result = await _categoryService.DeleteAsync(id);
-        return result.Success ? Ok(result) : NotFound(result);
+        if (!result.Success)
+        {
+            if (result.ErrorCode == ErrorCodes.CATEGORY_NOT_FOUND)
+                return NotFound(result);
+            return BadRequest(result);
+        }
+        return Ok(result);
     }
 }

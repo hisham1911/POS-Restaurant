@@ -6,6 +6,7 @@ import type {
   UpdateBranchRequest,
 } from "../types/branch.types";
 import type { Tenant, UpdateTenantRequest } from "../types/tenant.types";
+import { toast } from "sonner";
 
 export const branchesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -43,6 +44,14 @@ export const branchesApi = baseApi.injectEndpoints({
         method: "DELETE",
       }),
       invalidatesTags: ["Branches"],
+      async onQueryStarted(_id, { queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          toast.success("تم حذف الفرع بنجاح");
+        } catch {
+          // Error toast already shown by baseApi global handler
+        }
+      },
     }),
 
     // Tenant

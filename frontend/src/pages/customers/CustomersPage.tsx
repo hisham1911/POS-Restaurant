@@ -24,7 +24,6 @@ import { formatDateTime, formatCurrency } from "@/utils/formatters";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { Portal } from "@/components/common/Portal";
-import { handleApiError } from "@/utils/errorHandler";
 
 export const CustomersPage = () => {
   const [page, setPage] = useState(1);
@@ -72,8 +71,8 @@ export const CustomersPage = () => {
       await deleteCustomer(deletingCustomer.id).unwrap();
       toast.success("تم حذف العميل بنجاح");
       setDeletingCustomer(null);
-    } catch (error) {
-      toast.error(handleApiError(error));
+    } catch {
+      setDeletingCustomer(null);
     }
   };
 

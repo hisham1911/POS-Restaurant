@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Card, Loading } from "../../../components/common";
+import { Card, Loading, ConfirmDialog } from "../../../components/common";
 import { Plus, Edit, Trash2, Power, PowerOff } from "lucide-react";
 import {
   useGetAllUsersQuery,
@@ -13,21 +13,26 @@ import type { UserDto } from "../../../types/user.types";
 export default function UserManagementCard() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserDto | null>(null);
+  const [deletingUser, setDeletingUser] = useState<UserDto | null>(null);
 
   const { data: usersData, isLoading } = useGetAllUsersQuery();
-  const [deleteUser] = useDeleteUserMutation();
+  const [deleteUser, { isLoading: isDeleting }] = useDeleteUserMutation();
   const [toggleStatus] = useToggleUserStatusMutation();
 
   const users = usersData?.data || [];
 
-  const handleDelete = async (userId: number, userName: string) => {
-    if (!confirm(`هل أنت متأكد من حذف المستخدم "${userName}"؟`)) return;
+  const handleDeleteClick = (user: UserDto) => {
+    setDeletingUser(user);
+  };
 
+  const handleConfirmDelete = async () => {
+    if (!deletingUser) return;
     try {
-      await deleteUser(userId).unwrap();
+      await deleteUser(deletingUser.id).unwrap();
       toast.success("تم حذف المستخدم بنجاح");
-    } catch (error) {
-      toast.error("فشل حذف المستخدم");
+      setDeletingUser(null);
+    } catch {
+      setDeletingUser(null);
     }
   };
 
@@ -35,8 +40,8 @@ export default function UserManagementCard() {
     try {
       await toggleStatus({ id: userId, data: { isActive: !currentStatus } }).unwrap();
       toast.success(currentStatus ? "تم تعطيل المستخدم" : "تم تفعيل المستخدم");
-    } catch (error) {
-      toast.error("فشل تغيير حالة المستخدم");
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 
@@ -159,8 +164,9 @@ export default function UserManagementCard() {
                         )}
                       </button>
                       <button
-                        onClick={() => handleDelete(user.id, user.name)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                        onClick={() => handleDeleteClick(user)}
+                        disabled={isDeleting}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition disabled:opacity-50"
                         title="حذف"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -186,6 +192,19 @@ export default function UserManagementCard() {
           onClose={handleCloseModal}
         />
       )}
+
+      <ConfirmDialog
+        open={deletingUser !== null}
+        onOpenChange={(open) => !open && setDeletingUser(null)}
+        onConfirm={handleConfirmDelete}
+        title="حذف المستخدم"
+        description={
+          deletingUser
+            ? `هل أنت متأكد من حذف المستخدم "${deletingUser.name}"؟`
+            : ""
+        }
+        isLoading={isDeleting}
+      />
     </>
   );
 }

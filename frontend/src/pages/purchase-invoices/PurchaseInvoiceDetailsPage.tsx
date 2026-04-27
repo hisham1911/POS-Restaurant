@@ -5,14 +5,13 @@ import {
   useConfirmPurchaseInvoiceMutation,
   useDeletePurchaseInvoiceMutation,
 } from "../../api/purchaseInvoiceApi";
-import { Button } from "../../components/common/Button";
+import { Button, ConfirmDialog } from "../../components/common";
 import { Card } from "../../components/common/Card";
 import { Loading } from "../../components/common/Loading";
 import { formatCurrency, formatDateOnly } from "../../utils/formatters";
 import { toast } from "sonner";
 import { AddPaymentModal } from "../../components/purchase-invoices/AddPaymentModal";
 import { CancelInvoiceModal } from "../../components/purchase-invoices/CancelInvoiceModal";
-import { handleApiError } from "../../utils/errorHandler";
 
 const getPaymentMethodLabel = (method: string) => {
   const labels: Record<string, string> = {
@@ -30,38 +29,35 @@ export function PurchaseInvoiceDetailsPage() {
   const { id } = useParams<{ id: string }>();
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const { data: invoiceResponse, isLoading } = useGetPurchaseInvoiceByIdQuery(
     Number(id),
   );
   const [confirmInvoice, { isLoading: isConfirming }] =
     useConfirmPurchaseInvoiceMutation();
-  const [deleteInvoice] = useDeletePurchaseInvoiceMutation();
+  const [deleteInvoice, { isLoading: isDeleting }] = useDeletePurchaseInvoiceMutation();
 
   const invoice = invoiceResponse?.data;
 
   const handleConfirm = async () => {
-    if (!confirm("هل أنت متأكد من تأكيد الفاتورة؟ سيتم تحديث المخزون.")) return;
-
     try {
       await confirmInvoice(Number(id)).unwrap();
       toast.success("تم تأكيد الفاتورة بنجاح");
-    } catch (error) {
-      console.error("Error confirming invoice:", error);
-      toast.error(handleApiError(error));
+      setShowConfirmDialog(false);
+    } catch {
+      setShowConfirmDialog(false);
     }
   };
 
   const handleDelete = async () => {
-    if (!confirm("هل أنت متأكد من حذف الفاتورة؟")) return;
-
     try {
       await deleteInvoice(Number(id)).unwrap();
       toast.success("تم حذف الفاتورة بنجاح");
       navigate("/purchase-invoices");
-    } catch (error) {
-      console.error("Error deleting invoice:", error);
-      toast.error(handleApiError(error));
+    } catch {
+      setShowDeleteDialog(false);
     }
   };
 
@@ -332,11 +328,11 @@ export function PurchaseInvoiceDetailsPage() {
       <div className="flex justify-end gap-4 mb-6">
         {invoice.status === "Draft" && (
           <Button
-            variant="outline"
-            onClick={handleDelete}
-            className="text-red-600 border-red-600 hover:bg-red-50"
+            variant="primary"
+            onClick={() => setShowConfirmDialog(true)}
+            isLoading={isConfirming}
           >
-            حذف الفاتورة
+            تأكيد الفاتورة
           </Button>
         )}
         {(invoice.status === "Confirmed" ||
@@ -369,6 +365,26 @@ export function PurchaseInvoiceDetailsPage() {
           onClose={() => setShowCancelModal(false)}
         />
       )}
+
+      <ConfirmDialog
+        open={showConfirmDialog}
+        onOpenChange={(open) => !open && setShowConfirmDialog(false)}
+        onConfirm={handleConfirm}
+        title="تأكيد الفاتورة"
+        description="هل أنت متأكد من تأكيد الفاتورة؟ سيتم تحديث المخزون."
+        confirmText="تأكيد"
+        variant="primary"
+        isLoading={isConfirming}
+      />
+
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => !open && setShowDeleteDialog(false)}
+        onConfirm={handleDelete}
+        title="حذف الفاتورة"
+        description="هل أنت متأكد من حذف الفاتورة؟"
+        isLoading={isDeleting}
+      />
     </div>
   );
 }

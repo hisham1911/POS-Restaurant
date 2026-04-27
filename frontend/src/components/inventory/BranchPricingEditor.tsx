@@ -23,6 +23,7 @@ import {
 import { toast } from "sonner";
 import { formatDateOnly } from "../../utils/formatters";
 import { handleApiError } from "../../utils/errorHandler";
+import { ConfirmDialog } from "../common";
 import type { BranchProductPrice } from "../../types/inventory.types";
 
 export default function BranchPricingEditor() {
@@ -35,6 +36,7 @@ export default function BranchPricingEditor() {
   );
   const [isAddingPrice, setIsAddingPrice] = useState(false);
   const [editingPriceId, setEditingPriceId] = useState<number | null>(null);
+  const [removingProductId, setRemovingProductId] = useState<number | null>(null);
 
   const [formData, setFormData] = useState({
     productId: 0,
@@ -52,7 +54,7 @@ export default function BranchPricingEditor() {
   const products = productsResponse?.data ?? [];
 
   const [setBranchPrice, { isLoading: isSaving }] = useSetBranchPriceMutation();
-  const [removeBranchPrice] = useRemoveBranchPriceMutation();
+  const [removeBranchPrice, { isLoading: isRemoving }] = useRemoveBranchPriceMutation();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,18 +91,21 @@ export default function BranchPricingEditor() {
     }
   };
 
-  const handleRemove = async (productId: number) => {
-    if (!confirm("هل تريد حذف السعر المخصص؟ سيتم استخدام السعر الافتراضي"))
-      return;
+  const handleRemoveClick = (productId: number) => {
+    setRemovingProductId(productId);
+  };
 
+  const handleConfirmRemove = async () => {
+    if (removingProductId === null) return;
     try {
       await removeBranchPrice({
         branchId: selectedBranchId,
-        productId,
+        productId: removingProductId,
       }).unwrap();
       toast.success("تم حذف السعر المخصص");
-    } catch (error: unknown) {
-      toast.error(handleApiError(error));
+      setRemovingProductId(null);
+    } catch {
+      setRemovingProductId(null);
     }
   };
 
@@ -386,8 +391,9 @@ export default function BranchPricingEditor() {
                               <Edit className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleRemove(price.productId)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                              onClick={() => handleRemoveClick(price.productId)}
+                              disabled={isRemoving}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg disabled:opacity-50"
                               title="حذف"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -415,6 +421,15 @@ export default function BranchPricingEditor() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={removingProductId !== null}
+        onOpenChange={(open) => !open && setRemovingProductId(null)}
+        onConfirm={handleConfirmRemove}
+        title="حذف السعر المخصص"
+        description="هل تريد حذف السعر المخصص؟ سيتم استخدام السعر الافتراضي."
+        isLoading={isRemoving}
+      />
     </div>
   );
 }

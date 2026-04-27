@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "check:no-any": "node scripts/check-no-any.mjs",
-    "build": "npm run check:no-any && tsc -b && vite build",
+    "build": "tsc -b && vite build",
+    "build:check": "npm run check:no-any && tsc -b && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "test:e2e": "playwright test",

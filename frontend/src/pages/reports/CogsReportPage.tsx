@@ -302,10 +302,7 @@ export const CogsReportPage = () => {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {item.hasMissingCost ? (
-                          <AlertCircle
-                            className="w-4 h-4 text-amber-500 flex-shrink-0"
-                            title="بيانات التكلفة غير متوفرة"
-                          />
+                          <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
                         ) : null}
                         <div>
                           <div className="font-medium text-gray-800">

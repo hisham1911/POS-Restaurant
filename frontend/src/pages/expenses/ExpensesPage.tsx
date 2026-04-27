@@ -327,7 +327,7 @@ export function ExpensesPage() {
                                 <Edit className="w-4 h-4" />
                               </Link>
                               <button
-                                onClick={() => handleDelete(expense.id)}
+                                onClick={() => handleDeleteClick(expense.id)}
                                 disabled={isDeleting}
                                 className="text-red-600 hover:text-red-900 disabled:opacity-50"
                                 title="حذف"

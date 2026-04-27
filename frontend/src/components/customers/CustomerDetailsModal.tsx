@@ -498,8 +498,6 @@ export const CustomerDetailsModal = ({
                             <p className="font-medium">
                               {payment.paymentMethod === "Cash" && "💵 نقدي"}
                               {payment.paymentMethod === "Card" && "💳 فيزا"}
-                              {payment.paymentMethod === "BankTransfer" &&
-                                "🏦 تحويل بنكي"}
                               {payment.paymentMethod === "Fawry" &&
                                 "📱 فودافون كاش"}
                             </p>

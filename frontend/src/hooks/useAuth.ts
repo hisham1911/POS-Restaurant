@@ -12,9 +12,6 @@ import { clearBranch } from "../store/slices/branchSlice";
 import { useLoginMutation } from "../api/authApi";
 import { LoginRequest } from "../types/auth.types";
 import { toast } from "sonner";
-import {
-  handleApiError,
-} from "../utils/errorHandler";
 import { baseApi } from "../api/baseApi";
 import { extractApiData } from "@/utils/apiResponse";
 
@@ -58,8 +55,8 @@ export const useAuth = () => {
       );
       toast.success("تم تسجيل الدخول بنجاح");
       navigate("/home");
-    } catch (error: unknown) {
-      toast.error(handleApiError(error));
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

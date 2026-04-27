@@ -8,7 +8,6 @@ import { useGetBranchesQuery } from "../../../api/branchesApi";
 import { toast } from "react-hot-toast";
 import type { UserDto } from "../../../types/user.types";
 import { Portal } from "../../../components/common/Portal";
-import { handleApiError } from "../../../utils/errorHandler";
 
 interface UserFormModalProps {
   user: UserDto | null;
@@ -88,8 +87,8 @@ export default function UserFormModal({ user, onClose }: UserFormModalProps) {
         toast.success("تم إنشاء المستخدم بنجاح");
       }
       onClose();
-    } catch (error: unknown) {
-      toast.error(handleApiError(error));
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

@@ -20,7 +20,6 @@ import type {
   CreatePurchaseInvoiceItemRequest,
   PurchaseInvoicePreview,
 } from "../../types/purchaseInvoice.types";
-import { getApiErrorCode, handleApiError } from "../../utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
 
 interface InvoiceItem extends CreatePurchaseInvoiceItemRequest {
@@ -235,12 +234,7 @@ export function PurchaseInvoiceFormPage() {
       }
     } catch (error) {
       console.error("Error saving invoice:", error);
-      const errorCode = getApiErrorCode(error);
-      if (errorCode) {
-        toast.error(handleApiError({ data: { errorCode } }));
-        return;
-      }
-      toast.error(handleApiError(error));
+      // baseApi.ts already shows error toast
     }
   };
 

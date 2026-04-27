@@ -12,7 +12,6 @@ import {
 import { Button } from "@/components/common/Button";
 import { toast } from "sonner";
 import { Portal } from "@/components/common/Portal";
-import { handleApiError } from "@/utils/errorHandler";
 
 interface CustomerFormModalProps {
   customer?: Customer | null;
@@ -114,8 +113,8 @@ export const CustomerFormModal = ({
         onSuccess?.();
         onClose();
       }
-    } catch (error) {
-      toast.error(handleApiError(error));
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

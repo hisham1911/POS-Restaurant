@@ -22,7 +22,6 @@ import {
 } from "@/api/backupApi";
 import clsx from "clsx";
 import { Portal } from "@/components/common/Portal";
-import { getApiErrorCode, handleApiError } from "@/utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
 
 export const BackupPage = () => {
@@ -64,12 +63,6 @@ export const BackupPage = () => {
       toast.success("تم إنشاء النسخة الاحتياطية بنجاح");
       refetch();
     } catch (error) {
-      const errorCode = getApiErrorCode(error);
-      if (errorCode) {
-        toast.error(handleApiError({ data: { errorCode } }));
-        return;
-      }
-      toast.error(handleApiError(error));
       console.error(error);
     }
   };
@@ -89,7 +82,6 @@ export const BackupPage = () => {
       URL.revokeObjectURL(url);
       toast.success("تم تنزيل الملف بنجاح");
     } catch (error) {
-      toast.error("فشل تنزيل الملف");
       console.error(error);
     } finally {
       setDownloadingFile(null);
@@ -148,13 +140,6 @@ export const BackupPage = () => {
       }
       refetch();
     } catch (error) {
-      const errorCode = getApiErrorCode(error);
-      if (errorCode) {
-        toast.error(handleApiError({ data: { errorCode } }));
-        setShowConfirmUploadRestore(false);
-        return;
-      }
-      toast.error(handleApiError(error));
       console.error(error);
       setShowConfirmUploadRestore(false);
     }
@@ -197,13 +182,6 @@ export const BackupPage = () => {
 
       refetch();
     } catch (error) {
-      const errorCode = getApiErrorCode(error);
-      if (errorCode) {
-        toast.error(handleApiError({ data: { errorCode } }));
-        setShowConfirmRestore(false);
-        return;
-      }
-      toast.error(handleApiError(error));
       console.error(error);
       setShowConfirmRestore(false);
     }

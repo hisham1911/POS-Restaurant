@@ -3,7 +3,6 @@ import { useCancelPurchaseInvoiceMutation } from '../../api/purchaseInvoiceApi';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
 import { toast } from 'sonner';
-import { handleApiError } from '../../utils/errorHandler';
 
 interface CancelInvoiceModalProps {
   invoiceId: number;
@@ -38,7 +37,7 @@ export function CancelInvoiceModal({ invoiceId, isConfirmed, onClose }: CancelIn
       onClose();
     } catch (error) {
       console.error('Error cancelling invoice:', error);
-      toast.error(handleApiError(error));
+      // baseApi.ts already shows error toast
     }
   };
 

@@ -10,9 +10,6 @@ import { CompleteOrderRequest, Order } from "../types/order.types";
 import { toast } from "sonner";
 import { useAppSelector } from "../store/hooks";
 import { selectCurrentBranch } from "../store/slices/branchSlice";
-import {
-  handleApiError,
-} from "../utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
 import { useGetCurrentTenantQuery } from "@/api/branchesApi";
 import { printOrderReceiptFallback } from "@/utils/browserReceiptPrinter";
@@ -79,8 +76,7 @@ export const useOrders = () => {
         "ORDER_CREATE_EMPTY_RESPONSE",
         "تعذر إنشاء الطلب",
       );
-    } catch (error) {
-      toast.error(handleApiError(error));
+    } catch {
       return null;
     }
   };
@@ -146,8 +142,7 @@ export const useOrders = () => {
 
       toast.success("تم إكمال الطلب بنجاح");
       return order;
-    } catch (error) {
-      toast.error(handleApiError(error));
+    } catch {
       return null;
     }
   };
@@ -171,10 +166,7 @@ export const useOrders = () => {
       }
 
       return true;
-    } catch (error) {
-      if (!options?.silent) {
-        toast.error(handleApiError(error));
-      }
+    } catch {
       return false;
     }
   };

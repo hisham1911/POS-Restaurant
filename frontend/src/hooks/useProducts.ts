@@ -13,7 +13,6 @@ import {
   UpdateProductRequest,
 } from "../types/product.types";
 import { toast } from "sonner";
-import { handleApiError } from "../utils/errorHandler";
 
 export const useProducts = () => {
   const {
@@ -32,16 +31,12 @@ export const useProducts = () => {
 
   const products = productsData?.data || [];
 
-  const showMutationError = (error: unknown) => {
-    toast.error(handleApiError(error));
-  };
-
   const createProduct = async (data: CreateProductRequest) => {
     try {
       await createMutation(data).unwrap();
       toast.success("تم إضافة المنتج بنجاح");
-    } catch (error: unknown) {
-      showMutationError(error);
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 
@@ -49,8 +44,8 @@ export const useProducts = () => {
     try {
       await updateMutation({ id, data }).unwrap();
       toast.success("تم تحديث المنتج بنجاح");
-    } catch (error: unknown) {
-      showMutationError(error);
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 
@@ -58,8 +53,8 @@ export const useProducts = () => {
     try {
       await deleteMutation(id).unwrap();
       toast.success("تم حذف المنتج بنجاح");
-    } catch (error: unknown) {
-      showMutationError(error);
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

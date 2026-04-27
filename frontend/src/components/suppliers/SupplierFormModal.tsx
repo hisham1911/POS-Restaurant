@@ -9,7 +9,6 @@ import { Supplier, CreateSupplierRequest, UpdateSupplierRequest } from "../../ty
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { Input } from "../common/Input";
-import { handleApiError } from "../../utils/errorHandler";
 
 interface SupplierFormModalProps {
   supplier: Supplier | null;
@@ -88,8 +87,8 @@ export default function SupplierFormModal({
         toast.success("تم إضافة المورد بنجاح");
         onClose();
       }
-    } catch (error) {
-      toast.error(handleApiError(error));
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

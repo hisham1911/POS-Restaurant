@@ -6,7 +6,6 @@ import { ProductType } from "../../types/product.types";
 import { Modal } from "../common/Modal";
 import { Button } from "../common/Button";
 import { toast } from "sonner";
-import { getApiErrorCode, handleApiError } from "@/utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
 
 interface QuickAddProductModalProps {
@@ -77,12 +76,7 @@ export function QuickAddProductModal({
       handleClose();
     } catch (error) {
       console.error("Error creating product:", error);
-      const errorCode = getApiErrorCode(error);
-      if (errorCode) {
-        toast.error(handleApiError({ data: { errorCode } }));
-        return;
-      }
-      toast.error(handleApiError(error));
+      // baseApi.ts already shows error toast
     }
   };
 

@@ -128,7 +128,7 @@ export function ExpenseFormPage() {
       navigate(`/expenses/${expenseId}`);
     } catch (error) {
       console.error("Failed to save expense:", error);
-      toast.error("حدث خطأ أثناء حفظ المصروف");
+      // baseApi.ts already shows error toast
     }
   };
 

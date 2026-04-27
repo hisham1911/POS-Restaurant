@@ -9,7 +9,6 @@ import {
 import { Branch } from "@/types/branch.types";
 import { toast } from "react-hot-toast";
 import { Portal } from "@/components/common/Portal";
-import { handleApiError } from "@/utils/errorHandler";
 
 interface BranchFormModalProps {
   branch?: Branch;
@@ -66,8 +65,8 @@ export const BranchFormModal = ({ branch, onClose }: BranchFormModalProps) => {
         toast.success("تم إضافة الفرع بنجاح");
         onClose();
       }
-    } catch (error) {
-      toast.error(handleApiError(error));
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

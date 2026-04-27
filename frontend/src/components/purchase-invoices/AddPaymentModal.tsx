@@ -6,7 +6,6 @@ import { Button } from "../common/Button";
 import { formatCurrency } from "../../utils/formatters";
 import { toast } from "sonner";
 import type { PaymentMethod } from "../../types/purchaseInvoice.types";
-import { handleApiError } from "../../utils/errorHandler";
 
 interface AddPaymentModalProps {
   invoiceId: number;
@@ -69,7 +68,7 @@ export function AddPaymentModal({
       onClose();
     } catch (error) {
       console.error("Error adding payment:", error);
-      toast.error(handleApiError(error));
+      // baseApi.ts already shows error toast
     }
   };
 

@@ -10,9 +10,6 @@ import {
   Shift,
 } from "../types/shift.types";
 import { toast } from "sonner";
-import {
-  handleApiError,
-} from "../utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
 
 export const useShift = () => {
@@ -45,8 +42,7 @@ export const useShift = () => {
       toast.success("تم فتح الوردية بنجاح");
       refetch();
       return shift;
-    } catch (error) {
-      toast.error(handleApiError(error));
+    } catch {
       return null;
     }
   };
@@ -63,8 +59,7 @@ export const useShift = () => {
       toast.success("تم إغلاق الوردية بنجاح");
       refetch();
       return shift;
-    } catch (error) {
-      toast.error(handleApiError(error));
+    } catch {
       refetch();
       return null;
     }

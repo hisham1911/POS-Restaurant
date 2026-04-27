@@ -115,9 +115,7 @@ export const CategoriesPage = () => {
       }
       handleCloseForm();
     } catch {
-      toast.error(
-        editingCategory ? "فشل في تحديث التصنيف" : "فشل في إضافة التصنيف",
-      );
+      // baseApi.ts already shows error toast
     }
   };
 

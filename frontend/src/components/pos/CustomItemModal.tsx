@@ -8,7 +8,6 @@ import { useAppSelector } from "@/store/hooks";
 import { selectIsTaxEnabled, selectTaxRate } from "@/store/slices/cartSlice";
 import { AddCustomItemRequest } from "@/types/order.types";
 import { Product, ProductType } from "@/types/product.types";
-import { handleApiError } from "@/utils/errorHandler";
 import {
   getCartItemSubtotal,
   getCartItemTaxAmount,
@@ -104,8 +103,8 @@ export const CustomItemModal = ({
         toast.success(`تم إضافة: ${formData.name}`);
         onSuccess?.(formData);
         onClose();
-      } catch (error) {
-        toast.error(handleApiError(error));
+      } catch {
+        // baseApi.ts already shows error toast
       }
       return;
     }

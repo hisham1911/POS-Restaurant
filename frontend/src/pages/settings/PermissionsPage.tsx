@@ -44,8 +44,8 @@ export default function PermissionsPage() {
         data: { permissions: selectedPermissions },
       }).unwrap();
       toast.success("تم تحديث الصلاحيات بنجاح");
-    } catch (error) {
-      toast.error("فشل تحديث الصلاحيات");
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

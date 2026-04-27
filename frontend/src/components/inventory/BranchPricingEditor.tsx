@@ -22,7 +22,6 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDateOnly } from "../../utils/formatters";
-import { handleApiError } from "../../utils/errorHandler";
 import { ConfirmDialog } from "../common";
 import type { BranchProductPrice } from "../../types/inventory.types";
 
@@ -86,8 +85,8 @@ export default function BranchPricingEditor() {
         price: "" as string | number,
         effectiveFrom: new Date().toISOString().split("T")[0],
       });
-    } catch (error: unknown) {
-      toast.error(handleApiError(error));
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

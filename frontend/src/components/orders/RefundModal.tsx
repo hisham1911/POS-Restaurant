@@ -7,7 +7,6 @@ import { Button } from "@/components/common/Button";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { Portal } from "@/components/common/Portal";
-import { handleApiError } from "@/utils/errorHandler";
 
 interface RefundModalProps {
   order: Order;
@@ -163,8 +162,8 @@ export const RefundModal = ({
       toast.success(message);
       onSuccess?.();
       onClose();
-    } catch (err: unknown) {
-      toast.error(handleApiError(err));
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

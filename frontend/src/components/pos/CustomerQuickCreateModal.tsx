@@ -4,7 +4,6 @@ import { useCreateCustomerMutation } from "@/api/customersApi";
 import { Customer } from "@/types/customer.types";
 import toast from "react-hot-toast";
 import { Portal } from "@/components/common/Portal";
-import { getApiErrorCode, handleApiError } from "@/utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
 
 interface CustomerQuickCreateModalProps {
@@ -52,13 +51,8 @@ export const CustomerQuickCreateModal = ({
 
       toast.success("تم إضافة العميل بنجاح");
       onSuccess(createdCustomer);
-    } catch (error) {
-      const errorCode = getApiErrorCode(error);
-      if (errorCode) {
-        toast.error(handleApiError({ data: { errorCode } }));
-        return;
-      }
-      toast.error(handleApiError(error));
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

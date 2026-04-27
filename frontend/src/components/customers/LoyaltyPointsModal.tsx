@@ -8,7 +8,6 @@ import {
 } from "@/api/customersApi";
 import { toast } from "react-hot-toast";
 import { Portal } from "@/components/common/Portal";
-import { handleApiError } from "@/utils/errorHandler";
 
 interface LoyaltyPointsModalProps {
   customerId: number;
@@ -71,8 +70,8 @@ export const LoyaltyPointsModal = ({
         onSuccess();
         onClose();
       }
-    } catch (error) {
-      toast.error(handleApiError(error));
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

@@ -11,7 +11,6 @@ import { Customer, PayDebtRequest } from "../../types/customer.types";
 import { toast } from "sonner";
 import { Portal } from "@/components/common/Portal";
 import clsx from "clsx";
-import { getApiErrorCode, handleApiError } from "@/utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
 import { useGetCurrentShiftQuery } from "@/api/shiftsApi";
 
@@ -103,12 +102,7 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
       onClose();
     } catch (error) {
       console.error("Error paying debt:", error);
-      const errorCode = getApiErrorCode(error);
-      if (errorCode) {
-        toast.error(handleApiError({ data: { errorCode } }));
-        return;
-      }
-      toast.error(handleApiError(error));
+      // baseApi.ts already shows error toast
     }
   };
 

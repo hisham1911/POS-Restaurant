@@ -22,7 +22,6 @@ import { toast } from "sonner";
 import { ConfirmDialog } from "../../components/common";
 import type { TransferStatus } from "../../types/inventory.types";
 import { formatDateTimeFull } from "../../utils/formatters";
-import { handleApiError } from "../../utils/errorHandler";
 
 export default function InventoryTransferList() {
   const isAdmin = useAppSelector(selectIsAdmin);
@@ -91,8 +90,8 @@ export default function InventoryTransferList() {
       toast.success("تم إلغاء طلب النقل");
       setCancellingId(null);
       setCancelReason("");
-    } catch (error: unknown) {
-      toast.error(handleApiError(error));
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

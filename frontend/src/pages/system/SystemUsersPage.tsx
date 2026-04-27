@@ -51,8 +51,8 @@ export default function SystemUsersPage() {
       }).unwrap();
       toast.success('تم تحديث بيانات المستخدم بنجاح');
       setEditDialogOpen(false);
-    } catch (error) {
-      toast.error('فشل تحديث بيانات المستخدم');
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 
@@ -60,8 +60,8 @@ export default function SystemUsersPage() {
     try {
       await toggleStatus(userId).unwrap();
       toast.success('تم تغيير حالة المستخدم بنجاح');
-    } catch (error) {
-      toast.error('فشل تغيير حالة المستخدم');
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 
@@ -82,8 +82,8 @@ export default function SystemUsersPage() {
       toast.success('تم إعادة تعيين كلمة المرور بنجاح');
       setPasswordDialogOpen(false);
       setNewPassword('');
-    } catch (error) {
-      toast.error('فشل إعادة تعيين كلمة المرور');
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

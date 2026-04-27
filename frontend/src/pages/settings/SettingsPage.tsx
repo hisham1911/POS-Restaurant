@@ -39,7 +39,6 @@ import { toast } from "sonner";
 import clsx from "clsx";
 import { usePOSMode } from "@/hooks/usePOSMode";
 import { useDevicePrintPreferences } from "@/hooks/useDevicePrintPreferences";
-import { getApiErrorCode, handleApiError } from "@/utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
 import type { DevicePrintMode } from "@/utils/devicePrintPreferences";
 
@@ -295,13 +294,8 @@ export const SettingsPage = () => {
       );
       toast.success("تم حفظ الإعدادات بنجاح");
       refetch();
-    } catch (error) {
-      const errorCode = getApiErrorCode(error);
-      if (errorCode) {
-        toast.error(handleApiError({ data: { errorCode } }));
-        return;
-      }
-      toast.error(handleApiError(error));
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 
@@ -1039,13 +1033,8 @@ export const SettingsPage = () => {
                       setLogoUrl(logoData.logoUrl);
                       toast.success("تم رفع الشعار بنجاح");
                       refetch();
-                    } catch (error) {
-                      const errorCode = getApiErrorCode(error);
-                      if (errorCode) {
-                        toast.error(handleApiError({ data: { errorCode } }));
-                        return;
-                      }
-                      toast.error(handleApiError(error));
+                    } catch {
+                      // baseApi.ts already shows error toast
                     }
                     e.target.value = "";
                   }}

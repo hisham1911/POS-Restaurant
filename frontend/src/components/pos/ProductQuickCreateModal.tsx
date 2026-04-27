@@ -14,7 +14,6 @@ import { useCategories } from "@/hooks/useProducts";
 import { toast } from "sonner";
 import { QuickCreateProductRequest, ProductType } from "@/types/product.types";
 import { Portal } from "@/components/common/Portal";
-import { getApiErrorCode, handleApiError } from "@/utils/errorHandler";
 import { extractApiData } from "@/utils/apiResponse";
 
 interface ProductQuickCreateModalProps {
@@ -81,13 +80,8 @@ export const ProductQuickCreateModal = ({
       toast.success(`تمت إضافة المنتج: ${createdProduct.name}`);
       onSuccess?.(createdProduct.id);
       onClose();
-    } catch (error) {
-      const errorCode = getApiErrorCode(error);
-      if (errorCode) {
-        toast.error(handleApiError({ data: { errorCode } }));
-        return;
-      }
-      toast.error(handleApiError(error));
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

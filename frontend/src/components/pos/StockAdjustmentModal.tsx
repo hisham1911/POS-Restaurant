@@ -7,7 +7,6 @@ import { Button } from "@/components/common/Button";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { Portal } from "@/components/common/Portal";
-import { handleApiError } from "@/utils/errorHandler";
 import { getProductCurrentStock } from "@/utils/productStock";
 
 interface StockAdjustmentModalProps {
@@ -71,8 +70,8 @@ export const StockAdjustmentModal = ({
       const updatedStock = result.data?.newBalance ?? targetQuantity;
       toast.success(`تم تحديث المخزون: ${currentStock} -> ${updatedStock}`);
       onClose();
-    } catch (error) {
-      toast.error(handleApiError(error));
+    } catch {
+      // baseApi.ts already shows error toast
     }
   };
 

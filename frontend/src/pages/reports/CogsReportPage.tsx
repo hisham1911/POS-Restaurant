@@ -121,9 +121,9 @@ export const CogsReportPage = () => {
             <div className="mt-4 flex items-start gap-2 rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-800">
               <Info className="mt-0.5 h-4 w-4 shrink-0" />
               <p>
-                {report?.productsWithNoCostCount} منتجات بدون تكلفة مسجلة.
-                تم تقييم مخزونها بصفر حتى لا يتم تضخيم قيمة المخزون أو تكلفة
-                المبيعات.
+                {report?.productsWithNoCostCount} منتجات في المخزون لا تحمل
+                تكلفة مسجّلة. سيتم بيعها بدون تكلفة محفوظة، مما يُضخّم هامش
+                الربح في التقارير. يُرجى تحديث تكلفة هذه المنتجات.
               </p>
             </div>
           )}

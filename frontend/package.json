@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "check:no-any": "node scripts/check-no-any.mjs",
+    "type-check": "tsc -b --noEmit",
     "build": "tsc -b && vite build",
     "build:check": "npm run check:no-any && tsc -b && vite build",
     "preview": "vite preview",

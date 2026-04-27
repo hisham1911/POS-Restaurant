@@ -135,8 +135,8 @@ public class FinancialReportService : IFinancialReportService
 
             // Calculate net profit
             var netProfit = Math.Round(grossProfit - totalExpenses, 2);
-            var netProfitMargin = actualTotalRevenue > 0
-                ? Math.Round((netProfit / actualTotalRevenue) * 100, 2)
+            var netProfitMargin = actualNetSales > 0
+                ? Math.Round((netProfit / actualNetSales) * 100, 2)
                 : 0m;
 
             var report = new ProfitLossReportDto

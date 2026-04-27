@@ -174,7 +174,7 @@ public class OrderService : IOrderService
                 ProductBarcode = product.Barcode,
                 // Price Snapshot - UnitPrice is NET (excluding tax)
                 UnitPrice = unitPrice,
-                UnitCost = product.Cost,
+                UnitCost = product.Cost ?? product.AverageCost,
                 OriginalPrice = product.Price,
                 Quantity = item.Quantity,
                 DiscountType = NormalizeDiscountType(item.DiscountType),

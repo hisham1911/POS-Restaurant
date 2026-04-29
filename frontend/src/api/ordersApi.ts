@@ -43,6 +43,7 @@ export const ordersApi = baseApi.injectEndpoints({
 
         if (params) {
           if (params.status) queryParams.status = params.status;
+          if (params.orderType) queryParams.orderType = params.orderType;
           if (params.fromDate) queryParams.fromDate = params.fromDate;
           if (params.toDate) queryParams.toDate = params.toDate;
           if (params.page) queryParams.page = params.page.toString();

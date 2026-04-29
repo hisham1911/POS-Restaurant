@@ -18,6 +18,36 @@ public class PermissionService : IPermissionService
     {
         Permission.PosSell,
         Permission.OrdersView,
+        Permission.OrdersCreate,
+        Permission.ProductsView,
+        Permission.CategoriesView,
+        Permission.InventoryView,
+        Permission.BranchesView,
+    };
+
+    private static readonly Dictionary<Permission, Permission[]> PermissionImplications = new()
+    {
+        [Permission.OrdersCreate] = new[] { Permission.OrdersView },
+        [Permission.ProductsManage] = new[] { Permission.ProductsView },
+        [Permission.CategoriesManage] = new[] { Permission.CategoriesView },
+        [Permission.ExpensesCreate] = new[] { Permission.ExpensesView },
+        [Permission.ExpensesManage] = new[] { Permission.ExpensesView },
+        [Permission.InventoryManage] = new[] { Permission.InventoryView },
+        [Permission.InventoryTransfer] = new[] { Permission.InventoryView },
+        [Permission.CashRegisterManage] = new[] { Permission.CashRegisterView },
+        [Permission.SuppliersManage] = new[] { Permission.SuppliersView },
+        [Permission.PurchaseInvoicesManage] = new[] { Permission.PurchaseInvoicesView },
+        [Permission.UsersManage] = new[] { Permission.UsersView },
+        [Permission.DeliveryManage] = new[] { Permission.DeliveryView },
+        [Permission.PosSell] = new[]
+        {
+            Permission.OrdersView,
+            Permission.OrdersCreate,
+            Permission.ProductsView,
+            Permission.CategoriesView,
+            Permission.InventoryView,
+            Permission.BranchesView,
+        },
     };
 
     public PermissionService(
@@ -55,7 +85,7 @@ public class PermissionService : IPermissionService
             .Select(up => up.Permission)
             .ToListAsync();
 
-        return userPermissions;
+        return ExpandPermissions(userPermissions);
     }
 
     public async Task<UserPermissionsDto?> GetUserPermissionsDtoAsync(int userId)
@@ -68,13 +98,24 @@ public class PermissionService : IPermissionService
         }
 
         var permissions = await GetUserPermissionsAsync(userId);
+        var defaultPermissions = user.Role == UserRole.Cashier
+            ? DefaultCashierPermissions.Select(p => p.ToString()).ToList()
+            : new List<string>();
+
+        var currentPermissionStrings = permissions.Select(p => p.ToString()).ToList();
+        var isCustomized = user.Role == UserRole.Cashier
+            && !currentPermissionStrings.ToHashSet().SetEquals(defaultPermissions);
 
         return new UserPermissionsDto
         {
             UserId = user.Id,
             UserName = user.Name,
             Email = user.Email,
-            Permissions = permissions.Select(p => p.ToString()).ToList()
+            Role = user.Role.ToString(),
+            IsCustomized = isCustomized,
+            Permissions = currentPermissionStrings,
+            DefaultPermissions = defaultPermissions,
+            TenantId = user.TenantId ?? 0
         };
     }
 
@@ -106,7 +147,7 @@ public class PermissionService : IPermissionService
         return result;
     }
 
-    public async Task UpdateUserPermissionsAsync(int userId, List<Permission> permissions)
+    public async Task UpdateUserPermissionsAsync(int userId, List<Permission> permissions, int callerTenantId, int changedByUserId)
     {
         var user = await _unitOfWork.Users.GetByIdAsync(userId);
         if (user == null)
@@ -115,12 +156,30 @@ public class PermissionService : IPermissionService
             throw new InvalidOperationException($"User {userId} not found");
         }
 
+        // Tenant isolation check
+        if (user.TenantId != callerTenantId)
+        {
+            _logger.LogWarning(
+                "Cross-tenant permission update attempt: User {ChangedBy} tried to update user {TargetUserId} in tenant {TargetTenantId}",
+                changedByUserId,
+                userId,
+                user.TenantId);
+            throw new InvalidOperationException("Cross-tenant access denied");
+        }
+
         // Don't allow updating permissions for Admin or SystemOwner
         if (user.Role == UserRole.Admin || user.Role == UserRole.SystemOwner)
         {
             _logger.LogWarning("Attempted to update permissions for Admin/SystemOwner user {UserId}", userId);
             throw new InvalidOperationException("Cannot update permissions for Admin or SystemOwner");
         }
+
+        // Get previous permissions for audit
+        var previousPermissions = await _unitOfWork.UserPermissions
+            .Query()
+            .Where(up => up.UserId == userId)
+            .Select(up => up.Permission)
+            .ToListAsync();
 
         // Remove existing permissions
         var existingPermissions = await _unitOfWork.UserPermissions
@@ -150,6 +209,18 @@ public class PermissionService : IPermissionService
 
         await _unitOfWork.SaveChangesAsync();
 
+        // Audit log
+        var addedPermissions = permissions.Except(previousPermissions).ToList();
+        var removedPermissions = previousPermissions.Except(permissions).ToList();
+
+        _logger.LogInformation(
+            "Permission audit: User {ChangedByUserId} updated permissions for user {TargetUserId} in tenant {TenantId}. Added: {Added}. Removed: {Removed}.",
+            changedByUserId,
+            userId,
+            user.TenantId,
+            addedPermissions.Any() ? string.Join(", ", addedPermissions) : "none",
+            removedPermissions.Any() ? string.Join(", ", removedPermissions) : "none");
+
         _logger.LogInformation(
             "Updated permissions for user {UserId}. New permissions: {Permissions}",
             userId,
@@ -170,12 +241,40 @@ public class PermissionService : IPermissionService
             return true;
         }
 
-        // Check if cashier has the specific permission
-        var hasPermission = await _unitOfWork.UserPermissions
+        var permissions = await _unitOfWork.UserPermissions
             .Query()
-            .AnyAsync(up => up.UserId == userId && up.Permission == permission);
+            .Where(up => up.UserId == userId)
+            .Select(up => up.Permission)
+            .ToListAsync();
 
-        return hasPermission;
+        return ExpandPermissions(permissions).Contains(permission);
+    }
+
+    private static List<Permission> ExpandPermissions(IEnumerable<Permission> permissions)
+    {
+        var effectivePermissions = permissions.ToHashSet();
+        var changed = true;
+
+        while (changed)
+        {
+            changed = false;
+
+            foreach (var permission in effectivePermissions.ToList())
+            {
+                if (!PermissionImplications.TryGetValue(permission, out var impliedPermissions))
+                    continue;
+
+                foreach (var impliedPermission in impliedPermissions)
+                {
+                    if (effectivePermissions.Add(impliedPermission))
+                        changed = true;
+                }
+            }
+        }
+
+        return effectivePermissions
+            .OrderBy(permission => (int)permission)
+            .ToList();
     }
 
     public List<PermissionInfoDto> GetAllAvailablePermissions()
@@ -201,6 +300,44 @@ public class PermissionService : IPermissionService
                 DescriptionAr = "تطبيق خصومات",
                 IsDefault = false
             },
+            new PermissionInfoDto
+            {
+                Key = Permission.PosCreditSale.ToString(),
+                Group = "Point of Sale",
+                GroupAr = "نقطة البيع",
+                Description = "Sell on credit (partial payment)",
+                DescriptionAr = "البيع الآجل (دفع جزئي)",
+                IsDefault = false
+            },
+            new PermissionInfoDto
+            {
+                Key = Permission.PosEditPrice.ToString(),
+                Group = "Point of Sale",
+                GroupAr = "نقطة البيع",
+                Description = "Edit item price during sale",
+                DescriptionAr = "تعديل سعر المنتج أثناء البيع",
+                IsDefault = false,
+                IsSensitive = true
+            },
+            new PermissionInfoDto
+            {
+                Key = Permission.PosDeleteItem.ToString(),
+                Group = "Point of Sale",
+                GroupAr = "نقطة البيع",
+                Description = "Delete items from order",
+                DescriptionAr = "حذف صنف من الطلب",
+                IsDefault = false
+            },
+            new PermissionInfoDto
+            {
+                Key = Permission.PosCancelOrder.ToString(),
+                Group = "Point of Sale",
+                GroupAr = "نقطة البيع",
+                Description = "Cancel orders",
+                DescriptionAr = "إلغاء الطلبات",
+                IsDefault = false,
+                IsSensitive = true
+            },
 
             // Orders
             new PermissionInfoDto
@@ -219,7 +356,8 @@ public class PermissionService : IPermissionService
                 GroupAr = "الطلبات",
                 Description = "Process refunds",
                 DescriptionAr = "عمل مرتجعات",
-                IsDefault = false
+                IsDefault = false,
+                IsSensitive = true
             },
             new PermissionInfoDto
             {
@@ -228,7 +366,7 @@ public class PermissionService : IPermissionService
                 GroupAr = "الطلبات",
                 Description = "Create and update orders",
                 DescriptionAr = "إنشاء وتعديل الطلبات",
-                IsDefault = false
+                IsDefault = true
             },
 
             // Products
@@ -239,7 +377,7 @@ public class PermissionService : IPermissionService
                 GroupAr = "المنتجات",
                 Description = "View products",
                 DescriptionAr = "عرض المنتجات",
-                IsDefault = false
+                IsDefault = true
             },
             new PermissionInfoDto
             {
@@ -259,7 +397,7 @@ public class PermissionService : IPermissionService
                 GroupAr = "التصنيفات",
                 Description = "View categories",
                 DescriptionAr = "عرض التصنيفات",
-                IsDefault = false
+                IsDefault = true
             },
             new PermissionInfoDto
             {
@@ -328,7 +466,8 @@ public class PermissionService : IPermissionService
                 GroupAr = "المصروفات",
                 Description = "Manage expenses",
                 DescriptionAr = "إدارة المصروفات",
-                IsDefault = false
+                IsDefault = false,
+                IsSensitive = true
             },
 
             // Inventory
@@ -339,7 +478,26 @@ public class PermissionService : IPermissionService
                 GroupAr = "المخزون",
                 Description = "View inventory",
                 DescriptionAr = "عرض المخزون",
+                IsDefault = true
+            },
+            new PermissionInfoDto
+            {
+                Key = Permission.InventoryManage.ToString(),
+                Group = "Inventory",
+                GroupAr = "المخزون",
+                Description = "Manage inventory (adjustments, stock taking)",
+                DescriptionAr = "إدارة المخزون (تعديل، جرد)",
                 IsDefault = false
+            },
+            new PermissionInfoDto
+            {
+                Key = Permission.InventoryTransfer.ToString(),
+                Group = "Inventory",
+                GroupAr = "المخزون",
+                Description = "Transfer inventory between branches",
+                DescriptionAr = "تحويل مخزون بين الفروع",
+                IsDefault = false,
+                IsSensitive = true
             },
 
             // Shifts
@@ -350,7 +508,8 @@ public class PermissionService : IPermissionService
                 GroupAr = "الورديات",
                 Description = "Manage all shifts",
                 DescriptionAr = "إدارة الورديات (كل الورديات)",
-                IsDefault = false
+                IsDefault = false,
+                IsSensitive = true
             },
 
             // Cash Register
@@ -370,7 +529,8 @@ public class PermissionService : IPermissionService
                 GroupAr = "الخزينة",
                 Description = "Manage cash register transactions",
                 DescriptionAr = "إدارة حركات الخزينة",
-                IsDefault = false
+                IsDefault = false,
+                IsSensitive = true
             },
 
             // Branches
@@ -381,7 +541,7 @@ public class PermissionService : IPermissionService
                 GroupAr = "الفروع",
                 Description = "View branches",
                 DescriptionAr = "عرض الفروع",
-                IsDefault = false
+                IsDefault = true
             },
 
             // Suppliers
@@ -402,6 +562,80 @@ public class PermissionService : IPermissionService
                 Description = "Add/Edit/Delete suppliers",
                 DescriptionAr = "إضافة/تعديل/حذف موردين",
                 IsDefault = false
+            },
+
+            // Purchase Invoices
+            new PermissionInfoDto
+            {
+                Key = Permission.PurchaseInvoicesView.ToString(),
+                Group = "Purchase Invoices",
+                GroupAr = "فواتير الشراء",
+                Description = "View purchase invoices",
+                DescriptionAr = "عرض فواتير الشراء",
+                IsDefault = false
+            },
+            new PermissionInfoDto
+            {
+                Key = Permission.PurchaseInvoicesManage.ToString(),
+                Group = "Purchase Invoices",
+                GroupAr = "فواتير الشراء",
+                Description = "Create/Edit/Delete purchase invoices",
+                DescriptionAr = "إنشاء/تعديل/حذف فواتير الشراء",
+                IsDefault = false
+            },
+
+            // Users
+            new PermissionInfoDto
+            {
+                Key = Permission.UsersView.ToString(),
+                Group = "Users",
+                GroupAr = "المستخدمين",
+                Description = "View users",
+                DescriptionAr = "عرض المستخدمين",
+                IsDefault = false
+            },
+            new PermissionInfoDto
+            {
+                Key = Permission.UsersManage.ToString(),
+                Group = "Users",
+                GroupAr = "المستخدمين",
+                Description = "Add/Edit/Delete users",
+                DescriptionAr = "إضافة/تعديل/حذف مستخدمين",
+                IsDefault = false,
+                IsSensitive = true
+            },
+
+            // Settings
+            new PermissionInfoDto
+            {
+                Key = Permission.SettingsManage.ToString(),
+                Group = "Settings",
+                GroupAr = "الإعدادات",
+                Description = "Manage system settings",
+                DescriptionAr = "إدارة إعدادات النظام",
+                IsDefault = false,
+                IsSensitive = true
+            },
+
+            // Delivery
+            new PermissionInfoDto
+            {
+                Key = Permission.DeliveryView.ToString(),
+                Group = "Delivery",
+                GroupAr = "التوصيل",
+                Description = "View delivery orders",
+                DescriptionAr = "عرض طلبات التوصيل",
+                IsDefault = false
+            },
+            new PermissionInfoDto
+            {
+                Key = Permission.DeliveryManage.ToString(),
+                Group = "Delivery",
+                GroupAr = "التوصيل",
+                Description = "Manage delivery persons and orders",
+                DescriptionAr = "إدارة المناديب وطلبات التوصيل",
+                IsDefault = false,
+                IsSensitive = true
             },
         };
     }

@@ -40,6 +40,35 @@ export const OrderDetailsModal = ({
   const isFullyRefunded = order.status === "Refunded";
   const isPartiallyRefunded = order.status === "PartiallyRefunded";
   const hasRefund = isFullyRefunded || isPartiallyRefunded;
+  const deliveryStatusBadge = (() => {
+    switch (order.deliveryStatus) {
+      case "Assigned":
+        return {
+          label: "تم التعيين",
+          className: "bg-sky-50 text-sky-700 border border-sky-200",
+        };
+      case "OutForDelivery":
+        return {
+          label: "في الطريق",
+          className: "bg-amber-50 text-amber-700 border border-amber-200",
+        };
+      case "Delivered":
+        return {
+          label: "تم التوصيل",
+          className: "bg-success-50 text-success-600 border border-success-200",
+        };
+      case "Cancelled":
+        return {
+          label: "ملغي",
+          className: "bg-danger-50 text-danger-500 border border-danger-200",
+        };
+      default:
+        return {
+          label: "—",
+          className: "bg-gray-100 text-gray-600 border border-gray-200",
+        };
+    }
+  })();
 
   const handlePrint = async () => {
     if (printMode === "browser") {
@@ -331,6 +360,67 @@ export const OrderDetailsModal = ({
                     </span>
                   </div>
                 )}
+              </div>
+            )}
+
+            {order.orderType === "Delivery" && (
+              <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+                <h3 className="mb-4 text-base font-semibold text-blue-900">
+                  بيانات التوصيل
+                </h3>
+                <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-gray-500">العنوان</span>
+                    <span className="text-end font-medium text-gray-800">
+                      {order.deliveryAddress || "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-gray-500">الرسوم</span>
+                    <span className="text-end font-medium text-gray-800">
+                      {formatCurrency(order.deliveryFee)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-gray-500">المندوب</span>
+                    <span className="text-end font-medium text-gray-800">
+                      {order.deliveryPersonName || "لم يُعين بعد"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-gray-500">الحالة</span>
+                    <span
+                      className={clsx(
+                        "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold",
+                        deliveryStatusBadge.className,
+                      )}
+                    >
+                      {deliveryStatusBadge.label}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-gray-500">ملاحظات</span>
+                    <span className="text-end font-medium text-gray-800">
+                      {order.deliveryNotes || "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-gray-500">وقت التعيين</span>
+                    <span className="text-end font-medium text-gray-800">
+                      {order.assignedAt
+                        ? formatDateTime(order.assignedAt)
+                        : "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-gray-500">وقت التسليم</span>
+                    <span className="text-end font-medium text-gray-800">
+                      {order.deliveredAt
+                        ? formatDateTime(order.deliveredAt)
+                        : "—"}
+                    </span>
+                  </div>
+                </div>
               </div>
             )}
 

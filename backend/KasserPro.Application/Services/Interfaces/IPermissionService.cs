@@ -29,7 +29,7 @@ public interface IPermissionService
     /// Update permissions for a specific user.
     /// Updates SecurityStamp to force re-login.
     /// </summary>
-    Task UpdateUserPermissionsAsync(int userId, List<Permission> permissions);
+    Task UpdateUserPermissionsAsync(int userId, List<Permission> permissions, int callerTenantId, int changedByUserId);
 
     /// <summary>
     /// Check if a user has a specific permission.

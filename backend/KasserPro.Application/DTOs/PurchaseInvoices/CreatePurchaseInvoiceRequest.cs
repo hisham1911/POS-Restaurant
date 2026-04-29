@@ -15,4 +15,9 @@ public class CreatePurchaseInvoiceItemRequest
     public decimal PurchasePrice { get; set; }
     public decimal SellingPrice { get; set; }
     public string? Notes { get; set; }
+
+    // Batch / Expiry tracking
+    public string? BatchNumber { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+    public DateTime? ProductionDate { get; set; }
 }

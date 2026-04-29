@@ -556,6 +556,53 @@ namespace KasserPro.Infrastructure.Migrations
                     b.ToTable("DebtPayments");
                 });
 
+            modelBuilder.Entity("KasserPro.Domain.Entities.DeliveryPerson", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("VehicleInfo")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("TenantId", "Phone")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "BranchId", "IsActive");
+
+                    b.ToTable("DeliveryPersons");
+                });
+
             modelBuilder.Entity("KasserPro.Domain.Entities.Expense", b =>
                 {
                     b.Property<int>("Id")
@@ -955,6 +1002,9 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("AssignedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("BranchAddress")
                         .HasColumnType("TEXT");
 
@@ -998,6 +1048,24 @@ namespace KasserPro.Infrastructure.Migrations
 
                     b.Property<string>("CustomerPhone")
                         .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("DeliveredAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeliveryAddress")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("DeliveryFee")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("DeliveryNotes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("DeliveryPersonId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("DeliveryStatus")
+                        .HasColumnType("INTEGER");
 
                     b.Property<decimal>("DiscountAmount")
                         .HasPrecision(18, 2)
@@ -1097,6 +1165,8 @@ namespace KasserPro.Infrastructure.Migrations
 
                     b.HasIndex("CustomerId");
 
+                    b.HasIndex("DeliveryPersonId");
+
                     b.HasIndex("OrderNumber")
                         .IsUnique();
 
@@ -1120,6 +1190,12 @@ namespace KasserPro.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("BatchId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BatchNumber")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
@@ -1142,6 +1218,9 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.Property<decimal?>("DiscountValue")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ExpiryDate")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsCustomItem")
@@ -1206,6 +1285,8 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
 
                     b.HasIndex("OrderId");
 
@@ -1354,6 +1435,86 @@ namespace KasserPro.Infrastructure.Migrations
                     b.ToTable("Products");
                 });
 
+            modelBuilder.Entity("KasserPro.Domain.Entities.ProductBatch", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BatchNumber")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("CostPrice")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("ExpiryDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("InitialQuantity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("ProductionDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("PurchaseDate")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("PurchaseInvoiceId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Quantity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("StatusUpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("SupplierName")
+                        .HasMaxLength(200)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("PurchaseInvoiceId");
+
+                    b.HasIndex("BranchId", "ProductId", "Status", "ExpiryDate");
+
+                    b.HasIndex("TenantId", "BranchId", "ProductId", "BatchNumber")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "BranchId", "ProductId", "ExpiryDate");
+
+                    b.ToTable("ProductBatches");
+                });
+
             modelBuilder.Entity("KasserPro.Domain.Entities.PurchaseInvoice", b =>
                 {
                     b.Property<int>("Id")
@@ -1484,7 +1645,16 @@ namespace KasserPro.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("BatchId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("BatchNumber")
+                        .HasColumnType("TEXT");
+
                     b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("ExpiryDate")
                         .HasColumnType("TEXT");
 
                     b.Property<bool>("IsDeleted")
@@ -1509,6 +1679,9 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<string>("ProductSku")
                         .HasColumnType("TEXT");
 
+                    b.Property<DateTime?>("ProductionDate")
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("PurchaseInvoiceId")
                         .HasColumnType("INTEGER");
 
@@ -1530,6 +1703,8 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
 
                     b.HasIndex("ProductId");
 
@@ -1800,6 +1975,9 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<int>("BalanceBefore")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("BatchId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<int>("BranchId")
                         .HasColumnType("INTEGER");
 
@@ -1840,6 +2018,8 @@ namespace KasserPro.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("BatchId");
+
                     b.HasIndex("BranchId");
 
                     b.HasIndex("TenantId");
@@ -1849,6 +2029,113 @@ namespace KasserPro.Infrastructure.Migrations
                     b.HasIndex("ProductId", "CreatedAt");
 
                     b.ToTable("StockMovements");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.StockTaking", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int?>("CompletedByUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("CreatedByUserId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("StockTakingNumber")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("CompletedByUserId");
+
+                    b.HasIndex("CreatedByUserId");
+
+                    b.HasIndex("StockTakingNumber")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId", "BranchId", "Status");
+
+                    b.ToTable("StockTakings");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.StockTakingItem", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ActualQuantity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("BatchId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(500)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("StockTakingId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SystemQuantity")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BatchId");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("StockTakingId", "ProductId", "BatchId")
+                        .IsUnique();
+
+                    b.ToTable("StockTakingItems");
                 });
 
             modelBuilder.Entity("KasserPro.Domain.Entities.Supplier", b =>
@@ -1978,6 +2265,9 @@ namespace KasserPro.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("AllowExpiredSales")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("AllowNegativeStock")
                         .HasColumnType("INTEGER");
 
@@ -2005,6 +2295,9 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("TEXT")
                         .HasDefaultValue("EGP");
+
+                    b.Property<int>("ExpiryAlertDays")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
@@ -2421,6 +2714,25 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("KasserPro.Domain.Entities.DeliveryPerson", b =>
+                {
+                    b.HasOne("KasserPro.Domain.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KasserPro.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("KasserPro.Domain.Entities.Expense", b =>
                 {
                     b.HasOne("KasserPro.Domain.Entities.User", "ApprovedByUser")
@@ -2584,6 +2896,11 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("KasserPro.Domain.Entities.DeliveryPerson", "DeliveryPerson")
+                        .WithMany("Orders")
+                        .HasForeignKey("DeliveryPersonId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("KasserPro.Domain.Entities.Order", "OriginalOrder")
                         .WithMany()
                         .HasForeignKey("OriginalOrderId")
@@ -2610,6 +2927,8 @@ namespace KasserPro.Infrastructure.Migrations
 
                     b.Navigation("Customer");
 
+                    b.Navigation("DeliveryPerson");
+
                     b.Navigation("OriginalOrder");
 
                     b.Navigation("Shift");
@@ -2621,6 +2940,11 @@ namespace KasserPro.Infrastructure.Migrations
 
             modelBuilder.Entity("KasserPro.Domain.Entities.OrderItem", b =>
                 {
+                    b.HasOne("KasserPro.Domain.Entities.ProductBatch", "Batch")
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("KasserPro.Domain.Entities.Order", "Order")
                         .WithMany("Items")
                         .HasForeignKey("OrderId")
@@ -2630,6 +2954,8 @@ namespace KasserPro.Infrastructure.Migrations
                     b.HasOne("KasserPro.Domain.Entities.Product", "Product")
                         .WithMany("OrderItems")
                         .HasForeignKey("ProductId");
+
+                    b.Navigation("Batch");
 
                     b.Navigation("Order");
 
@@ -2682,6 +3008,40 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Navigation("Tenant");
                 });
 
+            modelBuilder.Entity("KasserPro.Domain.Entities.ProductBatch", b =>
+                {
+                    b.HasOne("KasserPro.Domain.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KasserPro.Domain.Entities.Product", "Product")
+                        .WithMany("Batches")
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("KasserPro.Domain.Entities.PurchaseInvoice", "PurchaseInvoice")
+                        .WithMany()
+                        .HasForeignKey("PurchaseInvoiceId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("KasserPro.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("PurchaseInvoice");
+
+                    b.Navigation("Tenant");
+                });
+
             modelBuilder.Entity("KasserPro.Domain.Entities.PurchaseInvoice", b =>
                 {
                     b.HasOne("KasserPro.Domain.Entities.Branch", "Branch")
@@ -2726,6 +3086,11 @@ namespace KasserPro.Infrastructure.Migrations
 
             modelBuilder.Entity("KasserPro.Domain.Entities.PurchaseInvoiceItem", b =>
                 {
+                    b.HasOne("KasserPro.Domain.Entities.ProductBatch", "Batch")
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("KasserPro.Domain.Entities.Product", "Product")
                         .WithMany("PurchaseInvoiceItems")
                         .HasForeignKey("ProductId")
@@ -2737,6 +3102,8 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasForeignKey("PurchaseInvoiceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Batch");
 
                     b.Navigation("Product");
 
@@ -2859,6 +3226,11 @@ namespace KasserPro.Infrastructure.Migrations
 
             modelBuilder.Entity("KasserPro.Domain.Entities.StockMovement", b =>
                 {
+                    b.HasOne("KasserPro.Domain.Entities.ProductBatch", "Batch")
+                        .WithMany("StockMovements")
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("KasserPro.Domain.Entities.Branch", "Branch")
                         .WithMany()
                         .HasForeignKey("BranchId")
@@ -2883,6 +3255,8 @@ namespace KasserPro.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.Navigation("Batch");
+
                     b.Navigation("Branch");
 
                     b.Navigation("Product");
@@ -2890,6 +3264,66 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Navigation("Tenant");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.StockTaking", b =>
+                {
+                    b.HasOne("KasserPro.Domain.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KasserPro.Domain.Entities.User", "CompletedByUser")
+                        .WithMany()
+                        .HasForeignKey("CompletedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("KasserPro.Domain.Entities.User", "CreatedByUser")
+                        .WithMany()
+                        .HasForeignKey("CreatedByUserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KasserPro.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("CompletedByUser");
+
+                    b.Navigation("CreatedByUser");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.StockTakingItem", b =>
+                {
+                    b.HasOne("KasserPro.Domain.Entities.ProductBatch", "Batch")
+                        .WithMany()
+                        .HasForeignKey("BatchId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("KasserPro.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KasserPro.Domain.Entities.StockTaking", "StockTaking")
+                        .WithMany("Items")
+                        .HasForeignKey("StockTakingId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Batch");
+
+                    b.Navigation("Product");
+
+                    b.Navigation("StockTaking");
                 });
 
             modelBuilder.Entity("KasserPro.Domain.Entities.Supplier", b =>
@@ -2987,6 +3421,11 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Navigation("Orders");
                 });
 
+            modelBuilder.Entity("KasserPro.Domain.Entities.DeliveryPerson", b =>
+                {
+                    b.Navigation("Orders");
+                });
+
             modelBuilder.Entity("KasserPro.Domain.Entities.Expense", b =>
                 {
                     b.Navigation("Attachments");
@@ -3008,6 +3447,8 @@ namespace KasserPro.Infrastructure.Migrations
 
             modelBuilder.Entity("KasserPro.Domain.Entities.Product", b =>
                 {
+                    b.Navigation("Batches");
+
                     b.Navigation("BranchInventories");
 
                     b.Navigation("BranchPrices");
@@ -3021,6 +3462,11 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Navigation("StockMovements");
 
                     b.Navigation("SupplierProducts");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.ProductBatch", b =>
+                {
+                    b.Navigation("StockMovements");
                 });
 
             modelBuilder.Entity("KasserPro.Domain.Entities.PurchaseInvoice", b =>
@@ -3037,6 +3483,11 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Navigation("Expenses");
 
                     b.Navigation("Orders");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.StockTaking", b =>
+                {
+                    b.Navigation("Items");
                 });
 
             modelBuilder.Entity("KasserPro.Domain.Entities.Supplier", b =>

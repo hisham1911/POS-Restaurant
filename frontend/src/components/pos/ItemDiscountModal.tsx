@@ -12,6 +12,7 @@ import {
   selectTaxRate,
 } from "@/store/slices/cartSlice";
 import { useAppSelector } from "@/store/hooks";
+import { usePermission } from "@/hooks/usePermission";
 import {
   getCartItemSubtotal,
   getProductNetUnitPrice,
@@ -32,6 +33,8 @@ export const ItemDiscountModal = ({
 }: ItemDiscountModalProps) => {
   const taxRate = useAppSelector(selectTaxRate);
   const isTaxEnabled = useAppSelector(selectIsTaxEnabled);
+  const { hasPermission } = usePermission();
+  const canManageDiscounts = hasPermission("PosApplyDiscount");
   const unitPrice = getProductNetUnitPrice(item.product, taxRate, isTaxEnabled);
   const itemTotal = getCartItemSubtotal(item, taxRate, isTaxEnabled);
   const currentDiscount = item.discount;
@@ -88,6 +91,11 @@ export const ItemDiscountModal = ({
       return;
     }
 
+    if (!canManageDiscounts) {
+      toast.error("ليس لديك صلاحية تطبيق أو تعديل الخصومات");
+      return;
+    }
+
     onApply({
       type: discountType,
       value: numericValue,
@@ -98,6 +106,11 @@ export const ItemDiscountModal = ({
   };
 
   const handleRemove = () => {
+    if (!canManageDiscounts) {
+      toast.error("ليس لديك صلاحية تطبيق أو تعديل الخصومات");
+      return;
+    }
+
     onRemove();
     toast.success(`تم إلغاء الخصم عن ${item.product.name}`);
     onClose();

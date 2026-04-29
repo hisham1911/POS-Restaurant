@@ -78,6 +78,15 @@ public class Order : BaseEntity
     public int? ShiftId { get; set; }
     public int? CompletedByUserId { get; set; }
 
+    // Delivery fields (for OrderType = Delivery)
+    public int? DeliveryPersonId { get; set; }
+    public string? DeliveryAddress { get; set; }
+    public decimal DeliveryFee { get; set; } = 0;
+    public DeliveryStatus? DeliveryStatus { get; set; }
+    public string? DeliveryNotes { get; set; }
+    public DateTime? AssignedAt { get; set; }
+    public DateTime? DeliveredAt { get; set; }
+
     // Navigation
     public Tenant Tenant { get; set; } = null!;
     public Branch Branch { get; set; } = null!;
@@ -88,4 +97,5 @@ public class Order : BaseEntity
     public RefundLog? RefundLog { get; set; }
     public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();
     public ICollection<Payment> Payments { get; set; } = new List<Payment>();
+    public DeliveryPerson? DeliveryPerson { get; set; }
 }

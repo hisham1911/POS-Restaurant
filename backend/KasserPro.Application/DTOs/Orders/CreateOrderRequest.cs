@@ -14,6 +14,11 @@ public class CreateOrderRequest
     // Order-level discount
     public string? DiscountType { get; set; } // "Percentage" or "Fixed"
     public decimal? DiscountValue { get; set; }
+
+    // Delivery fields (for OrderType = Delivery)
+    public string? DeliveryAddress { get; set; }
+    public decimal DeliveryFee { get; set; } = 0;
+    public string? DeliveryNotes { get; set; }
 }
 
 public class CreateOrderItemRequest

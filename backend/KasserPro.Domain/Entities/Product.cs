@@ -74,4 +74,5 @@ public class Product : BaseEntity
     public ICollection<BranchInventory> BranchInventories { get; set; } = new List<BranchInventory>();
     public ICollection<BranchProductPrice> BranchPrices { get; set; } = new List<BranchProductPrice>();
     public ICollection<InventoryTransfer> InventoryTransfers { get; set; } = new List<InventoryTransfer>();
+    public ICollection<ProductBatch> Batches { get; set; } = new List<ProductBatch>();
 }

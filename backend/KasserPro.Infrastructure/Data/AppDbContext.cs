@@ -50,8 +50,18 @@ public class AppDbContext : DbContext
     public DbSet<BranchProductPrice> BranchProductPrices => Set<BranchProductPrice>();
     public DbSet<InventoryTransfer> InventoryTransfers => Set<InventoryTransfer>();
 
+    // Batch/Expiry tracking (FEFO)
+    public DbSet<ProductBatch> ProductBatches => Set<ProductBatch>();
+
     // User Permissions
     public DbSet<UserPermission> UserPermissions => Set<UserPermission>();
+
+    // Delivery
+    public DbSet<DeliveryPerson> DeliveryPersons => Set<DeliveryPerson>();
+
+    // Stock Taking (Inventory Count)
+    public DbSet<StockTaking> StockTakings => Set<StockTaking>();
+    public DbSet<StockTakingItem> StockTakingItems => Set<StockTakingItem>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -95,8 +105,18 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<BranchProductPrice>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<InventoryTransfer>().HasQueryFilter(e => !e.IsDeleted);
 
+        // Batch/Expiry: Soft delete filter
+        modelBuilder.Entity<ProductBatch>().HasQueryFilter(e => !e.IsDeleted);
+
         // User Permissions: Soft delete filter
         modelBuilder.Entity<UserPermission>().HasQueryFilter(e => !e.IsDeleted);
+
+        // Delivery: Soft delete filter
+        modelBuilder.Entity<DeliveryPerson>().HasQueryFilter(e => !e.IsDeleted);
+
+        // Stock Taking: Soft delete filters
+        modelBuilder.Entity<StockTaking>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<StockTakingItem>().HasQueryFilter(e => !e.IsDeleted);
 
         // Tenant relationships
         modelBuilder.Entity<Branch>()
@@ -149,6 +169,35 @@ public class AppDbContext : DbContext
             .HasForeignKey(o => o.OriginalOrderId)
             .IsRequired(false)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // Order -> DeliveryPerson relationship
+        modelBuilder.Entity<Order>()
+            .HasOne(o => o.DeliveryPerson)
+            .WithMany(dp => dp.Orders)
+            .HasForeignKey(o => o.DeliveryPersonId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // DeliveryPerson relationships
+        modelBuilder.Entity<DeliveryPerson>()
+            .HasOne(dp => dp.Tenant)
+            .WithMany()
+            .HasForeignKey(dp => dp.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<DeliveryPerson>()
+            .HasOne(dp => dp.Branch)
+            .WithMany()
+            .HasForeignKey(dp => dp.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // DeliveryPerson indexes
+        modelBuilder.Entity<DeliveryPerson>()
+            .HasIndex(dp => new { dp.TenantId, dp.BranchId, dp.IsActive });
+
+        modelBuilder.Entity<DeliveryPerson>()
+            .HasIndex(dp => new { dp.TenantId, dp.Phone })
+            .IsUnique();
 
         // Shift configuration is in ShiftConfiguration.cs
 
@@ -393,6 +442,34 @@ public class AppDbContext : DbContext
         });
 
         // ═══════════════════════════════════════════════════════════════════════
+        // BATCH / EXPIRY: ProductBatch relationships
+        // ═══════════════════════════════════════════════════════════════════════
+        modelBuilder.Entity<ProductBatch>()
+            .HasOne(pb => pb.Tenant)
+            .WithMany()
+            .HasForeignKey(pb => pb.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ProductBatch>()
+            .HasOne(pb => pb.Branch)
+            .WithMany()
+            .HasForeignKey(pb => pb.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ProductBatch>()
+            .HasOne(pb => pb.Product)
+            .WithMany(p => p.Batches)
+            .HasForeignKey(pb => pb.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ProductBatch>()
+            .HasOne(pb => pb.PurchaseInvoice)
+            .WithMany()
+            .HasForeignKey(pb => pb.PurchaseInvoiceId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        // ═══════════════════════════════════════════════════════════════════════
         // PRODUCTION: Performance-critical indexes
         // ═══════════════════════════════════════════════════════════════════════
 
@@ -416,6 +493,33 @@ public class AppDbContext : DbContext
             .HasIndex(c => new { c.ShiftId, c.Type, c.CreatedAt })
             .HasFilter("IsDeleted = 0");
 
+        // ProductBatch indexes (FEFO performance)
+        modelBuilder.Entity<ProductBatch>()
+            .HasIndex(pb => new { pb.TenantId, pb.BranchId, pb.ProductId, pb.ExpiryDate });
+
+        modelBuilder.Entity<ProductBatch>()
+            .HasIndex(pb => new { pb.BranchId, pb.ProductId, pb.Status, pb.ExpiryDate });
+
+        modelBuilder.Entity<ProductBatch>()
+            .HasIndex(pb => new { pb.TenantId, pb.BranchId, pb.ProductId, pb.BatchNumber })
+            .IsUnique();
+
+        // StockMovement → Batch FK
+        modelBuilder.Entity<StockMovement>()
+            .HasOne(sm => sm.Batch)
+            .WithMany(pb => pb.StockMovements)
+            .HasForeignKey(sm => sm.BatchId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // OrderItem → Batch FK
+        modelBuilder.Entity<OrderItem>()
+            .HasOne(oi => oi.Batch)
+            .WithMany()
+            .HasForeignKey(oi => oi.BatchId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
         // Inventory by Branch (critical for multi-branch queries)
         modelBuilder.Entity<BranchInventory>()
             .HasIndex(bi => new { bi.BranchId, bi.ProductId })
@@ -431,6 +535,64 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Expense>()
             .HasIndex(e => new { e.CategoryId, e.Status, e.ExpenseDate })
             .HasFilter("IsDeleted = 0");
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // STOCK TAKING: Relationships and indexes
+        // ═══════════════════════════════════════════════════════════════════════
+        modelBuilder.Entity<StockTaking>()
+            .HasOne(st => st.Tenant)
+            .WithMany()
+            .HasForeignKey(st => st.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<StockTaking>()
+            .HasOne(st => st.Branch)
+            .WithMany()
+            .HasForeignKey(st => st.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<StockTaking>()
+            .HasOne(st => st.CreatedByUser)
+            .WithMany()
+            .HasForeignKey(st => st.CreatedByUserId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<StockTaking>()
+            .HasOne(st => st.CompletedByUser)
+            .WithMany()
+            .HasForeignKey(st => st.CompletedByUserId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<StockTaking>()
+            .HasMany(st => st.Items)
+            .WithOne(sti => sti.StockTaking)
+            .HasForeignKey(sti => sti.StockTakingId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<StockTaking>()
+            .HasIndex(st => new { st.TenantId, st.BranchId, st.Status });
+
+        modelBuilder.Entity<StockTaking>()
+            .HasIndex(st => st.StockTakingNumber)
+            .IsUnique();
+
+        modelBuilder.Entity<StockTakingItem>()
+            .HasOne(sti => sti.Product)
+            .WithMany()
+            .HasForeignKey(sti => sti.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<StockTakingItem>()
+            .HasOne(sti => sti.Batch)
+            .WithMany()
+            .HasForeignKey(sti => sti.BatchId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<StockTakingItem>()
+            .HasIndex(sti => new { sti.StockTakingId, sti.ProductId, sti.BatchId })
+            .IsUnique();
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

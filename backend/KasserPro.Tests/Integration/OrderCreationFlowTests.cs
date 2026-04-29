@@ -189,7 +189,8 @@ public class OrderCreationFlowTests : IClassFixture<CustomWebApplicationFactory>
             branchId: branch1Id,
             email: "cashier@test.com",
             name: "Test Cashier",
-            role: "Cashier"
+            role: "Cashier",
+            permissions: new[] { "OrdersView", "OrdersCreate", "PosApplyDiscount" }
         );
 
         var client = _factory.CreateClient();
@@ -259,6 +260,51 @@ public class OrderCreationFlowTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
+    public async Task CreateOrder_WithDiscountWithoutPosApplyDiscountPermission_ShouldFail()
+    {
+        var (testUserId, testProductId, branch1Id, _) = await SeedTestDataAsync();
+
+        const int tenantId = 1;
+        var token = TestHelpers.GenerateTestToken(
+            userId: testUserId,
+            tenantId: tenantId,
+            branchId: branch1Id,
+            email: "cashier@test.com",
+            name: "Test Cashier",
+            role: "Cashier",
+            permissions: new[] { "OrdersView", "OrdersCreate" }
+        );
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var createOrderRequest = new CreateOrderRequest
+        {
+            OrderType = OrderType.DineIn,
+            DiscountType = "Percentage",
+            DiscountValue = 10m,
+            Items = new List<CreateOrderItemRequest>
+            {
+                new() { ProductId = testProductId, Quantity = 1 }
+            }
+        };
+
+        var response = await client.PostAsJsonAsync("/api/orders", createOrderRequest);
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var content = await response.Content.ReadAsStringAsync();
+        var apiResponse = JsonSerializer.Deserialize<ApiResponse<OrderDto>>(content, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        apiResponse.Should().NotBeNull();
+        apiResponse!.Success.Should().BeFalse();
+        apiResponse.ErrorCode.Should().Be("INSUFFICIENT_PRIVILEGES");
+    }
+
+    [Fact]
     public async Task CreateOrder_WithItemAndOrderDiscounts_ShouldPersistBackendTotalThatMatchesPosFormula()
     {
         var (testUserId, testProductId, branch1Id, _) = await SeedTestDataAsync();
@@ -270,7 +316,8 @@ public class OrderCreationFlowTests : IClassFixture<CustomWebApplicationFactory>
             branchId: branch1Id,
             email: "cashier@test.com",
             name: "Test Cashier",
-            role: "Cashier"
+            role: "Cashier",
+            permissions: new[] { "OrdersView", "OrdersCreate", "PosApplyDiscount" }
         );
 
         var client = _factory.CreateClient();

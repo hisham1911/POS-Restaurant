@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Card, Loading, ConfirmDialog } from "../../../components/common";
-import { Plus, Edit, Trash2, Power, PowerOff } from "lucide-react";
+import { Plus, Edit, Trash2, Power, PowerOff, Shield } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import {
   useGetAllUsersQuery,
   useDeleteUserMutation,
@@ -11,6 +12,7 @@ import UserFormModal from "./UserFormModal";
 import type { UserDto } from "../../../types/user.types";
 
 export default function UserManagementCard() {
+  const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<UserDto | null>(null);
   const [deletingUser, setDeletingUser] = useState<UserDto | null>(null);
@@ -148,6 +150,15 @@ export default function UserManagementCard() {
                       >
                         <Edit className="w-4 h-4" />
                       </button>
+                      {user.role !== "Admin" && user.role !== "SystemOwner" && (
+                        <button
+                          onClick={() => navigate(`/users/${user.id}/permissions`)}
+                          className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                          title="الصلاحيات"
+                        >
+                          <Shield className="w-4 h-4" />
+                        </button>
+                      )}
                       <button
                         onClick={() => handleToggleStatus(user.id, user.isActive)}
                         className={`p-2 rounded-lg transition ${

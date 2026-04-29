@@ -48,6 +48,11 @@ public class PurchaseInvoiceItemDto
     public decimal SellingPrice { get; set; }
     public decimal Total { get; set; }
     public string? Notes { get; set; }
+
+    // Batch / Expiry tracking
+    public string? BatchNumber { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+    public DateTime? ProductionDate { get; set; }
 }
 
 public class PurchaseInvoicePaymentDto

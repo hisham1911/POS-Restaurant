@@ -34,6 +34,13 @@ public class Tenant : BaseEntity
     /// </summary>
     public bool AllowNegativeStock { get; set; } = false;
 
+    // Expiry & Batch Settings
+    /// <summary>Days before expiry to start showing alerts</summary>
+    public int ExpiryAlertDays { get; set; } = 30;
+
+    /// <summary>Whether to allow selling expired batches</summary>
+    public bool AllowExpiredSales { get; set; } = false;
+
     // Receipt Settings - إعدادات تنسيق الفاتورة
     /// <summary>مقاس الورق: "80mm" أو "58mm" أو "custom"</summary>
     public string ReceiptPaperSize { get; set; } = "80mm";

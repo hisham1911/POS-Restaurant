@@ -19,6 +19,7 @@ export const DiscountModal = ({ onClose }: DiscountModalProps) => {
     removeDiscount,
     discountType: currentDiscountType,
     discountValue: currentDiscountValue,
+    canManageDiscounts,
   } = useCart();
 
   const [discountType, setDiscountType] = useState<DiscountType>(
@@ -73,12 +74,22 @@ export const DiscountModal = ({ onClose }: DiscountModalProps) => {
       return;
     }
 
+    if (!canManageDiscounts) {
+      toast.error("ليس لديك صلاحية تطبيق أو تعديل الخصومات");
+      return;
+    }
+
     applyDiscount(discountType, numericValue);
     toast.success("تم تطبيق الخصم بنجاح");
     onClose();
   };
 
   const handleRemove = () => {
+    if (!canManageDiscounts) {
+      toast.error("ليس لديك صلاحية تطبيق أو تعديل الخصومات");
+      return;
+    }
+
     removeDiscount();
     toast.success("تم إلغاء الخصم");
     onClose();

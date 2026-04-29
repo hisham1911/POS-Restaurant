@@ -165,6 +165,9 @@ builder.Services.AddScoped<IInventoryReportService, InventoryReportService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<IPurchaseInvoiceService, PurchaseInvoiceService>();
+builder.Services.AddScoped<IProductBatchService, ProductBatchService>();
+builder.Services.AddScoped<IDeliveryService, DeliveryService>();
+builder.Services.AddScoped<IStockTakingService, StockTakingService>();
 
 // Report Services
 builder.Services.AddScoped<IFinancialReportService, FinancialReportService>();

@@ -22,6 +22,30 @@ public class HasPermissionAttribute : TypeFilterAttribute
 public class HasPermissionFilter : IAsyncAuthorizationFilter
 {
     private readonly Permission _permission;
+    private static readonly Dictionary<Permission, Permission[]> PermissionImplications = new()
+    {
+        [Permission.OrdersCreate] = new[] { Permission.OrdersView },
+        [Permission.ProductsManage] = new[] { Permission.ProductsView },
+        [Permission.CategoriesManage] = new[] { Permission.CategoriesView },
+        [Permission.ExpensesCreate] = new[] { Permission.ExpensesView },
+        [Permission.ExpensesManage] = new[] { Permission.ExpensesView },
+        [Permission.InventoryManage] = new[] { Permission.InventoryView },
+        [Permission.InventoryTransfer] = new[] { Permission.InventoryView },
+        [Permission.CashRegisterManage] = new[] { Permission.CashRegisterView },
+        [Permission.SuppliersManage] = new[] { Permission.SuppliersView },
+        [Permission.PurchaseInvoicesManage] = new[] { Permission.PurchaseInvoicesView },
+        [Permission.UsersManage] = new[] { Permission.UsersView },
+        [Permission.DeliveryManage] = new[] { Permission.DeliveryView },
+        [Permission.PosSell] = new[]
+        {
+            Permission.OrdersView,
+            Permission.OrdersCreate,
+            Permission.ProductsView,
+            Permission.CategoriesView,
+            Permission.InventoryView,
+            Permission.BranchesView,
+        },
+    };
 
     public HasPermissionFilter(Permission permission)
     {
@@ -49,12 +73,41 @@ public class HasPermissionFilter : IAsyncAuthorizationFilter
             .Select(c => c.Value)
             .ToList();
 
-        if (!permissions.Contains(_permission.ToString()))
+        if (!HasEffectivePermission(permissions, _permission))
         {
             context.Result = new ForbidResult();
             return;
         }
 
         await Task.CompletedTask;
+    }
+
+    private static bool HasEffectivePermission(IEnumerable<string> permissionClaims, Permission requiredPermission)
+    {
+        var permissions = permissionClaims
+            .Select(claim => Enum.TryParse<Permission>(claim, out var permission) ? permission : (Permission?)null)
+            .Where(permission => permission.HasValue)
+            .Select(permission => permission!.Value)
+            .ToHashSet();
+
+        var changed = true;
+        while (changed)
+        {
+            changed = false;
+
+            foreach (var permission in permissions.ToList())
+            {
+                if (!PermissionImplications.TryGetValue(permission, out var impliedPermissions))
+                    continue;
+
+                foreach (var impliedPermission in impliedPermissions)
+                {
+                    if (permissions.Add(impliedPermission))
+                        changed = true;
+                }
+            }
+        }
+
+        return permissions.Contains(requiredPermission);
     }
 }

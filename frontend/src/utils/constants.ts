@@ -53,8 +53,18 @@ export const ERROR_MESSAGES: Record<string, string> = {
   ORDER_CANNOT_MODIFY: "لا يمكن تعديل هذا الطلب في حالته الحالية",
   ORDER_INVALID_QUANTITY: "الكمية غير صالحة",
 
+  // Delivery
+  DELIVERY_PERSON_INACTIVE: "المندوب غير نشط",
+  DELIVERY_ORDER_TYPE_INVALID: "هذا الطلب ليس طلب توصيل",
+  DELIVERY_NO_PERSON_ASSIGNED:
+    "يجب تعيين مندوب قبل تحديث الحالة إلى في الطريق",
+  DELIVERY_INVALID_STATUS_TRANSITION:
+    "لا يمكن تحديث الحالة - تسلسل الحالات غير صحيح",
+  DELIVERY_STATUS_FINAL: "لا يمكن تعديل طلب منتهٍ أو ملغي",
+
   // Payment
   PAYMENT_INSUFFICIENT: "المبلغ المدفوع غير كافٍ",
+  PAYMENT_CREDIT_NOT_ALLOWED: "ليس لديك صلاحية البيع الآجل. يرجى سداد المبلغ بالكامل.",
   PAYMENT_INVALID_METHOD: "طريقة الدفع غير صالحة",
   PAYMENT_REFERENCE_REQUIRED: "رقم المعاملة مطلوب لطرق الدفع غير النقدية",
   PAYMENT_INVALID_AMOUNT: "مبلغ الدفع غير صالح",

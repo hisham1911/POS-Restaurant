@@ -53,10 +53,10 @@ public class InventoryController : ControllerBase
     }
 
     /// <summary>
-    /// Manually adjust inventory (Admin only)
+    /// Manually adjust inventory
     /// </summary>
     [HttpPost("adjust")]
-    [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.InventoryManage)]
     public async Task<IActionResult> AdjustInventory([FromBody] AdjustInventoryRequest request)
     {
         var result = await _inventoryService.AdjustInventoryAsync(request);
@@ -64,10 +64,10 @@ public class InventoryController : ControllerBase
     }
 
     /// <summary>
-    /// Create inventory transfer request (Admin only)
+    /// Create inventory transfer request
     /// </summary>
     [HttpPost("transfer")]
-    [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.InventoryTransfer)]
     public async Task<IActionResult> CreateTransfer([FromBody] CreateTransferRequest request)
     {
         var result = await _inventoryService.CreateTransferAsync(request);
@@ -102,10 +102,10 @@ public class InventoryController : ControllerBase
     }
 
     /// <summary>
-    /// Approve transfer (Admin only) - deducts from source
+    /// Approve transfer - deducts from source
     /// </summary>
     [HttpPost("transfer/{id}/approve")]
-    [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.InventoryTransfer)]
     public async Task<IActionResult> ApproveTransfer(int id)
     {
         var result = await _inventoryService.ApproveTransferAsync(id);
@@ -113,10 +113,10 @@ public class InventoryController : ControllerBase
     }
 
     /// <summary>
-    /// Receive transfer (Admin only) - adds to destination
+    /// Receive transfer - adds to destination
     /// </summary>
     [HttpPost("transfer/{id}/receive")]
-    [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.InventoryTransfer)]
     public async Task<IActionResult> ReceiveTransfer(int id)
     {
         var result = await _inventoryService.ReceiveTransferAsync(id);
@@ -124,10 +124,10 @@ public class InventoryController : ControllerBase
     }
 
     /// <summary>
-    /// Cancel transfer (Admin only)
+    /// Cancel transfer
     /// </summary>
     [HttpPost("transfer/{id}/cancel")]
-    [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.InventoryTransfer)]
     public async Task<IActionResult> CancelTransfer(int id, [FromBody] CancelTransferRequest request)
     {
         var result = await _inventoryService.CancelTransferAsync(id, request);
@@ -146,10 +146,10 @@ public class InventoryController : ControllerBase
     }
 
     /// <summary>
-    /// Set branch-specific price (Admin only)
+    /// Set branch-specific price
     /// </summary>
     [HttpPost("branch-prices")]
-    [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.InventoryManage)]
     public async Task<IActionResult> SetBranchPrice([FromBody] SetBranchPriceRequest request)
     {
         var result = await _inventoryService.SetBranchPriceAsync(request);
@@ -157,10 +157,10 @@ public class InventoryController : ControllerBase
     }
 
     /// <summary>
-    /// Remove branch-specific price (Admin only)
+    /// Remove branch-specific price
     /// </summary>
     [HttpDelete("branch-prices/{branchId}/{productId}")]
-    [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.InventoryManage)]
     public async Task<IActionResult> RemoveBranchPrice(int branchId, int productId)
     {
         var result = await _inventoryService.RemoveBranchPriceAsync(branchId, productId);

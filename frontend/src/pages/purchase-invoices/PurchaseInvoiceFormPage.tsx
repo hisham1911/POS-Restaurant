@@ -46,6 +46,9 @@ export function PurchaseInvoiceFormPage() {
   const [purchasePrice, setPurchasePrice] = useState<string>("");
   const [sellingPrice, setSellingPrice] = useState<string>("");
   const [itemNotes, setItemNotes] = useState<string>("");
+  const [batchNumber, setBatchNumber] = useState<string>("");
+  const [expiryDate, setExpiryDate] = useState<string>("");
+  const [productionDate, setProductionDate] = useState<string>("");
   const [showQuickAddProduct, setShowQuickAddProduct] = useState(false);
   const [preview, setPreview] = useState<PurchaseInvoicePreview | null>(null);
 
@@ -82,6 +85,9 @@ export function PurchaseInvoiceFormPage() {
           purchasePrice: item.purchasePrice,
           sellingPrice: item.sellingPrice,
           notes: item.notes,
+          batchNumber: item.batchNumber,
+          expiryDate: item.expiryDate,
+          productionDate: item.productionDate,
         })),
       );
     }
@@ -102,6 +108,9 @@ export function PurchaseInvoiceFormPage() {
         purchasePrice: item.purchasePrice,
         sellingPrice: item.sellingPrice,
         notes: item.notes,
+        batchNumber: item.batchNumber,
+        expiryDate: item.expiryDate,
+        productionDate: item.productionDate,
       })),
       notes,
     };
@@ -143,6 +152,9 @@ export function PurchaseInvoiceFormPage() {
       purchasePrice: numPurchasePrice,
       sellingPrice: numSellingPrice,
       notes: itemNotes,
+      batchNumber: batchNumber || undefined,
+      expiryDate: expiryDate ? new Date(expiryDate).toISOString() : undefined,
+      productionDate: productionDate ? new Date(productionDate).toISOString() : undefined,
     };
 
     setItems([...items, newItem]);
@@ -151,6 +163,9 @@ export function PurchaseInvoiceFormPage() {
     setPurchasePrice("");
     setSellingPrice("");
     setItemNotes("");
+    setBatchNumber("");
+    setExpiryDate("");
+    setProductionDate("");
   };
 
   const handleProductCreated = (productId: number) => {
@@ -208,6 +223,9 @@ export function PurchaseInvoiceFormPage() {
         purchasePrice: item.purchasePrice,
         sellingPrice: item.sellingPrice,
         notes: item.notes,
+        batchNumber: item.batchNumber,
+        expiryDate: item.expiryDate,
+        productionDate: item.productionDate,
       })),
       notes,
     };
@@ -396,7 +414,7 @@ export function PurchaseInvoiceFormPage() {
             </div>
           </div>
 
-          <div className="mt-2">
+          <div className="mt-2 grid grid-cols-1 md:grid-cols-3 gap-3">
             <input
               type="text"
               value={itemNotes}
@@ -404,6 +422,29 @@ export function PurchaseInvoiceFormPage() {
               className="w-full px-3 py-2 border rounded-lg"
               placeholder="ملاحظات المنتج (اختياري)"
             />
+            <input
+              type="text"
+              value={batchNumber}
+              onChange={(e) => setBatchNumber(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg"
+              placeholder="رقم الباتش (اختياري)"
+            />
+            <div className="flex gap-3">
+              <input
+                type="date"
+                value={expiryDate}
+                onChange={(e) => setExpiryDate(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg"
+                placeholder="تاريخ الانتهاء"
+              />
+              <input
+                type="date"
+                value={productionDate}
+                onChange={(e) => setProductionDate(e.target.value)}
+                className="w-full px-3 py-2 border rounded-lg"
+                placeholder="تاريخ الانتاج"
+              />
+            </div>
           </div>
         </Card>
 
@@ -429,6 +470,9 @@ export function PurchaseInvoiceFormPage() {
                     سعر البيع
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    الباتش / الانتهاء
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                     الإجمالي
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
@@ -443,7 +487,7 @@ export function PurchaseInvoiceFormPage() {
                 {items.length === 0 ? (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="px-4 py-8 text-center text-gray-500"
                     >
                       لم يتم إضافة منتجات بعد
@@ -459,6 +503,14 @@ export function PurchaseInvoiceFormPage() {
                       </td>
                       <td className="px-4 py-3 text-sm font-medium text-green-600">
                         {formatCurrency(item.sellingPrice)}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-500">
+                        {item.batchNumber || "-"}
+                        {item.expiryDate && (
+                          <span className="block text-xs text-red-500">
+                            ينتهي: {new Date(item.expiryDate).toLocaleDateString("ar-EG")}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-sm font-medium">
                         {formatCurrency(item.quantity * item.purchasePrice)}

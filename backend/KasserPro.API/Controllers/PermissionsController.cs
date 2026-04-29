@@ -15,7 +15,7 @@ using KasserPro.Application.Common;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Admin,SystemOwner")]
 public class PermissionsController : ControllerBase
 {
     private readonly IPermissionService _permissionService;
@@ -71,7 +71,7 @@ public class PermissionsController : ControllerBase
     }
 
     /// <summary>
-    /// Get permissions for a specific user
+    /// Get permissions for a specific user (legacy format)
     /// </summary>
     /// <param name="userId">User ID</param>
     /// <returns>User permissions DTO</returns>
@@ -92,6 +92,44 @@ public class PermissionsController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting permissions for user {UserId}", userId);
+            return StatusCode(500, ApiResponse<UserPermissionsDto>.Fail(ErrorCodes.INTERNAL_ERROR, "Error retrieving user permissions"));
+        }
+    }
+
+    /// <summary>
+    /// Get rich permissions DTO for a specific user (includes defaults and customization status)
+    /// </summary>
+    /// <param name="userId">User ID</param>
+    /// <returns>User permissions DTO with defaults</returns>
+    [HttpGet("user/{userId}/dto")]
+    public async Task<IActionResult> GetUserPermissionsDto(int userId)
+    {
+        try
+        {
+            var callerTenantId = _currentUserService.TenantId;
+            var userPermissions = await _permissionService.GetUserPermissionsDtoAsync(userId);
+            
+            if (userPermissions == null)
+            {
+                return NotFound(ApiResponse<UserPermissionsDto>.Fail(ErrorCodes.USER_NOT_FOUND, $"User {userId} not found"));
+            }
+
+            // Tenant isolation check
+            if (userPermissions.TenantId != callerTenantId)
+            {
+                _logger.LogWarning(
+                    "Cross-tenant access attempt: User {UserId} tried to access permissions for user {TargetUserId} in tenant {TargetTenantId}",
+                    _currentUserService.UserId,
+                    userId,
+                    userPermissions.TenantId);
+                return Forbid();
+            }
+
+            return Ok(ApiResponse<UserPermissionsDto>.Ok(userPermissions));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting permissions DTO for user {UserId}", userId);
             return StatusCode(500, ApiResponse<UserPermissionsDto>.Fail(ErrorCodes.INTERNAL_ERROR, "Error retrieving user permissions"));
         }
     }
@@ -123,14 +161,25 @@ public class PermissionsController : ControllerBase
                 }
             }
 
-            await _permissionService.UpdateUserPermissionsAsync(userId, permissions);
+            var callerTenantId = _currentUserService.TenantId;
+            await _permissionService.UpdateUserPermissionsAsync(userId, permissions, callerTenantId, _currentUserService.UserId);
 
             _logger.LogInformation(
                 "Admin {AdminId} updated permissions for user {UserId}",
                 _currentUserService.UserId,
                 userId);
 
-            return Ok(ApiResponse<object>.Ok(null, "تم تحديث الصلاحيات بنجاح"));
+            return Ok(ApiResponse<object>.Ok(null, "تم تحديث الصلاحيات بنجاح — سيطبق التغيير بعد إعادة تسجيل دخول المستخدم"));
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("Cannot update permissions for Admin or SystemOwner"))
+        {
+            _logger.LogWarning(ex, "Attempted to update permissions for protected user {UserId}", userId);
+            return BadRequest(ApiResponse<object>.Fail("CANNOT_MODIFY_ADMIN_PERMISSIONS", "لا يمكن تعديل صلاحيات مستخدم إداري"));
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("not found"))
+        {
+            _logger.LogWarning(ex, "User not found when updating permissions {UserId}", userId);
+            return NotFound(ApiResponse<object>.Fail(ErrorCodes.USER_NOT_FOUND, "المستخدم غير موجود"));
         }
         catch (InvalidOperationException ex)
         {

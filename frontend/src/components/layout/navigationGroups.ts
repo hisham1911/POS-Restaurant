@@ -61,7 +61,14 @@ export const moduleSections: ModuleSectionConfig[] = [
     id: "sales",
     title: "البيع والتشغيل",
     icon: ShoppingCart,
-    paths: ["/pos", "/orders", "/shift", "/shifts-management"],
+    paths: [
+      "/pos",
+      "/orders",
+      "/delivery/operations",
+      "/delivery-persons",
+      "/shift",
+      "/shifts-management",
+    ],
     tone: "primary",
   },
   {

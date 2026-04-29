@@ -9,6 +9,10 @@ public enum Permission
     // Point of Sale
     PosSell            = 100,
     PosApplyDiscount   = 101,
+    PosCreditSale      = 102,
+    PosEditPrice       = 103,
+    PosDeleteItem      = 104,
+    PosCancelOrder     = 105,
 
     // Orders
     OrdersView         = 200,
@@ -38,6 +42,8 @@ public enum Permission
 
     // Inventory
     InventoryView      = 800,
+    InventoryManage    = 801,
+    InventoryTransfer  = 802,
 
     // Shifts
     ShiftsManage       = 900,
@@ -52,4 +58,19 @@ public enum Permission
     // Suppliers
     SuppliersView      = 1200,
     SuppliersManage    = 1201,
+
+    // Purchase Invoices
+    PurchaseInvoicesView   = 1300,
+    PurchaseInvoicesManage = 1301,
+
+    // Users
+    UsersView      = 1400,
+    UsersManage    = 1401,
+
+    // Settings
+    SettingsManage = 1500,
+
+    // Delivery
+    DeliveryView   = 1600,
+    DeliveryManage = 1601,
 }

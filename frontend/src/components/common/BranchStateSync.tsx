@@ -8,6 +8,7 @@ import {
   selectIsAuthenticated,
 } from "@/store/slices/authSlice";
 import { getBranchStorageKey, readSavedBranchId } from "@/utils/branchStorage";
+import { usePermission } from "@/hooks/usePermission";
 
 const BRANCH_SENSITIVE_TAGS = [
   "Products",
@@ -30,9 +31,13 @@ export const BranchStateSync = () => {
   const isAuthenticated = useAppSelector(selectIsAuthenticated);
   const currentUser = useAppSelector(selectCurrentUser);
   const currentBranch = useAppSelector(selectCurrentBranch);
+  const { hasPermission } = usePermission();
   const previousBranchIdRef = useRef<number | null>(null);
   const branchStorageKey = getBranchStorageKey(currentUser?.id);
-  const canReadBranches = isAuthenticated && currentUser?.role === "Admin";
+  const canReadBranches =
+    isAuthenticated &&
+    currentUser?.role !== "SystemOwner" &&
+    hasPermission("BranchesView");
 
   const { data: branchesData } = useGetBranchesQuery(undefined, {
     skip: !canReadBranches,

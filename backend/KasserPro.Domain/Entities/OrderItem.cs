@@ -66,6 +66,11 @@ public class OrderItem : BaseEntity
 
     public string? Notes { get; set; }
 
+    // Batch tracking (FEFO)
+    public int? BatchId { get; set; }
+    public string? BatchNumber { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+
     public int OrderId { get; set; }
     public Order Order { get; set; } = null!;
 
@@ -73,4 +78,9 @@ public class OrderItem : BaseEntity
     /// Navigation to Product - nullable for custom items
     /// </summary>
     public Product? Product { get; set; }
+
+    /// <summary>
+    /// Navigation to Batch - nullable for custom items
+    /// </summary>
+    public ProductBatch? Batch { get; set; }
 }

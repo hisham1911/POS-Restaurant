@@ -62,6 +62,16 @@ public class OrderDto
     /// </summary>
     public int? OriginalOrderId { get; set; }
 
+    // Delivery fields
+    public int? DeliveryPersonId { get; set; }
+    public string? DeliveryPersonName { get; set; }
+    public string? DeliveryAddress { get; set; }
+    public decimal DeliveryFee { get; set; }
+    public string? DeliveryStatus { get; set; }
+    public string? DeliveryNotes { get; set; }
+    public DateTime? AssignedAt { get; set; }
+    public DateTime? DeliveredAt { get; set; }
+
     public List<OrderItemDto> Items { get; set; } = new();
     public List<PaymentDto> Payments { get; set; } = new();
 }

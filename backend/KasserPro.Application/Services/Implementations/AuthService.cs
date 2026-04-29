@@ -77,6 +77,7 @@ public class AuthService : IAuthService
                 Name = user.Name,
                 Email = user.Email,
                 Role = user.Role.ToString(),
+                BranchId = user.BranchId,
                 Permissions = permissionStrings
             }
         });
@@ -134,7 +135,7 @@ public class AuthService : IAuthService
         if (user.Role == UserRole.Cashier)
         {
             var defaultPermissions = _permissionService.GetDefaultCashierPermissions();
-            await _permissionService.UpdateUserPermissionsAsync(user.Id, defaultPermissions);
+            await _permissionService.UpdateUserPermissionsAsync(user.Id, defaultPermissions, _currentUserService.TenantId, _currentUserService.UserId);
         }
 
         return ApiResponse<bool>.Ok(true, "تم إنشاء الحساب بنجاح");
@@ -157,6 +158,7 @@ public class AuthService : IAuthService
             Name = user.Name,
             Email = user.Email,
             Role = user.Role.ToString(),
+            BranchId = user.BranchId,
             Permissions = permissionStrings
         });
     }

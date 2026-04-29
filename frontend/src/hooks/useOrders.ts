@@ -6,7 +6,7 @@ import {
   useCancelOrderMutation,
 } from "../api/ordersApi";
 import { useCart } from "./useCart";
-import { CompleteOrderRequest, Order } from "../types/order.types";
+import { CompleteOrderRequest, Order, OrderType } from "../types/order.types";
 import { toast } from "sonner";
 import { useAppSelector } from "../store/hooks";
 import { selectCurrentBranch } from "../store/slices/branchSlice";
@@ -38,7 +38,13 @@ export const useOrders = () => {
   const orders = ordersData?.data?.items || [];
   const todayOrders = todayOrdersData?.data || [];
 
-  const createOrder = async (customerId?: number): Promise<Order | null> => {
+  const createOrder = async (
+    customerId?: number,
+    orderType?: OrderType,
+    deliveryAddress?: string,
+    deliveryFee?: number,
+    deliveryNotes?: string,
+  ): Promise<Order | null> => {
     if (items.length === 0) {
       toast.error("السلة فارغة");
       return null;
@@ -69,6 +75,10 @@ export const useOrders = () => {
         customerId,
         discountType,
         discountValue,
+        orderType,
+        deliveryAddress,
+        deliveryFee,
+        deliveryNotes,
       }).unwrap();
 
       return extractApiData(

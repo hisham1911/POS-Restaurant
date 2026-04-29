@@ -280,20 +280,20 @@ public class InventoryService : IInventoryService
     }
 
     // Legacy compatibility methods for OrderService
-    public async Task BatchDecrementStockAsync(List<(int ProductId, int Quantity)> items, int orderId)
+    public async Task BatchDecrementStockAsync(List<(int OrderItemId, int ProductId, int Quantity)> items, int orderId)
     {
         var branchId = _currentUserService.BranchId;
+        var tenantId = _currentUserService.TenantId;
+        var tenant = await _context.Tenants.FindAsync(tenantId);
+        var allowExpired = tenant?.AllowExpiredSales ?? false;
 
-        foreach (var (productId, quantity) in items)
+        foreach (var (orderItemId, productId, quantity) in items)
         {
-            // GUARD: Check if product tracks inventory
             var product = await _context.Products.FindAsync(productId);
             if (product == null || !product.TrackInventory)
             {
-                _logger.LogInformation(
-                    "Skipping stock decrement for Product={ProductId} (not found or TrackInventory=false)",
-                    productId);
-                continue; // Skip inventory operations for service products
+                _logger.LogInformation("Skipping stock decrement for Product={ProductId}", productId);
+                continue;
             }
 
             var inventory = await _context.BranchInventories
@@ -302,25 +302,53 @@ public class InventoryService : IInventoryService
             if (inventory != null)
             {
                 var balanceBefore = inventory.Quantity;
-
-                // P0-3: Log warning if stock would go negative.
-                // The real enforcement is in CompleteAsync's re-validation.
-                // This is a defense-in-depth safety net.
                 if (balanceBefore < quantity)
                 {
                     _logger.LogWarning(
-                        "Stock would go negative: Product={ProductId}, Branch={BranchId}, " +
-                        "Available={Available}, Requested={Requested}",
-                        productId, branchId, balanceBefore, quantity);
+                        "Stock would go negative: Product={ProductId}, Available={Available}, Requested={Requested}",
+                        productId, balanceBefore, quantity);
                 }
 
                 inventory.Quantity -= quantity;
                 inventory.LastUpdatedAt = DateTime.UtcNow;
 
+                // FEFO: Deduct from batches with nearest expiry first
+                var remaining = quantity;
+                var batchQuery = _context.ProductBatches
+                    .Where(pb => pb.TenantId == tenantId && pb.BranchId == branchId
+                                 && pb.ProductId == productId && !pb.IsDeleted
+                                 && pb.Status != BatchStatus.Depleted && pb.Quantity > 0)
+                    .OrderBy(pb => pb.ExpiryDate);
+
+                if (!allowExpired)
+                    batchQuery = batchQuery.Where(pb => pb.ExpiryDate >= DateTime.UtcNow.Date)
+                                           .OrderBy(pb => pb.ExpiryDate);
+
+                var batches = await batchQuery.ToListAsync();
+                ProductBatch? primaryBatch = null;
+
+                foreach (var batch in batches)
+                {
+                    if (remaining <= 0) break;
+                    var deduct = Math.Min(batch.Quantity, remaining);
+                    batch.Quantity -= deduct;
+                    remaining -= deduct;
+
+                    if (batch.Quantity <= 0)
+                        batch.Status = BatchStatus.Depleted;
+                    else if (batch.ExpiryDate.Date < DateTime.UtcNow.Date && batch.Status == BatchStatus.Active)
+                        batch.Status = BatchStatus.Expired;
+
+                    _context.ProductBatches.Update(batch);
+
+                    if (primaryBatch == null)
+                        primaryBatch = batch;
+                }
+
                 // Record stock movement
                 var movement = new StockMovement
                 {
-                    TenantId = _currentUserService.TenantId,
+                    TenantId = tenantId,
                     BranchId = branchId,
                     ProductId = productId,
                     Type = StockMovementType.Sale,
@@ -329,10 +357,24 @@ public class InventoryService : IInventoryService
                     ReferenceId = orderId,
                     BalanceBefore = balanceBefore,
                     BalanceAfter = inventory.Quantity,
-                    Reason = "بيع منتج",
+                    BatchId = primaryBatch?.Id,
+                    Reason = primaryBatch != null ? $"بيع من باتش {primaryBatch.BatchNumber}" : "بيع منتج",
                     UserId = _currentUserService.UserId
                 };
                 _context.StockMovements.Add(movement);
+
+                // Update OrderItem with batch info
+                if (primaryBatch != null && orderItemId > 0)
+                {
+                    var orderItem = await _context.OrderItems.FindAsync(orderItemId);
+                    if (orderItem != null)
+                    {
+                        orderItem.BatchId = primaryBatch.Id;
+                        orderItem.BatchNumber = primaryBatch.BatchNumber;
+                        orderItem.ExpiryDate = primaryBatch.ExpiryDate;
+                        _context.OrderItems.Update(orderItem);
+                    }
+                }
             }
         }
 

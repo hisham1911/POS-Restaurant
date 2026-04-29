@@ -152,6 +152,28 @@ export const navigationItems: NavigationItem[] = [
     permission: "OrdersView",
   },
   {
+    path: "/delivery/operations",
+    label: "إدارة التوصيل",
+    description:
+      "شاشة تشغيل يومية لمتابعة طلبات التوصيل وتعيين المناديب وتحريك الحالات حتى التسليم.",
+    spotlight: "تشغيل التوصيل",
+    icon: Truck,
+    sectionId: "operations",
+    audience: "non-system-owner",
+    permission: "DeliveryView",
+  },
+  {
+    path: "/delivery-persons",
+    label: "المناديب",
+    description:
+      "إدارة مناديب التوصيل وتتبع حالة طلبات التوصيل.",
+    spotlight: "التوصيل",
+    icon: Truck,
+    sectionId: "operations",
+    audience: "non-system-owner",
+    permission: "DeliveryView",
+  },
+  {
     path: "/shift",
     label: "الوردية",
     description:
@@ -215,7 +237,7 @@ export const navigationItems: NavigationItem[] = [
     icon: Truck,
     sectionId: "catalog",
     audience: "non-system-owner",
-    adminOnly: true,
+    permission: "SuppliersView",
   },
   {
     path: "/purchase-invoices",
@@ -226,7 +248,7 @@ export const navigationItems: NavigationItem[] = [
     icon: FileText,
     sectionId: "catalog",
     audience: "non-system-owner",
-    adminOnly: true,
+    permission: "PurchaseInvoicesView",
   },
   {
     path: "/inventory",
@@ -238,6 +260,17 @@ export const navigationItems: NavigationItem[] = [
     sectionId: "catalog",
     audience: "non-system-owner",
     permission: "InventoryView",
+  },
+  {
+    path: "/stock-taking",
+    label: "الجرد",
+    description:
+      "إنشاء وإدارة جلسات الجرد الفعلي ومطابقة الكميات مع النظام.",
+    spotlight: "الجرد",
+    icon: ClipboardList,
+    sectionId: "catalog",
+    audience: "non-system-owner",
+    permission: "InventoryManage",
   },
   {
     path: "/expenses",
@@ -294,7 +327,7 @@ export const navigationItems: NavigationItem[] = [
     icon: Shield,
     sectionId: "admin",
     audience: "non-system-owner",
-    adminOnly: true,
+    permission: "UsersManage",
   },
   {
     path: "/audit",
@@ -327,7 +360,7 @@ export const navigationItems: NavigationItem[] = [
     icon: Settings,
     sectionId: "admin",
     audience: "non-system-owner",
-    adminOnly: true,
+    permission: "SettingsManage",
   },
   {
     path: "/owner/tenants",

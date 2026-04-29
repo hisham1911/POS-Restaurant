@@ -55,9 +55,17 @@ public static class ErrorCodes
     public const string ORDER_CANNOT_MODIFY = "ORDER_CANNOT_MODIFY";
     public const string ORDER_INVALID_QUANTITY = "ORDER_INVALID_QUANTITY";
 
+    // Delivery Errors (1690-1699)
+    public const string DELIVERY_PERSON_INACTIVE = "DELIVERY_PERSON_INACTIVE";
+    public const string DELIVERY_ORDER_TYPE_INVALID = "DELIVERY_ORDER_TYPE_INVALID";
+    public const string DELIVERY_NO_PERSON_ASSIGNED = "DELIVERY_NO_PERSON_ASSIGNED";
+    public const string DELIVERY_INVALID_STATUS_TRANSITION = "DELIVERY_INVALID_STATUS_TRANSITION";
+    public const string DELIVERY_STATUS_FINAL = "DELIVERY_STATUS_FINAL";
+
     // Payment Errors (1700-1799)
     public const string PAYMENT_NOT_FOUND = "PAYMENT_NOT_FOUND";
     public const string PAYMENT_INSUFFICIENT = "PAYMENT_INSUFFICIENT";
+    public const string PAYMENT_CREDIT_NOT_ALLOWED = "PAYMENT_CREDIT_NOT_ALLOWED";
     public const string PAYMENT_INVALID_METHOD = "PAYMENT_INVALID_METHOD";
     public const string PAYMENT_REFERENCE_REQUIRED = "PAYMENT_REFERENCE_REQUIRED";
     public const string PAYMENT_OVERPAYMENT_LIMIT = "PAYMENT_OVERPAYMENT_LIMIT";
@@ -218,9 +226,17 @@ public static class ErrorMessages
         { ErrorCodes.ORDER_CANNOT_MODIFY, "لا يمكن تعديل الطلب" },
         { ErrorCodes.ORDER_INVALID_QUANTITY, "الكمية يجب أن تكون أكبر من صفر" },
 
+        // Delivery
+        { ErrorCodes.DELIVERY_PERSON_INACTIVE, "لا يمكن تعيين مندوب غير نشط" },
+        { ErrorCodes.DELIVERY_ORDER_TYPE_INVALID, "هذا الطلب ليس طلب توصيل" },
+        { ErrorCodes.DELIVERY_NO_PERSON_ASSIGNED, "يجب تعيين مندوب قبل تحديث الحالة إلى في الطريق" },
+        { ErrorCodes.DELIVERY_INVALID_STATUS_TRANSITION, "لا يمكن تحديث الحالة — تسلسل الحالات غير صحيح" },
+        { ErrorCodes.DELIVERY_STATUS_FINAL, "لا يمكن تعديل طلب منتهٍ أو ملغي" },
+
         // Payment
         { ErrorCodes.PAYMENT_NOT_FOUND, "الدفعة غير موجودة" },
         { ErrorCodes.PAYMENT_INSUFFICIENT, "المبلغ المدفوع غير كافي" },
+        { ErrorCodes.PAYMENT_CREDIT_NOT_ALLOWED, "ليس لديك صلاحية البيع الآجل. يرجى سداد المبلغ بالكامل." },
         { ErrorCodes.PAYMENT_INVALID_METHOD, "طريقة الدفع غير صالحة" },
         { ErrorCodes.PAYMENT_REFERENCE_REQUIRED, "رقم المعاملة مطلوب لطرق الدفع غير النقدية" },
         { ErrorCodes.PAYMENT_OVERPAYMENT_LIMIT, "المبلغ المدفوع يتجاوز الحد المسموح" },

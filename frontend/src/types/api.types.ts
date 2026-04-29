@@ -6,6 +6,19 @@ export interface ApiResponse<T> {
   errors?: string[];
 }
 
+export interface PagedResult<T> {
+  items: T[];
+  totalCount: number;
+  totalAmount?: number;
+  totalSpentAmount?: number;
+  totalDueAmount?: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
+}
+
 export interface PaginatedResponse<T> {
   data: T[];
   meta: {

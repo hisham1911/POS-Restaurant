@@ -37,12 +37,13 @@ public class OrdersController : ControllerBase
     [HasPermission(Permission.OrdersView)]
     public async Task<IActionResult> GetAllOrders(
         [FromQuery] string? status = null,
+        [FromQuery] string? orderType = null,
         [FromQuery] DateTime? fromDate = null,
         [FromQuery] DateTime? toDate = null,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
-        var result = await _orderService.GetAllAsync(status, fromDate, toDate, page, pageSize);
+        var result = await _orderService.GetAllAsync(status, orderType, fromDate, toDate, page, pageSize);
         return Ok(result);
     }
 
@@ -102,7 +103,7 @@ public class OrdersController : ControllerBase
     }
 
     [HttpDelete("{id}/items/{itemId}")]
-    [HasPermission(Permission.OrdersCreate)]
+    [HasPermission(Permission.PosDeleteItem)]
     public async Task<IActionResult> RemoveItem(int id, int itemId)
     {
         var result = await _orderService.RemoveItemAsync(id, itemId);
@@ -246,7 +247,7 @@ public class OrdersController : ControllerBase
     }
 
     [HttpPost("{id}/cancel")]
-    [HasPermission(Permission.OrdersCreate)]
+    [HasPermission(Permission.PosCancelOrder)]
     public async Task<IActionResult> Cancel(int id, [FromBody] CancelOrderRequest? request)
     {
         var result = await _orderService.CancelAsync(id, request?.Reason);
@@ -258,7 +259,6 @@ public class OrdersController : ControllerBase
     /// Restores stock and updates order status.
     /// </summary>
     [HttpPost("{id}/refund")]
-    [Authorize(Roles = "Admin,Manager")]
     [HasPermission(Permission.OrdersRefund)]
     public async Task<IActionResult> Refund(int id, [FromBody] RefundRequest request)
     {

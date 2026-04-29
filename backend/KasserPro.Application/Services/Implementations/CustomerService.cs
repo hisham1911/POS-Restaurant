@@ -99,12 +99,31 @@ public class CustomerService : ICustomerService
         var tenantId = _currentUser.TenantId;
         var normalizedPhone = NormalizePhone(request.Phone);
 
-        // Check for duplicate phone
+        // Check for duplicate phone (including soft-deleted to avoid DB UNIQUE constraint failure)
         var existingCustomer = await _unitOfWork.Customers.Query()
+            .IgnoreQueryFilters()
             .FirstOrDefaultAsync(c => c.Phone == normalizedPhone && c.TenantId == tenantId);
 
         if (existingCustomer != null)
+        {
+            if (existingCustomer.IsDeleted)
+            {
+                // Restore soft-deleted customer and overwrite personal info
+                existingCustomer.IsDeleted = false;
+                existingCustomer.IsActive = true;
+                existingCustomer.Name = request.Name;
+                existingCustomer.Email = request.Email;
+                existingCustomer.Address = request.Address;
+                existingCustomer.Notes = request.Notes;
+                existingCustomer.UpdatedAt = DateTime.UtcNow;
+
+                _unitOfWork.Customers.Update(existingCustomer);
+                await _unitOfWork.SaveChangesAsync();
+                return MapToDto(existingCustomer);
+            }
+
             throw new InvalidOperationException($"Customer with phone {request.Phone} already exists");
+        }
 
         var customer = new Customer
         {

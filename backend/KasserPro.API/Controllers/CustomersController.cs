@@ -124,6 +124,11 @@ public class CustomersController : ControllerBase
             var message = wasCreated ? "تم إنشاء عميل جديد بنجاح" : "تم العثور على العميل الحالي";
             return Ok(ApiResponse<GetOrCreateCustomerResult>.Ok(payload, message));
         }
+        catch (InvalidOperationException ex)
+        {
+            _logger.LogWarning(ex, "GetOrCreate customer conflict for phone {Phone}", request.Phone);
+            return Conflict(ApiResponse<object>.Fail(ErrorCodes.CONFLICT, ex.Message));
+        }
         catch (ArgumentException ex)
         {
             _logger.LogWarning(ex, "GetOrCreate customer validation failed for phone {Phone}", request.Phone);

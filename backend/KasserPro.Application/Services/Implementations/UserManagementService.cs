@@ -151,7 +151,7 @@ public class UserManagementService : IUserManagementService
             if (user.Role == UserRole.Cashier)
             {
                 var defaultPermissions = _permissionService.GetDefaultCashierPermissions();
-                await _permissionService.UpdateUserPermissionsAsync(user.Id, defaultPermissions);
+                await _permissionService.UpdateUserPermissionsAsync(user.Id, defaultPermissions, _currentUserService.TenantId, _currentUserService.UserId);
             }
 
             _logger.LogInformation("User {UserId} created by {AdminId}", user.Id, _currentUserService.UserId);

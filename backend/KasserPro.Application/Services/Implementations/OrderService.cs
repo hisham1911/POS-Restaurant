@@ -17,6 +17,7 @@ public class OrderService : IOrderService
     private readonly IInventoryService _inventoryService;
     private readonly ICustomerService _customerService;
     private readonly ICashRegisterService _cashRegisterService;
+    private readonly IPermissionService _permissionService;
 
     // Valid state transitions
     private static readonly Dictionary<OrderStatus, OrderStatus[]> ValidTransitions = new()
@@ -29,13 +30,14 @@ public class OrderService : IOrderService
         { OrderStatus.Refunded, Array.Empty<OrderStatus>() }
     };
 
-    public OrderService(IUnitOfWork unitOfWork, ICurrentUserService currentUser, IInventoryService inventoryService, ICustomerService customerService, ICashRegisterService cashRegisterService)
+    public OrderService(IUnitOfWork unitOfWork, ICurrentUserService currentUser, IInventoryService inventoryService, ICustomerService customerService, ICashRegisterService cashRegisterService, IPermissionService permissionService)
     {
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
         _inventoryService = inventoryService;
         _customerService = customerService;
         _cashRegisterService = cashRegisterService;
+        _permissionService = permissionService;
     }
 
     public async Task<ApiResponse<OrderDto>> CreateAsync(CreateOrderRequest request, int userId)
@@ -52,7 +54,7 @@ public class OrderService : IOrderService
         if (tenant == null)
             return ApiResponse<OrderDto>.Fail(ErrorCodes.TENANT_NOT_FOUND, "الشركة غير موجودة");
 
-        // Get Branch for snapshot and default tax rate
+        // Get Branch for snapshot
         var branch = await _unitOfWork.Branches.GetByIdAsync(branchId);
         if (branch == null)
             return ApiResponse<OrderDto>.Fail(ErrorCodes.BRANCH_NOT_FOUND, ErrorMessages.Get(ErrorCodes.BRANCH_NOT_FOUND));
@@ -61,6 +63,13 @@ public class OrderService : IOrderService
         var user = await _unitOfWork.Users.GetByIdAsync(userId);
         if (user == null)
             return ApiResponse<OrderDto>.Fail(ErrorCodes.USER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.USER_NOT_FOUND));
+
+        if (RequestContainsAnyDiscount(request))
+        {
+            var canApplyDiscount = await _permissionService.HasPermissionAsync(userId, Permission.PosApplyDiscount);
+            if (!canApplyDiscount)
+                return ApiResponse<OrderDto>.Fail(ErrorCodes.INSUFFICIENT_PRIVILEGES, ErrorMessages.Get(ErrorCodes.INSUFFICIENT_PRIVILEGES));
+        }
 
         // SHIFT LINKING (optional): attach an open shift if available for this branch and user.
         var currentShift = await _unitOfWork.Shifts.Query()
@@ -102,6 +111,11 @@ public class OrderService : IOrderService
             Notes = request.Notes,
             Status = OrderStatus.Draft,
             OrderType = request.OrderType,
+            // Delivery fields
+            DeliveryAddress = request.DeliveryAddress,
+            DeliveryFee = request.DeliveryFee,
+            DeliveryNotes = request.DeliveryNotes,
+            DeliveryStatus = request.OrderType == OrderType.Delivery ? DeliveryStatus.PendingAssignment : null,
             // Branch Snapshot (on Order entity)
             BranchName = branch.Name,
             BranchAddress = branch.Address,
@@ -204,6 +218,7 @@ public class OrderService : IOrderService
         var order = await _unitOfWork.Orders.Query()
             .Include(o => o.Items)
             .Include(o => o.Payments)
+            .Include(o => o.DeliveryPerson)
             .FirstOrDefaultAsync(o => o.Id == id
                 && o.TenantId == _currentUser.TenantId
                 && o.BranchId == _currentUser.BranchId);
@@ -223,6 +238,7 @@ public class OrderService : IOrderService
         var orders = await _unitOfWork.Orders.Query()
             .Include(o => o.Items)
             .Include(o => o.Payments)
+            .Include(o => o.DeliveryPerson)
             .Where(o => o.TenantId == tenantId && o.BranchId == branchId && o.CreatedAt.Date == today)
             .OrderByDescending(o => o.CreatedAt)
             .ToListAsync();
@@ -230,7 +246,7 @@ public class OrderService : IOrderService
         return ApiResponse<List<OrderDto>>.Ok(orders.Select(MapToDto).ToList());
     }
 
-    public async Task<ApiResponse<PagedResult<OrderDto>>> GetAllAsync(string? status = null, DateTime? fromDate = null, DateTime? toDate = null, int page = 1, int pageSize = 20)
+    public async Task<ApiResponse<PagedResult<OrderDto>>> GetAllAsync(string? status = null, string? orderType = null, DateTime? fromDate = null, DateTime? toDate = null, int page = 1, int pageSize = 20)
     {
         var tenantId = _currentUser.TenantId;
         var branchId = _currentUser.BranchId;
@@ -238,6 +254,7 @@ public class OrderService : IOrderService
         var query = _unitOfWork.Orders.Query()
             .Include(o => o.Items)
             .Include(o => o.Payments)
+            .Include(o => o.DeliveryPerson)
             .Where(o => o.TenantId == tenantId && o.BranchId == branchId);
 
         // Apply status filter
@@ -247,6 +264,12 @@ public class OrderService : IOrderService
             {
                 query = query.Where(o => o.Status == orderStatus);
             }
+        }
+
+        if (!string.IsNullOrWhiteSpace(orderType)
+            && Enum.TryParse<OrderType>(orderType, true, out var parsedOrderType))
+        {
+            query = query.Where(o => o.OrderType == parsedOrderType);
         }
 
         // Apply date range filter
@@ -290,6 +313,7 @@ public class OrderService : IOrderService
         var query = _unitOfWork.Orders.Query()
             .Include(o => o.Items)
             .Include(o => o.Payments)
+            .Include(o => o.DeliveryPerson)
             .Where(o => o.TenantId == tenantId
                 && o.BranchId == branchId
                 && o.CustomerId == customerId);
@@ -329,6 +353,13 @@ public class OrderService : IOrderService
 
         if (order.Status != OrderStatus.Draft)
             return ApiResponse<OrderDto>.Fail(ErrorCodes.ORDER_CANNOT_MODIFY, ErrorMessages.Get(ErrorCodes.ORDER_CANNOT_MODIFY));
+
+        if (RequestContainsDiscount(request.DiscountType, request.DiscountValue))
+        {
+            var canApplyDiscount = await _permissionService.HasPermissionAsync(_currentUser.UserId, Permission.PosApplyDiscount);
+            if (!canApplyDiscount)
+                return ApiResponse<OrderDto>.Fail(ErrorCodes.INSUFFICIENT_PRIVILEGES, ErrorMessages.Get(ErrorCodes.INSUFFICIENT_PRIVILEGES));
+        }
 
         var product = await _unitOfWork.Products.GetByIdAsync(request.ProductId);
         if (product == null)
@@ -389,7 +420,7 @@ public class OrderService : IOrderService
             DiscountType = NormalizeDiscountType(request.DiscountType),
             DiscountValue = request.DiscountValue,
             DiscountReason = request.DiscountReason,
-            // Tax Snapshot - Dynamic from Product or Tenant
+            // Tax Snapshot
             TaxRate = taxRate,
             TaxInclusive = product.TaxInclusive,
             Notes = request.Notes
@@ -421,6 +452,7 @@ public class OrderService : IOrderService
 
         var order = await _unitOfWork.Orders.Query()
             .Include(o => o.Items)
+            .Include(o => o.DeliveryPerson)
             .FirstOrDefaultAsync(o => o.Id == orderId);
 
         if (order == null)
@@ -485,6 +517,7 @@ public class OrderService : IOrderService
     {
         var order = await _unitOfWork.Orders.Query()
             .Include(o => o.Items)
+            .Include(o => o.DeliveryPerson)
             .FirstOrDefaultAsync(o => o.Id == orderId
                 && o.TenantId == _currentUser.TenantId
                 && o.BranchId == _currentUser.BranchId);
@@ -538,6 +571,7 @@ public class OrderService : IOrderService
             var order = await _unitOfWork.Orders.Query()
                 .Include(o => o.Items)
                 .Include(o => o.Payments)
+                .Include(o => o.DeliveryPerson)
                 .FirstOrDefaultAsync(o => o.Id == orderId && o.TenantId == _currentUser.TenantId);
 
             if (order == null)
@@ -551,9 +585,16 @@ public class OrderService : IOrderService
             // Validate payment amount
             decimal totalPaymentAmount = request.Payments.Sum(p => p.Amount);
 
-            // Allow partial payment ONLY if customer is linked
+            // Allow partial payment ONLY if customer is linked AND user has credit sale permission
             if (totalPaymentAmount < order.Total)
             {
+                var hasCreditPermission = await _permissionService.HasPermissionAsync(_currentUser.UserId, Permission.PosCreditSale);
+                if (!hasCreditPermission)
+                {
+                    return ApiResponse<OrderDto>.Fail(ErrorCodes.PAYMENT_CREDIT_NOT_ALLOWED,
+                        ErrorMessages.Get(ErrorCodes.PAYMENT_CREDIT_NOT_ALLOWED));
+                }
+
                 if (!order.CustomerId.HasValue)
                 {
                     return ApiResponse<OrderDto>.Fail(ErrorCodes.PAYMENT_INSUFFICIENT,
@@ -667,7 +708,7 @@ public class OrderService : IOrderService
                          && !i.IsCustomItem
                          && products.ContainsKey(i.ProductId.Value)
                          && products[i.ProductId.Value].TrackInventory)
-                .Select(i => (i.ProductId!.Value, i.Quantity))
+                .Select(i => (i.Id, i.ProductId!.Value, i.Quantity))
                 .ToList();
 
             if (stockItems.Any())
@@ -750,21 +791,33 @@ public class OrderService : IOrderService
         if (!validationResult.Success)
             return ApiResponse<bool>.Fail(ErrorCodes.ORDER_INVALID_STATE_TRANSITION, validationResult.Message!);
 
-        order.Status = OrderStatus.Cancelled;
-        order.CancelledAt = DateTime.UtcNow;
-        order.CancellationReason = reason;
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
 
-        // ✅ FIX: Reduce customer's TotalDue if order had unpaid amount
-        if (order.CustomerId.HasValue && order.AmountDue > 0)
+        try
         {
-            await _customerService.ReduceCreditBalanceAsync(
-                order.CustomerId.Value,
-                order.AmountDue
-            );
-        }
+            order.Status = OrderStatus.Cancelled;
+            order.CancelledAt = DateTime.UtcNow;
+            order.CancellationReason = reason;
 
-        await _unitOfWork.SaveChangesAsync();
-        return ApiResponse<bool>.Ok(true, "تم إلغاء الطلب");
+            // ✅ FIX: Reduce customer's TotalDue if order had unpaid amount
+            if (order.CustomerId.HasValue && order.AmountDue > 0)
+            {
+                await _customerService.ReduceCreditBalanceAsync(
+                    order.CustomerId.Value,
+                    order.AmountDue
+                );
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return ApiResponse<bool>.Ok(true, "تم إلغاء الطلب");
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            return ApiResponse<bool>.Fail(ErrorCodes.SYSTEM_INTERNAL_ERROR,
+                $"حدث خطأ أثناء إلغاء الطلب: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -1333,8 +1386,8 @@ public class OrderService : IOrderService
         // Service charge on net amount after discount
         order.ServiceChargeAmount = Math.Round(afterDiscount * (order.ServiceChargePercent / 100m), 2);
 
-        // Total = (Subtotal - Discount) + Tax + Service Charge
-        order.Total = Math.Round(afterDiscount + order.TaxAmount + order.ServiceChargeAmount, 2);
+        // Total = (Subtotal - Discount) + Tax + Service Charge + Delivery Fee
+        order.Total = Math.Round(afterDiscount + order.TaxAmount + order.ServiceChargeAmount + order.DeliveryFee, 2);
         order.AmountDue = Math.Round(order.Total - order.AmountPaid, 2);
     }
 
@@ -1351,6 +1404,17 @@ public class OrderService : IOrderService
             _ => normalized
         };
     }
+
+    private static bool RequestContainsAnyDiscount(CreateOrderRequest request)
+    {
+        if (RequestContainsDiscount(request.DiscountType, request.DiscountValue))
+            return true;
+
+        return request.Items.Any(item => RequestContainsDiscount(item.DiscountType, item.DiscountValue));
+    }
+
+    private static bool RequestContainsDiscount(string? discountType, decimal? discountValue)
+        => !string.IsNullOrWhiteSpace(discountType) || discountValue.HasValue;
 
     private static decimal ResolveNetUnitPrice(decimal configuredPrice, bool taxInclusive, decimal taxRate)
     {
@@ -1415,6 +1479,15 @@ public class OrderService : IOrderService
         RefundedByUserId = order.RefundedByUserId,
         RefundedByUserName = order.RefundedByUserName,
         OriginalOrderId = order.OriginalOrderId,
+        // Delivery fields
+        DeliveryPersonId = order.DeliveryPersonId,
+        DeliveryPersonName = order.DeliveryPerson?.Name,
+        DeliveryAddress = order.DeliveryAddress,
+        DeliveryFee = order.DeliveryFee,
+        DeliveryStatus = order.DeliveryStatus?.ToString(),
+        DeliveryNotes = order.DeliveryNotes,
+        AssignedAt = order.AssignedAt,
+        DeliveredAt = order.DeliveredAt,
         Items = order.Items.Select(i => new OrderItemDto
         {
             Id = i.Id,

@@ -165,10 +165,7 @@ const formatShiftDuration = (hours: number, minutes: number) => {
 
 export const POSWorkspacePage = () => {
   const { mode } = usePOSMode();
-
-  if (mode === "cashier") {
-    return <Navigate to="/pos" replace />;
-  }
+  const shouldRedirectToCashier = mode === "cashier";
 
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
@@ -193,6 +190,10 @@ export const POSWorkspacePage = () => {
   const [discountInputType, setDiscountInputType] = useState<
     "Percentage" | "Fixed"
   >("Percentage");
+  const [orderType, setOrderType] = useState<"Standard" | "Delivery">("Standard");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryFee, setDeliveryFee] = useState("");
+  const [deliveryNotes, setDeliveryNotes] = useState("");
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const customerPhoneRef = useRef<HTMLInputElement>(null);
@@ -216,6 +217,7 @@ export const POSWorkspacePage = () => {
     clearCart,
     applyDiscount,
     removeDiscount,
+    canManageDiscounts,
   } = useCart();
   const {
     hasActiveShift,
@@ -248,6 +250,10 @@ export const POSWorkspacePage = () => {
     usePreparedPaymentOrder({
       enabled: activeTab === "payment" && items.length > 0,
       customerId: selectedCustomer?.id,
+      orderType: orderType === "Standard" ? "DineIn" : "Delivery",
+      deliveryAddress: orderType === "Delivery" ? deliveryAddress || undefined : undefined,
+      deliveryFee: orderType === "Delivery" ? parseFloat(deliveryFee || "0") || 0 : 0,
+      deliveryNotes: orderType === "Delivery" ? deliveryNotes || undefined : undefined,
       createOrder,
       cancelOrder,
       onPrepareFailed: () => setActiveTab("cart"),
@@ -259,7 +265,12 @@ export const POSWorkspacePage = () => {
   });
 
   const shiftWarning = warningsData?.data;
-  const paymentTotal = preparedOrder?.total ?? total;
+  const deliveryFeeAmount =
+    orderType === "Delivery" ? parseFloat(deliveryFee || "0") || 0 : 0;
+  const checkoutTotal = total + deliveryFeeAmount;
+  const paymentTotal = preparedOrder?.total ?? checkoutTotal;
+  const displayWorkspaceTotal =
+    activeTab === "payment" ? paymentTotal : checkoutTotal;
 
   const openPaymentWorkspace = useCallback(() => {
     if (items.length === 0) {
@@ -390,6 +401,16 @@ export const POSWorkspacePage = () => {
     return () => clearTimeout(timer);
   }, [customerPhone, searchCustomer]);
 
+  useEffect(() => {
+    if (selectedPaymentMethod === "Cash") {
+      setTransactionReference("");
+      return;
+    }
+
+    setAllowPartialPayment(false);
+    setAmountPaid(paymentTotal.toFixed(2));
+  }, [selectedPaymentMethod, paymentTotal]);
+
   const handleSelectCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
     setCustomerPhone("");
@@ -411,6 +432,11 @@ export const POSWorkspacePage = () => {
   };
 
   const handleApplyDiscount = () => {
+    if (!canManageDiscounts) {
+      toast.error("ليس لديك صلاحية تطبيق أو تعديل الخصومات");
+      return;
+    }
+
     const parsedValue = parseFloat(discountInputValue);
     if (Number.isNaN(parsedValue) || parsedValue <= 0) {
       return;
@@ -531,6 +557,7 @@ export const POSWorkspacePage = () => {
     }
 
     try {
+      const wasDeliveryOrder = orderType === "Delivery";
       const completedOrder = await completeOrder(preparedOrder.id, {
         payments: [
           {
@@ -559,6 +586,12 @@ export const POSWorkspacePage = () => {
           toast.success("تم إتمام الدفع بنجاح!");
         }
 
+        if (wasDeliveryOrder) {
+          toast.info(
+            "تم إنشاء طلب التوصيل — يمكن تعيين المندوب من شاشة إدارة التوصيل",
+          );
+        }
+
         markPreparedOrderCompleted(preparedOrder.id);
         clearCart();
         setSelectedCustomer(null);
@@ -566,6 +599,10 @@ export const POSWorkspacePage = () => {
         setTransactionReference("");
         setAmountPaid("");
         setAllowPartialPayment(false);
+        setOrderType("Standard");
+        setDeliveryAddress("");
+        setDeliveryFee("");
+        setDeliveryNotes("");
         setActiveTab("cart");
       }
     } catch {
@@ -618,6 +655,10 @@ export const POSWorkspacePage = () => {
   const visibleSearchResults = showCatalog
     ? filteredProducts
     : filteredProducts.slice(0, 12);
+
+  if (shouldRedirectToCashier) {
+    return <Navigate to="/pos" replace />;
+  }
 
   if (isLoading || isLoadingShift) {
     return (
@@ -734,16 +775,6 @@ export const POSWorkspacePage = () => {
     paymentMethods.find((method) => method.id === selectedPaymentMethod)
       ?.label ?? selectedPaymentMethod;
   const requiresTransactionReference = selectedPaymentMethod !== "Cash";
-
-  useEffect(() => {
-    if (selectedPaymentMethod === "Cash") {
-      setTransactionReference("");
-      return;
-    }
-
-    setAllowPartialPayment(false);
-    setAmountPaid(paymentTotal.toFixed(2));
-  }, [selectedPaymentMethod, paymentTotal]);
   const selectedCategoryName =
     selectedCategory !== null
       ? (categories.find((category) => category.id === selectedCategory)
@@ -799,10 +830,11 @@ export const POSWorkspacePage = () => {
           ))}
         </div>
 
-        <SurfaceCard>
+        {(canManageDiscounts || discountAmount > 0) && (
+          <SurfaceCard>
           <div className="mb-3 flex items-center justify-between">
             <h4 className="text-sm font-bold text-slate-900">الخصم</h4>
-            {discountAmount > 0 && (
+            {canManageDiscounts && discountAmount > 0 && (
               <button
                 type="button"
                 onClick={() => {
@@ -817,7 +849,7 @@ export const POSWorkspacePage = () => {
             )}
           </div>
 
-          {discountAmount === 0 ? (
+          {discountAmount === 0 && canManageDiscounts ? (
             showDiscountInput ? (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-2">
@@ -906,13 +938,10 @@ export const POSWorkspacePage = () => {
               </div>
             </div>
           )}
-        </SurfaceCard>
+          </SurfaceCard>
+        )}
 
         <SurfaceCard className="space-y-3">
-          <SummaryLine
-            label="المجموع الفرعي"
-            value={formatCurrency(subtotal)}
-          />
           {discountAmount > 0 && (
             <SummaryLine
               label="خصم الطلب"
@@ -933,10 +962,17 @@ export const POSWorkspacePage = () => {
               value={formatCurrency(serviceChargeAmount)}
             />
           )}
+          {orderType === "Delivery" && (
+            <SummaryLine
+              label="رسوم التوصيل"
+              value={formatCurrency(deliveryFeeAmount)}
+              icon={<Store className="h-4 w-4 text-primary-500" />}
+            />
+          )}
           <div className="border-t border-slate-200 pt-3">
             <SummaryLine
               label="الإجمالي الحالي"
-              value={formatCurrency(total)}
+              value={formatCurrency(checkoutTotal)}
               valueClassName="text-primary-600 text-base font-black"
               icon={<Wallet className="h-4 w-4 text-primary-500" />}
             />
@@ -944,6 +980,62 @@ export const POSWorkspacePage = () => {
               * الإجمالي تقديري، ويتم تأكيده نهائيًا عند إنشاء الطلب.
             </p>
           </div>
+        </SurfaceCard>
+
+        {/* Order Type Selector */}
+        <SurfaceCard className="space-y-3">
+          <h4 className="text-sm font-bold text-slate-900">نوع الطلب</h4>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { id: "DineIn", label: "صالة" },
+              { id: "Takeaway", label: "تيك أواي" },
+              { id: "Delivery", label: "توصيل" },
+            ]
+              .filter((t) => t.id !== "Takeaway")
+              .map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() =>
+                  setOrderType(t.id === "Delivery" ? "Delivery" : "Standard")
+                }
+                className={clsx(
+                  "min-h-[44px] rounded-2xl px-3 py-2 text-sm font-semibold transition-all",
+                  orderType ===
+                    (t.id === "Delivery" ? "Delivery" : "Standard")
+                    ? "bg-primary-600 text-white shadow-sm"
+                    : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50",
+                )}
+              >
+                {t.id === "Delivery" ? "توصيل" : "طلب عادي"}
+              </button>
+            ))}
+          </div>
+          {orderType === "Delivery" && (
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={deliveryAddress}
+                onChange={(e) => setDeliveryAddress(e.target.value)}
+                placeholder="عنوان التوصيل"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+              />
+              <input
+                type="number"
+                value={deliveryFee}
+                onChange={(e) => setDeliveryFee(e.target.value)}
+                placeholder="رسوم التوصيل"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+              />
+              <textarea
+                placeholder="ملاحظات التوصيل (اختياري)"
+                value={deliveryNotes}
+                onChange={(e) => setDeliveryNotes(e.target.value)}
+                rows={2}
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+              />
+            </div>
+          )}
         </SurfaceCard>
       </div>
     );
@@ -1334,7 +1426,7 @@ export const POSWorkspacePage = () => {
             الإجمالي
           </p>
           <p className="mt-1 text-lg font-black text-primary-700">
-            {formatCurrency(activeTab === "payment" ? paymentTotal : total)}
+            {formatCurrency(displayWorkspaceTotal)}
           </p>
         </div>
       </div>

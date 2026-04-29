@@ -125,7 +125,9 @@ export const purchaseInvoiceApi = baseApi.injectEndpoints({
       invalidatesTags: (result, error, id) => [
         { type: 'PurchaseInvoice', id },
         { type: 'PurchaseInvoice', id: 'LIST' },
-        { type: 'Products', id: 'LIST' }, // Invalidate products because inventory changed
+        { type: 'Products', id: 'LIST' },
+        { type: 'ProductBatch', id: 'LIST' },
+        { type: 'ProductBatch', id: 'ALERTS' },
       ],
     }),
 

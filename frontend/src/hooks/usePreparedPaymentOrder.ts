@@ -1,13 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { useCart } from "./useCart";
-import { Order } from "@/types/order.types";
+import { Order, OrderType } from "@/types/order.types";
 
 const DRAFT_CANCEL_REASON = "POS payment draft discarded";
 
 interface UsePreparedPaymentOrderOptions {
   enabled: boolean;
   customerId?: number;
-  createOrder: (customerId?: number) => Promise<Order | null>;
+  orderType?: OrderType;
+  deliveryAddress?: string;
+  deliveryFee?: number;
+  deliveryNotes?: string;
+  createOrder: (
+    customerId?: number,
+    orderType?: OrderType,
+    deliveryAddress?: string,
+    deliveryFee?: number,
+    deliveryNotes?: string,
+  ) => Promise<Order | null>;
   cancelOrder: (
     orderId: number,
     reason?: string,
@@ -19,6 +29,10 @@ interface UsePreparedPaymentOrderOptions {
 export const usePreparedPaymentOrder = ({
   enabled,
   customerId,
+  orderType,
+  deliveryAddress,
+  deliveryFee,
+  deliveryNotes,
   createOrder,
   cancelOrder,
   onPrepareFailed,
@@ -39,6 +53,10 @@ export const usePreparedPaymentOrder = ({
 
   const cartSignature = JSON.stringify({
     customerId: customerId ?? null,
+    orderType: orderType ?? null,
+    deliveryAddress: deliveryAddress ?? null,
+    deliveryFee: deliveryFee ?? null,
+    deliveryNotes: deliveryNotes ?? null,
     discountType: discountType ?? null,
     discountValue: discountValue ?? null,
     items: items.map((item) => ({
@@ -91,7 +109,13 @@ export const usePreparedPaymentOrder = ({
       await discardPreparedOrder();
       setIsPreparingOrder(true);
 
-      const order = await createOrderRef.current(customerId);
+      const order = await createOrderRef.current(
+        customerId,
+        orderType,
+        deliveryAddress,
+        deliveryFee,
+        deliveryNotes,
+      );
 
       if (isDisposed) {
         await cancelPreparedOrderSilently(order);
@@ -117,7 +141,7 @@ export const usePreparedPaymentOrder = ({
       preparedOrderRef.current = null;
       void cancelPreparedOrderSilently(orderToCancel);
     };
-  }, [enabled, items.length, cartSignature, customerId]);
+  }, [enabled, items.length, cartSignature, customerId, orderType, deliveryAddress, deliveryFee, deliveryNotes]);
 
   return {
     preparedOrder,

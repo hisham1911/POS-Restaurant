@@ -21,6 +21,9 @@ export interface PurchaseInvoiceItem {
   sellingPrice: number;
   total: number;
   notes?: string;
+  batchNumber?: string;
+  expiryDate?: string;
+  productionDate?: string;
 }
 
 export interface PurchaseInvoicePayment {
@@ -70,6 +73,9 @@ export interface CreatePurchaseInvoiceItemRequest {
   purchasePrice: number;
   sellingPrice: number;
   notes?: string;
+  batchNumber?: string;
+  expiryDate?: string;
+  productionDate?: string;
 }
 
 export interface CreatePurchaseInvoiceRequest {
@@ -86,6 +92,9 @@ export interface UpdatePurchaseInvoiceItemRequest {
   purchasePrice: number;
   sellingPrice: number;
   notes?: string;
+  batchNumber?: string;
+  expiryDate?: string;
+  productionDate?: string;
 }
 
 export interface UpdatePurchaseInvoiceRequest {

@@ -24,6 +24,10 @@ import { Portal } from "@/components/common/Portal";
 interface PaymentModalProps {
   onClose: () => void;
   selectedCustomer?: Customer | null;
+  orderType: "Standard" | "Delivery";
+  deliveryAddress: string;
+  deliveryFee: string;
+  deliveryNotes: string;
   onOrderComplete?: () => void;
 }
 
@@ -44,6 +48,10 @@ const paymentMethods: {
 export const PaymentModal = ({
   onClose,
   selectedCustomer,
+  orderType,
+  deliveryAddress,
+  deliveryFee,
+  deliveryNotes,
   onOrderComplete,
 }: PaymentModalProps) => {
   const { createOrder, completeOrder, cancelOrder, isCreating, isCompleting } =
@@ -54,6 +62,9 @@ export const PaymentModal = ({
   const [transactionReference, setTransactionReference] = useState("");
   const [showError, setShowError] = useState(false);
   const [allowPartialPayment, setAllowPartialPayment] = useState(false);
+  const isDeliveryOrder = orderType === "Delivery";
+  const parsedDeliveryFee =
+    isDeliveryOrder ? Number.parseFloat(deliveryFee || "0") || 0 : 0;
 
   const customerId = selectedCustomer?.id;
   const {
@@ -64,6 +75,10 @@ export const PaymentModal = ({
   } = usePreparedPaymentOrder({
     enabled: true,
     customerId,
+    orderType: isDeliveryOrder ? "Delivery" : "DineIn",
+    deliveryAddress: isDeliveryOrder ? deliveryAddress || undefined : undefined,
+    deliveryFee: isDeliveryOrder ? parsedDeliveryFee : 0,
+    deliveryNotes: isDeliveryOrder ? deliveryNotes || undefined : undefined,
     createOrder,
     cancelOrder,
     onPrepareFailed: onClose,
@@ -212,6 +227,12 @@ export const PaymentModal = ({
           toast.success("تم إتمام الدفع بنجاح!");
         }
         // مسح العميل المحدد
+        if (isDeliveryOrder) {
+          toast.info(
+            "تم إنشاء طلب التوصيل — يمكن تعيين المندوب من شاشة إدارة التوصيل",
+          );
+        }
+
         markPreparedOrderCompleted(preparedOrder.id);
         clearCart();
         setTransactionReference("");
@@ -368,6 +389,40 @@ export const PaymentModal = ({
                 </div>
               )}
             </div>
+
+            {isDeliveryOrder && (
+              <div className="rounded-xl border border-primary-200 bg-primary-50 p-4">
+                <p className="mb-2 text-sm font-medium text-primary-700">
+                  بيانات التوصيل
+                </p>
+                <div className="space-y-2 text-sm text-gray-700">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">نوع الطلب</span>
+                    <span className="font-semibold text-primary-700">
+                      توصيل
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">العنوان</span>
+                    <span className="text-end font-medium text-gray-900">
+                      {deliveryAddress || "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">رسوم التوصيل</span>
+                    <span className="font-semibold text-gray-900">
+                      {formatCurrency(parsedDeliveryFee)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-gray-500">الملاحظات</span>
+                    <span className="text-end font-medium text-gray-900">
+                      {deliveryNotes || "—"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Total Amount */}
             <div className="text-center p-6 bg-gray-50 rounded-xl">

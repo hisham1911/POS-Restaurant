@@ -8,6 +8,7 @@ import {
   InventoryTransferForm,
   InventoryTransferList,
   BranchPricingEditor,
+  BatchExpiryAlertBanner,
 } from "../../components/inventory";
 import {
   Package,
@@ -76,6 +77,9 @@ export default function InventoryPage() {
             </div>
           )}
         </div>
+
+        {/* Batch Expiry Alert */}
+        <BatchExpiryAlertBanner />
 
         {/* Tabs */}
         <div className="bg-white rounded-lg border border-gray-200 mb-6">

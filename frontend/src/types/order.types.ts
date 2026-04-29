@@ -13,6 +13,7 @@ export type PaymentMethod = "Cash" | "Card" | "Fawry";
 // Query parameters for filtering orders
 export interface OrdersQueryParams {
   status?: OrderStatus;
+  orderType?: OrderType;
   fromDate?: string; // ISO date string
   toDate?: string; // ISO date string
   page?: number;
@@ -65,6 +66,11 @@ export interface OrderItem {
   subtotal: number;
   total: number;
   notes?: string;
+
+  // FEFO Batch tracking
+  batchId?: number;
+  batchNumber?: string;
+  expiryDate?: string;
 }
 
 export interface Order {
@@ -116,6 +122,15 @@ export interface Order {
   refundedByUserId?: number;
   refundedByUserName?: string;
   originalOrderId?: number;
+  // Delivery fields
+  deliveryPersonId?: number;
+  deliveryPersonName?: string;
+  deliveryAddress?: string;
+  deliveryFee: number;
+  deliveryStatus?: string;
+  deliveryNotes?: string;
+  assignedAt?: string;
+  deliveredAt?: string;
   // Shift
   shiftId?: number;
   items: OrderItem[];
@@ -148,6 +163,10 @@ export interface CreateOrderRequest {
   // Order-level discount
   discountType?: "Percentage" | "Fixed";
   discountValue?: number;
+  // Delivery fields
+  deliveryAddress?: string;
+  deliveryFee?: number;
+  deliveryNotes?: string;
 }
 
 export interface CompleteOrderRequest {

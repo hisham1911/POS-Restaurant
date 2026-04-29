@@ -22,6 +22,7 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
     removeItemDiscount,
     taxRate,
     isTaxEnabled,
+    canManageDiscounts,
   } = useCart();
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const { product, quantity, discount } = item;
@@ -87,17 +88,19 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
             </button>
 
             {/* Item Discount Button - with secondary accent */}
-            <button
-              onClick={() => setShowDiscountModal(true)}
-              className={`flex h-9 w-9 items-center justify-center rounded-lg border ${
-                discount
-                  ? "bg-green-100 border-green-400 text-green-600"
-                  : "bg-gray-50 border-gray-300 hover:border-gray-400 hover:bg-gray-100 text-gray-600"
-              }`}
-              aria-label={`خصم على ${product.name}`}
-            >
-              <Tag className="w-5 h-5" />
-            </button>
+            {canManageDiscounts && (
+              <button
+                onClick={() => setShowDiscountModal(true)}
+                className={`flex h-9 w-9 items-center justify-center rounded-lg border ${
+                  discount
+                    ? "bg-green-100 border-green-400 text-green-600"
+                    : "bg-gray-50 border-gray-300 hover:border-gray-400 hover:bg-gray-100 text-gray-600"
+                }`}
+                aria-label={`خصم على ${product.name}`}
+              >
+                <Tag className="w-5 h-5" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -128,7 +131,7 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
         </div>
       </div>
 
-      {showDiscountModal && (
+      {canManageDiscounts && showDiscountModal && (
         <ItemDiscountModal
           item={item}
           onApply={(disc) => applyItemDiscount(product.id, disc)}

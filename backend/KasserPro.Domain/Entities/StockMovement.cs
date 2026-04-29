@@ -55,10 +55,16 @@ public class StockMovement : BaseEntity
     /// User who created this movement
     /// </summary>
     public int UserId { get; set; }
-    
+
+    /// <summary>
+    /// Optional batch reference for batch-level stock tracking (FEFO)
+    /// </summary>
+    public int? BatchId { get; set; }
+
     // Navigation
     public Tenant Tenant { get; set; } = null!;
     public Branch Branch { get; set; } = null!;
     public Product Product { get; set; } = null!;
     public User User { get; set; } = null!;
+    public ProductBatch? Batch { get; set; }
 }

@@ -204,7 +204,10 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                 PurchasePrice = item.PurchasePrice,
                 SellingPrice = item.SellingPrice,
                 Total = item.Total,
-                Notes = item.Notes
+                Notes = item.Notes,
+                BatchNumber = item.BatchNumber,
+                ExpiryDate = item.ExpiryDate,
+                ProductionDate = item.ProductionDate
             }).ToList(),
             Payments = invoice.Payments.Select(p => new PurchaseInvoicePaymentDto
             {
@@ -302,7 +305,10 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                 PurchasePrice = itemRequest.PurchasePrice,
                 SellingPrice = itemRequest.SellingPrice,
                 Total = itemTotal,
-                Notes = itemRequest.Notes
+                Notes = itemRequest.Notes,
+                BatchNumber = itemRequest.BatchNumber,
+                ExpiryDate = itemRequest.ExpiryDate,
+                ProductionDate = itemRequest.ProductionDate
             });
         }
 
@@ -389,7 +395,10 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                 PurchasePrice = itemRequest.PurchasePrice,
                 SellingPrice = itemRequest.SellingPrice,
                 Total = itemTotal,
-                Notes = itemRequest.Notes
+                Notes = itemRequest.Notes,
+                BatchNumber = itemRequest.BatchNumber,
+                ExpiryDate = itemRequest.ExpiryDate,
+                ProductionDate = itemRequest.ProductionDate
             });
         }
 
@@ -521,6 +530,37 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                         UserId = userId,
                         CreatedAt = DateTime.UtcNow
                     };
+
+                    // If batch/expiry data provided, create ProductBatch and link stock movement
+                    ProductBatch? batch = null;
+                    if (!string.IsNullOrWhiteSpace(item.BatchNumber) || item.ExpiryDate.HasValue)
+                    {
+                        var batchNumber = !string.IsNullOrWhiteSpace(item.BatchNumber)
+                            ? item.BatchNumber
+                            : $"AUTO-{invoice.InvoiceNumber}-{product.Id}";
+
+                        batch = new ProductBatch
+                        {
+                            TenantId = tenantId,
+                            BranchId = invoice.BranchId,
+                            ProductId = product.Id,
+                            BatchNumber = batchNumber,
+                            PurchaseDate = invoice.InvoiceDate,
+                            ExpiryDate = item.ExpiryDate ?? DateTime.UtcNow.AddYears(1),
+                            ProductionDate = item.ProductionDate,
+                            Quantity = item.Quantity,
+                            InitialQuantity = item.Quantity,
+                            CostPrice = item.PurchasePrice,
+                            SupplierName = invoice.SupplierName,
+                            PurchaseInvoiceId = invoice.Id,
+                            Status = BatchStatus.Active,
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        await _unitOfWork.ProductBatches.AddAsync(batch);
+                        stockMovement.Batch = batch;
+                        item.Batch = batch;
+                    }
+
                     await _unitOfWork.StockMovements.AddAsync(stockMovement);
 
                     // Update product metadata (not stock quantity)

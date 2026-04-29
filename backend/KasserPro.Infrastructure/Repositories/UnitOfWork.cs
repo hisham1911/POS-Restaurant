@@ -41,6 +41,9 @@ public class UnitOfWork : IUnitOfWork
         BranchProductPrices = new GenericRepository<BranchProductPrice>(context);
         InventoryTransfers = new GenericRepository<InventoryTransfer>(context);
 
+        // Batch/Expiry tracking (FEFO)
+        ProductBatches = new GenericRepository<ProductBatch>(context);
+
         // Expenses and Cash Register repositories
         ExpenseCategories = new GenericRepository<ExpenseCategory>(context);
         Expenses = new GenericRepository<Expense>(context);
@@ -49,6 +52,13 @@ public class UnitOfWork : IUnitOfWork
 
         // User Permissions repository
         UserPermissions = new GenericRepository<UserPermission>(context);
+
+        // Delivery repository
+        DeliveryPersons = new GenericRepository<DeliveryPerson>(context);
+
+        // Stock Taking repositories
+        StockTakings = new GenericRepository<StockTaking>(context);
+        StockTakingItems = new GenericRepository<StockTakingItem>(context);
     }
 
     public IRepository<Tenant> Tenants { get; }
@@ -79,6 +89,9 @@ public class UnitOfWork : IUnitOfWork
     public IRepository<BranchProductPrice> BranchProductPrices { get; }
     public IRepository<InventoryTransfer> InventoryTransfers { get; }
 
+    // Batch/Expiry tracking (FEFO)
+    public IRepository<ProductBatch> ProductBatches { get; }
+
     // Expenses and Cash Register repository properties
     public IRepository<ExpenseCategory> ExpenseCategories { get; }
     public IRepository<Expense> Expenses { get; }
@@ -87,6 +100,13 @@ public class UnitOfWork : IUnitOfWork
 
     // User Permissions repository property
     public IRepository<UserPermission> UserPermissions { get; }
+
+    // Delivery repository property
+    public IRepository<DeliveryPerson> DeliveryPersons { get; }
+
+    // Stock Taking repository properties
+    public IRepository<StockTaking> StockTakings { get; }
+    public IRepository<StockTakingItem> StockTakingItems { get; }
 
     public async Task<int> SaveChangesAsync() => await _context.SaveChangesAsync();
 

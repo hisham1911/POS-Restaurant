@@ -48,8 +48,8 @@ import SupplierDebtsReportPage from "./pages/reports/SupplierDebtsReportPage";
 import SupplierPerformanceReportPage from "./pages/reports/SupplierPerformanceReportPage";
 import AuditLogPage from "./pages/audit/AuditLogPage";
 import SettingsPage from "./pages/settings/SettingsPage";
-import PermissionsPage from "./pages/settings/PermissionsPage";
 import UserManagementPage from "./pages/users/UserManagementPage";
+import UserDetailPage from "./pages/users/UserDetailPage";
 import { PurchaseInvoicesPage } from "./pages/purchase-invoices/PurchaseInvoicesPage";
 import { PurchaseInvoiceFormPage } from "./pages/purchase-invoices/PurchaseInvoiceFormPage";
 import { PurchaseInvoiceDetailsPage } from "./pages/purchase-invoices/PurchaseInvoiceDetailsPage";
@@ -59,6 +59,9 @@ import { ExpenseDetailsPage } from "./pages/expenses/ExpenseDetailsPage";
 import { CashRegisterDashboard } from "./pages/cash-register/CashRegisterDashboard";
 import { CashRegisterTransactionsPage } from "./pages/cash-register/CashRegisterTransactionsPage";
 import InventoryPage from "./pages/inventory/InventoryPage";
+import { StockTakingPage } from "./pages/inventory/StockTakingPage";
+import DeliveryPersonsPage from "./pages/delivery/DeliveryPersonsPage";
+import DeliveryOperationsPage from "./pages/delivery/DeliveryOperationsPage";
 import TenantCreationPage from "./pages/owner/TenantCreationPage";
 import SystemUsersPage from "./pages/system/SystemUsersPage";
 import { BackupPage } from "./pages/backup/BackupPage";
@@ -91,6 +94,13 @@ const PermissionRoute = ({
 const SystemOwnerRoute = ({ children }: { children: React.ReactNode }) => {
   const isSystemOwner = useAppSelector(selectIsSystemOwner);
   if (!isSystemOwner) return <Navigate to="/home" replace />;
+  return <>{children}</>;
+};
+
+const AdminOnlyRoute = ({ children }: { children: React.ReactNode }) => {
+  const isAdmin = useAppSelector(selectIsAdmin);
+  const isSystemOwner = useAppSelector(selectIsSystemOwner);
+  if (!isAdmin && !isSystemOwner) return <Navigate to="/unauthorized" replace />;
   return <>{children}</>;
 };
 
@@ -145,7 +155,9 @@ const AppRoutes = () => (
         path="/pos"
         element={
           <NonSystemOwnerRoute>
-            <POSPage />
+            <PermissionRoute permission="PosSell">
+              <POSPage />
+            </PermissionRoute>
           </NonSystemOwnerRoute>
         }
       />
@@ -153,7 +165,9 @@ const AppRoutes = () => (
         path="/pos-workspace"
         element={
           <NonSystemOwnerRoute>
-            <POSWorkspacePage />
+            <PermissionRoute permission="PosSell">
+              <POSWorkspacePage />
+            </PermissionRoute>
           </NonSystemOwnerRoute>
         }
       />
@@ -161,7 +175,9 @@ const AppRoutes = () => (
         path="/orders"
         element={
           <NonSystemOwnerRoute>
-            <OrdersPage />
+            <PermissionRoute permission="OrdersView">
+              <OrdersPage />
+            </PermissionRoute>
           </NonSystemOwnerRoute>
         }
       />
@@ -169,7 +185,9 @@ const AppRoutes = () => (
         path="/shift"
         element={
           <NonSystemOwnerRoute>
-            <ShiftPage />
+            <PermissionRoute permission="OrdersCreate">
+              <ShiftPage />
+            </PermissionRoute>
           </NonSystemOwnerRoute>
         }
       />
@@ -177,9 +195,9 @@ const AppRoutes = () => (
         path="/shifts-management"
         element={
           <NonSystemOwnerRoute>
-            <AdminRoute>
+            <PermissionRoute permission="ShiftsManage">
               <ShiftsManagementPage />
-            </AdminRoute>
+            </PermissionRoute>
           </NonSystemOwnerRoute>
         }
       />
@@ -227,9 +245,9 @@ const AppRoutes = () => (
         path="/purchase-invoices"
         element={
           <NonSystemOwnerRoute>
-            <AdminRoute>
+            <PermissionRoute permission="PurchaseInvoicesView">
               <PurchaseInvoicesPage />
-            </AdminRoute>
+            </PermissionRoute>
           </NonSystemOwnerRoute>
         }
       />
@@ -237,9 +255,9 @@ const AppRoutes = () => (
         path="/purchase-invoices/new"
         element={
           <NonSystemOwnerRoute>
-            <AdminRoute>
+            <PermissionRoute permission="PurchaseInvoicesManage">
               <PurchaseInvoiceFormPage />
-            </AdminRoute>
+            </PermissionRoute>
           </NonSystemOwnerRoute>
         }
       />
@@ -247,9 +265,9 @@ const AppRoutes = () => (
         path="/purchase-invoices/:id"
         element={
           <NonSystemOwnerRoute>
-            <AdminRoute>
+            <PermissionRoute permission="PurchaseInvoicesView">
               <PurchaseInvoiceDetailsPage />
-            </AdminRoute>
+            </PermissionRoute>
           </NonSystemOwnerRoute>
         }
       />
@@ -257,9 +275,9 @@ const AppRoutes = () => (
         path="/purchase-invoices/:id/edit"
         element={
           <NonSystemOwnerRoute>
-            <AdminRoute>
+            <PermissionRoute permission="PurchaseInvoicesManage">
               <PurchaseInvoiceFormPage />
-            </AdminRoute>
+            </PermissionRoute>
           </NonSystemOwnerRoute>
         }
       />
@@ -487,19 +505,19 @@ const AppRoutes = () => (
         path="/settings"
         element={
           <NonSystemOwnerRoute>
-            <AdminRoute>
+            <PermissionRoute permission="SettingsManage">
               <SettingsPage />
-            </AdminRoute>
+            </PermissionRoute>
           </NonSystemOwnerRoute>
         }
       />
       <Route
-        path="/settings/permissions"
+        path="/users/:userId/permissions"
         element={
           <NonSystemOwnerRoute>
-            <AdminRoute>
-              <PermissionsPage />
-            </AdminRoute>
+            <AdminOnlyRoute>
+              <UserDetailPage />
+            </AdminOnlyRoute>
           </NonSystemOwnerRoute>
         }
       />
@@ -507,9 +525,9 @@ const AppRoutes = () => (
         path="/users"
         element={
           <NonSystemOwnerRoute>
-            <AdminRoute>
+            <PermissionRoute permission="UsersManage">
               <UserManagementPage />
-            </AdminRoute>
+            </PermissionRoute>
           </NonSystemOwnerRoute>
         }
       />
@@ -589,6 +607,36 @@ const AppRoutes = () => (
           <NonSystemOwnerRoute>
             <PermissionRoute permission="InventoryView">
               <InventoryPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/stock-taking"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="InventoryManage">
+              <StockTakingPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/delivery-persons"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="DeliveryView">
+              <DeliveryPersonsPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/delivery/operations"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="DeliveryView">
+              <DeliveryOperationsPage />
             </PermissionRoute>
           </NonSystemOwnerRoute>
         }

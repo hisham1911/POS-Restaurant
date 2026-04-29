@@ -13,13 +13,16 @@ import {
   getBranchStorageKey,
   saveSelectedBranchId,
 } from "@/utils/branchStorage";
+import { usePermission } from "@/hooks/usePermission";
 
 export const BranchSelector = () => {
   const dispatch = useAppDispatch();
   const currentBranch = useAppSelector(selectCurrentBranch);
   const branches = useAppSelector(selectBranches);
   const currentUser = useAppSelector(selectCurrentUser);
-  const canReadBranches = currentUser?.role === "Admin";
+  const { hasPermission } = usePermission();
+  const canReadBranches =
+    currentUser?.role !== "SystemOwner" && hasPermission("BranchesView");
   const { isLoading } = useGetBranchesQuery(undefined, {
     skip: !canReadBranches,
   });

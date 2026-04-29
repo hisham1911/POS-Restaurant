@@ -39,8 +39,18 @@ public interface IUnitOfWork : IDisposable
     IRepository<BranchProductPrice> BranchProductPrices { get; }
     IRepository<InventoryTransfer> InventoryTransfers { get; }
 
+    // Batch/Expiry tracking (FEFO)
+    IRepository<ProductBatch> ProductBatches { get; }
+
     // User Permissions repository
-    IRepository<UserPermission> UserPermissions { get; }
+    public IRepository<UserPermission> UserPermissions { get; }
+
+    // Delivery repository
+    public IRepository<DeliveryPerson> DeliveryPersons { get; }
+
+    // Stock Taking repositories
+    public IRepository<StockTaking> StockTakings { get; }
+    public IRepository<StockTakingItem> StockTakingItems { get; }
 
     Task<int> SaveChangesAsync();
 

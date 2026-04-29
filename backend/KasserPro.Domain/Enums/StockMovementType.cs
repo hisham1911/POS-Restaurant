@@ -21,5 +21,11 @@ public enum StockMovementType
     Damage = 5,
     
     /// <summary>Transfer between branches</summary>
-    Transfer = 6
+    Transfer = 6,
+
+    /// <summary>Stock taking / physical inventory count</summary>
+    StockTaking = 7,
+
+    /// <summary>Expired goods write-off</summary>
+    Expired = 8
 }

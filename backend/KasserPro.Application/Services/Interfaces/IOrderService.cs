@@ -9,7 +9,7 @@ public interface IOrderService
     Task<ApiResponse<OrderDto>> CreateAsync(CreateOrderRequest request, int userId);
     Task<ApiResponse<OrderDto>> GetByIdAsync(int id);
     Task<ApiResponse<List<OrderDto>>> GetTodayOrdersAsync();
-    Task<ApiResponse<PagedResult<OrderDto>>> GetAllAsync(string? status = null, DateTime? fromDate = null, DateTime? toDate = null, int page = 1, int pageSize = 20);
+    Task<ApiResponse<PagedResult<OrderDto>>> GetAllAsync(string? status = null, string? orderType = null, DateTime? fromDate = null, DateTime? toDate = null, int page = 1, int pageSize = 20);
     Task<ApiResponse<PagedResult<OrderDto>>> GetByCustomerIdAsync(int customerId, int page = 1, int pageSize = 10);
     Task<ApiResponse<OrderDto>> AddItemAsync(int orderId, AddOrderItemRequest request);
     Task<ApiResponse<OrderDto>> AddCustomItemAsync(int orderId, AddCustomItemRequest request);

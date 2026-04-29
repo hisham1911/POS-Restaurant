@@ -1,4 +1,6 @@
 import { useAppDispatch, useAppSelector } from "../store/hooks";
+import { toast } from "sonner";
+import { usePermission } from "./usePermission";
 import {
   addItem,
   removeItem,
@@ -27,6 +29,7 @@ import { Product } from "../types/product.types";
 
 export const useCart = () => {
   const dispatch = useAppDispatch();
+  const { hasPermission } = usePermission();
 
   const items = useAppSelector(selectCartItems);
   const itemsCount = useAppSelector(selectItemsCount);
@@ -41,6 +44,12 @@ export const useCart = () => {
   const isTaxEnabled = useAppSelector(selectIsTaxEnabled);
   const serviceChargeRate = useAppSelector(selectServiceChargeRate);
   const serviceChargeAmount = useAppSelector(selectServiceChargeAmount);
+
+  const canManageDiscounts = hasPermission("PosApplyDiscount");
+
+  const notifyDiscountPermissionDenied = () => {
+    toast.error("ليس لديك صلاحية تطبيق أو تعديل الخصومات");
+  };
 
   const add = (product: Product, quantity = 1) => {
     dispatch(addItem({ product, quantity }));
@@ -63,18 +72,38 @@ export const useCart = () => {
   };
 
   const applyDiscount = (type: DiscountType, value: number) => {
+    if (!canManageDiscounts) {
+      notifyDiscountPermissionDenied();
+      return;
+    }
+
     dispatch(setDiscount({ type, value }));
   };
 
   const removeDiscount = () => {
+    if (!canManageDiscounts) {
+      notifyDiscountPermissionDenied();
+      return;
+    }
+
     dispatch(setDiscount(undefined));
   };
 
   const applyItemDiscount = (productId: number, discount: ItemDiscount) => {
+    if (!canManageDiscounts) {
+      notifyDiscountPermissionDenied();
+      return;
+    }
+
     dispatch(setItemDiscount({ productId, discount }));
   };
 
   const removeItemDiscount = (productId: number) => {
+    if (!canManageDiscounts) {
+      notifyDiscountPermissionDenied();
+      return;
+    }
+
     dispatch(setItemDiscount({ productId, discount: undefined }));
   };
 
@@ -92,6 +121,7 @@ export const useCart = () => {
     isTaxEnabled,
     serviceChargeRate,
     serviceChargeAmount,
+    canManageDiscounts,
     addItem: add,
     removeItem: remove,
     updateQuantity: setQuantity,

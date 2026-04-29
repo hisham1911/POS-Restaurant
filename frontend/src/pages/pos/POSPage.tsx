@@ -5,6 +5,7 @@ import { CategoryTabs } from "@/components/pos/CategoryTabs";
 import { Cart } from "@/components/pos/Cart";
 import { PaymentModal } from "@/components/pos/PaymentModal";
 import { LowStockAlert } from "@/components/pos/LowStockAlert";
+import { BatchExpiryAlertBanner } from "@/components/inventory";
 import { ProductQuickCreateModal } from "@/components/pos/ProductQuickCreateModal";
 import { CustomItemModal } from "@/components/pos/CustomItemModal";
 import { Loading } from "@/components/common/Loading";
@@ -37,11 +38,7 @@ import { selectCurrentBranch } from "@/store/slices/branchSlice";
 
 export const POSPage = () => {
   const { mode } = usePOSMode();
-
-  // Redirect to workspace if mode is standard
-  if (mode === "standard") {
-    return <Navigate to="/pos-workspace" replace />;
-  }
+  const shouldRedirectToWorkspace = mode === "standard";
 
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [showPayment, setShowPayment] = useState(false);
@@ -52,6 +49,12 @@ export const POSPage = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
     null,
   );
+  const [orderType, setOrderType] = useState<"Standard" | "Delivery">(
+    "Standard",
+  );
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [deliveryFee, setDeliveryFee] = useState("");
+  const [deliveryNotes, setDeliveryNotes] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -175,6 +178,10 @@ export const POSPage = () => {
     });
   }
 
+  if (shouldRedirectToWorkspace) {
+    return <Navigate to="/pos-workspace" replace />;
+  }
+
   if (isLoading || isLoadingShift) {
     return (
       <div className="h-full flex items-center justify-center bg-gray-50">
@@ -222,6 +229,9 @@ export const POSPage = () => {
 
         {/* Low Stock Alert */}
         <LowStockAlert />
+
+        {/* Batch Expiry Alert */}
+        <BatchExpiryAlertBanner />
 
         {/* Search Input */}
         <div className="mb-3">
@@ -436,6 +446,14 @@ export const POSPage = () => {
           onCheckout={() => setShowPayment(true)}
           selectedCustomer={selectedCustomer}
           onCustomerSelect={setSelectedCustomer}
+          orderType={orderType}
+          onOrderTypeChange={setOrderType}
+          deliveryAddress={deliveryAddress}
+          onDeliveryAddressChange={setDeliveryAddress}
+          deliveryFee={deliveryFee}
+          onDeliveryFeeChange={setDeliveryFee}
+          deliveryNotes={deliveryNotes}
+          onDeliveryNotesChange={setDeliveryNotes}
         />
       </div>
 
@@ -454,6 +472,14 @@ export const POSPage = () => {
               }}
               selectedCustomer={selectedCustomer}
               onCustomerSelect={setSelectedCustomer}
+              orderType={orderType}
+              onOrderTypeChange={setOrderType}
+              deliveryAddress={deliveryAddress}
+              onDeliveryAddressChange={setDeliveryAddress}
+              deliveryFee={deliveryFee}
+              onDeliveryFeeChange={setDeliveryFee}
+              deliveryNotes={deliveryNotes}
+              onDeliveryNotesChange={setDeliveryNotes}
             />
           </div>
         </div>
@@ -464,7 +490,17 @@ export const POSPage = () => {
         <PaymentModal
           onClose={() => setShowPayment(false)}
           selectedCustomer={selectedCustomer}
-          onOrderComplete={() => setSelectedCustomer(null)}
+          orderType={orderType}
+          deliveryAddress={deliveryAddress}
+          deliveryFee={deliveryFee}
+          deliveryNotes={deliveryNotes}
+          onOrderComplete={() => {
+            setSelectedCustomer(null);
+            setOrderType("Standard");
+            setDeliveryAddress("");
+            setDeliveryFee("");
+            setDeliveryNotes("");
+          }}
         />
       )}
 

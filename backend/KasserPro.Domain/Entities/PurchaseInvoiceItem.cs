@@ -36,8 +36,15 @@ public class PurchaseInvoiceItem : BaseEntity
     public decimal Total { get; set; }
     
     public string? Notes { get; set; }
-    
+
+    // Batch tracking
+    public int? BatchId { get; set; }
+    public string? BatchNumber { get; set; }
+    public DateTime? ExpiryDate { get; set; }
+    public DateTime? ProductionDate { get; set; }
+
     // Navigation properties
     public PurchaseInvoice PurchaseInvoice { get; set; } = null!;
     public Product Product { get; set; } = null!;
+    public ProductBatch? Batch { get; set; }
 }

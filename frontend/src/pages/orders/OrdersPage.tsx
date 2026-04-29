@@ -30,6 +30,9 @@ export const OrdersPage = () => {
   const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"today" | "all" | "date">("today");
   const [selectedDate, setSelectedDate] = useState<string>("");
+  const [orderTypeFilter, setOrderTypeFilter] = useState<"all" | "delivery">(
+    "all",
+  );
 
   const [filters, setFilters] = useState<OrdersQueryParams>({
     page: 1,
@@ -48,13 +51,15 @@ export const OrdersPage = () => {
 
   const filteredOrders = displayOrders.filter(
     (o) =>
-      o.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.customerName?.toLowerCase().includes(searchQuery.toLowerCase()),
+      (orderTypeFilter === "all" || o.orderType === "Delivery") &&
+      (o.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        o.customerName?.toLowerCase().includes(searchQuery.toLowerCase())),
   );
 
   const isLoading = viewMode === "today" ? isLoadingOrders : isLoadingFiltered;
 
   const handleViewModeChange = (mode: "today" | "all" | "date") => {
+    const orderType = orderTypeFilter === "delivery" ? "Delivery" : undefined;
     setViewMode(mode);
     if (mode === "date" && !selectedDate) {
       setSelectedDate(new Date().toISOString().split("T")[0]);
@@ -63,6 +68,7 @@ export const OrdersPage = () => {
       setFilters({
         page: 1,
         pageSize: 20,
+        orderType,
         fromDate: selectedDate,
         toDate: selectedDate,
       });
@@ -70,19 +76,36 @@ export const OrdersPage = () => {
       setFilters({
         page: 1,
         pageSize: 20,
+        orderType,
       });
     }
   };
 
   const handleDateChange = (date: string) => {
+    const orderType = orderTypeFilter === "delivery" ? "Delivery" : undefined;
     setSelectedDate(date);
     setViewMode("date");
     setFilters({
       page: 1,
       pageSize: 20,
+      orderType,
       fromDate: date,
       toDate: date,
     });
+  };
+
+  const handleOrderTypeFilterChange = (value: "all" | "delivery") => {
+    setOrderTypeFilter(value);
+
+    if (viewMode === "today") {
+      return;
+    }
+
+    setFilters((prev) => ({
+      ...prev,
+      page: 1,
+      orderType: value === "delivery" ? "Delivery" : undefined,
+    }));
   };
 
   const getStatusColor = (status: string) => {
@@ -123,13 +146,18 @@ export const OrdersPage = () => {
   };
 
   const clearFilters = () => {
+    setOrderTypeFilter("all");
     setFilters({
       page: 1,
       pageSize: 20,
     });
   };
 
-  const hasActiveFilters = filters.status || filters.fromDate || filters.toDate;
+  const hasActiveFilters =
+    filters.status ||
+    filters.fromDate ||
+    filters.toDate ||
+    orderTypeFilter === "delivery";
 
   if (isLoading) {
     return <Loading />;
@@ -368,6 +396,21 @@ export const OrdersPage = () => {
               className="pl-10"
             />
           </div>
+          <div className="relative mt-3">
+            <select
+              value={orderTypeFilter}
+              onChange={(e) =>
+                handleOrderTypeFilterChange(
+                  e.target.value as "all" | "delivery",
+                )
+              }
+              className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-2.5 pe-10 text-sm text-gray-700 outline-none transition-all duration-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">كل الطلبات</option>
+              <option value="delivery">طلبات التوصيل فقط</option>
+            </select>
+            <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+          </div>
         </Card>
 
         {/* Orders Table */}
@@ -458,14 +501,29 @@ export const OrdersPage = () => {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <span
-                          className={clsx(
-                            "px-2.5 py-0.5 rounded-full text-xs font-medium",
-                            getStatusColor(order.status),
+                        <div className="flex flex-wrap gap-1">
+                          <span
+                            className={clsx(
+                              "px-2.5 py-0.5 rounded-full text-xs font-medium",
+                              getStatusColor(order.status),
+                            )}
+                          >
+                            {ORDER_STATUS[order.status]?.label}
+                          </span>
+                          {order.orderType === "Delivery" && (
+                            <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                              {order.deliveryStatus === "Delivered"
+                                ? "تم التوصيل"
+                                : order.deliveryStatus === "OutForDelivery"
+                                ? "في الطريق"
+                                : order.deliveryStatus === "Assigned"
+                                ? "تم التعيين"
+                                : order.deliveryStatus === "Cancelled"
+                                ? "ملغى"
+                                : "في الانتظار"}
+                            </span>
                           )}
-                        >
-                          {ORDER_STATUS[order.status]?.label}
-                        </span>
+                        </div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1">
@@ -595,5 +653,3 @@ export const OrdersPage = () => {
 };
 
 export default OrdersPage;
-
-

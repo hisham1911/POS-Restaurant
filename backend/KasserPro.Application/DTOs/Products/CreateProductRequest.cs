@@ -36,4 +36,10 @@ public class CreateProductRequest
     // Branch-specific initial stock (optional)
     // Key: BranchId, Value: Initial Quantity
     public Dictionary<int, int>? BranchStockQuantities { get; set; }
+    
+    /// <summary>
+    /// Whether this product tracks batches (FEFO, expiry, cost-per-batch).
+    /// Default true for all products.
+    /// </summary>
+    public bool IsBatchTracked { get; set; } = true;
 }

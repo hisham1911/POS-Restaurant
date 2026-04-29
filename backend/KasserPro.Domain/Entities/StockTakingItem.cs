@@ -12,17 +12,20 @@ public class StockTakingItem : BaseEntity
     public int ProductId { get; set; }
 
     /// <summary>
-    /// System quantity at the time of counting
+    /// System quantity at the time of counting.
+    /// NOTE: Phase 2 — change to decimal when fractional quantities are supported.
     /// </summary>
     public int SystemQuantity { get; set; }
 
     /// <summary>
-    /// Actual quantity counted physically
+    /// Actual quantity counted physically.
+    /// NOTE: Phase 2 — change to decimal when fractional quantities are supported.
     /// </summary>
     public int ActualQuantity { get; set; }
 
     /// <summary>
-    /// Difference = ActualQuantity - SystemQuantity
+    /// Difference = ActualQuantity - SystemQuantity.
+    /// NOTE: Phase 2 — recalculate as decimal when fractional quantities are supported.
     /// </summary>
     public int Difference => ActualQuantity - SystemQuantity;
 

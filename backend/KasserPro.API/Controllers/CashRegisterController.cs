@@ -111,7 +111,7 @@ public class CashRegisterController : ControllerBase
     /// Reconcile cash register at shift close (Admin only)
     /// </summary>
     [HttpPost("reconcile")]
-    [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.CashRegisterReconcile)]
     public async Task<IActionResult> Reconcile(
         [FromQuery] int shiftId,
         [FromBody] ReconcileCashRegisterRequest request)
@@ -128,7 +128,7 @@ public class CashRegisterController : ControllerBase
     /// Transfer cash between branches (Admin only)
     /// </summary>
     [HttpPost("transfer")]
-    [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.CashRegisterTransfer)]
     public async Task<IActionResult> Transfer([FromBody] TransferCashRequest request)
     {
         var result = await _cashRegisterService.TransferCashAsync(request);

@@ -91,6 +91,7 @@ public class ProductService : IProductService
                 IsActive = p.IsActive,
                 Type = p.Type,
                 TrackInventory = p.TrackInventory,
+                IsBatchTracked = p.IsBatchTracked,
                 CurrentBranchStock = branchQuantity,
                 CategoryId = p.CategoryId,
                 CategoryName = p.Category?.Name,
@@ -156,6 +157,7 @@ public class ProductService : IProductService
             IsActive = product.IsActive,
             Type = product.Type,
             TrackInventory = product.TrackInventory,
+            IsBatchTracked = product.IsBatchTracked,
             CurrentBranchStock = branchQuantity,
             CategoryId = product.CategoryId,
             CategoryName = product.Category?.Name,
@@ -195,6 +197,7 @@ public class ProductService : IProductService
             Type = request.Type,
             // TrackInventory is automatically set based on Type
             TrackInventory = request.Type == Domain.Enums.ProductType.Physical,
+            IsBatchTracked = request.IsBatchTracked,
             LowStockThreshold = request.LowStockThreshold,
             ReorderPoint = request.ReorderPoint,
             LastStockUpdate = DateTime.UtcNow
@@ -253,6 +256,7 @@ public class ProductService : IProductService
             IsActive = product.IsActive,
             Type = product.Type,
             TrackInventory = product.TrackInventory,
+            IsBatchTracked = product.IsBatchTracked,
             CurrentBranchStock = request.InitialBranchStock, // Return requested quantity for consistency
             CategoryId = product.CategoryId
         }, "تم إنشاء المنتج بنجاح");
@@ -294,6 +298,7 @@ public class ProductService : IProductService
         product.TrackInventory = request.Type == Domain.Enums.ProductType.Physical;
         product.LowStockThreshold = request.LowStockThreshold;
         product.ReorderPoint = request.ReorderPoint;
+        product.IsBatchTracked = request.IsBatchTracked;
         product.LastStockUpdate = DateTime.UtcNow;
 
         _unitOfWork.Products.Update(product);
@@ -320,6 +325,7 @@ public class ProductService : IProductService
             IsActive = product.IsActive,
             Type = product.Type,
             TrackInventory = product.TrackInventory,
+            IsBatchTracked = product.IsBatchTracked,
             CurrentBranchStock = branchQuantity,
             CategoryId = product.CategoryId
         }, "تم تحديث المنتج بنجاح");
@@ -496,6 +502,7 @@ public class ProductService : IProductService
                 ImageUrl = product.ImageUrl,
                 Type = product.Type,
                 TrackInventory = product.TrackInventory,
+                IsBatchTracked = product.IsBatchTracked,
                 IsActive = product.IsActive,
                 CategoryId = product.CategoryId,
                 CurrentBranchStock = request.InitialStock

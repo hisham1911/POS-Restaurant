@@ -118,7 +118,7 @@ public class ExpensesController : ControllerBase
     /// Approve an expense (Admin only)
     /// </summary>
     [HttpPost("{id}/approve")]
-    [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.ExpensesApprove)]
     public async Task<IActionResult> Approve(int id, [FromBody] ApproveExpenseRequest request)
     {
         var result = await _expenseService.ApproveAsync(id, request);
@@ -133,7 +133,7 @@ public class ExpensesController : ControllerBase
     /// Reject an expense (Admin only)
     /// </summary>
     [HttpPost("{id}/reject")]
-    [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.ExpensesApprove)]
     public async Task<IActionResult> Reject(int id, [FromBody] RejectExpenseRequest request)
     {
         var result = await _expenseService.RejectAsync(id, request);
@@ -148,7 +148,7 @@ public class ExpensesController : ControllerBase
     /// Pay an expense (Admin only)
     /// </summary>
     [HttpPost("{id}/pay")]
-    [Authorize(Roles = "Admin")]
+    [HasPermission(Permission.ExpensesApprove)]
     public async Task<IActionResult> Pay(int id, [FromBody] PayExpenseRequest request)
     {
         var result = await _expenseService.PayAsync(id, request);

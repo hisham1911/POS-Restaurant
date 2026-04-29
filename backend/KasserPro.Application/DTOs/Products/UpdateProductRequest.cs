@@ -33,4 +33,10 @@ public class UpdateProductRequest
     public int CurrentBranchStock { get; set; } = 0;
     public int LowStockThreshold { get; set; } = 5;
     public int? ReorderPoint { get; set; }
+    
+    /// <summary>
+    /// Whether this product tracks batches (FEFO, expiry, cost-per-batch).
+    /// Default true for all products.
+    /// </summary>
+    public bool IsBatchTracked { get; set; } = true;
 }

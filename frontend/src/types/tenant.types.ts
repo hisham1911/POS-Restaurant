@@ -13,6 +13,8 @@ export interface Tenant {
   serviceChargeRate: number;
   // Inventory Settings
   allowNegativeStock: boolean;
+  expiryAlertDays: number;
+  allowExpiredSales: boolean;
   // Receipt Settings
   receiptPaperSize: string;
   receiptCustomWidth?: number;
@@ -46,6 +48,8 @@ export interface UpdateTenantRequest {
   serviceChargeRate?: number;
   // Inventory Settings
   allowNegativeStock?: boolean;
+  expiryAlertDays?: number;
+  allowExpiredSales?: boolean;
   // Receipt Settings
   receiptPaperSize?: string;
   receiptCustomWidth?: number;

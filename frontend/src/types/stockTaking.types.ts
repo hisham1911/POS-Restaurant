@@ -1,8 +1,13 @@
 export type StockTakingStatus = "InProgress" | "Completed" | "Cancelled";
+export type StockTakingType = "Full" | "Partial";
 
 export interface StockTaking {
   id: number;
   stockTakingNumber: string;
+  type: StockTakingType;
+  typeName: string;
+  categoryId?: number;
+  categoryName?: string;
   status: StockTakingStatus;
   statusName: string;
   startedAt: string;
@@ -31,6 +36,8 @@ export interface StockTakingItem {
 }
 
 export interface CreateStockTakingRequest {
+  type: StockTakingType;
+  categoryId?: number;
   notes?: string;
 }
 
@@ -54,4 +61,14 @@ export interface StockTakingPagedResult {
   totalPages: number;
   hasNextPage: boolean;
   hasPreviousPage: boolean;
+}
+
+export interface StockTakingReviewSummary {
+  totalItems: number;
+  positiveDiffCount: number;
+  negativeDiffCount: number;
+  zeroDiffCount: number;
+  totalPositiveDiff: number;
+  totalNegativeDiff: number;
+  largeDifferences: StockTakingItem[];
 }

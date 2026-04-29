@@ -60,6 +60,7 @@ import { CashRegisterDashboard } from "./pages/cash-register/CashRegisterDashboa
 import { CashRegisterTransactionsPage } from "./pages/cash-register/CashRegisterTransactionsPage";
 import InventoryPage from "./pages/inventory/InventoryPage";
 import { StockTakingPage } from "./pages/inventory/StockTakingPage";
+import { ProductBatchesPage } from "./pages/inventory/ProductBatchesPage";
 import DeliveryPersonsPage from "./pages/delivery/DeliveryPersonsPage";
 import DeliveryOperationsPage from "./pages/delivery/DeliveryOperationsPage";
 import TenantCreationPage from "./pages/owner/TenantCreationPage";
@@ -617,6 +618,16 @@ const AppRoutes = () => (
           <NonSystemOwnerRoute>
             <PermissionRoute permission="InventoryManage">
               <StockTakingPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/product-batches"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="InventoryView">
+              <ProductBatchesPage />
             </PermissionRoute>
           </NonSystemOwnerRoute>
         }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAppSelector } from "../../store/hooks";
 import { selectCurrentBranch } from "../../store/slices/branchSlice";
 import { selectIsAdmin } from "../../store/slices/authSlice";
@@ -10,12 +11,15 @@ import {
   BranchPricingEditor,
   BatchExpiryAlertBanner,
 } from "../../components/inventory";
+import { useGetLatestCompletedStockTakingQuery } from "../../api/stockTakingApi";
 import {
   Package,
   AlertTriangle,
   ArrowRightLeft,
   DollarSign,
   Building2,
+  ClipboardList,
+  ArrowRight,
 } from "lucide-react";
 
 type TabType = "inventory" | "alerts" | "transfers" | "pricing";
@@ -23,8 +27,12 @@ type TabType = "inventory" | "alerts" | "transfers" | "pricing";
 export default function InventoryPage() {
   const currentBranch = useAppSelector(selectCurrentBranch);
   const isAdmin = useAppSelector(selectIsAdmin);
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<TabType>("inventory");
   const [showTransferForm, setShowTransferForm] = useState(false);
+
+  const { data: latestStockTakingData } = useGetLatestCompletedStockTakingQuery();
+  const latestStockTaking = latestStockTakingData?.data;
 
   const tabs = [
     {
@@ -80,6 +88,30 @@ export default function InventoryPage() {
 
         {/* Batch Expiry Alert */}
         <BatchExpiryAlertBanner />
+
+        {/* Latest Completed Stock Taking */}
+        {latestStockTaking && (
+          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <ClipboardList className="w-5 h-5 text-purple-600" />
+              <div>
+                <p className="text-sm font-semibold text-purple-900">
+                  آخر جرد مكتمل: {latestStockTaking.stockTakingNumber}
+                </p>
+                <p className="text-xs text-purple-700 mt-0.5">
+                  {latestStockTaking.itemCount} بنود | الفرق الكلي: {latestStockTaking.totalDifference > 0 ? '+' : ''}{latestStockTaking.totalDifference}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => navigate(`/stock-taking?open=${latestStockTaking.id}`)}
+              className="flex items-center gap-1 text-sm text-purple-700 hover:text-purple-900 font-medium transition-colors"
+            >
+              عرض الجرد
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="bg-white rounded-lg border border-gray-200 mb-6">

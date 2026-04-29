@@ -1,0 +1,121 @@
+# KasserPro Cash Register Supplier Payment Verification
+# Run these requests against a running API instance to verify scenarios 1 & 2
+# Then run the SQL queries below to confirm database state
+
+@baseUrl = http://localhost:5243
+@adminEmail = admin@kasserpro.com
+@adminPassword = Admin@123
+
+### ─────────────────────────────────────────
+### Step 0: Login as Admin to get JWT token
+### ─────────────────────────────────────────
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "{{adminEmail}}",
+  "password": "{{adminPassword}}"
+}
+
+# @name loginResponse
+# Capture: {{loginResponse.response.body.$.data.token}}
+
+### ─────────────────────────────────────────
+### PRE-TEST SQL (Run before Scenario 1):
+### ─────────────────────────────────────────
+# -- Check current cash register transactions count for target branch
+# SELECT COUNT(*) FROM CashRegisterTransactions WHERE Type = 6; -- SupplierPayment = 6
+# -- Note the count. After Scenario 1, it should increase by 1.
+# -- After Scenario 2, it should NOT change.
+
+### ─────────────────────────────────────────
+### Scenario 1: Pay Purchase Invoice with CASH
+### → Should create a CashRegisterTransaction (SupplierPayment)
+### ─────────────────────────────────────────
+
+### Step 1a: Find an unpaid/partially paid purchase invoice
+GET {{baseUrl}}/api/purchase-invoices?page=1&pageSize=5&status=Pending,PartiallyPaid
+Authorization: Bearer {{loginResponse.response.body.$.data.token}}
+
+# @name invoicesResponse
+
+### Step 1b: Add CASH payment to purchase invoice
+# Replace {invoiceId} with actual ID from previous response
+POST {{baseUrl}}/api/purchase-invoices/{invoiceId}/payments
+Authorization: Bearer {{loginResponse.response.body.$.data.token}}
+Content-Type: application/json
+
+{
+  "amount": 100.00,
+  "paymentDate": "{{$datetime iso8601}}",
+  "method": "Cash",
+  "referenceNumber": "CASH-PAY-001",
+  "notes": "Manual test - cash payment should create cash register record"
+}
+
+# @name cashPaymentResponse
+# Expected: isSuccess = true
+
+### ─────────────────────────────────────────
+### Scenario 1 VERIFICATION SQL (Run after):
+### ─────────────────────────────────────────
+# -- Verify a new SupplierPayment record was created
+# SELECT
+#   t.Id,
+#   t.Type,
+#   t.Amount,
+#   t.Description,
+#   t.CreatedAt,
+#   t.BranchId,
+#   t.ShiftId
+# FROM CashRegisterTransactions t
+# WHERE t.Type = 6  -- SupplierPayment
+# ORDER BY t.CreatedAt DESC
+# LIMIT 5;
+# -- EXPECTED: A new row with Type=6, Amount=100.00, matching the payment above
+
+### ─────────────────────────────────────────
+### Scenario 2: Pay Purchase Invoice with BANK TRANSFER
+### → Should NOT create a CashRegisterTransaction
+### ─────────────────────────────────────────
+
+### Step 2a: Record the current SupplierPayment count
+# (Run SQL: SELECT COUNT(*) FROM CashRegisterTransactions WHERE Type = 6;)
+# Note the current count.
+
+### Step 2b: Add BANK TRANSFER payment to purchase invoice
+# Replace {invoiceId} with actual ID
+POST {{baseUrl}}/api/purchase-invoices/{invoiceId}/payments
+Authorization: Bearer {{loginResponse.response.body.$.data.token}}
+Content-Type: application/json
+
+{
+  "amount": 150.00,
+  "paymentDate": "{{$datetime iso8601}}",
+  "method": "BankTransfer",
+  "referenceNumber": "BANK-REF-002",
+  "notes": "Manual test - bank transfer should NOT create cash register record"
+}
+
+# @name bankPaymentResponse
+# Expected: isSuccess = true
+
+### ─────────────────────────────────────────
+### Scenario 2 VERIFICATION SQL (Run after):
+### ─────────────────────────────────────────
+# -- Verify NO new SupplierPayment record was created
+# SELECT COUNT(*) FROM CashRegisterTransactions WHERE Type = 6;
+# -- EXPECTED: Count should be SAME as before (no new row for bank transfer)
+
+# -- Alternative: verify the most recent SupplierPayment is still the CASH one
+# SELECT
+#   t.Id,
+#   t.Type,
+#   t.Amount,
+#   t.Description,
+#   t.CreatedAt
+# FROM CashRegisterTransactions t
+# WHERE t.Type = 6
+# ORDER BY t.CreatedAt DESC
+# LIMIT 1;
+# -- EXPECTED: Most recent should be the 100.00 cash payment, NOT 150.00

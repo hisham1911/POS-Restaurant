@@ -465,7 +465,8 @@ public class CashRegisterService : ICashRegisterService
         string description,
         string? referenceType = null,
         int? referenceId = null,
-        int? shiftId = null)
+        int? shiftId = null,
+        int? branchId = null)
     {
         // P0-8: If we're already inside a caller's transaction (e.g., CompleteAsync),
         // piggyback on it. If not, create our own to ensure read+write atomicity.
@@ -477,8 +478,10 @@ public class CashRegisterService : ICashRegisterService
 
         try
         {
+            var targetBranchId = branchId ?? _currentUserService.BranchId;
+
             // Read current balance — inside transaction, so SQLite write lock protects us
-            var currentBalance = await GetCurrentBalanceForBranchAsync(_currentUserService.BranchId);
+            var currentBalance = await GetCurrentBalanceForBranchAsync(targetBranchId);
 
             var user = await _unitOfWork.Users.Query()
                 .FirstOrDefaultAsync(u => u.Id == _currentUserService.UserId);
@@ -502,7 +505,7 @@ public class CashRegisterService : ICashRegisterService
             var cashTransaction = new CashRegisterTransaction
             {
                 TenantId = _currentUserService.TenantId,
-                BranchId = _currentUserService.BranchId,
+                BranchId = targetBranchId,
                 TransactionNumber = transactionNumber,
                 Type = type,
                 Amount = amount,

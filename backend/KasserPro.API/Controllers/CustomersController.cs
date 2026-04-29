@@ -53,7 +53,7 @@ public class CustomersController : ControllerBase
     }
 
     [HttpGet("by-phone/{phone}")]
-    [HasPermission(Permission.CustomersView)]
+    [HasPermission(Permission.CustomersView, Permission.PosSell)]
     public async Task<IActionResult> GetByPhone(string phone)
     {
         var result = await _customerService.GetByPhoneAsync(phone);
@@ -63,7 +63,7 @@ public class CustomersController : ControllerBase
     }
 
     [HttpPost]
-    [HasPermission(Permission.CustomersManage)]
+    [HasPermission(Permission.CustomersManage, Permission.PosSell)]
     public async Task<IActionResult> Create([FromBody] CreateCustomerRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Phone))
@@ -108,6 +108,7 @@ public class CustomersController : ControllerBase
     }
 
     [HttpPost("get-or-create")]
+    [HasPermission(Permission.CustomersManage, Permission.PosSell)]
     public async Task<IActionResult> GetOrCreate([FromBody] GetOrCreateCustomerRequest request)
     {
         if (string.IsNullOrWhiteSpace(request.Phone))

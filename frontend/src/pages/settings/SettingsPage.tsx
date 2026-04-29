@@ -181,6 +181,8 @@ export const SettingsPage = () => {
   const [currency, setCurrency] = useState<string>("EGP");
   const [timezone, setTimezone] = useState<string>("Africa/Cairo");
   const [allowNegativeStock, setAllowNegativeStock] = useState<boolean>(false);
+  const [expiryAlertDays, setExpiryAlertDays] = useState<number>(30);
+  const [allowExpiredSales, setAllowExpiredSales] = useState<boolean>(false);
 
   // Receipt settings state
   const [receiptPaperSize, setReceiptPaperSize] = useState<string>("80mm");
@@ -218,6 +220,8 @@ export const SettingsPage = () => {
       setCurrency(tenant.currency);
       setTimezone(tenant.timezone);
       setAllowNegativeStock(tenant.allowNegativeStock ?? false);
+      setExpiryAlertDays(tenant.expiryAlertDays ?? 30);
+      setAllowExpiredSales(tenant.allowExpiredSales ?? false);
       // Receipt settings
       setReceiptPaperSize(tenant.receiptPaperSize || "80mm");
       setReceiptCustomWidth(tenant.receiptCustomWidth ?? 280);
@@ -260,6 +264,8 @@ export const SettingsPage = () => {
         isTaxEnabled,
         serviceChargeRate,
         allowNegativeStock,
+        expiryAlertDays,
+        allowExpiredSales,
         receiptPaperSize,
         receiptCustomWidth,
         receiptHeaderFontSize,
@@ -810,6 +816,56 @@ export const SettingsPage = () => {
               </p>
             </div>
           )}
+
+          {/* Expiry Alert Days */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              عدد أيام التنبيه قبل انتهاء الصلاحية
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="number"
+                min="0"
+                max="365"
+                value={expiryAlertDays}
+                onChange={(e) => setExpiryAlertDays(Number(e.target.value))}
+                className="w-32 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
+                dir="ltr"
+              />
+              <span className="text-sm text-gray-500">
+                يوم (0 = إيقاف التنبيهات)
+              </span>
+            </div>
+          </div>
+
+          {/* Allow Expired Sales Toggle */}
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <p className="font-medium">
+                السماح ببيع المنتجات منتهية الصلاحية
+              </p>
+              <p className="text-sm text-gray-500">
+                {allowExpiredSales
+                  ? "مسموح - يمكن بيع الباتشات المنتهية الصلاحية"
+                  : "غير مسموح - سيمنع النظام بيع الباتشات المنتهية"}
+              </p>
+            </div>
+            <button
+              onClick={() => setAllowExpiredSales(!allowExpiredSales)}
+              className={clsx(
+                "p-2 rounded-lg transition-colors",
+                allowExpiredSales
+                  ? "bg-success-100 text-success-600"
+                  : "bg-gray-200 text-gray-500",
+              )}
+            >
+              {allowExpiredSales ? (
+                <ToggleRight className="w-8 h-8" />
+              ) : (
+                <ToggleLeft className="w-8 h-8" />
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Receipt Settings Card */}

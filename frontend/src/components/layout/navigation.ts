@@ -273,6 +273,17 @@ export const navigationItems: NavigationItem[] = [
     permission: "InventoryManage",
   },
   {
+    path: "/product-batches",
+    label: "الدفعات",
+    description:
+      "إدارة دفعات المخزون، تتبع الصلاحية، والتكلفة لكل دفعة.",
+    spotlight: "تتبع الدفعات",
+    icon: Package,
+    sectionId: "catalog",
+    audience: "non-system-owner",
+    permission: "InventoryView",
+  },
+  {
     path: "/expenses",
     label: "المصروفات",
     description:

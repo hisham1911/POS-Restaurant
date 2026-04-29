@@ -17,6 +17,8 @@ export interface ProductBatch {
   status: BatchStatus;
   notes?: string;
   daysUntilExpiry: number;
+  branchId?: number;
+  branchName?: string;
 }
 
 export interface BatchExpiryAlert {

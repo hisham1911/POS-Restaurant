@@ -59,6 +59,7 @@ public class InventoryService : IInventoryService
                 Quantity = i.Quantity,
                 ReorderLevel = i.ReorderLevel,
                 IsLowStock = i.Quantity <= i.ReorderLevel,
+                IsBatchTracked = i.Product.IsBatchTracked,
                 LastUpdatedAt = i.LastUpdatedAt
             }).ToList();
 
@@ -109,6 +110,7 @@ public class InventoryService : IInventoryService
                     Quantity = i.Quantity,
                     ReorderLevel = i.ReorderLevel,
                     IsLowStock = i.Quantity <= i.ReorderLevel,
+                    IsBatchTracked = i.Product.IsBatchTracked,
                     LastUpdatedAt = i.LastUpdatedAt
                 }).ToList()
             };
@@ -154,6 +156,7 @@ public class InventoryService : IInventoryService
                 Quantity = i.Quantity,
                 ReorderLevel = i.ReorderLevel,
                 IsLowStock = true,
+                IsBatchTracked = i.Product.IsBatchTracked,
                 LastUpdatedAt = i.LastUpdatedAt
             }).ToList();
 
@@ -240,6 +243,7 @@ public class InventoryService : IInventoryService
                 Quantity = inventory.Quantity,
                 ReorderLevel = inventory.ReorderLevel,
                 IsLowStock = inventory.Quantity <= inventory.ReorderLevel,
+                IsBatchTracked = inventory.Product.IsBatchTracked,
                 LastUpdatedAt = inventory.LastUpdatedAt
             };
 
@@ -387,9 +391,10 @@ public class InventoryService : IInventoryService
         return await GetAvailableQuantityAsync(productId, branchId);
     }
 
-    public async Task<int> IncrementStockAsync(int productId, int quantity, int referenceId)
+    public async Task<int> IncrementStockAsync(int productId, int quantity, int referenceId, int? batchId = null)
     {
         var branchId = _currentUserService.BranchId;
+        var tenantId = _currentUserService.TenantId;
 
         // GUARD: Check if product tracks inventory
         var product = await _context.Products.FindAsync(productId);
@@ -408,7 +413,7 @@ public class InventoryService : IInventoryService
         {
             inventory = new BranchInventory
             {
-                TenantId = _currentUserService.TenantId,
+                TenantId = tenantId,
                 BranchId = branchId,
                 ProductId = productId,
                 Quantity = 0,
@@ -422,10 +427,32 @@ public class InventoryService : IInventoryService
         inventory.Quantity += quantity;
         inventory.LastUpdatedAt = DateTime.UtcNow;
 
+        // Restore batch quantity if batchId provided and batch is active
+        ProductBatch? restoredBatch = null;
+        if (batchId.HasValue)
+        {
+            var batch = await _context.ProductBatches
+                .FirstOrDefaultAsync(pb => pb.Id == batchId.Value
+                    && pb.TenantId == tenantId
+                    && pb.BranchId == branchId
+                    && !pb.IsDeleted
+                    && (pb.Status == BatchStatus.Active || pb.Status == BatchStatus.Depleted));
+            if (batch != null)
+            {
+                batch.Quantity += quantity;
+                if (batch.Status == BatchStatus.Depleted && batch.Quantity > 0)
+                {
+                    batch.Status = BatchStatus.Active;
+                }
+                _context.ProductBatches.Update(batch);
+                restoredBatch = batch;
+            }
+        }
+
         // Record stock movement
         var movement = new StockMovement
         {
-            TenantId = _currentUserService.TenantId,
+            TenantId = tenantId,
             BranchId = branchId,
             ProductId = productId,
             Type = StockMovementType.Refund,
@@ -434,7 +461,10 @@ public class InventoryService : IInventoryService
             ReferenceId = referenceId,
             BalanceBefore = balanceBefore,
             BalanceAfter = inventory.Quantity,
-            Reason = "إرجاع منتج",
+            BatchId = restoredBatch?.Id,
+            Reason = restoredBatch != null
+                ? $"إرجاع منتج للباتش: {restoredBatch.BatchNumber}"
+                : "إرجاع منتج",
             UserId = _currentUserService.UserId
         };
         _context.StockMovements.Add(movement);

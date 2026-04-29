@@ -28,6 +28,11 @@ public class ProductDto
     public bool TrackInventory { get; set; }
     
     /// <summary>
+    /// Whether this product tracks batches (FEFO, expiry, cost-per-batch).
+    /// </summary>
+    public bool IsBatchTracked { get; set; } = true;
+    
+    /// <summary>
     /// Current stock quantity for the current branch (from BranchInventories table).
     /// Transitional field only until BranchInventory endpoints fully replace it in clients.
     /// </summary>

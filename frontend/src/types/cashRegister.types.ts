@@ -39,6 +39,8 @@ export interface CashRegisterBalance {
   currentBalance: number;
   lastTransactionDate?: string;
   lastTransactionType?: CashRegisterTransactionType;
+  activeShiftId?: number;
+  activeShiftNumber?: string;
 }
 
 // Cash Register Summary Interface
@@ -75,11 +77,33 @@ export interface ReconcileCashRegisterRequest {
 }
 
 export interface TransferCashRequest {
-  fromBranchId: number;
-  toBranchId: number;
+  sourceBranchId: number;
+  targetBranchId: number;
   amount: number;
   description: string;
-  shiftId?: number;
+  transactionDate: string;
+}
+
+export interface TransferCashDto {
+  sourceBranchId: number;
+  targetBranchId: number;
+  amount: number;
+  description?: string;
+  transactionDate: string;
+}
+
+export interface ReconcileDto {
+  branchId: number;
+  shiftId: number;
+  actualCashAmount: number;
+  notes?: string;
+}
+
+export interface ReconcileResultDto {
+  expectedAmount: number;
+  actualAmount: number;
+  difference: number;
+  transactionId: number;
 }
 
 // Filters

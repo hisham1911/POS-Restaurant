@@ -970,7 +970,7 @@ public class OrderService : IOrderService
                         if (product != null && product.TrackInventory)
                         {
                             var currentStock = await _inventoryService.GetCurrentStockAsync(orderItem.ProductId.Value);
-                            var newStock = await _inventoryService.IncrementStockAsync(orderItem.ProductId.Value, refundItem.Quantity, originalOrder.Id);
+                            var newStock = await _inventoryService.IncrementStockAsync(orderItem.ProductId.Value, refundItem.Quantity, originalOrder.Id, orderItem.BatchId);
 
                             stockChanges.Add(new
                             {
@@ -1064,7 +1064,7 @@ public class OrderService : IOrderService
                         if (product != null && product.TrackInventory)
                         {
                             var currentStock = await _inventoryService.GetCurrentStockAsync(item.ProductId.Value);
-                            var newStock = await _inventoryService.IncrementStockAsync(item.ProductId.Value, remainingQuantity, originalOrder.Id);
+                            var newStock = await _inventoryService.IncrementStockAsync(item.ProductId.Value, remainingQuantity, originalOrder.Id, item.BatchId);
 
                             stockChanges.Add(new
                             {

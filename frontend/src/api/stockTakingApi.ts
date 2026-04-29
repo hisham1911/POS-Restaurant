@@ -81,6 +81,7 @@ export const stockTakingApi = baseApi.injectEndpoints({
       invalidatesTags: (_result, _error, { id }) => [
         { type: "StockTaking", id },
         { type: "StockTaking", id: "LIST" },
+        { type: "StockTaking", id: "LATEST" },
         { type: "Inventory", id: "LIST" },
       ],
     }),
@@ -95,6 +96,11 @@ export const stockTakingApi = baseApi.injectEndpoints({
         { type: "StockTaking", id: "LIST" },
       ],
     }),
+
+    getLatestCompletedStockTaking: builder.query<ApiResponse<StockTaking | null>, void>({
+      query: () => `stocktaking/latest-completed`,
+      providesTags: [{ type: "StockTaking", id: "LATEST" }],
+    }),
   }),
 });
 
@@ -106,4 +112,5 @@ export const {
   useRemoveStockTakingItemMutation,
   useCompleteStockTakingMutation,
   useCancelStockTakingMutation,
+  useGetLatestCompletedStockTakingQuery,
 } = stockTakingApi;

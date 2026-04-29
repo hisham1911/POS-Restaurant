@@ -39,7 +39,7 @@ public interface IInventoryService
     // Legacy compatibility methods for OrderService
     Task BatchDecrementStockAsync(List<(int OrderItemId, int ProductId, int Quantity)> items, int orderId);
     Task<int> GetCurrentStockAsync(int productId);
-    Task<int> IncrementStockAsync(int productId, int quantity, int referenceId);
+    Task<int> IncrementStockAsync(int productId, int quantity, int referenceId, int? batchId = null);
 
     /// <summary>
     /// FIX H-2: Get restorable quantity for a product on a given order.

@@ -39,6 +39,7 @@ public enum Permission
     ExpensesView       = 700,
     ExpensesCreate     = 701,
     ExpensesManage     = 702,
+    ExpensesApprove    = 703,
 
     // Inventory
     InventoryView      = 800,
@@ -49,8 +50,10 @@ public enum Permission
     ShiftsManage       = 900,
 
     // Cash Register
-    CashRegisterView   = 1000,
-    CashRegisterManage = 1001,
+    CashRegisterView      = 1000,
+    CashRegisterManage    = 1001,
+    CashRegisterTransfer  = 1002,
+    CashRegisterReconcile = 1003,
 
     // Branches
     BranchesView       = 1100,

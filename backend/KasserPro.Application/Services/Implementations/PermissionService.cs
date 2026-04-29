@@ -32,6 +32,9 @@ public class PermissionService : IPermissionService
         [Permission.CategoriesManage] = new[] { Permission.CategoriesView },
         [Permission.ExpensesCreate] = new[] { Permission.ExpensesView },
         [Permission.ExpensesManage] = new[] { Permission.ExpensesView },
+        [Permission.ExpensesApprove] = new[] { Permission.ExpensesView },
+        [Permission.CashRegisterTransfer] = new[] { Permission.CashRegisterView },
+        [Permission.CashRegisterReconcile] = new[] { Permission.CashRegisterView },
         [Permission.InventoryManage] = new[] { Permission.InventoryView },
         [Permission.InventoryTransfer] = new[] { Permission.InventoryView },
         [Permission.CashRegisterManage] = new[] { Permission.CashRegisterView },
@@ -469,6 +472,16 @@ public class PermissionService : IPermissionService
                 IsDefault = false,
                 IsSensitive = true
             },
+            new PermissionInfoDto
+            {
+                Key = Permission.ExpensesApprove.ToString(),
+                Group = "Expenses",
+                GroupAr = "المصروفات",
+                Description = "Approve, reject and pay expenses",
+                DescriptionAr = "اعتماد المصروفات",
+                IsDefault = false,
+                IsSensitive = true
+            },
 
             // Inventory
             new PermissionInfoDto
@@ -529,6 +542,26 @@ public class PermissionService : IPermissionService
                 GroupAr = "الخزينة",
                 Description = "Manage cash register transactions",
                 DescriptionAr = "إدارة حركات الخزينة",
+                IsDefault = false,
+                IsSensitive = true
+            },
+            new PermissionInfoDto
+            {
+                Key = Permission.CashRegisterTransfer.ToString(),
+                Group = "Cash Register",
+                GroupAr = "الخزينة",
+                Description = "Transfer cash between branches",
+                DescriptionAr = "تحويل نقدي بين الفروع",
+                IsDefault = false,
+                IsSensitive = true
+            },
+            new PermissionInfoDto
+            {
+                Key = Permission.CashRegisterReconcile.ToString(),
+                Group = "Cash Register",
+                GroupAr = "الخزينة",
+                Description = "Reconcile and close shift",
+                DescriptionAr = "مطابقة وإغلاق الشيفت",
                 IsDefault = false,
                 IsSensitive = true
             },

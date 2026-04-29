@@ -168,6 +168,18 @@ public static class ErrorCodes
     public const string INVENTORY_TRANSFER_ALREADY_CANCELLED = "INVENTORY_TRANSFER_ALREADY_CANCELLED";
     public const string BRANCH_PRICE_NOT_FOUND = "BRANCH_PRICE_NOT_FOUND";
     public const string BRANCH_PRICE_ALREADY_EXISTS = "BRANCH_PRICE_ALREADY_EXISTS";
+
+    // Stock Taking Errors (7100-7199)
+    public const string STOCK_TAKING_NOT_FOUND = "STOCK_TAKING_NOT_FOUND";
+    public const string STOCK_TAKING_NOT_EDITABLE = "STOCK_TAKING_NOT_EDITABLE";
+    public const string STOCK_TAKING_BATCH_INVALID = "STOCK_TAKING_BATCH_INVALID";
+    public const string STOCK_TAKING_BATCH_EXPIRED = "STOCK_TAKING_BATCH_EXPIRED";
+    public const string STOCK_TAKING_ITEM_NOT_FOUND = "STOCK_TAKING_ITEM_NOT_FOUND";
+
+    // Product Batch Errors (7200-7299)
+    public const string BATCH_HAS_QUANTITY = "BATCH_HAS_QUANTITY";
+    public const string BATCH_HAS_ORDERS = "BATCH_HAS_ORDERS";
+    public const string BATCH_HAS_MOVEMENTS = "BATCH_HAS_MOVEMENTS";
 }
 
 /// <summary>
@@ -332,7 +344,19 @@ public static class ErrorMessages
         { ErrorCodes.INVENTORY_TRANSFER_ALREADY_COMPLETED, "عملية النقل مكتملة بالفعل" },
         { ErrorCodes.INVENTORY_TRANSFER_ALREADY_CANCELLED, "عملية النقل ملغاة بالفعل" },
         { ErrorCodes.BRANCH_PRICE_NOT_FOUND, "سعر الفرع غير موجود" },
-        { ErrorCodes.BRANCH_PRICE_ALREADY_EXISTS, "سعر الفرع موجود بالفعل" }
+        { ErrorCodes.BRANCH_PRICE_ALREADY_EXISTS, "سعر الفرع موجود بالفعل" },
+
+        // Stock Taking
+        { ErrorCodes.STOCK_TAKING_NOT_FOUND, "جلسة الجرد غير موجودة" },
+        { ErrorCodes.STOCK_TAKING_NOT_EDITABLE, "لا يمكن تعديل جرد مكتمل أو ملغى" },
+        { ErrorCodes.STOCK_TAKING_BATCH_INVALID, "الباتش المختار لا ينتمي لهذا المنتج أو الفرع" },
+        { ErrorCodes.STOCK_TAKING_BATCH_EXPIRED, "الباتش منتهي الصلاحية أو غير نشط" },
+        { ErrorCodes.STOCK_TAKING_ITEM_NOT_FOUND, "بند الجرد غير موجود" },
+
+        // Product Batch
+        { ErrorCodes.BATCH_HAS_QUANTITY, "لا يمكن حذف باتش له كمية في المخزون" },
+        { ErrorCodes.BATCH_HAS_ORDERS, "لا يمكن حذف باتش مرتبط بطلبات" },
+        { ErrorCodes.BATCH_HAS_MOVEMENTS, "لا يمكن حذف باتش له حركات مخزون" }
     };
 
     public static string Get(string code) => Messages.TryGetValue(code, out var msg) ? msg : code;

@@ -12,16 +12,16 @@ namespace KasserPro.API.Middleware;
 [AttributeUsage(AttributeTargets.Method | AttributeTargets.Class)]
 public class HasPermissionAttribute : TypeFilterAttribute
 {
-    public HasPermissionAttribute(Permission permission)
+    public HasPermissionAttribute(params Permission[] permissions)
         : base(typeof(HasPermissionFilter))
     {
-        Arguments = new object[] { permission };
+        Arguments = new object[] { permissions };
     }
 }
 
 public class HasPermissionFilter : IAsyncAuthorizationFilter
 {
-    private readonly Permission _permission;
+    private readonly Permission[] _permissions;
     private static readonly Dictionary<Permission, Permission[]> PermissionImplications = new()
     {
         [Permission.OrdersCreate] = new[] { Permission.OrdersView },
@@ -47,9 +47,9 @@ public class HasPermissionFilter : IAsyncAuthorizationFilter
         },
     };
 
-    public HasPermissionFilter(Permission permission)
+    public HasPermissionFilter(Permission[] permissions)
     {
-        _permission = permission;
+        _permissions = permissions;
     }
 
     public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
@@ -73,7 +73,7 @@ public class HasPermissionFilter : IAsyncAuthorizationFilter
             .Select(c => c.Value)
             .ToList();
 
-        if (!HasEffectivePermission(permissions, _permission))
+        if (!_permissions.Any(permission => HasEffectivePermission(permissions, permission)))
         {
             context.Result = new ForbidResult();
             return;

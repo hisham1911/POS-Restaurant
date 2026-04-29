@@ -41,7 +41,7 @@ export default function PermissionsManagementCard() {
     try {
       await updatePermissions({
         userId: selectedUserId,
-        data: { permissions: selectedPermissions },
+        permissions: selectedPermissions,
       }).unwrap();
       toast.success("تم تحديث الصلاحيات بنجاح");
     } catch {

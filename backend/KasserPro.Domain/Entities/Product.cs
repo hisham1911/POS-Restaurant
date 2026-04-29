@@ -33,6 +33,12 @@ public class Product : BaseEntity
     public bool TrackInventory { get; set; } = true;
     
     /// <summary>
+    /// Whether this product tracks batches (FEFO, expiry, cost-per-batch).
+    /// Default true for all products; ExpiryDate is optional per batch.
+    /// </summary>
+    public bool IsBatchTracked { get; set; } = true;
+    
+    /// <summary>
     /// Alert threshold - show warning when stock falls below this level
     /// </summary>
     public int? LowStockThreshold { get; set; }

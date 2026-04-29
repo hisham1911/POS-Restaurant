@@ -60,8 +60,9 @@ public class AuthService : IAuthService
                     ErrorMessages.Get(ErrorCodes.TENANT_INACTIVE));
         }
 
-        var token = await GenerateTokenAsync(user);
-        var expiresAt = DateTime.UtcNow.AddHours(int.Parse(_config["Jwt:ExpiryInHours"]!));
+        var expiryHours = GetJwtExpiryHours();
+        var expiresAt = DateTime.UtcNow.AddHours(expiryHours);
+        var token = await GenerateTokenAsync(user, expiresAt);
 
         // Get permissions for the response
         var permissions = await _permissionService.GetUserPermissionsAsync(user.Id);
@@ -163,7 +164,7 @@ public class AuthService : IAuthService
         });
     }
 
-    private async Task<string> GenerateTokenAsync(User user)
+    private async Task<string> GenerateTokenAsync(User user, DateTime expiresAt)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
         var claims = new List<Claim>
@@ -192,16 +193,29 @@ public class AuthService : IAuthService
             claims.Add(new Claim("permission", permission.ToString()));
         }
 
-        var expiryHours = int.TryParse(_config["Jwt:ExpiryInHours"], out var hours) ? hours : 24;
-
         var token = new JwtSecurityToken(
-            issuer: _config["Jwt:Issuer"],
-            audience: _config["Jwt:Audience"],
+            issuer: GetJwtIssuer(),
+            audience: GetJwtAudience(),
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(expiryHours),
+            expires: expiresAt,
             signingCredentials: new SigningCredentials(key, SecurityAlgorithms.HmacSha256)
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private int GetJwtExpiryHours()
+    {
+        return int.TryParse(_config["Jwt:ExpiryInHours"], out var hours) ? hours : 24;
+    }
+
+    private string GetJwtIssuer()
+    {
+        return _config["Jwt:Issuer"] ?? "KasserPro";
+    }
+
+    private string GetJwtAudience()
+    {
+        return _config["Jwt:Audience"] ?? "KasserPro";
     }
 }

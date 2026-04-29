@@ -44,7 +44,7 @@ export default defineConfig({
   // Auto-start dev server before tests
   webServer: {
     command: 'npm run dev',
-    url: 'http://localhost:3002',
+    url: 'http://localhost:3000',
     reuseExistingServer: true,
     timeout: 120000,
   },

@@ -80,6 +80,8 @@ if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Length < 32)
         "Set environment variable 'Jwt__Key' to a random string of at least 32 characters. " +
         "Example PowerShell: $env:Jwt__Key = [Convert]::ToBase64String((1..64 | ForEach-Object { Get-Random -Max 256 }) -as [byte[]])");
 }
+var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? "KasserPro";
+var jwtAudience = builder.Configuration["Jwt:Audience"] ?? "KasserPro";
 
 // HttpContextAccessor for CurrentUserService
 builder.Services.AddHttpContextAccessor();
@@ -208,10 +210,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = builder.Configuration["Jwt:Issuer"],
-            ValidAudience = builder.Configuration["Jwt:Audience"],
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtAudience,
             IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]!))
+                Encoding.UTF8.GetBytes(jwtKey))
         };
 
         options.Events = new JwtBearerEvents

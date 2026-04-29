@@ -23,6 +23,8 @@ export interface Product {
   type: ProductType;
   // يتم تحديده تلقائياً بناءً على النوع
   trackInventory: boolean;
+  // تتبع الدفعات (Batch/Expiry/FEFO)
+  isBatchTracked: boolean;
   /** @deprecated Use BranchInventory endpoint instead. Will be removed next sprint. */
   // الكمية المتاحة في الفرع الحالي (من جدول BranchInventories)
   currentBranchStock?: number;
@@ -47,6 +49,8 @@ export interface CreateProductRequest {
   categoryId: number;
   // نوع المنتج (مادي أو خدمة) - بدلاً من trackInventory
   type?: ProductType;
+  // تتبع الدفعات (Batch/Expiry/FEFO)
+  isBatchTracked?: boolean;
   // الكمية الأولية للفرع الحالي (تُحفظ في BranchInventories)
   initialBranchStock?: number;
   lowStockThreshold?: number;
@@ -68,6 +72,8 @@ export interface UpdateProductRequest {
   categoryId: number;
   // نوع المنتج (مادي أو خدمة) - بدلاً من trackInventory
   type?: ProductType;
+  // تتبع الدفعات (Batch/Expiry/FEFO)
+  isBatchTracked?: boolean;
   /** @deprecated Use BranchInventory endpoint instead. Will be removed next sprint. */
   // الكمية في الفرع الحالي (تُحدّث في BranchInventories)
   currentBranchStock?: number; // @deprecated

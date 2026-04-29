@@ -1372,6 +1372,9 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
+                    b.Property<bool>("IsBatchTracked")
+                        .HasColumnType("INTEGER");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
@@ -2040,6 +2043,9 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<int>("BranchId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int?>("CategoryId")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("TEXT");
 
@@ -2073,12 +2079,17 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<int>("TenantId")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("Type")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("TEXT");
 
                     b.HasKey("Id");
 
                     b.HasIndex("BranchId");
+
+                    b.HasIndex("CategoryId");
 
                     b.HasIndex("CompletedByUserId");
 
@@ -3274,6 +3285,10 @@ namespace KasserPro.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("KasserPro.Domain.Entities.Category", "Category")
+                        .WithMany()
+                        .HasForeignKey("CategoryId");
+
                     b.HasOne("KasserPro.Domain.Entities.User", "CompletedByUser")
                         .WithMany()
                         .HasForeignKey("CompletedByUserId")
@@ -3292,6 +3307,8 @@ namespace KasserPro.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("Branch");
+
+                    b.Navigation("Category");
 
                     b.Navigation("CompletedByUser");
 

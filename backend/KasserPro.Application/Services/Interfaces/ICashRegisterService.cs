@@ -60,5 +60,6 @@ public interface ICashRegisterService
         string description,
         string? referenceType = null,
         int? referenceId = null,
-        int? shiftId = null);
+        int? shiftId = null,
+        int? branchId = null);
 }

@@ -13,6 +13,11 @@ public class BranchInventoryDto
     public int ReorderLevel { get; set; }
     public bool IsLowStock { get; set; }
     public DateTime LastUpdatedAt { get; set; }
+    
+    /// <summary>
+    /// Whether this product tracks batches (FEFO, expiry, cost-per-batch).
+    /// </summary>
+    public bool IsBatchTracked { get; set; } = true;
 }
 
 public class BranchInventorySummaryDto

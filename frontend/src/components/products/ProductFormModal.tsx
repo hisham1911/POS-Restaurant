@@ -5,6 +5,9 @@ import {
   Package,
   Wrench,
   ChevronDown,
+  ToggleRight,
+  ToggleLeft,
+  Eye,
 } from "lucide-react";
 import {
   Product,
@@ -142,6 +145,7 @@ export const ProductFormModal = ({
     imageUrl: product?.imageUrl || "",
     categoryId: product?.categoryId || categories[0]?.id || 0,
     type: product?.type || ProductType.Physical,
+    isBatchTracked: product?.isBatchTracked ?? true,
     branchQuantity: 0,
     lowStockThreshold: product?.lowStockThreshold ?? 5,
     reorderPoint: product?.reorderPoint ?? null,
@@ -194,6 +198,7 @@ export const ProductFormModal = ({
         imageUrl: formData.imageUrl,
         categoryId: formData.categoryId,
         type: formData.type,
+        isBatchTracked: formData.isBatchTracked,
         lowStockThreshold: formData.lowStockThreshold,
         reorderPoint: formData.reorderPoint ?? undefined,
         isActive: formData.isActive,
@@ -221,6 +226,7 @@ export const ProductFormModal = ({
         imageUrl: formData.imageUrl,
         categoryId: formData.categoryId,
         type: formData.type,
+        isBatchTracked: formData.isBatchTracked,
         initialBranchStock: formData.branchQuantity,
         lowStockThreshold: formData.lowStockThreshold,
         reorderPoint: formData.reorderPoint ?? undefined,
@@ -363,6 +369,56 @@ export const ProductFormModal = ({
                 : "الخدمات لا تحتاج لتتبع مخزون"}
             </p>
           </div>
+
+          {formData.type === ProductType.Physical && (
+            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+              <div>
+                <p className="font-medium text-sm">تتبع دفعات المخزون</p>
+                <p className="text-xs text-gray-500">
+                  {formData.isBatchTracked
+                    ? "يتم تتبع الدفعات والصلاحية (FEFO)"
+                    : "لا يتم تتبع الدفعات (FIFO)"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setFormData({
+                    ...formData,
+                    isBatchTracked: !formData.isBatchTracked,
+                  })
+                }
+                className={clsx(
+                  "p-2 rounded-lg transition-colors",
+                  formData.isBatchTracked
+                    ? "bg-success-100 text-success-600"
+                    : "bg-gray-200 text-gray-500",
+                )}
+              >
+                {formData.isBatchTracked ? (
+                  <ToggleRight className="w-7 h-7" />
+                ) : (
+                  <ToggleLeft className="w-7 h-7" />
+                )}
+              </button>
+            </div>
+          )}
+
+          {isEditing && product && (
+            <div className="flex justify-end">
+              <a
+                href={`/product-batches?productId=${product.id}`}
+                className="text-sm text-primary-600 hover:underline inline-flex items-center gap-1"
+                onClick={(e) => {
+                  e.preventDefault();
+                  window.location.href = `/product-batches?productId=${product.id}`;
+                }}
+              >
+                <Eye className="w-4 h-4" />
+                عرض دفعات هذا المنتج
+              </a>
+            </div>
+          )}
         </div>
 
         {/* Icon Picker */}

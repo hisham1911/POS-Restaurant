@@ -12,4 +12,5 @@ public interface IStockTakingService
     Task<ApiResponse<bool>> RemoveItemAsync(int stockTakingId, int itemId);
     Task<ApiResponse<StockTakingDto>> CompleteAsync(int id, CompleteStockTakingRequest request);
     Task<ApiResponse<bool>> CancelAsync(int id);
+    Task<StockTakingDto?> GetLatestCompletedAsync();
 }

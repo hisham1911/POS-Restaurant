@@ -58,6 +58,7 @@ public class ProductBatchService : IProductBatchService
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .Include(pb => pb.Product)
+            .Include(pb => pb.Branch)
             .Select(pb => MapToDto(pb))
             .ToListAsync();
 
@@ -77,50 +78,60 @@ public class ProductBatchService : IProductBatchService
         if (product == null)
             return ApiResponse<ProductBatchDto>.Fail(ErrorCodes.PRODUCT_NOT_FOUND, "المنتج غير موجود");
 
-        var batch = new ProductBatch
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
+        try
         {
-            TenantId = tenantId, BranchId = branchId, ProductId = dto.ProductId,
-            BatchNumber = dto.BatchNumber, Quantity = dto.Quantity, InitialQuantity = dto.Quantity,
-            ExpiryDate = dto.ExpiryDate, PurchaseDate = DateTime.UtcNow,
-            ProductionDate = dto.ProductionDate, CostPrice = dto.CostPrice,
-            SupplierName = dto.SupplierName, Status = BatchStatus.Active,
-            Notes = dto.Notes, CreatedAt = DateTime.UtcNow
-        };
-
-        await _unitOfWork.ProductBatches.AddAsync(batch);
-
-        // Update branch inventory
-        var bi = await _unitOfWork.BranchInventories.Query()
-            .FirstOrDefaultAsync(x => x.ProductId == dto.ProductId && x.BranchId == branchId && x.TenantId == tenantId);
-        if (bi == null)
-        {
-            bi = new BranchInventory
+            var batch = new ProductBatch
             {
                 TenantId = tenantId, BranchId = branchId, ProductId = dto.ProductId,
-                Quantity = dto.Quantity, ReorderLevel = product.LowStockThreshold ?? 10,
-                LastUpdatedAt = DateTime.UtcNow
+                BatchNumber = dto.BatchNumber, Quantity = dto.Quantity, InitialQuantity = dto.Quantity,
+                ExpiryDate = dto.ExpiryDate, PurchaseDate = DateTime.UtcNow,
+                ProductionDate = dto.ProductionDate, CostPrice = dto.CostPrice,
+                SupplierName = dto.SupplierName, Status = BatchStatus.Active,
+                Notes = dto.Notes, CreatedAt = DateTime.UtcNow
             };
-            await _unitOfWork.BranchInventories.AddAsync(bi);
-        }
-        else
-        {
-            bi.Quantity += dto.Quantity; bi.LastUpdatedAt = DateTime.UtcNow;
-            _unitOfWork.BranchInventories.Update(bi);
-        }
 
-        // Stock movement
-        var sm = new StockMovement
-        {
-            TenantId = tenantId, BranchId = branchId, ProductId = dto.ProductId,
-            Type = StockMovementType.Adjustment, Quantity = dto.Quantity,
-            ReferenceType = "BatchManual", BalanceBefore = bi.Quantity - dto.Quantity,
-            BalanceAfter = bi.Quantity, Reason = $"إنشاء باتش: {dto.BatchNumber}",
-            UserId = userId, CreatedAt = DateTime.UtcNow
-        };
-        await _unitOfWork.StockMovements.AddAsync(sm);
-        await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.ProductBatches.AddAsync(batch);
 
-        return await GetByIdAsync(batch.Id);
+            // Update branch inventory
+            var bi = await _unitOfWork.BranchInventories.Query()
+                .FirstOrDefaultAsync(x => x.ProductId == dto.ProductId && x.BranchId == branchId && x.TenantId == tenantId);
+            if (bi == null)
+            {
+                bi = new BranchInventory
+                {
+                    TenantId = tenantId, BranchId = branchId, ProductId = dto.ProductId,
+                    Quantity = dto.Quantity, ReorderLevel = product.LowStockThreshold ?? 10,
+                    LastUpdatedAt = DateTime.UtcNow
+                };
+                await _unitOfWork.BranchInventories.AddAsync(bi);
+            }
+            else
+            {
+                bi.Quantity += dto.Quantity; bi.LastUpdatedAt = DateTime.UtcNow;
+                _unitOfWork.BranchInventories.Update(bi);
+            }
+
+            // Stock movement
+            var sm = new StockMovement
+            {
+                TenantId = tenantId, BranchId = branchId, ProductId = dto.ProductId,
+                Type = StockMovementType.Adjustment, Quantity = dto.Quantity,
+                ReferenceType = "BatchManual", BalanceBefore = bi.Quantity - dto.Quantity,
+                BalanceAfter = bi.Quantity, Reason = $"إنشاء باتش: {dto.BatchNumber}",
+                UserId = userId, CreatedAt = DateTime.UtcNow
+            };
+            await _unitOfWork.StockMovements.AddAsync(sm);
+            await _unitOfWork.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            return await GetByIdAsync(batch.Id);
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(int id)
@@ -131,6 +142,19 @@ public class ProductBatchService : IProductBatchService
 
         if (batch == null)
             return ApiResponse<bool>.Fail(ErrorCodes.NOT_FOUND, "الباتش غير موجود");
+
+        if (batch.Quantity > 0)
+            return ApiResponse<bool>.Fail(ErrorCodes.BATCH_HAS_QUANTITY, ErrorMessages.Get(ErrorCodes.BATCH_HAS_QUANTITY));
+
+        var hasOrderItems = await _unitOfWork.OrderItems.Query()
+            .AnyAsync(oi => oi.BatchId == id && !oi.IsDeleted);
+        if (hasOrderItems)
+            return ApiResponse<bool>.Fail(ErrorCodes.BATCH_HAS_ORDERS, ErrorMessages.Get(ErrorCodes.BATCH_HAS_ORDERS));
+
+        var hasStockMovements = await _unitOfWork.StockMovements.Query()
+            .AnyAsync(sm => sm.BatchId == id && !sm.IsDeleted);
+        if (hasStockMovements)
+            return ApiResponse<bool>.Fail(ErrorCodes.BATCH_HAS_MOVEMENTS, ErrorMessages.Get(ErrorCodes.BATCH_HAS_MOVEMENTS));
 
         batch.IsDeleted = true; batch.UpdatedAt = DateTime.UtcNow;
         _unitOfWork.ProductBatches.Update(batch);
@@ -150,6 +174,14 @@ public class ProductBatchService : IProductBatchService
         var batches = await query.Include(pb => pb.Product).ToListAsync();
         var tenant = await _unitOfWork.Tenants.Query().FirstOrDefaultAsync(t => t.Id == tenantId);
         var alertDays = tenant?.ExpiryAlertDays ?? 30;
+        if (alertDays <= 0)
+            return ApiResponse<BatchExpirySummaryDto>.Ok(new BatchExpirySummaryDto
+            {
+                TotalBatches = batches.Count,
+                ExpiredBatches = 0,
+                NearExpiryBatches = 0,
+                Alerts = new List<BatchExpiryAlertDto>()
+            });
         var alerts = new List<BatchExpiryAlertDto>();
 
         foreach (var batch in batches)
@@ -209,7 +241,8 @@ public class ProductBatchService : IProductBatchService
             ExpiryDate = pb.ExpiryDate, PurchaseDate = pb.PurchaseDate,
             ProductionDate = pb.ProductionDate, CostPrice = pb.CostPrice,
             SupplierName = pb.SupplierName, Status = pb.Status.ToString(),
-            Notes = pb.Notes, DaysUntilExpiry = days
+            Notes = pb.Notes, DaysUntilExpiry = days,
+            BranchId = pb.BranchId, BranchName = pb.Branch?.Name ?? ""
         };
     }
 }

@@ -16,6 +16,8 @@ public class ProductBatchDto
     public string Status { get; set; } = string.Empty;
     public string? Notes { get; set; }
     public int DaysUntilExpiry { get; set; }
+    public int BranchId { get; set; }
+    public string BranchName { get; set; } = string.Empty;
 }
 
 public class ProductBatchListDto

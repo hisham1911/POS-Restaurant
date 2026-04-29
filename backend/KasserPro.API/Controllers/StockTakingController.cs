@@ -97,4 +97,15 @@ public class StockTakingController : ControllerBase
 
         return Ok(result);
     }
+
+    [HttpGet("latest-completed")]
+    [HasPermission(Permission.InventoryView)]
+    public async Task<ActionResult<ApiResponse<StockTakingDto?>>> GetLatestCompleted()
+    {
+        var result = await _stockTakingService.GetLatestCompletedAsync();
+        if (result == null)
+            return Ok(ApiResponse<StockTakingDto?>.Ok(null, "لا يوجد جرد مكتمل"));
+
+        return Ok(ApiResponse<StockTakingDto>.Ok(result));
+    }
 }

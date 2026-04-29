@@ -13,11 +13,13 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
+    private readonly ICashRegisterService _cashRegisterService;
 
-    public PurchaseInvoiceService(IUnitOfWork unitOfWork, ICurrentUserService currentUser)
+    public PurchaseInvoiceService(IUnitOfWork unitOfWork, ICurrentUserService currentUser, ICashRegisterService cashRegisterService)
     {
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
+        _cashRegisterService = cashRegisterService;
     }
 
     public async Task<ApiResponse<PagedResult<PurchaseInvoiceDto>>> GetAllAsync(
@@ -675,8 +677,27 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                         {
                             var balanceBefore = branchInventory.Quantity;
                             branchInventory.Quantity -= item.Quantity;
+                            if (branchInventory.Quantity < 0) branchInventory.Quantity = 0;
                             branchInventory.LastUpdatedAt = DateTime.UtcNow;
                             _unitOfWork.BranchInventories.Update(branchInventory);
+
+                            // Find and adjust associated product batches for this invoice item
+                            var batch = await _unitOfWork.ProductBatches.Query()
+                                .FirstOrDefaultAsync(pb => pb.PurchaseInvoiceId == invoice.Id
+                                    && pb.ProductId == product.Id
+                                    && pb.TenantId == tenantId
+                                    && pb.BranchId == invoice.BranchId
+                                    && !pb.IsDeleted);
+                            if (batch != null)
+                            {
+                                batch.Quantity -= item.Quantity;
+                                if (batch.Quantity <= 0)
+                                {
+                                    batch.Quantity = 0;
+                                    batch.Status = BatchStatus.Depleted;
+                                }
+                                _unitOfWork.ProductBatches.Update(batch);
+                            }
 
                             // Create stock movement
                             var stockMovement = new StockMovement
@@ -690,6 +711,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                                 ReferenceType = "PurchaseInvoice",
                                 BalanceBefore = balanceBefore,
                                 BalanceAfter = branchInventory.Quantity,
+                                BatchId = batch?.Id,
                                 Reason = $"إلغاء فاتورة شراء: {request.Reason}",
                                 UserId = userId,
                                 CreatedAt = DateTime.UtcNow
@@ -778,6 +800,20 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
 
             _unitOfWork.PurchaseInvoices.Update(invoice);
             await _unitOfWork.SaveChangesAsync();
+
+            // Record cash register transaction for cash payments only
+            if (request.Method == PaymentMethod.Cash)
+            {
+                await _cashRegisterService.RecordTransactionAsync(
+                    CashRegisterTransactionType.SupplierPayment,
+                    request.Amount,
+                    $"دفع فاتورة مورد: {invoice.SupplierName}",
+                    referenceType: "PurchaseInvoicePayment",
+                    referenceId: payment.Id,
+                    shiftId: null,
+                    branchId: invoice.BranchId);
+            }
+
             await _unitOfWork.CommitTransactionAsync();
 
             var dto = new PurchaseInvoicePaymentDto

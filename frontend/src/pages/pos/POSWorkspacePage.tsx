@@ -11,7 +11,6 @@ import { useProducts, useCategories } from "@/hooks/useProducts";
 import { useCart } from "@/hooks/useCart";
 import { useShift } from "@/hooks/useShift";
 import { useOrders } from "@/hooks/useOrders";
-import { usePreparedPaymentOrder } from "@/hooks/usePreparedPaymentOrder";
 import { usePOSShortcuts } from "@/hooks/usePOSShortcuts";
 import { useGetShiftWarningsQuery } from "@/api/shiftsApi";
 import { useGetBranchInventoryQuery } from "@/api/inventoryApi";
@@ -224,13 +223,13 @@ export const POSWorkspacePage = () => {
     isLoading: isLoadingShift,
     currentShift,
   } = useShift();
-  const { createOrder, completeOrder, cancelOrder, isCreating, isCompleting } =
-    useOrders();
+  const { createOrder, completeOrder, isCreating, isCompleting } = useOrders();
   const currentBranch = useAppSelector(selectCurrentBranch);
   const allowNegativeStock = useAppSelector(selectAllowNegativeStock);
   const { hasPermission } = usePermission();
   const canQuickCreateProduct =
     hasPermission("ProductsCreateFromPOS") || hasPermission("ProductsManage");
+  const canSellOnCredit = hasPermission("PosCreditSale");
   const { data: branchInventory, isLoading: isInventoryLoading } =
     useGetBranchInventoryQuery(currentBranch?.id ?? 0, {
       skip: !currentBranch?.id,
@@ -246,19 +245,6 @@ export const POSWorkspacePage = () => {
     searchCustomer,
     { data: searchResult, isFetching: isSearchingCustomer },
   ] = useLazyGetCustomerByPhoneQuery();
-  const { preparedOrder, isPreparingOrder, markPreparedOrderCompleted } =
-    usePreparedPaymentOrder({
-      enabled: activeTab === "payment" && items.length > 0,
-      customerId: selectedCustomer?.id,
-      orderType: orderType === "Standard" ? "DineIn" : "Delivery",
-      deliveryAddress: orderType === "Delivery" ? deliveryAddress || undefined : undefined,
-      deliveryFee: orderType === "Delivery" ? parseFloat(deliveryFee || "0") || 0 : 0,
-      deliveryNotes: orderType === "Delivery" ? deliveryNotes || undefined : undefined,
-      createOrder,
-      cancelOrder,
-      onPrepareFailed: () => setActiveTab("cart"),
-    });
-
   const { data: warningsData } = useGetShiftWarningsQuery(undefined, {
     pollingInterval: 10 * 60 * 1000,
     skip: !hasActiveShift,
@@ -268,7 +254,7 @@ export const POSWorkspacePage = () => {
   const deliveryFeeAmount =
     orderType === "Delivery" ? parseFloat(deliveryFee || "0") || 0 : 0;
   const checkoutTotal = total + deliveryFeeAmount;
-  const paymentTotal = preparedOrder?.total ?? checkoutTotal;
+  const paymentTotal = checkoutTotal;
   const displayWorkspaceTotal =
     activeTab === "payment" ? paymentTotal : checkoutTotal;
 
@@ -290,10 +276,10 @@ export const POSWorkspacePage = () => {
   }, []);
 
   useEffect(() => {
-    if (preparedOrder) {
-      setAmountPaid(preparedOrder.total.toFixed(2));
+    if (!allowPartialPayment) {
+      setAmountPaid(paymentTotal.toFixed(2));
     }
-  }, [preparedOrder]);
+  }, [allowPartialPayment, paymentTotal]);
 
   useEffect(() => {
     if (activeTab === "customer" && !selectedCustomer) {
@@ -503,12 +489,17 @@ export const POSWorkspacePage = () => {
   };
 
   const handleCompletePayment = async () => {
-    if (!preparedOrder) {
+    if (paymentTotal <= 0) {
       return;
     }
 
     const numericAmount = parseFloat(amountPaid) || 0;
     const amountDue = paymentTotal - numericAmount;
+
+    if (numericAmount < paymentTotal && !canSellOnCredit) {
+      toast.error("ليس لديك صلاحية البيع الآجل أو الدفع الجزئي");
+      return;
+    }
 
     if (numericAmount < paymentTotal && !allowPartialPayment) {
       setShowPaymentError(true);
@@ -558,7 +549,19 @@ export const POSWorkspacePage = () => {
 
     try {
       const wasDeliveryOrder = orderType === "Delivery";
-      const completedOrder = await completeOrder(preparedOrder.id, {
+      const order = await createOrder(
+        selectedCustomer?.id,
+        orderType === "Standard" ? "DineIn" : "Delivery",
+        orderType === "Delivery" ? deliveryAddress || undefined : undefined,
+        orderType === "Delivery" ? deliveryFeeAmount : 0,
+        orderType === "Delivery" ? deliveryNotes || undefined : undefined,
+      );
+
+      if (!order) {
+        return;
+      }
+
+      const completedOrder = await completeOrder(order.id, {
         payments: [
           {
             method: selectedPaymentMethod,
@@ -592,7 +595,6 @@ export const POSWorkspacePage = () => {
           );
         }
 
-        markPreparedOrderCompleted(preparedOrder.id);
         clearCart();
         setSelectedCustomer(null);
         setCustomerPhone("");
@@ -1212,22 +1214,6 @@ export const POSWorkspacePage = () => {
     );
   };
   const renderPaymentTab = () => {
-    if (isPreparingOrder || !preparedOrder) {
-      return (
-        <SurfaceCard className="flex min-h-[260px] flex-col items-center justify-center gap-4 text-center">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary-100 border-t-primary-600" />
-          <div>
-            <p className="text-lg font-black text-slate-900">
-              جارٍ تأكيد إجمالي الطلب
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              يتم إنشاء الطلب ومزامنة الإجمالي من الباك-إند قبل الدفع.
-            </p>
-          </div>
-        </SurfaceCard>
-      );
-    }
-
     return (
       <div className="space-y-4">
         <div>
@@ -1256,6 +1242,29 @@ export const POSWorkspacePage = () => {
               دفع كامل
             </button>
           </div>
+
+          {orderType === "Delivery" && (
+            <div className="rounded-[1.15rem] border border-primary-100 bg-primary-50 px-3 py-3 text-sm">
+              <div className="flex items-center justify-between gap-3 text-primary-800">
+                <span className="font-semibold">رسوم التوصيل</span>
+                <span className="font-black">
+                  {formatCurrency(deliveryFeeAmount)}
+                </span>
+              </div>
+              <div className="mt-2 flex items-start justify-between gap-3 border-t border-primary-100 pt-2 text-primary-800">
+                <span className="shrink-0 font-semibold">العنوان</span>
+                <span className="text-end font-medium">
+                  {deliveryAddress || "لم يتم إدخال عنوان"}
+                </span>
+              </div>
+              {deliveryNotes && (
+                <div className="mt-2 flex items-start justify-between gap-3 border-t border-primary-100 pt-2 text-primary-800">
+                  <span className="shrink-0 font-semibold">ملاحظات</span>
+                  <span className="text-end font-medium">{deliveryNotes}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-2">
             {paymentMethods.map((method) => (
@@ -1351,7 +1360,7 @@ export const POSWorkspacePage = () => {
           </SurfaceCard>
         )}
 
-        {numericAmount < paymentTotal && numericAmount > 0 && (
+        {allowPartialPayment && numericAmount < paymentTotal && (
           <SurfaceCard
             className={clsx(
               creditLimitExceeded
@@ -1383,15 +1392,21 @@ export const POSWorkspacePage = () => {
 
         {selectedCustomer &&
           canTakeCredit &&
+          canSellOnCredit &&
           selectedPaymentMethod === "Cash" && (
             <div className="flex items-start gap-3 rounded-[1.35rem] border border-blue-200 bg-blue-50 p-4">
               <input
                 type="checkbox"
                 id="partialPayment"
                 checked={allowPartialPayment}
-                onChange={(event) =>
-                  setAllowPartialPayment(event.target.checked)
-                }
+                onChange={(event) => {
+                  const isChecked = event.target.checked;
+                  setAllowPartialPayment(isChecked);
+
+                  if (isChecked && numericAmount >= paymentTotal) {
+                    setAmountPaid("");
+                  }
+                }}
                 className="mt-1 h-5 w-5 rounded text-primary-600 focus:ring-2 focus:ring-primary-500"
               />
               <label htmlFor="partialPayment" className="flex-1 cursor-pointer">
@@ -1472,6 +1487,29 @@ export const POSWorkspacePage = () => {
           value={formatCurrency(serviceChargeAmount)}
         />
       )}
+      {orderType === "Delivery" && (
+        <>
+          <SummaryLine
+            label="رسوم التوصيل"
+            value={formatCurrency(deliveryFeeAmount)}
+            icon={<Store className="h-4 w-4 text-primary-500" />}
+          />
+          <div className="rounded-[1.15rem] bg-primary-50 px-3 py-2.5 text-sm text-primary-800">
+            <div className="flex items-start justify-between gap-3">
+              <span className="shrink-0 font-semibold">عنوان التوصيل</span>
+              <span className="text-end font-medium">
+                {deliveryAddress || "لم يتم إدخال عنوان"}
+              </span>
+            </div>
+            {deliveryNotes && (
+              <div className="mt-2 flex items-start justify-between gap-3 border-t border-primary-100 pt-2">
+                <span className="shrink-0 font-semibold">ملاحظات</span>
+                <span className="text-end font-medium">{deliveryNotes}</span>
+              </div>
+            )}
+          </div>
+        </>
+      )}
       <SummaryLine
         label="طريقة الدفع"
         value={selectedPaymentMethodLabel}
@@ -1481,7 +1519,7 @@ export const POSWorkspacePage = () => {
       <div className="border-t border-slate-200 pt-3">
         <SummaryLine
           label="الصافي النهائي"
-          value={formatCurrency(total)}
+          value={formatCurrency(checkoutTotal)}
           valueClassName="text-primary-600 text-base font-black"
           icon={<Wallet className="h-4 w-4 text-primary-500" />}
         />
@@ -1519,7 +1557,7 @@ export const POSWorkspacePage = () => {
             الإجمالي
           </p>
           <p className="mt-1 text-lg font-black text-primary-700">
-            {formatCurrency(activeTab === "payment" ? paymentTotal : total)}
+            {formatCurrency(displayWorkspaceTotal)}
           </p>
         </div>
         <div className="text-end text-xs text-slate-500">
@@ -1540,21 +1578,18 @@ export const POSWorkspacePage = () => {
           size="xl"
           className="w-full rounded-[1.5rem]"
           onClick={handleCompletePayment}
-          isLoading={isPreparingOrder || isCreating || isCompleting}
+          isLoading={isCreating || isCompleting}
           disabled={
-            isPreparingOrder ||
             isCreating ||
             isCompleting ||
-            !preparedOrder ||
             (requiresTransactionReference && !transactionReference.trim()) ||
+            (numericAmount < paymentTotal && !canSellOnCredit) ||
             (numericAmount < paymentTotal && !allowPartialPayment) ||
             (numericAmount < paymentTotal && creditLimitExceeded)
           }
           rightIcon={<Check className="h-5 w-5" />}
         >
-          {isPreparingOrder
-            ? "جارٍ تأكيد الإجمالي..."
-            : isCreating
+          {isCreating
               ? "جاري إنشاء الطلب..."
               : isCompleting
                 ? "جاري الدفع..."
@@ -1571,7 +1606,7 @@ export const POSWorkspacePage = () => {
           disabled={items.length === 0}
           rightIcon={<CreditCard className="h-5 w-5" />}
         >
-          الدفع {formatCurrency(total)}
+          الدفع {formatCurrency(checkoutTotal)}
         </Button>
       )}
     </div>
@@ -1902,9 +1937,7 @@ export const POSWorkspacePage = () => {
                 <span className="inline-flex items-center gap-1 rounded-full bg-success-50 px-2.5 py-1 text-[11px] font-semibold text-success-700">
                   <Wallet className="h-3 w-3" />
                   {itemsCount > 0
-                    ? formatCurrency(
-                        activeTab === "payment" ? paymentTotal : total,
-                      )
+                    ? formatCurrency(displayWorkspaceTotal)
                     : "جاهز للبيع"}
                 </span>
               </div>
@@ -2072,9 +2105,7 @@ export const POSWorkspacePage = () => {
                       </span>
                       <span className="inline-flex items-center gap-1 rounded-lg bg-success-50 px-3 py-1.5 text-xs font-semibold text-success-700">
                         <Wallet className="h-3.5 w-3.5" />
-                        {formatCurrency(
-                          activeTab === "payment" ? paymentTotal : total,
-                        )}
+                        {formatCurrency(displayWorkspaceTotal)}
                       </span>
                     </div>
                   </div>
@@ -2213,9 +2244,7 @@ export const POSWorkspacePage = () => {
                       الإجمالي
                     </p>
                     <p className="mt-1 text-lg font-black text-primary-700">
-                      {formatCurrency(
-                        activeTab === "payment" ? paymentTotal : total,
-                      )}
+                      {formatCurrency(displayWorkspaceTotal)}
                     </p>
                   </div>
                 </div>
@@ -2246,9 +2275,7 @@ export const POSWorkspacePage = () => {
                       الإجمالي
                     </p>
                     <p className="mt-1 text-lg font-black text-primary-700">
-                      {formatCurrency(
-                        activeTab === "payment" ? paymentTotal : total,
-                      )}
+                      {formatCurrency(displayWorkspaceTotal)}
                     </p>
                   </div>
                   <div className="text-end text-xs text-slate-500">
@@ -2271,22 +2298,19 @@ export const POSWorkspacePage = () => {
                     size="xl"
                     className="w-full rounded-[1.5rem]"
                     onClick={handleCompletePayment}
-                    isLoading={isPreparingOrder || isCreating || isCompleting}
+                    isLoading={isCreating || isCompleting}
                     disabled={
-                      isPreparingOrder ||
                       isCreating ||
                       isCompleting ||
-                      !preparedOrder ||
                       (requiresTransactionReference &&
                         !transactionReference.trim()) ||
+                      (numericAmount < paymentTotal && !canSellOnCredit) ||
                       (numericAmount < paymentTotal && !allowPartialPayment) ||
                       (numericAmount < paymentTotal && creditLimitExceeded)
                     }
                     rightIcon={<Check className="h-5 w-5" />}
                   >
-                    {isPreparingOrder
-                      ? "جارٍ تأكيد الإجمالي..."
-                      : isCreating
+                    {isCreating
                         ? "جاري إنشاء الطلب..."
                         : isCompleting
                           ? "جاري الدفع..."
@@ -2303,7 +2327,7 @@ export const POSWorkspacePage = () => {
                     disabled={items.length === 0}
                     rightIcon={<CreditCard className="h-5 w-5" />}
                   >
-                    الدفع {formatCurrency(total)}
+                    الدفع {formatCurrency(checkoutTotal)}
                   </Button>
                 )}
               </div>

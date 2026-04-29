@@ -1,14 +1,18 @@
-import { AlertTriangle, AlertCircle, X } from "lucide-react";
+import { AlertTriangle, AlertCircle, X, Eye } from "lucide-react";
 import { useGetExpiryAlertsQuery } from "@/api/productBatchApi";
 import { useState } from "react";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentUser } from "@/store/slices/authSlice";
+import { usePermission } from "@/hooks/usePermission";
+import { useNavigate } from "react-router-dom";
 
 export const BatchExpiryAlertBanner = () => {
   const [dismissed, setDismissed] = useState(false);
   const user = useAppSelector(selectCurrentUser);
+  const { hasPermission } = usePermission();
+  const navigate = useNavigate();
 
-  const canViewAlert = user?.role === "Admin" || user?.role === "SystemOwner";
+  const canViewAlert = hasPermission("InventoryView");
   const branchId = user?.branchId;
 
   const { data } = useGetExpiryAlertsQuery(branchId ?? undefined, {
@@ -49,13 +53,24 @@ export const BatchExpiryAlertBanner = () => {
             : `تنبيه: ${nearExpiryCount} باتش قريب من الانتهاء`}
         </span>
       </div>
-      <button
-        onClick={() => setDismissed(true)}
-        className={`${hoverClass} p-1 rounded transition-colors`}
-        aria-label="إخفاء التنبيه"
-      >
-        <X className="w-4 h-4" />
-      </button>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => navigate("/product-batches?status=NearExpiry")}
+          className={`${hoverClass} p-1.5 rounded transition-colors flex items-center gap-1 text-xs`}
+          aria-label="عرض التنبيهات"
+          title="عرض التنبيهات"
+        >
+          <Eye className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">عرض</span>
+        </button>
+        <button
+          onClick={() => setDismissed(true)}
+          className={`${hoverClass} p-1 rounded transition-colors`}
+          aria-label="إخفاء التنبيه"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
     </div>
   );
 };

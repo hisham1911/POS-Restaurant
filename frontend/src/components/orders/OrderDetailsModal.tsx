@@ -40,6 +40,13 @@ export const OrderDetailsModal = ({
   const isFullyRefunded = order.status === "Refunded";
   const isPartiallyRefunded = order.status === "PartiallyRefunded";
   const hasRefund = isFullyRefunded || isPartiallyRefunded;
+  const hasDeliveryInfo =
+    order.orderType === "Delivery" ||
+    order.deliveryFee > 0 ||
+    Boolean(order.deliveryAddress) ||
+    Boolean(order.deliveryNotes) ||
+    Boolean(order.deliveryPersonName) ||
+    Boolean(order.deliveryStatus);
   const deliveryStatusBadge = (() => {
     switch (order.deliveryStatus) {
       case "Assigned":
@@ -219,6 +226,11 @@ export const OrderDetailsModal = ({
                               (مسترجع: {item.refundedQuantity})
                             </span>
                           )}
+                          {item.batchNumber && (
+                            <span className="text-blue-500 mr-2">
+                              (باتش: {item.batchNumber})
+                            </span>
+                          )}
                         </p>
                       </div>
                       <div className="text-left shrink-0">
@@ -303,6 +315,12 @@ export const OrderDetailsModal = ({
                 </span>
                 <span>{formatCurrency(order.taxAmount)}</span>
               </div>
+              {hasDeliveryInfo && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500">رسوم التوصيل</span>
+                  <span>{formatCurrency(order.deliveryFee)}</span>
+                </div>
+              )}
               <div className="flex justify-between text-lg font-bold pt-2 border-t">
                 <span>الإجمالي</span>
                 <span className="text-primary-600">
@@ -363,12 +381,18 @@ export const OrderDetailsModal = ({
               </div>
             )}
 
-            {order.orderType === "Delivery" && (
+            {hasDeliveryInfo && (
               <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
                 <h3 className="mb-4 text-base font-semibold text-blue-900">
                   بيانات التوصيل
                 </h3>
                 <div className="space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-gray-500">نوع الطلب</span>
+                    <span className="text-end font-medium text-gray-800">
+                      {order.orderType === "Delivery" ? "توصيل" : "—"}
+                    </span>
+                  </div>
                   <div className="flex items-center justify-between gap-4">
                     <span className="text-gray-500">العنوان</span>
                     <span className="text-end font-medium text-gray-800">

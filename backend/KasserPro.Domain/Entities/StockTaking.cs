@@ -18,6 +18,13 @@ public class StockTaking : BaseEntity
     [MaxLength(50)]
     public string StockTakingNumber { get; set; } = string.Empty;
 
+    public StockTakingType Type { get; set; } = StockTakingType.Full;
+
+    /// <summary>
+    /// Optional category filter for partial stock taking
+    /// </summary>
+    public int? CategoryId { get; set; }
+
     public StockTakingStatus Status { get; set; } = StockTakingStatus.InProgress;
 
     public DateTime StartedAt { get; set; } = DateTime.UtcNow;
@@ -42,5 +49,6 @@ public class StockTaking : BaseEntity
     public Branch Branch { get; set; } = null!;
     public User CreatedByUser { get; set; } = null!;
     public User? CompletedByUser { get; set; }
+    public Category? Category { get; set; }
     public ICollection<StockTakingItem> Items { get; set; } = new List<StockTakingItem>();
 }

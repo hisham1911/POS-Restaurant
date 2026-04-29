@@ -9,6 +9,10 @@ public class StockTakingDto
 {
     public int Id { get; set; }
     public string StockTakingNumber { get; set; } = string.Empty;
+    public StockTakingType Type { get; set; }
+    public string TypeName => Type.ToString();
+    public int? CategoryId { get; set; }
+    public string? CategoryName { get; set; }
     public StockTakingStatus Status { get; set; }
     public string StatusName => Status.ToString();
     public DateTime StartedAt { get; set; }
@@ -45,6 +49,8 @@ public class StockTakingItemDto
 /// </summary>
 public class CreateStockTakingRequest
 {
+    public StockTakingType Type { get; set; } = StockTakingType.Full;
+    public int? CategoryId { get; set; }
     public string? Notes { get; set; }
 }
 

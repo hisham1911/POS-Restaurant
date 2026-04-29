@@ -52,6 +52,11 @@ public class ReceiptDto
     public string? CustomerName { get; set; }
     public bool IsRefund { get; set; } = false;
     public string? RefundReason { get; set; }
+    public string? OrderType { get; set; }
+    public string? DeliveryAddress { get; set; }
+    public decimal DeliveryFee { get; set; }
+    public string? DeliveryNotes { get; set; }
+    public string? DeliveryStatus { get; set; }
 }
 
 /// <summary>

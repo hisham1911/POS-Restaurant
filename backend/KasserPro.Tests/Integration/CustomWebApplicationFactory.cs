@@ -15,19 +15,48 @@ using KasserPro.Infrastructure.Data;
 /// </summary>
 public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 {
+    private readonly bool _includeJwtExpiry;
+    private readonly bool _includeJwtIssuerAudience;
     private SqliteConnection? _connection;
+
+    public CustomWebApplicationFactory(
+        bool includeJwtExpiry = true,
+        bool includeJwtIssuerAudience = true)
+    {
+        _includeJwtExpiry = includeJwtExpiry;
+        _includeJwtIssuerAudience = includeJwtIssuerAudience;
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.ConfigureAppConfiguration((_, configBuilder) =>
         {
-            configBuilder.AddInMemoryCollection(new Dictionary<string, string?>
+            var configuration = new Dictionary<string, string?>
             {
-                ["Jwt:Key"] = "YourSuperSecretKeyHere_MustBe32Characters!",
-                ["Jwt:Issuer"] = "KasserPro",
-                ["Jwt:Audience"] = "KasserPro",
-                ["Jwt:ExpiryInHours"] = "24"
-            });
+                ["Jwt:Key"] = "YourSuperSecretKeyHere_MustBe32Characters!"
+            };
+
+            if (_includeJwtIssuerAudience)
+            {
+                configuration["Jwt:Issuer"] = "KasserPro";
+                configuration["Jwt:Audience"] = "KasserPro";
+            }
+            else
+            {
+                configuration["Jwt:Issuer"] = null;
+                configuration["Jwt:Audience"] = null;
+            }
+
+            if (_includeJwtExpiry)
+            {
+                configuration["Jwt:ExpiryInHours"] = "24";
+            }
+            else
+            {
+                configuration["Jwt:ExpiryInHours"] = null;
+            }
+
+            configBuilder.AddInMemoryCollection(configuration);
         });
 
         builder.ConfigureServices(services =>

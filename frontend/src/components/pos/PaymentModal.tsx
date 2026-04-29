@@ -11,8 +11,8 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { useOrders } from "@/hooks/useOrders";
-import { usePreparedPaymentOrder } from "@/hooks/usePreparedPaymentOrder";
 import { useCart } from "@/hooks/useCart";
+import { usePermission } from "@/hooks/usePermission";
 import { formatCurrency } from "@/utils/formatters";
 import { PaymentMethod } from "@/types/order.types";
 import { Customer } from "@/types/customer.types";
@@ -54,42 +54,26 @@ export const PaymentModal = ({
   deliveryNotes,
   onOrderComplete,
 }: PaymentModalProps) => {
-  const { createOrder, completeOrder, cancelOrder, isCreating, isCompleting } =
-    useOrders();
-  const { clearCart } = useCart();
+  const { createOrder, completeOrder, isCreating, isCompleting } = useOrders();
+  const { clearCart, total: cartTotal } = useCart();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("Cash");
   const [amountPaid, setAmountPaid] = useState<string>("");
   const [transactionReference, setTransactionReference] = useState("");
   const [showError, setShowError] = useState(false);
   const [allowPartialPayment, setAllowPartialPayment] = useState(false);
+  const { hasPermission } = usePermission();
+  const canSellOnCredit = hasPermission("PosCreditSale");
   const isDeliveryOrder = orderType === "Delivery";
   const parsedDeliveryFee =
     isDeliveryOrder ? Number.parseFloat(deliveryFee || "0") || 0 : 0;
 
-  const customerId = selectedCustomer?.id;
-  const {
-    preparedOrder,
-    isPreparingOrder,
-    markPreparedOrderCompleted,
-    discardPreparedOrder,
-  } = usePreparedPaymentOrder({
-    enabled: true,
-    customerId,
-    orderType: isDeliveryOrder ? "Delivery" : "DineIn",
-    deliveryAddress: isDeliveryOrder ? deliveryAddress || undefined : undefined,
-    deliveryFee: isDeliveryOrder ? parsedDeliveryFee : 0,
-    deliveryNotes: isDeliveryOrder ? deliveryNotes || undefined : undefined,
-    createOrder,
-    cancelOrder,
-    onPrepareFailed: onClose,
-  });
-  const total = preparedOrder?.total ?? 0;
+  const total = cartTotal + parsedDeliveryFee;
 
   useEffect(() => {
-    if (preparedOrder) {
-      setAmountPaid(preparedOrder.total.toFixed(2));
+    if (!allowPartialPayment) {
+      setAmountPaid(total.toFixed(2));
     }
-  }, [preparedOrder]);
+  }, [allowPartialPayment, total]);
 
   useEffect(() => {
     if (selectedMethod === "Cash") {
@@ -106,8 +90,7 @@ export const PaymentModal = ({
   const amountDue = total - numericAmount;
   const requiresTransactionReference = selectedMethod !== "Cash";
 
-  const handleClose = async () => {
-    await discardPreparedOrder();
+  const handleClose = () => {
     onClose();
   };
 
@@ -146,11 +129,16 @@ export const PaymentModal = ({
   };
 
   const handleComplete = async () => {
-    if (!preparedOrder) {
+    if (total <= 0) {
       return;
     }
 
     // Validate payment amount
+    if (numericAmount < total && !canSellOnCredit) {
+      toast.error("ليس لديك صلاحية البيع الآجل أو الدفع الجزئي");
+      return;
+    }
+
     if (numericAmount < total && !allowPartialPayment) {
       setShowError(true);
       setTimeout(() => setShowError(false), 500);
@@ -196,14 +184,20 @@ export const PaymentModal = ({
 
     try {
       // 1. إنشاء الطلب أولاً (مع العميل إن وجد)
-      const order = preparedOrder;
+      const order = await createOrder(
+        selectedCustomer?.id,
+        isDeliveryOrder ? "Delivery" : "DineIn",
+        isDeliveryOrder ? deliveryAddress || undefined : undefined,
+        isDeliveryOrder ? parsedDeliveryFee : 0,
+        isDeliveryOrder ? deliveryNotes || undefined : undefined,
+      );
       if (!order) {
         // فشل إنشاء الطلب - لا نغلق النافذة، السلة محفوظة
         return;
       }
 
       // 2. إكمال الطلب بالدفع
-      const completedOrder = await completeOrder(preparedOrder.id, {
+      const completedOrder = await completeOrder(order.id, {
         payments: [
           {
             method: selectedMethod,
@@ -233,7 +227,6 @@ export const PaymentModal = ({
           );
         }
 
-        markPreparedOrderCompleted(preparedOrder.id);
         clearCart();
         setTransactionReference("");
         onOrderComplete?.();
@@ -247,38 +240,6 @@ export const PaymentModal = ({
   };
 
   const quickAmounts = [50, 100, 200, 500];
-
-  if (isPreparingOrder || !preparedOrder) {
-    return (
-      <Portal>
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
-          <div className="flex w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b p-6">
-              <h2 className="text-xl font-bold">الدفع</h2>
-              <button
-                onClick={handleClose}
-                className="flex h-10 w-10 items-center justify-center rounded-lg bg-gray-100 transition-colors hover:bg-danger-50 hover:text-danger-500"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <div className="flex min-h-[280px] flex-col items-center justify-center gap-4 p-6 text-center">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary-100 border-t-primary-600" />
-              <div>
-                <p className="text-lg font-bold text-slate-900">
-                  جارٍ تأكيد إجمالي الطلب
-                </p>
-                <p className="mt-1 text-sm text-slate-500">
-                  يتم الآن إنشاء الطلب ومزامنة الإجمالي من الباك-إند قبل الدفع.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </Portal>
-    );
-  }
 
   return (
     <Portal>
@@ -554,7 +515,7 @@ export const PaymentModal = ({
                 )}
 
                 {/* Amount Due (Partial Payment) */}
-                {numericAmount < total && numericAmount > 0 && (
+                {allowPartialPayment && numericAmount < total && (
                   <div
                     className={clsx(
                       "text-center p-4 rounded-xl border",
@@ -591,13 +552,20 @@ export const PaymentModal = ({
             )}
 
             {/* Partial Payment Option */}
-            {selectedCustomer && canTakeCredit && (
+            {selectedCustomer && canTakeCredit && canSellOnCredit && (
               <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-xl border border-blue-200">
                 <input
                   type="checkbox"
                   id="partialPayment"
                   checked={allowPartialPayment}
-                  onChange={(e) => setAllowPartialPayment(e.target.checked)}
+                  onChange={(e) => {
+                    const isChecked = e.target.checked;
+                    setAllowPartialPayment(isChecked);
+
+                    if (isChecked && numericAmount >= total) {
+                      setAmountPaid("");
+                    }
+                  }}
                   className="w-5 h-5 text-primary-600 rounded focus:ring-2 focus:ring-primary-500"
                 />
                 <label
@@ -624,6 +592,7 @@ export const PaymentModal = ({
               disabled={
                 isCreating ||
                 isCompleting ||
+                (numericAmount < total && !canSellOnCredit) ||
                 (numericAmount < total && !allowPartialPayment) ||
                 (numericAmount < total && creditLimitExceeded)
               }

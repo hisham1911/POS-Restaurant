@@ -5,7 +5,9 @@ import type {
   CashRegisterSummary,
   CreateCashRegisterTransactionRequest,
   ReconcileCashRegisterRequest,
-  TransferCashRequest,
+  TransferCashDto,
+  ReconcileDto,
+  ReconcileResultDto,
   CashRegisterFilters,
 } from "../types/cashRegister.types";
 import type { ApiResponse } from "../types/api.types";
@@ -81,24 +83,29 @@ export const cashRegisterApi = baseApi.injectEndpoints({
 
     // Reconcile
     reconcile: builder.mutation<
-      ApiResponse<boolean>,
-      { shiftId: number; request: ReconcileCashRegisterRequest }
+      ApiResponse<ReconcileResultDto>,
+      ReconcileDto
     >({
-      query: ({ shiftId, request }) => ({
+      query: (dto) => ({
         url: "/cash-register/reconcile",
         method: "POST",
-        params: { shiftId },
-        body: request,
+        params: { shiftId: dto.shiftId },
+        body: {
+          actualBalance: dto.actualCashAmount,
+          varianceReason: dto.notes,
+        },
+        headers: { "X-Idempotency-Key": crypto.randomUUID() },
       }),
-      invalidatesTags: ["CashRegisterBalance", "CashRegisterTransactions"],
+      invalidatesTags: ["CashRegisterBalance", "CashRegisterTransactions", "Shifts"],
     }),
 
     // Transfer cash between branches
-    transferCash: builder.mutation<ApiResponse<boolean>, TransferCashRequest>({
-      query: (request) => ({
+    transferCash: builder.mutation<ApiResponse<void>, TransferCashDto>({
+      query: (dto) => ({
         url: "/cash-register/transfer",
         method: "POST",
-        body: request,
+        body: dto,
+        headers: { "X-Idempotency-Key": crypto.randomUUID() },
       }),
       invalidatesTags: ["CashRegisterBalance", "CashRegisterTransactions"],
     }),

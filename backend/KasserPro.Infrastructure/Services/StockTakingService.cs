@@ -37,6 +37,9 @@ public class StockTakingService : IStockTakingService
             {
                 Id = st.Id,
                 StockTakingNumber = st.StockTakingNumber,
+                Type = st.Type,
+                CategoryId = st.CategoryId,
+                CategoryName = st.CategoryId != null ? st.Category.Name : null,
                 Status = st.Status,
                 StartedAt = st.StartedAt,
                 CompletedAt = st.CompletedAt,
@@ -60,7 +63,7 @@ public class StockTakingService : IStockTakingService
             .ThenInclude(i => i.Product)
             .Include(s => s.CreatedByUser)
             .Include(s => s.CompletedByUser)
-            .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == _currentUser.TenantId);
+            .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == _currentUser.TenantId && s.BranchId == _currentUser.BranchId);
 
         if (st == null) return null;
 
@@ -68,6 +71,9 @@ public class StockTakingService : IStockTakingService
         {
             Id = st.Id,
             StockTakingNumber = st.StockTakingNumber,
+            Type = st.Type,
+            CategoryId = st.CategoryId,
+            CategoryName = st.CategoryId != null ? st.Category?.Name : null,
             Status = st.Status,
             StartedAt = st.StartedAt,
             CompletedAt = st.CompletedAt,
@@ -102,6 +108,17 @@ public class StockTakingService : IStockTakingService
         if (branchId == 0)
             return ApiResponse<StockTakingDto>.Fail(ErrorCodes.VALIDATION_ERROR, "يجب اختيار الفرع");
 
+        if (request.Type == StockTakingType.Partial && !request.CategoryId.HasValue)
+            return ApiResponse<StockTakingDto>.Fail(ErrorCodes.VALIDATION_ERROR, "يجب اختيار الفئة عند الجرد الجزئي");
+
+        if (request.CategoryId.HasValue)
+        {
+            var categoryExists = await _context.Categories
+                .AnyAsync(c => c.Id == request.CategoryId.Value && c.TenantId == tenantId);
+            if (!categoryExists)
+                return ApiResponse<StockTakingDto>.Fail(ErrorCodes.CATEGORY_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CATEGORY_NOT_FOUND));
+        }
+
         var count = await _context.StockTakings.CountAsync(st => st.TenantId == tenantId);
         var number = $"ST-{DateTime.UtcNow:yyyy}-{(count + 1):D4}";
 
@@ -110,6 +127,8 @@ public class StockTakingService : IStockTakingService
             TenantId = tenantId,
             BranchId = branchId,
             StockTakingNumber = number,
+            Type = request.Type,
+            CategoryId = request.Type == StockTakingType.Partial ? request.CategoryId : null,
             Status = StockTakingStatus.InProgress,
             StartedAt = DateTime.UtcNow,
             CreatedByUserId = userId,
@@ -119,15 +138,44 @@ public class StockTakingService : IStockTakingService
         _context.StockTakings.Add(stockTaking);
         await _context.SaveChangesAsync();
 
+        // Snapshot: pre-populate items with current system quantities
+        var inventoryQuery = _context.BranchInventories
+            .Where(bi => bi.BranchId == branchId && bi.TenantId == tenantId)
+            .AsQueryable();
+
+        if (request.Type == StockTakingType.Partial && request.CategoryId.HasValue)
+        {
+            inventoryQuery = inventoryQuery.Where(bi => bi.Product.CategoryId == request.CategoryId.Value);
+        }
+
+        var snapshotItems = await inventoryQuery
+            .Select(bi => new StockTakingItem
+            {
+                StockTakingId = stockTaking.Id,
+                ProductId = bi.ProductId,
+                SystemQuantity = bi.Quantity,
+                ActualQuantity = bi.Quantity, // Default to system quantity (no diff initially)
+                Reason = null
+            })
+            .ToListAsync();
+
+        if (snapshotItems.Count > 0)
+        {
+            _context.StockTakingItems.AddRange(snapshotItems);
+            await _context.SaveChangesAsync();
+        }
+
         var dto = new StockTakingDto
         {
             Id = stockTaking.Id,
             StockTakingNumber = stockTaking.StockTakingNumber,
+            Type = stockTaking.Type,
+            CategoryId = stockTaking.CategoryId,
             Status = stockTaking.Status,
             StartedAt = stockTaking.StartedAt,
             CreatedByUserId = stockTaking.CreatedByUserId,
             Notes = stockTaking.Notes,
-            ItemCount = 0,
+            ItemCount = snapshotItems.Count,
             TotalDifference = 0
         };
 
@@ -138,22 +186,35 @@ public class StockTakingService : IStockTakingService
     {
         var stockTaking = await _context.StockTakings
             .Include(st => st.Items)
-            .FirstOrDefaultAsync(st => st.Id == stockTakingId && st.TenantId == _currentUser.TenantId);
+            .FirstOrDefaultAsync(st => st.Id == stockTakingId && st.TenantId == _currentUser.TenantId && st.BranchId == _currentUser.BranchId);
 
         if (stockTaking == null)
-            return ApiResponse<StockTakingItemDto>.Fail(ErrorCodes.NOT_FOUND, "جلسة الجرد غير موجودة");
+            return ApiResponse<StockTakingItemDto>.Fail(ErrorCodes.STOCK_TAKING_NOT_FOUND, ErrorMessages.Get(ErrorCodes.STOCK_TAKING_NOT_FOUND));
 
         if (stockTaking.Status != StockTakingStatus.InProgress)
-            return ApiResponse<StockTakingItemDto>.Fail(ErrorCodes.VALIDATION_ERROR, "لا يمكن تعديل بنود جرد مكتمل أو ملغى");
+            return ApiResponse<StockTakingItemDto>.Fail(ErrorCodes.STOCK_TAKING_NOT_EDITABLE, ErrorMessages.Get(ErrorCodes.STOCK_TAKING_NOT_EDITABLE));
 
         var product = await _context.Products
             .FirstOrDefaultAsync(p => p.Id == request.ProductId && p.TenantId == _currentUser.TenantId);
 
         if (product == null)
-            return ApiResponse<StockTakingItemDto>.Fail(ErrorCodes.PRODUCT_NOT_FOUND, "المنتج غير موجود");
+            return ApiResponse<StockTakingItemDto>.Fail(ErrorCodes.PRODUCT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PRODUCT_NOT_FOUND));
+
+        // Batch validation
+        if (request.BatchId.HasValue)
+        {
+            var batch = await _context.ProductBatches
+                .FirstOrDefaultAsync(b => b.Id == request.BatchId.Value && b.ProductId == request.ProductId && b.BranchId == stockTaking.BranchId && b.TenantId == _currentUser.TenantId);
+
+            if (batch == null)
+                return ApiResponse<StockTakingItemDto>.Fail(ErrorCodes.STOCK_TAKING_BATCH_INVALID, ErrorMessages.Get(ErrorCodes.STOCK_TAKING_BATCH_INVALID));
+
+            if (batch.Status != BatchStatus.Active)
+                return ApiResponse<StockTakingItemDto>.Fail(ErrorCodes.STOCK_TAKING_BATCH_EXPIRED, ErrorMessages.Get(ErrorCodes.STOCK_TAKING_BATCH_EXPIRED));
+        }
 
         var inventory = await _context.BranchInventories
-            .FirstOrDefaultAsync(bi => bi.BranchId == stockTaking.BranchId && bi.ProductId == request.ProductId);
+            .FirstOrDefaultAsync(bi => bi.BranchId == stockTaking.BranchId && bi.ProductId == request.ProductId && bi.TenantId == _currentUser.TenantId);
 
         var systemQty = inventory?.Quantity ?? 0;
 
@@ -200,17 +261,17 @@ public class StockTakingService : IStockTakingService
     {
         var stockTaking = await _context.StockTakings
             .Include(st => st.Items)
-            .FirstOrDefaultAsync(st => st.Id == stockTakingId && st.TenantId == _currentUser.TenantId);
+            .FirstOrDefaultAsync(st => st.Id == stockTakingId && st.TenantId == _currentUser.TenantId && st.BranchId == _currentUser.BranchId);
 
         if (stockTaking == null)
-            return ApiResponse<bool>.Fail(ErrorCodes.NOT_FOUND, "جلسة الجرد غير موجودة");
+            return ApiResponse<bool>.Fail(ErrorCodes.STOCK_TAKING_NOT_FOUND, ErrorMessages.Get(ErrorCodes.STOCK_TAKING_NOT_FOUND));
 
         if (stockTaking.Status != StockTakingStatus.InProgress)
-            return ApiResponse<bool>.Fail(ErrorCodes.VALIDATION_ERROR, "لا يمكن حذف بنود جرد مكتمل أو ملغى");
+            return ApiResponse<bool>.Fail(ErrorCodes.STOCK_TAKING_NOT_EDITABLE, ErrorMessages.Get(ErrorCodes.STOCK_TAKING_NOT_EDITABLE));
 
         var item = stockTaking.Items.FirstOrDefault(i => i.Id == itemId);
         if (item == null)
-            return ApiResponse<bool>.Fail(ErrorCodes.NOT_FOUND, "البند غير موجود");
+            return ApiResponse<bool>.Fail(ErrorCodes.STOCK_TAKING_ITEM_NOT_FOUND, ErrorMessages.Get(ErrorCodes.STOCK_TAKING_ITEM_NOT_FOUND));
 
         _context.StockTakingItems.Remove(item);
         await _context.SaveChangesAsync();
@@ -226,13 +287,13 @@ public class StockTakingService : IStockTakingService
             var stockTaking = await _context.StockTakings
                 .Include(st => st.Items)
                 .ThenInclude(i => i.Product)
-                .FirstOrDefaultAsync(st => st.Id == id && st.TenantId == _currentUser.TenantId);
+                .FirstOrDefaultAsync(st => st.Id == id && st.TenantId == _currentUser.TenantId && st.BranchId == _currentUser.BranchId);
 
             if (stockTaking == null)
-                return ApiResponse<StockTakingDto>.Fail(ErrorCodes.NOT_FOUND, "جلسة الجرد غير موجودة");
+                return ApiResponse<StockTakingDto>.Fail(ErrorCodes.STOCK_TAKING_NOT_FOUND, ErrorMessages.Get(ErrorCodes.STOCK_TAKING_NOT_FOUND));
 
             if (stockTaking.Status != StockTakingStatus.InProgress)
-                return ApiResponse<StockTakingDto>.Fail(ErrorCodes.VALIDATION_ERROR, "جلسة الجرد ليست قيد التنفيذ");
+                return ApiResponse<StockTakingDto>.Fail(ErrorCodes.STOCK_TAKING_NOT_EDITABLE, ErrorMessages.Get(ErrorCodes.STOCK_TAKING_NOT_EDITABLE));
 
             if (request.ApplyAdjustments)
             {
@@ -241,8 +302,21 @@ public class StockTakingService : IStockTakingService
                     var diff = item.ActualQuantity - item.SystemQuantity;
                     if (diff == 0) continue;
 
+                    // Batch validation before applying
+                    if (item.BatchId.HasValue)
+                    {
+                        var batch = await _context.ProductBatches
+                            .FirstOrDefaultAsync(b => b.Id == item.BatchId.Value && b.ProductId == item.ProductId && b.BranchId == stockTaking.BranchId && b.TenantId == _currentUser.TenantId);
+
+                        if (batch == null)
+                            throw new InvalidOperationException($"Batch {item.BatchId} not found for product {item.ProductId}");
+
+                        if (batch.Status != BatchStatus.Active)
+                            throw new InvalidOperationException($"Batch {item.BatchId} is not active (status: {batch.Status})");
+                    }
+
                     var inventory = await _context.BranchInventories
-                        .FirstOrDefaultAsync(bi => bi.BranchId == stockTaking.BranchId && bi.ProductId == item.ProductId);
+                        .FirstOrDefaultAsync(bi => bi.BranchId == stockTaking.BranchId && bi.ProductId == item.ProductId && bi.TenantId == _currentUser.TenantId);
 
                     if (inventory == null && diff > 0)
                     {
@@ -305,13 +379,13 @@ public class StockTakingService : IStockTakingService
     public async Task<ApiResponse<bool>> CancelAsync(int id)
     {
         var stockTaking = await _context.StockTakings
-            .FirstOrDefaultAsync(st => st.Id == id && st.TenantId == _currentUser.TenantId);
+            .FirstOrDefaultAsync(st => st.Id == id && st.TenantId == _currentUser.TenantId && st.BranchId == _currentUser.BranchId);
 
         if (stockTaking == null)
-            return ApiResponse<bool>.Fail(ErrorCodes.NOT_FOUND, "جلسة الجرد غير موجودة");
+            return ApiResponse<bool>.Fail(ErrorCodes.STOCK_TAKING_NOT_FOUND, ErrorMessages.Get(ErrorCodes.STOCK_TAKING_NOT_FOUND));
 
         if (stockTaking.Status != StockTakingStatus.InProgress)
-            return ApiResponse<bool>.Fail(ErrorCodes.VALIDATION_ERROR, "لا يمكن إلغاء جرد مكتمل أو ملغى بالفعل");
+            return ApiResponse<bool>.Fail(ErrorCodes.STOCK_TAKING_NOT_EDITABLE, ErrorMessages.Get(ErrorCodes.STOCK_TAKING_NOT_EDITABLE));
 
         stockTaking.Status = StockTakingStatus.Cancelled;
         stockTaking.CompletedAt = DateTime.UtcNow;
@@ -319,5 +393,35 @@ public class StockTakingService : IStockTakingService
 
         await _context.SaveChangesAsync();
         return ApiResponse<bool>.Ok(true, "تم إلغاء الجرد بنجاح");
+    }
+
+    public async Task<StockTakingDto?> GetLatestCompletedAsync()
+    {
+        var latest = await _context.StockTakings
+            .Where(st => st.TenantId == _currentUser.TenantId
+                      && st.BranchId == _currentUser.BranchId
+                      && st.Status == StockTakingStatus.Completed)
+            .OrderByDescending(st => st.CompletedAt)
+            .Select(st => new StockTakingDto
+            {
+                Id = st.Id,
+                StockTakingNumber = st.StockTakingNumber,
+                Type = st.Type,
+                CategoryId = st.CategoryId,
+                CategoryName = st.CategoryId != null ? st.Category.Name : null,
+                Status = st.Status,
+                StartedAt = st.StartedAt,
+                CompletedAt = st.CompletedAt,
+                CreatedByUserId = st.CreatedByUserId,
+                CreatedByUserName = st.CreatedByUser.Name,
+                CompletedByUserId = st.CompletedByUserId,
+                CompletedByUserName = st.CompletedByUser != null ? st.CompletedByUser.Name : null,
+                Notes = st.Notes,
+                ItemCount = st.Items.Count,
+                TotalDifference = st.Items.Sum(i => i.ActualQuantity - i.SystemQuantity)
+            })
+            .FirstOrDefaultAsync();
+
+        return latest;
     }
 }

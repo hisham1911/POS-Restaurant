@@ -244,6 +244,8 @@ export const printOrderReceiptFallback = (
   const amountPaid = Math.abs(order.amountPaid || 0);
   const changeAmount = Math.abs(order.changeAmount || 0);
   const amountDue = Math.abs(order.amountDue || 0);
+  const isDeliveryOrder = order.orderType === "Delivery";
+  const deliveryFee = Math.abs(order.deliveryFee || 0);
   const itemDiscountsTotal = Math.abs(
     order.itemDiscountsTotal ??
       order.items.reduce((sum, item) => sum + (item.discountAmount || 0), 0),
@@ -297,6 +299,21 @@ export const printOrderReceiptFallback = (
       ? `<div class="line-item"><span>العميل: ${escapeHtml(order.customerName)}</span><span></span></div>`
       : ""
   }
+  ${
+    isDeliveryOrder
+      ? `<div class="line-item"><span>نوع الطلب</span><span>توصيل</span></div>
+         ${
+           order.deliveryAddress
+             ? `<div class="line-item"><span>عنوان التوصيل</span><span>${escapeHtml(order.deliveryAddress)}</span></div>`
+             : ""
+         }
+         ${
+           order.deliveryNotes
+             ? `<div class="line-item"><span>ملاحظات التوصيل</span><span>${escapeHtml(order.deliveryNotes)}</span></div>`
+             : ""
+         }`
+      : ""
+  }
 
   <div class="line"></div>
 
@@ -318,6 +335,11 @@ export const printOrderReceiptFallback = (
   ${
     discountAmount > 0
       ? `<div class="line-item"><span>خصم الطلب</span><span>-${formatMoney(discountAmount)}</span></div>`
+      : ""
+  }
+  ${
+    isDeliveryOrder
+      ? `<div class="line-item"><span>رسوم التوصيل</span><span>${formatMoney(deliveryFee)}</span></div>`
       : ""
   }
 

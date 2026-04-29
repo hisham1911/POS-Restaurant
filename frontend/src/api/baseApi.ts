@@ -289,6 +289,7 @@ export const baseApi = createApi({
     "Expenses",
     "ExpenseCategory",
     "ExpenseCategories",
+    "CashRegister",
     "CashRegisterBalance",
     "CashRegisterTransactions",
     "Backup",

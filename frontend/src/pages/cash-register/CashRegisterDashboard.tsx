@@ -7,6 +7,8 @@ import {
   ArrowUpCircle,
   ArrowDownCircle,
   RefreshCw,
+  ArrowRightLeft,
+  ClipboardCheck,
 } from "lucide-react";
 import {
   useGetCurrentBalanceQuery,
@@ -18,15 +20,21 @@ import { Button } from "../../components/common/Button";
 import { Card } from "../../components/common/Card";
 import { Loading } from "../../components/common/Loading";
 import { Modal } from "../../components/common/Modal";
+import { TransferCashModal } from "../../components/cashRegister/TransferCashModal";
+import { ReconcileModal } from "../../components/cashRegister/ReconcileModal";
 import type { CashRegisterTransactionType } from "../../types/cashRegister.types";
 import { useAppSelector } from "../../store/hooks";
 import { selectCurrentBranch } from "../../store/slices/branchSlice";
 import { formatDateTimeFull } from "../../utils/formatters";
+import { usePermission } from "../../hooks/usePermission";
 
 export function CashRegisterDashboard() {
   const currentBranch = useAppSelector(selectCurrentBranch);
+  const { hasPermission } = usePermission();
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showReconcileModal, setShowReconcileModal] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [depositDescription, setDepositDescription] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -200,6 +208,24 @@ export function CashRegisterDashboard() {
               <ArrowDownCircle className="w-4 h-4" />
               سحب
             </Button>
+            {hasPermission("CashRegisterTransfer") && (
+              <Button
+                variant="primary"
+                onClick={() => setShowTransferModal(true)}
+              >
+                <ArrowRightLeft className="w-4 h-4" />
+                تحويل نقدي
+              </Button>
+            )}
+            {hasPermission("CashRegisterReconcile") && (
+              <Button
+                variant="outline"
+                onClick={() => setShowReconcileModal(true)}
+              >
+                <ClipboardCheck className="w-4 h-4" />
+                مطابقة وإغلاق الشيفت
+              </Button>
+            )}
             <Button
               variant="outline"
               onClick={handleRefresh}
@@ -443,6 +469,17 @@ export function CashRegisterDashboard() {
             </div>
           </div>
         </Modal>
+        <TransferCashModal
+          isOpen={showTransferModal}
+          onClose={() => setShowTransferModal(false)}
+        />
+        <ReconcileModal
+          isOpen={showReconcileModal}
+          onClose={() => setShowReconcileModal(false)}
+          branchId={currentBranch?.id ?? 0}
+          shiftId={balance?.activeShiftId ?? 0}
+          expectedAmount={balance?.currentBalance ?? 0}
+        />
         {/* Help Section */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
           <h3 className="text-lg font-semibold text-blue-900 mb-3">

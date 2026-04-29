@@ -181,7 +181,12 @@ public class OrdersController : ControllerBase
                             CashierName = order.UserName ?? userName,
                             CustomerName = order.CustomerName ?? "",
                             IsRefund = false,
-                            RefundReason = (string?)null
+                            RefundReason = (string?)null,
+                            OrderType = order.OrderType,
+                            DeliveryAddress = order.DeliveryAddress,
+                            DeliveryFee = order.DeliveryFee,
+                            DeliveryNotes = order.DeliveryNotes,
+                            DeliveryStatus = order.DeliveryStatus
                         },
                         Settings = tenant != null ? new
                         {
@@ -339,7 +344,12 @@ public class OrdersController : ControllerBase
                     CashierName = order.UserName ?? userName,
                     CustomerName = order.CustomerName ?? "",
                     IsRefund = order.Status == "Refunded" || order.Status == "PartiallyRefunded" || order.OrderType == "Return",
-                    RefundReason = order.RefundReason ?? (order.OrderType == "Return" ? "ارجاع بضاعة" : null)
+                    RefundReason = order.RefundReason ?? (order.OrderType == "Return" ? "ارجاع بضاعة" : null),
+                    OrderType = order.OrderType,
+                    DeliveryAddress = order.DeliveryAddress,
+                    DeliveryFee = order.DeliveryFee,
+                    DeliveryNotes = order.DeliveryNotes,
+                    DeliveryStatus = order.DeliveryStatus
                 },
                 Settings = tenant != null ? new
                 {

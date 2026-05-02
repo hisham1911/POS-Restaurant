@@ -1,15 +1,17 @@
 import {
   ArrowUpLeft,
   BarChart3,
-  Building2,
   Clock3,
   FileText,
   LogOut,
-  Receipt,
   Store,
+  type LucideIcon,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { getAccessibleNavigationItems, navigationItems } from "@/components/layout/navigation";
+import {
+  getAccessibleNavigationItems,
+  navigationItems,
+} from "@/components/layout/navigation";
 import {
   buildVisibleModuleSections,
   reportGroups,
@@ -19,14 +21,12 @@ import { useGetCurrentTenantQuery } from "@/api/branchesApi";
 import { useAuth } from "@/hooks/useAuth";
 import { usePermission } from "@/hooks/usePermission";
 import { cn } from "@/lib/utils";
-import { useAppSelector } from "@/store/hooks";
-import { selectCurrentBranch } from "@/store/slices/branchSlice";
+import { BranchSelector } from "@/components/layout/BranchSelector";
 
 export default function HomePage() {
   const navigate = useNavigate();
   const { user, logout, isAdmin, isSystemOwner } = useAuth();
   const { hasPermission } = usePermission();
-  const currentBranch = useAppSelector(selectCurrentBranch);
   const { data: tenantResponse } = useGetCurrentTenantQuery(undefined, {
     skip: isSystemOwner || !user,
   });
@@ -69,11 +69,7 @@ export default function HomePage() {
 
             <div className="flex w-full flex-wrap justify-end gap-2 md:w-auto md:max-w-[52%] md:self-start">
               <InfoChip label={storeName} icon={Store} tone="primary" />
-              <InfoChip
-                label={currentBranch?.name ?? "بدون فرع"}
-                icon={Building2}
-                tone="secondary"
-              />
+              <BranchSelector variant="chip" />
               <InfoChip label={currentTime} icon={Clock3} tone="primary" />
               <ActionChip
                 label="تسجيل الخروج"
@@ -143,13 +139,7 @@ export default function HomePage() {
   );
 }
 
-function SectionHeader({
-  title,
-  count,
-}: {
-  title: string;
-  count: number;
-}) {
+function SectionHeader({ title, count }: { title: string; count: number }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <h2 className="text-lg font-bold text-gray-900 sm:text-xl">{title}</h2>
@@ -166,7 +156,7 @@ function InfoChip({
   tone,
 }: {
   label: string;
-  icon: typeof Building2;
+  icon: LucideIcon;
   tone: "primary" | "secondary";
 }) {
   const toneClasses =
@@ -194,7 +184,7 @@ function ActionChip({
   onClick,
 }: {
   label: string;
-  icon: typeof LogOut;
+  icon: LucideIcon;
   tone: "primary" | "secondary";
   onClick: () => void;
 }) {
@@ -225,11 +215,11 @@ function CompactSectionCard({
   items,
 }: {
   title: string;
-  icon: typeof Receipt;
+  icon: LucideIcon;
   tone: GroupTone;
   items: Array<{
     label: string;
-    icon: typeof Receipt;
+    icon: LucideIcon;
     onClick: () => void;
   }>;
 }) {

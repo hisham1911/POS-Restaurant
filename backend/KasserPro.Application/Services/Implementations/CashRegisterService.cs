@@ -492,6 +492,7 @@ public class CashRegisterService : ICashRegisterService
             {
                 CashRegisterTransactionType.Sale => currentBalance + amount,
                 CashRegisterTransactionType.Deposit => currentBalance + amount,
+                CashRegisterTransactionType.DebtPayment => currentBalance + amount,
                 CashRegisterTransactionType.Opening => amount,
                 CashRegisterTransactionType.Refund => currentBalance - amount,
                 CashRegisterTransactionType.Withdrawal => currentBalance - amount,

@@ -13,6 +13,10 @@ public class SupplierDto
     public string? Notes { get; set; }
     public bool IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
+    public decimal TotalDue { get; set; }
+    public decimal TotalPaid { get; set; }
+    public decimal TotalPurchases { get; set; }
+    public DateTime? LastPurchaseDate { get; set; }
 }
 
 public class CreateSupplierRequest

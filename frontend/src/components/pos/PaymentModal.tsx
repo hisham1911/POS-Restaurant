@@ -54,13 +54,14 @@ export const PaymentModal = ({
   deliveryNotes,
   onOrderComplete,
 }: PaymentModalProps) => {
-  const { createOrder, completeOrder, isCreating, isCompleting } = useOrders();
+  const { createOrder, completeOrder, cancelOrder, isCreating, isCompleting } = useOrders();
   const { clearCart, total: cartTotal } = useCart();
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("Cash");
   const [amountPaid, setAmountPaid] = useState<string>("");
   const [transactionReference, setTransactionReference] = useState("");
   const [showError, setShowError] = useState(false);
   const [allowPartialPayment, setAllowPartialPayment] = useState(false);
+  const [isOrderCompleted, setIsOrderCompleted] = useState(false);
   const { hasPermission } = usePermission();
   const canSellOnCredit = hasPermission("PosCreditSale");
   const isDeliveryOrder = orderType === "Delivery";
@@ -70,10 +71,11 @@ export const PaymentModal = ({
   const total = cartTotal + parsedDeliveryFee;
 
   useEffect(() => {
-    if (!allowPartialPayment) {
+    // ❌ Don't reset amountPaid if order is already completed
+    if (!allowPartialPayment && !isOrderCompleted) {
       setAmountPaid(total.toFixed(2));
     }
-  }, [allowPartialPayment, total]);
+  }, [allowPartialPayment, total, isOrderCompleted]);
 
   useEffect(() => {
     if (selectedMethod === "Cash") {
@@ -81,9 +83,12 @@ export const PaymentModal = ({
       return;
     }
 
-    setAllowPartialPayment(false);
-    setAmountPaid(total.toFixed(2));
-  }, [selectedMethod, total]);
+    // ❌ Don't reset if order is already completed
+    if (!isOrderCompleted) {
+      setAllowPartialPayment(false);
+      setAmountPaid(total.toFixed(2));
+    }
+  }, [selectedMethod, total, isOrderCompleted]);
 
   const numericAmount = parseFloat(amountPaid) || 0;
   const change = numericAmount - total;
@@ -209,13 +214,32 @@ export const PaymentModal = ({
         ],
       });
 
-      if (completedOrder) {
-        // نجاح - عرض الباقي أو المبلغ المستحق
-        if (change > 0) {
-          toast.success(`تم إتمام الدفع! الباقي: ${formatCurrency(change)}`);
-        } else if (amountDue > 0) {
+      if (!completedOrder) {
+        // ✅ فشل إكمال الطلب - نلغي المسودة تلقائيًا
+        await cancelOrder(order.id, "فشل إكمال الدفع", { silent: true });
+        // لا نغلق النافذة، السلة محفوظة
+        return;
+      }
+
+      // نجاح - عرض الباقي أو المبلغ المستحق
+      const completedChange = completedOrder.changeAmount ?? 0;
+      const completedAmountDue = completedOrder.amountDue ?? 0;
+
+      // ✅ Close modal IMMEDIATELY after order completion (before toasts and cleanup)
+      // This ensures modal closes fast even if printing takes time
+      onClose();
+
+      // ✅ Defer cleanup to next tick to ensure modal closes immediately
+      // This prevents parent re-renders from delaying modal close
+      setTimeout(() => {
+        // ✅ Mark order as completed to prevent useEffect from resetting amountPaid
+        setIsOrderCompleted(true);
+
+        if (completedChange > 0) {
+          toast.success(`تم إتمام الدفع! الباقي: ${formatCurrency(completedChange)}`);
+        } else if (completedAmountDue > 0) {
           toast.success(
-            `تم إتمام البيع الآجل! المبلغ المستحق: ${formatCurrency(amountDue)}`,
+            `تم إتمام البيع الآجل! المبلغ المستحق: ${formatCurrency(completedAmountDue)}`,
           );
         } else {
           toast.success("تم إتمام الدفع بنجاح!");
@@ -227,12 +251,11 @@ export const PaymentModal = ({
           );
         }
 
+        // Then clear cart and call callbacks
         clearCart();
         setTransactionReference("");
         onOrderComplete?.();
-        onClose();
-      }
-      // فشل إكمال الطلب - لا نغلق النافذة، السلة محفوظة
+      }, 0);
     } catch {
       // خطأ غير متوقع - لا نغلق النافذة
       toast.error("حدث خطأ غير متوقع");

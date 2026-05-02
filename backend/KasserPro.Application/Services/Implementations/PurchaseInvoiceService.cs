@@ -31,8 +31,9 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         int pageSize = 20)
     {
         var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
         var query = _unitOfWork.PurchaseInvoices.Query()
-            .Where(pi => pi.TenantId == tenantId && !pi.IsDeleted);
+            .Where(pi => pi.TenantId == tenantId && pi.BranchId == branchId && !pi.IsDeleted);
 
         if (supplierId.HasValue)
             query = query.Where(pi => pi.SupplierId == supplierId.Value);
@@ -50,6 +51,12 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
         // SQLite doesn't support Sum on decimal - cast to double first
         var totalAmount = Math.Round(
             (decimal)(await query.SumAsync(pi => (double?)pi.Total) ?? 0.0),
+            2);
+        var totalPaidAmount = Math.Round(
+            (decimal)(await query.SumAsync(pi => (double?)pi.AmountPaid) ?? 0.0),
+            2);
+        var totalDueAmount = Math.Round(
+            (decimal)(await query.SumAsync(pi => (double?)pi.AmountDue) ?? 0.0),
             2);
 
         var invoices = await query
@@ -84,7 +91,9 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             totalCount,
             pageNumber,
             pageSize,
-            totalAmount);
+            totalAmount,
+            totalPaidAmount,
+            totalDueAmount);
 
         return ApiResponse<PagedResult<PurchaseInvoiceDto>>.Ok(result);
     }
@@ -143,6 +152,14 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                 return ApiResponse<PurchaseInvoicePreviewDto>.Fail(
                     ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE,
                     ErrorMessages.Get(ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE));
+            }
+
+            var batchRequested = IsBatchRequested(item);
+            if ((product.IsBatchTracked || batchRequested) && item.SellingPrice <= 0)
+            {
+                return ApiResponse<PurchaseInvoicePreviewDto>.Fail(
+                    ErrorCodes.VALIDATION_ERROR,
+                    "سعر بيع الدفعة مطلوب");
             }
 
             subtotal += item.Quantity * item.PurchasePrice;
@@ -295,6 +312,10 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             if (product.Type == ProductType.Service)
                 return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE, ErrorMessages.Get(ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE));
 
+            var batchRequested = IsBatchRequested(itemRequest);
+            if ((product.IsBatchTracked || batchRequested) && itemRequest.SellingPrice <= 0)
+                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.VALIDATION_ERROR, "سعر بيع الدفعة مطلوب");
+
             var itemTotal = itemRequest.Quantity * itemRequest.PurchasePrice;
             subtotal += itemTotal;
 
@@ -384,6 +405,10 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
 
             if (product.Type == ProductType.Service)
                 return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE, ErrorMessages.Get(ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE));
+
+            var batchRequested = IsBatchRequested(itemRequest);
+            if ((product.IsBatchTracked || batchRequested) && itemRequest.SellingPrice <= 0)
+                return ApiResponse<PurchaseInvoiceDto>.Fail(ErrorCodes.VALIDATION_ERROR, "سعر بيع الدفعة مطلوب");
 
             var itemTotal = itemRequest.Quantity * itemRequest.PurchasePrice;
             subtotal += itemTotal;
@@ -475,16 +500,34 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             if (supplier != null)
             {
                 supplier.TotalDue = Math.Round(supplier.TotalDue + invoice.AmountDue, 2);
+                supplier.TotalPurchases = Math.Round(supplier.TotalPurchases + invoice.Total, 2);
+                supplier.LastPurchaseDate = invoice.InvoiceDate;
             }
 
             // Update inventory for each item
             foreach (var item in invoice.Items)
             {
                 var product = await _unitOfWork.Products.Query()
-                    .FirstOrDefaultAsync(p => p.Id == item.ProductId);
+                    .FirstOrDefaultAsync(p => p.Id == item.ProductId
+                                           && p.TenantId == tenantId
+                                           && !p.IsDeleted);
 
                 if (product != null)
                 {
+                    var batchRequested = IsBatchRequested(item);
+                    var shouldCreateBatch = product.IsBatchTracked || batchRequested;
+                    if (shouldCreateBatch && item.SellingPrice <= 0)
+                    {
+                        return ApiResponse<PurchaseInvoiceDto>.Fail(
+                            ErrorCodes.VALIDATION_ERROR,
+                            "سعر بيع الدفعة مطلوب");
+                    }
+
+                    if (batchRequested && !product.IsBatchTracked)
+                    {
+                        product.IsBatchTracked = true;
+                    }
+
                     // Update BranchInventory (the authoritative stock location)
                     var branchInventory = await _unitOfWork.BranchInventories.Query()
                         .FirstOrDefaultAsync(bi => bi.ProductId == product.Id
@@ -492,6 +535,17 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                                                 && bi.TenantId == tenantId);
 
                     int balanceBefore;
+
+                    if (shouldCreateBatch)
+                    {
+                        await EnsureExistingStockHasOpeningBatchAsync(
+                            product,
+                            invoice.BranchId,
+                            tenantId,
+                            branchInventory?.Quantity ?? 0,
+                            DateTime.UtcNow,
+                            invoice.InvoiceDate.AddTicks(-1));
+                    }
 
                     if (branchInventory == null)
                     {
@@ -533,13 +587,31 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                         CreatedAt = DateTime.UtcNow
                     };
 
-                    // If batch/expiry data provided, create ProductBatch and link stock movement
+                    // Create ProductBatch when the product tracks batches or the invoice line explicitly provides batch data.
                     ProductBatch? batch = null;
-                    if (!string.IsNullOrWhiteSpace(item.BatchNumber) || item.ExpiryDate.HasValue)
+                    if (shouldCreateBatch)
                     {
-                        var batchNumber = !string.IsNullOrWhiteSpace(item.BatchNumber)
-                            ? item.BatchNumber
-                            : $"AUTO-{invoice.InvoiceNumber}-{product.Id}";
+                        // Generate BatchNumber if not provided
+                        var batchNumber = string.IsNullOrWhiteSpace(item.BatchNumber)
+                            ? null
+                            : item.BatchNumber.Trim();
+
+                        if (!string.IsNullOrWhiteSpace(batchNumber))
+                        {
+                            var batchExists = await _unitOfWork.ProductBatches.Query()
+                                .AnyAsync(b => b.BatchNumber == batchNumber
+                                            && b.ProductId == item.ProductId
+                                            && b.BranchId == invoice.BranchId
+                                            && b.TenantId == tenantId
+                                            && !b.IsDeleted
+                                            && b.Status != BatchStatus.Depleted);
+                            if (batchExists)
+                            {
+                                return ApiResponse<PurchaseInvoiceDto>.Fail(
+                                    ErrorCodes.BATCH_NUMBER_DUPLICATE,
+                                    ErrorMessages.Get(ErrorCodes.BATCH_NUMBER_DUPLICATE));
+                            }
+                        }
 
                         batch = new ProductBatch
                         {
@@ -548,11 +620,13 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                             ProductId = product.Id,
                             BatchNumber = batchNumber,
                             PurchaseDate = invoice.InvoiceDate,
-                            ExpiryDate = item.ExpiryDate ?? DateTime.UtcNow.AddYears(1),
+                            ExpiryDate = item.ExpiryDate,
                             ProductionDate = item.ProductionDate,
                             Quantity = item.Quantity,
                             InitialQuantity = item.Quantity,
                             CostPrice = item.PurchasePrice,
+                            // Save SellingPrice if provided and > 0
+                            SellingPrice = item.SellingPrice > 0 ? item.SellingPrice : null,
                             SupplierName = invoice.SupplierName,
                             PurchaseInvoiceId = invoice.Id,
                             Status = BatchStatus.Active,
@@ -569,7 +643,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                     product.LastPurchasePrice = item.PurchasePrice;
                     product.LastPurchaseDate = DateTime.UtcNow;
                     product.LastStockUpdate = DateTime.UtcNow;
-
+                    
                     // Update average cost using weighted average
                     var oldStock = balanceBefore;
                     var oldAvgCost = product.AverageCost ?? product.Cost ?? 0m;
@@ -583,6 +657,39 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
 
                     product.UpdatedAt = DateTime.UtcNow;
                     _unitOfWork.Products.Update(product);
+
+                    // Update SupplierProduct link
+                    var supplierProduct = await _unitOfWork.SupplierProducts.Query()
+                        .FirstOrDefaultAsync(sp => sp.SupplierId == invoice.SupplierId
+                                                 && sp.ProductId == item.ProductId
+                                                 && sp.TenantId == tenantId);
+
+                    if (supplierProduct == null)
+                    {
+                        supplierProduct = new SupplierProduct
+                        {
+                            TenantId = tenantId,
+                            SupplierId = invoice.SupplierId,
+                            ProductId = item.ProductId,
+                            IsPreferred = false,
+                            LastPurchasePrice = item.PurchasePrice,
+                            LastPurchaseDate = invoice.InvoiceDate,
+                            TotalQuantityPurchased = item.Quantity,
+                            TotalAmountSpent = Math.Round(item.Quantity * item.PurchasePrice, 2),
+                            CreatedAt = DateTime.UtcNow
+                        };
+                        await _unitOfWork.SupplierProducts.AddAsync(supplierProduct);
+                    }
+                    else
+                    {
+                        supplierProduct.LastPurchasePrice = item.PurchasePrice;
+                        supplierProduct.LastPurchaseDate = invoice.InvoiceDate;
+                        supplierProduct.TotalQuantityPurchased += item.Quantity;
+                        supplierProduct.TotalAmountSpent = Math.Round(
+                            supplierProduct.TotalAmountSpent + (item.Quantity * item.PurchasePrice), 2);
+                        supplierProduct.UpdatedAt = DateTime.UtcNow;
+                        _unitOfWork.SupplierProducts.Update(supplierProduct);
+                    }
                 }
             }
 
@@ -654,6 +761,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                 if (supplier != null)
                 {
                     supplier.TotalDue = Math.Round(Math.Max(0m, supplier.TotalDue - invoice.AmountDue), 2);
+                    supplier.TotalPurchases = Math.Round(Math.Max(0m, supplier.TotalPurchases - invoice.Total), 2);
                 }
             }
 
@@ -796,6 +904,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             if (supplier != null)
             {
                 supplier.TotalDue = Math.Round(Math.Max(0m, supplier.TotalDue - request.Amount), 2);
+                supplier.TotalPaid = Math.Round(supplier.TotalPaid + request.Amount, 2);
             }
 
             _unitOfWork.PurchaseInvoices.Update(invoice);
@@ -814,6 +923,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                     branchId: invoice.BranchId);
             }
 
+            await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitTransactionAsync();
 
             var dto = new PurchaseInvoicePaymentDto
@@ -874,28 +984,33 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             // Update invoice amounts
             invoice.AmountPaid = Math.Round(Math.Max(0m, invoice.AmountPaid - payment.Amount), 2);
             invoice.AmountDue = Math.Round(invoice.Total - invoice.AmountPaid, 2);
-            if (invoice.AmountPaid == 0)
-            {
-                invoice.Status = PurchaseInvoiceStatus.Confirmed;
-            }
-            else if (invoice.AmountPaid > 0 && invoice.AmountDue > 0)
-            {
-                invoice.Status = PurchaseInvoiceStatus.PartiallyPaid;
-            }
-            else if (invoice.AmountDue <= 0)
-            {
-                invoice.Status = PurchaseInvoiceStatus.Paid;
-            }
+            RecalculateInvoiceStatus(invoice);
             invoice.UpdatedAt = DateTime.UtcNow;
 
             var supplier = await GetSupplierForInvoiceAsync(invoice.SupplierId, invoice.BranchId);
             if (supplier != null)
             {
                 supplier.TotalDue = Math.Round(supplier.TotalDue + payment.Amount, 2);
+                supplier.TotalPaid = Math.Round(Math.Max(0m, supplier.TotalPaid - payment.Amount), 2);
             }
 
             _unitOfWork.PurchaseInvoices.Update(invoice);
             _unitOfWork.PurchaseInvoicePayments.Delete(payment);
+            await _unitOfWork.SaveChangesAsync();
+
+            // Reverse CashRegister for cash payments
+            if (payment.Method == PaymentMethod.Cash)
+            {
+                await _cashRegisterService.RecordTransactionAsync(
+                    CashRegisterTransactionType.SupplierPaymentReversal,
+                    payment.Amount,
+                    $"عكس دفعة مورد محذوفة - فاتورة {invoice.InvoiceNumber}",
+                    referenceType: "PurchaseInvoicePayment",
+                    referenceId: payment.Id,
+                    shiftId: null,
+                    branchId: invoice.BranchId);
+            }
+
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitTransactionAsync();
 
@@ -906,6 +1021,85 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             await _unitOfWork.RollbackTransactionAsync();
             throw;
         }
+    }
+
+    private static bool IsBatchRequested(CreatePurchaseInvoiceItemRequest item)
+    {
+        return !string.IsNullOrWhiteSpace(item.BatchNumber)
+            || item.ExpiryDate.HasValue
+            || item.ProductionDate.HasValue;
+    }
+
+    private static bool IsBatchRequested(UpdatePurchaseInvoiceItemRequest item)
+    {
+        return !string.IsNullOrWhiteSpace(item.BatchNumber)
+            || item.ExpiryDate.HasValue
+            || item.ProductionDate.HasValue;
+    }
+
+    private static bool IsBatchRequested(PurchaseInvoiceItem item)
+    {
+        return !string.IsNullOrWhiteSpace(item.BatchNumber)
+            || item.ExpiryDate.HasValue
+            || item.ProductionDate.HasValue;
+    }
+
+    private async Task EnsureExistingStockHasOpeningBatchAsync(
+        Product product,
+        int branchId,
+        int tenantId,
+        int existingBranchStock,
+        DateTime now,
+        DateTime purchaseDate)
+    {
+        if (existingBranchStock <= 0)
+        {
+            return;
+        }
+
+        var activeBatchQuantity = await _unitOfWork.ProductBatches.Query()
+            .Where(pb => pb.TenantId == tenantId
+                      && pb.BranchId == branchId
+                      && pb.ProductId == product.Id
+                      && !pb.IsDeleted
+                      && pb.Status == BatchStatus.Active)
+            .SumAsync(pb => (int?)pb.Quantity) ?? 0;
+
+        var missingBatchQuantity = existingBranchStock - activeBatchQuantity;
+        if (missingBatchQuantity <= 0)
+        {
+            return;
+        }
+
+        var branchSellingPrice = await _unitOfWork.BranchProductPrices.Query()
+            .Where(bp => bp.TenantId == tenantId
+                      && bp.ProductId == product.Id
+                      && bp.BranchId == branchId
+                      && bp.IsActive
+                      && !bp.IsDeleted
+                      && bp.EffectiveFrom <= now
+                      && (bp.EffectiveTo == null || bp.EffectiveTo >= now))
+            .OrderByDescending(bp => bp.EffectiveFrom)
+            .Select(bp => (decimal?)bp.Price)
+            .FirstOrDefaultAsync();
+
+        var openingBatch = new ProductBatch
+        {
+            TenantId = tenantId,
+            BranchId = branchId,
+            ProductId = product.Id,
+            BatchNumber = $"رصيد افتتاحي - {purchaseDate:yyyyMMddHHmmss}-{now:HHmmssfff}",
+            Quantity = missingBatchQuantity,
+            InitialQuantity = missingBatchQuantity,
+            CostPrice = product.AverageCost ?? product.Cost,
+            SellingPrice = branchSellingPrice ?? product.Price,
+            PurchaseDate = purchaseDate,
+            Status = BatchStatus.Active,
+            Notes = "Opening batch generated from existing branch inventory before purchase invoice batch receiving.",
+            CreatedAt = now
+        };
+
+        await _unitOfWork.ProductBatches.AddAsync(openingBatch);
     }
 
     private static void RecalculateInvoiceStatus(PurchaseInvoice invoice)

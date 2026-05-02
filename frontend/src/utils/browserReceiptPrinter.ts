@@ -347,20 +347,16 @@ export const printOrderReceiptFallback = (
 
   <div class="line-item total"><span>الإجمالي</span><span>${formatMoney(totalAmount)}</span></div>
 
+  <div class="line"></div>
+  <div class="line-item"><span>المبلغ المدفوع</span><span>${formatMoney(amountPaid)}</span></div>
   ${
-    amountPaid > 0
-      ? `<div class="line"></div>
-         <div class="line-item"><span>المبلغ المدفوع</span><span>${formatMoney(amountPaid)}</span></div>
-         ${
-           changeAmount > 0
-             ? `<div class="line-item"><span>الباقي</span><span>${formatMoney(changeAmount)}</span></div>`
-             : ""
-         }
-         ${
-           amountDue > 0
-             ? `<div class="line-item total"><span>المتبقي على العميل</span><span>${formatMoney(amountDue)}</span></div>`
-             : ""
-         }`
+    changeAmount > 0
+      ? `<div class="line-item"><span>الباقي</span><span>${formatMoney(changeAmount)}</span></div>`
+      : ""
+  }
+  ${
+    amountDue > 0 && changeAmount === 0
+      ? `<div class="line-item total"><span>المتبقي على العميل</span><span>${formatMoney(amountDue)}</span></div>`
       : ""
   }
 

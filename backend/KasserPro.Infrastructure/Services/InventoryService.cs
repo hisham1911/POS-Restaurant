@@ -44,6 +44,25 @@ public class InventoryService : IInventoryService
                 .OrderBy(i => i.Product.Name)
                 .ToListAsync();
 
+            var productIds = inventories
+                .Where(i => i.Product.IsBatchTracked)
+                .Select(i => i.ProductId)
+                .Distinct()
+                .ToList();
+
+            var batchAvailableByProductId = productIds.Count == 0
+                ? new Dictionary<int, int>()
+                : await _context.ProductBatches
+                    .Where(pb => pb.TenantId == tenantId
+                              && pb.BranchId == branchId
+                              && productIds.Contains(pb.ProductId)
+                              && !pb.IsDeleted
+                              && pb.Status == BatchStatus.Active
+                              && pb.Quantity > 0)
+                    .GroupBy(pb => pb.ProductId)
+                    .Select(g => new { ProductId = g.Key, Quantity = g.Sum(pb => pb.Quantity) })
+                    .ToDictionaryAsync(x => x.ProductId, x => x.Quantity);
+
             _logger.LogInformation("Found {Count} inventory records for BranchId={BranchId}, TenantId={TenantId}",
                 inventories.Count, branchId, tenantId);
 
@@ -57,6 +76,9 @@ public class InventoryService : IInventoryService
                 ProductSku = i.Product.Sku,
                 ProductBarcode = i.Product.Barcode,
                 Quantity = i.Quantity,
+                BatchAvailableQuantity = i.Product.IsBatchTracked
+                    ? batchAvailableByProductId.GetValueOrDefault(i.ProductId)
+                    : null,
                 ReorderLevel = i.ReorderLevel,
                 IsLowStock = i.Quantity <= i.ReorderLevel,
                 IsBatchTracked = i.Product.IsBatchTracked,
@@ -284,14 +306,14 @@ public class InventoryService : IInventoryService
     }
 
     // Legacy compatibility methods for OrderService
-    public async Task BatchDecrementStockAsync(List<(int OrderItemId, int ProductId, int Quantity)> items, int orderId)
+    public async Task BatchDecrementStockAsync(List<(int OrderItemId, int ProductId, int Quantity, int? BatchId)> items, int orderId)
     {
         var branchId = _currentUserService.BranchId;
         var tenantId = _currentUserService.TenantId;
         var tenant = await _context.Tenants.FindAsync(tenantId);
         var allowExpired = tenant?.AllowExpiredSales ?? false;
 
-        foreach (var (orderItemId, productId, quantity) in items)
+        foreach (var (orderItemId, productId, quantity, requestedBatchId) in items)
         {
             var product = await _context.Products.FindAsync(productId);
             if (product == null || !product.TrackInventory)
@@ -316,19 +338,41 @@ public class InventoryService : IInventoryService
                 inventory.Quantity -= quantity;
                 inventory.LastUpdatedAt = DateTime.UtcNow;
 
-                // FEFO: Deduct from batches with nearest expiry first
+                // FIFO: deduct from the selected batch when provided, otherwise from the oldest available batch.
                 var remaining = quantity;
                 var batchQuery = _context.ProductBatches
                     .Where(pb => pb.TenantId == tenantId && pb.BranchId == branchId
                                  && pb.ProductId == productId && !pb.IsDeleted
-                                 && pb.Status != BatchStatus.Depleted && pb.Quantity > 0)
-                    .OrderBy(pb => pb.ExpiryDate);
+                                 && pb.Status != BatchStatus.Depleted
+                                 && pb.Status != BatchStatus.OnHold
+                                 && pb.Quantity > 0)
+                    .OrderBy(pb => pb.PurchaseDate)
+                    .ThenBy(pb => pb.CreatedAt)
+                    .ThenBy(pb => pb.Id);
 
                 if (!allowExpired)
-                    batchQuery = batchQuery.Where(pb => pb.ExpiryDate >= DateTime.UtcNow.Date)
-                                           .OrderBy(pb => pb.ExpiryDate);
+                {
+                    var today = DateTime.UtcNow.Date;
+                    batchQuery = batchQuery.Where(pb => !pb.ExpiryDate.HasValue || pb.ExpiryDate.Value.Date >= today)
+                                           .OrderBy(pb => pb.PurchaseDate)
+                                           .ThenBy(pb => pb.CreatedAt)
+                                           .ThenBy(pb => pb.Id);
+                }
+
+                if (requestedBatchId.HasValue)
+                    batchQuery = batchQuery.Where(pb => pb.Id == requestedBatchId.Value)
+                                           .OrderBy(pb => pb.PurchaseDate)
+                                           .ThenBy(pb => pb.CreatedAt)
+                                           .ThenBy(pb => pb.Id);
 
                 var batches = await batchQuery.ToListAsync();
+                var availableInSelectedBatches = batches.Sum(batch => batch.Quantity);
+                if (product.IsBatchTracked && availableInSelectedBatches < quantity)
+                {
+                    throw new InvalidOperationException(
+                        $"Insufficient batch stock for product {productId}. Available={availableInSelectedBatches}, Requested={quantity}");
+                }
+
                 ProductBatch? primaryBatch = null;
 
                 foreach (var batch in batches)
@@ -340,7 +384,9 @@ public class InventoryService : IInventoryService
 
                     if (batch.Quantity <= 0)
                         batch.Status = BatchStatus.Depleted;
-                    else if (batch.ExpiryDate.Date < DateTime.UtcNow.Date && batch.Status == BatchStatus.Active)
+                    else if (batch.ExpiryDate.HasValue
+                             && batch.ExpiryDate.Value.Date < DateTime.UtcNow.Date
+                             && batch.Status == BatchStatus.Active)
                         batch.Status = BatchStatus.Expired;
 
                     _context.ProductBatches.Update(batch);
@@ -530,10 +576,15 @@ public class InventoryService : IInventoryService
 
             // Check source inventory
             var sourceInventory = await _context.BranchInventories
-                .FirstOrDefaultAsync(i => i.BranchId == request.FromBranchId && i.ProductId == request.ProductId);
+                .FirstOrDefaultAsync(i => i.TenantId == _currentUserService.TenantId
+                                       && i.BranchId == request.FromBranchId
+                                       && i.ProductId == request.ProductId);
 
             if (sourceInventory == null || sourceInventory.Quantity < request.Quantity)
                 return ApiResponse<InventoryTransferDto>.Fail(ErrorCodes.INVENTORY_INSUFFICIENT_STOCK, "الكمية المتوفرة في المخزون غير كافية");
+
+            if (product.IsBatchTracked && !await HasEnoughBatchStockAsync(request.ProductId, request.FromBranchId, request.Quantity))
+                return ApiResponse<InventoryTransferDto>.Fail(ErrorCodes.INVENTORY_INSUFFICIENT_STOCK, "الكمية المتوفرة في دفعات المخزون غير كافية");
 
             // Generate transfer number
             var transferCount = await _context.InventoryTransfers.CountAsync(t => t.TenantId == _currentUserService.TenantId);
@@ -601,32 +652,45 @@ public class InventoryService : IInventoryService
 
             // Check source inventory again
             var sourceInventory = await _context.BranchInventories
-                .FirstOrDefaultAsync(i => i.BranchId == transfer.FromBranchId && i.ProductId == transfer.ProductId);
+                .FirstOrDefaultAsync(i => i.TenantId == _currentUserService.TenantId
+                                       && i.BranchId == transfer.FromBranchId
+                                       && i.ProductId == transfer.ProductId);
 
             if (sourceInventory == null || sourceInventory.Quantity < transfer.Quantity)
                 return ApiResponse<InventoryTransferDto>.Fail(ErrorCodes.INVENTORY_INSUFFICIENT_STOCK, "الكمية المتوفرة في المخزون غير كافية");
 
-            // Deduct from source
-            var balanceBefore = sourceInventory.Quantity;
-            sourceInventory.Quantity -= transfer.Quantity;
-            sourceInventory.LastUpdatedAt = DateTime.UtcNow;
+            if (transfer.Product.IsBatchTracked && !await HasEnoughBatchStockAsync(transfer.ProductId, transfer.FromBranchId, transfer.Quantity))
+                return ApiResponse<InventoryTransferDto>.Fail(ErrorCodes.INVENTORY_INSUFFICIENT_STOCK, "الكمية المتوفرة في دفعات المخزون غير كافية");
 
-            // Record stock movement for source
-            var sourceMovement = new StockMovement
+            // Deduct from source
+            var now = DateTime.UtcNow;
+            var balanceBefore = sourceInventory.Quantity;
+            var sourceMovements = transfer.Product.IsBatchTracked
+                ? await DeductTransferBatchesAsync(transfer, balanceBefore, now)
+                : new List<StockMovement>();
+
+            sourceInventory.Quantity -= transfer.Quantity;
+            sourceInventory.LastUpdatedAt = now;
+
+            if (sourceMovements.Count == 0)
             {
-                TenantId = _currentUserService.TenantId,
-                BranchId = transfer.FromBranchId,
-                ProductId = transfer.ProductId,
-                Type = StockMovementType.Transfer,
-                Quantity = -transfer.Quantity,
-                ReferenceType = "InventoryTransfer",
-                ReferenceId = transfer.Id,
-                BalanceBefore = balanceBefore,
-                BalanceAfter = sourceInventory.Quantity,
-                Reason = $"نقل إلى {transfer.ToBranch.Name} - {transfer.Reason}",
-                UserId = _currentUserService.UserId
-            };
-            _context.StockMovements.Add(sourceMovement);
+                sourceMovements.Add(new StockMovement
+                {
+                    TenantId = _currentUserService.TenantId,
+                    BranchId = transfer.FromBranchId,
+                    ProductId = transfer.ProductId,
+                    Type = StockMovementType.Transfer,
+                    Quantity = -transfer.Quantity,
+                    ReferenceType = "InventoryTransfer",
+                    ReferenceId = transfer.Id,
+                    BalanceBefore = balanceBefore,
+                    BalanceAfter = sourceInventory.Quantity,
+                    Reason = $"نقل إلى {transfer.ToBranch.Name} - {transfer.Reason}",
+                    UserId = _currentUserService.UserId
+                });
+            }
+
+            _context.StockMovements.AddRange(sourceMovements);
 
             // Get current user
             var user = await _context.Users.FindAsync(_currentUserService.UserId);
@@ -635,7 +699,7 @@ public class InventoryService : IInventoryService
             transfer.Status = InventoryTransferStatus.Approved;
             transfer.ApprovedByUserId = _currentUserService.UserId;
             transfer.ApprovedByUserName = user?.Name ?? "Unknown";
-            transfer.ApprovedAt = DateTime.UtcNow;
+            transfer.ApprovedAt = now;
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
@@ -675,8 +739,11 @@ public class InventoryService : IInventoryService
 
             // Get or create destination inventory
             var destInventory = await _context.BranchInventories
-                .FirstOrDefaultAsync(i => i.BranchId == transfer.ToBranchId && i.ProductId == transfer.ProductId);
+                .FirstOrDefaultAsync(i => i.TenantId == _currentUserService.TenantId
+                                       && i.BranchId == transfer.ToBranchId
+                                       && i.ProductId == transfer.ProductId);
 
+            var now = DateTime.UtcNow;
             if (destInventory == null)
             {
                 destInventory = new BranchInventory
@@ -686,32 +753,39 @@ public class InventoryService : IInventoryService
                     ProductId = transfer.ProductId,
                     Quantity = 0,
                     ReorderLevel = transfer.Product.ReorderPoint ?? 10,
-                    LastUpdatedAt = DateTime.UtcNow
+                    LastUpdatedAt = now
                 };
                 _context.BranchInventories.Add(destInventory);
             }
 
             // Add to destination
             var balanceBefore = destInventory.Quantity;
-            destInventory.Quantity += transfer.Quantity;
-            destInventory.LastUpdatedAt = DateTime.UtcNow;
+            var destMovements = transfer.Product.IsBatchTracked
+                ? await ReceiveTransferBatchesAsync(transfer, balanceBefore, now)
+                : new List<StockMovement>();
 
-            // Record stock movement for destination
-            var destMovement = new StockMovement
+            destInventory.Quantity += transfer.Quantity;
+            destInventory.LastUpdatedAt = now;
+
+            if (destMovements.Count == 0)
             {
-                TenantId = _currentUserService.TenantId,
-                BranchId = transfer.ToBranchId,
-                ProductId = transfer.ProductId,
-                Type = StockMovementType.Transfer,
-                Quantity = transfer.Quantity,
-                ReferenceType = "InventoryTransfer",
-                ReferenceId = transfer.Id,
-                BalanceBefore = balanceBefore,
-                BalanceAfter = destInventory.Quantity,
-                Reason = $"استلام من {transfer.FromBranch.Name} - {transfer.Reason}",
-                UserId = _currentUserService.UserId
-            };
-            _context.StockMovements.Add(destMovement);
+                destMovements.Add(new StockMovement
+                {
+                    TenantId = _currentUserService.TenantId,
+                    BranchId = transfer.ToBranchId,
+                    ProductId = transfer.ProductId,
+                    Type = StockMovementType.Transfer,
+                    Quantity = transfer.Quantity,
+                    ReferenceType = "InventoryTransfer",
+                    ReferenceId = transfer.Id,
+                    BalanceBefore = balanceBefore,
+                    BalanceAfter = destInventory.Quantity,
+                    Reason = $"استلام من {transfer.FromBranch.Name} - {transfer.Reason}",
+                    UserId = _currentUserService.UserId
+                });
+            }
+
+            _context.StockMovements.AddRange(destMovements);
 
             // Get current user
             var user = await _context.Users.FindAsync(_currentUserService.UserId);
@@ -720,7 +794,7 @@ public class InventoryService : IInventoryService
             transfer.Status = InventoryTransferStatus.Completed;
             transfer.ReceivedByUserId = _currentUserService.UserId;
             transfer.ReceivedByUserName = user?.Name ?? "Unknown";
-            transfer.ReceivedAt = DateTime.UtcNow;
+            transfer.ReceivedAt = now;
 
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
@@ -762,13 +836,19 @@ public class InventoryService : IInventoryService
             if (transfer.Status == InventoryTransferStatus.Approved)
             {
                 var sourceInventory = await _context.BranchInventories
-                    .FirstOrDefaultAsync(i => i.BranchId == transfer.FromBranchId && i.ProductId == transfer.ProductId);
+                    .FirstOrDefaultAsync(i => i.TenantId == _currentUserService.TenantId
+                                           && i.BranchId == transfer.FromBranchId
+                                           && i.ProductId == transfer.ProductId);
 
                 if (sourceInventory != null)
                 {
+                    var now = DateTime.UtcNow;
+                    if (transfer.Product.IsBatchTracked)
+                        await RestoreCancelledTransferBatchesAsync(transfer, now);
+
                     var balanceBefore = sourceInventory.Quantity;
                     sourceInventory.Quantity += transfer.Quantity;
-                    sourceInventory.LastUpdatedAt = DateTime.UtcNow;
+                    sourceInventory.LastUpdatedAt = now;
 
                     // Record stock movement
                     var movement = new StockMovement
@@ -1033,6 +1113,234 @@ public class InventoryService : IInventoryService
             return ApiResponse<bool>.Fail(ErrorCodes.INTERNAL_ERROR, "حدث خطأ أثناء حذف سعر الفرع");
         }
     }
+
+    private async Task<bool> HasEnoughBatchStockAsync(int productId, int branchId, int quantity)
+    {
+        var availableQuantity = await _context.ProductBatches
+            .Where(pb => pb.TenantId == _currentUserService.TenantId
+                      && pb.BranchId == branchId
+                      && pb.ProductId == productId
+                      && !pb.IsDeleted
+                      && pb.Status == BatchStatus.Active
+                      && pb.Quantity > 0)
+            .SumAsync(pb => (int?)pb.Quantity) ?? 0;
+
+        return availableQuantity >= quantity;
+    }
+
+    private async Task<List<StockMovement>> DeductTransferBatchesAsync(InventoryTransfer transfer, int balanceBefore, DateTime now)
+    {
+        var sourceBatches = await _context.ProductBatches
+            .Where(pb => pb.TenantId == _currentUserService.TenantId
+                      && pb.BranchId == transfer.FromBranchId
+                      && pb.ProductId == transfer.ProductId
+                      && !pb.IsDeleted
+                      && pb.Status == BatchStatus.Active
+                      && pb.Quantity > 0)
+            .OrderBy(pb => pb.PurchaseDate)
+            .ThenBy(pb => pb.CreatedAt)
+            .ThenBy(pb => pb.Id)
+            .ToListAsync();
+
+        if (sourceBatches.Sum(pb => pb.Quantity) < transfer.Quantity)
+            throw new InvalidOperationException($"Insufficient batch stock for transfer {transfer.Id}");
+
+        var remaining = transfer.Quantity;
+        var runningBalance = balanceBefore;
+        var movements = new List<StockMovement>();
+
+        foreach (var batch in sourceBatches)
+        {
+            if (remaining <= 0)
+                break;
+
+            var quantityToMove = Math.Min(batch.Quantity, remaining);
+            var movementBalanceBefore = runningBalance;
+            runningBalance -= quantityToMove;
+            remaining -= quantityToMove;
+
+            batch.Quantity -= quantityToMove;
+            batch.UpdatedAt = now;
+            if (batch.Quantity <= 0)
+            {
+                batch.Status = BatchStatus.Depleted;
+                batch.StatusUpdatedAt = now;
+            }
+
+            movements.Add(new StockMovement
+            {
+                TenantId = _currentUserService.TenantId,
+                BranchId = transfer.FromBranchId,
+                ProductId = transfer.ProductId,
+                Type = StockMovementType.Transfer,
+                Quantity = -quantityToMove,
+                ReferenceType = "InventoryTransfer",
+                ReferenceId = transfer.Id,
+                BalanceBefore = movementBalanceBefore,
+                BalanceAfter = runningBalance,
+                BatchId = batch.Id,
+                Reason = $"نقل إلى {transfer.ToBranch.Name} - باتش {GetBatchLabel(batch)}",
+                UserId = _currentUserService.UserId
+            });
+        }
+
+        return movements;
+    }
+
+    private async Task<List<StockMovement>> ReceiveTransferBatchesAsync(InventoryTransfer transfer, int balanceBefore, DateTime now)
+    {
+        var sourceMovements = await _context.StockMovements
+            .Where(m => m.TenantId == _currentUserService.TenantId
+                     && m.BranchId == transfer.FromBranchId
+                     && m.ProductId == transfer.ProductId
+                     && m.ReferenceType == "InventoryTransfer"
+                     && m.ReferenceId == transfer.Id
+                     && m.Quantity < 0
+                     && m.BatchId.HasValue)
+            .Include(m => m.Batch)
+            .OrderBy(m => m.Id)
+            .ToListAsync();
+
+        if (sourceMovements.Count == 0)
+        {
+            var sourceInventory = await _context.BranchInventories
+                .FirstOrDefaultAsync(i => i.TenantId == _currentUserService.TenantId
+                                       && i.BranchId == transfer.FromBranchId
+                                       && i.ProductId == transfer.ProductId);
+
+            var logicalSourceBalanceBefore = (sourceInventory?.Quantity ?? 0) + transfer.Quantity;
+            sourceMovements = await DeductTransferBatchesAsync(transfer, logicalSourceBalanceBefore, now);
+        }
+
+        var runningBalance = balanceBefore;
+        var destMovements = new List<StockMovement>();
+
+        foreach (var sourceMovement in sourceMovements)
+        {
+            var sourceBatch = sourceMovement.Batch ?? await _context.ProductBatches
+                .FirstOrDefaultAsync(pb => pb.Id == sourceMovement.BatchId
+                                       && pb.TenantId == _currentUserService.TenantId);
+
+            if (sourceBatch == null)
+                throw new InvalidOperationException($"Source batch {sourceMovement.BatchId} not found for transfer {transfer.Id}");
+
+            var quantityToReceive = -sourceMovement.Quantity;
+            var destinationBatch = await GetOrCreateDestinationBatchAsync(transfer, sourceBatch, quantityToReceive, now);
+            var movementBalanceBefore = runningBalance;
+            runningBalance += quantityToReceive;
+
+            destMovements.Add(new StockMovement
+            {
+                TenantId = _currentUserService.TenantId,
+                BranchId = transfer.ToBranchId,
+                ProductId = transfer.ProductId,
+                Type = StockMovementType.Transfer,
+                Quantity = quantityToReceive,
+                ReferenceType = "InventoryTransfer",
+                ReferenceId = transfer.Id,
+                BalanceBefore = movementBalanceBefore,
+                BalanceAfter = runningBalance,
+                Batch = destinationBatch,
+                Reason = $"استلام من {transfer.FromBranch.Name} - باتش {GetBatchLabel(sourceBatch)}",
+                UserId = _currentUserService.UserId
+            });
+        }
+
+        return destMovements;
+    }
+
+    private async Task<ProductBatch> GetOrCreateDestinationBatchAsync(
+        InventoryTransfer transfer,
+        ProductBatch sourceBatch,
+        int quantity,
+        DateTime now)
+    {
+        ProductBatch? destinationBatch = null;
+
+        if (!string.IsNullOrWhiteSpace(sourceBatch.BatchNumber))
+        {
+            destinationBatch = await _context.ProductBatches
+                .FirstOrDefaultAsync(pb => pb.TenantId == _currentUserService.TenantId
+                                       && pb.BranchId == transfer.ToBranchId
+                                       && pb.ProductId == transfer.ProductId
+                                       && pb.BatchNumber == sourceBatch.BatchNumber
+                                       && !pb.IsDeleted);
+        }
+
+        if (destinationBatch == null)
+        {
+            destinationBatch = new ProductBatch
+            {
+                TenantId = _currentUserService.TenantId,
+                BranchId = transfer.ToBranchId,
+                ProductId = transfer.ProductId,
+                BatchNumber = sourceBatch.BatchNumber,
+                ProductionDate = sourceBatch.ProductionDate,
+                ExpiryDate = sourceBatch.ExpiryDate,
+                PurchaseDate = sourceBatch.PurchaseDate,
+                PurchaseInvoiceId = sourceBatch.PurchaseInvoiceId,
+                Quantity = quantity,
+                InitialQuantity = quantity,
+                CostPrice = sourceBatch.CostPrice,
+                SellingPrice = sourceBatch.SellingPrice,
+                SupplierName = sourceBatch.SupplierName,
+                Status = BatchStatus.Active,
+                Notes = $"منقول من {transfer.FromBranch.Name} عبر {transfer.TransferNumber}",
+                CreatedAt = now
+            };
+
+            _context.ProductBatches.Add(destinationBatch);
+            return destinationBatch;
+        }
+
+        destinationBatch.Quantity += quantity;
+        destinationBatch.InitialQuantity += quantity;
+        destinationBatch.UpdatedAt = now;
+        if (destinationBatch.Status == BatchStatus.Depleted)
+        {
+            destinationBatch.Status = BatchStatus.Active;
+            destinationBatch.StatusUpdatedAt = now;
+        }
+
+        return destinationBatch;
+    }
+
+    private async Task RestoreCancelledTransferBatchesAsync(InventoryTransfer transfer, DateTime now)
+    {
+        var sourceMovements = await _context.StockMovements
+            .Where(m => m.TenantId == _currentUserService.TenantId
+                     && m.BranchId == transfer.FromBranchId
+                     && m.ProductId == transfer.ProductId
+                     && m.ReferenceType == "InventoryTransfer"
+                     && m.ReferenceId == transfer.Id
+                     && m.Quantity < 0
+                     && m.BatchId.HasValue)
+            .ToListAsync();
+
+        foreach (var movement in sourceMovements)
+        {
+            var batch = await _context.ProductBatches
+                .FirstOrDefaultAsync(pb => pb.Id == movement.BatchId
+                                       && pb.TenantId == _currentUserService.TenantId
+                                       && pb.BranchId == transfer.FromBranchId
+                                       && pb.ProductId == transfer.ProductId
+                                       && !pb.IsDeleted);
+
+            if (batch == null)
+                continue;
+
+            batch.Quantity += -movement.Quantity;
+            batch.UpdatedAt = now;
+            if (batch.Status == BatchStatus.Depleted && batch.Quantity > 0)
+            {
+                batch.Status = BatchStatus.Active;
+                batch.StatusUpdatedAt = now;
+            }
+        }
+    }
+
+    private static string GetBatchLabel(ProductBatch batch)
+        => string.IsNullOrWhiteSpace(batch.BatchNumber) ? "بدون رقم دفعة" : batch.BatchNumber;
 
     private InventoryTransferDto MapTransferToDto(InventoryTransfer transfer)
     {

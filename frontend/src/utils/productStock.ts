@@ -11,7 +11,9 @@ export const buildBranchInventoryStockMap = (
   }
 
   return branchInventory.reduce<BranchInventoryStockMap>((acc, item) => {
-    acc[item.productId] = item.quantity;
+    acc[item.productId] = item.isBatchTracked
+      ? item.batchAvailableQuantity ?? 0
+      : item.quantity;
     return acc;
   }, {});
 };
@@ -20,10 +22,17 @@ export const getProductCurrentStock = (
   product: Product,
   stockByProductId?: BranchInventoryStockMap,
 ): number => {
+  // If product doesn't track inventory, return infinite stock
+  if (!product.trackInventory) {
+    return Number.POSITIVE_INFINITY;
+  }
+
+  // If no inventory snapshot available, return 0 (unknown)
   if (!stockByProductId) {
     return 0;
   }
 
+  // Return actual stock from inventory snapshot
   return stockByProductId[product.id] ?? 0;
 };
 

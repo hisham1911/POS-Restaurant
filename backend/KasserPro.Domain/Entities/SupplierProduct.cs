@@ -7,6 +7,7 @@ using KasserPro.Domain.Common;
 /// </summary>
 public class SupplierProduct : BaseEntity
 {
+    public int TenantId { get; set; }
     public int SupplierId { get; set; }
     public int ProductId { get; set; }
     

@@ -6,6 +6,7 @@ using KasserPro.Application.DTOs.Shifts;
 public interface IShiftService
 {
     Task<ApiResponse<ShiftDto>> GetCurrentAsync(int userId);
+    Task<ApiResponse<ShiftDto>> GetByIdAsync(int shiftId);
     Task<ApiResponse<ShiftDto>> OpenAsync(OpenShiftRequest request, int userId);
     Task<ApiResponse<ShiftDto>> CloseAsync(CloseShiftRequest request, int userId);
     Task<ApiResponse<List<ShiftDto>>> GetUserShiftsAsync(int userId);
@@ -16,6 +17,7 @@ public interface IShiftService
     Task<ApiResponse<bool>> UpdateActivityAsync(int shiftId);
     Task<ApiResponse<List<ShiftDto>>> GetActiveShiftsAsync();
     Task<ApiResponse<ShiftWarningDto>> GetShiftWarningsAsync(int userId);
+    Task<ApiResponse<List<ShiftOrderDto>>> GetShiftOrdersAsync(int shiftId);
     
     /// <summary>
     /// Shift deletion is NOT supported for audit/financial integrity.

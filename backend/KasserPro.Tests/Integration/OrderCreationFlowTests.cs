@@ -264,6 +264,19 @@ public class OrderCreationFlowTests : IClassFixture<CustomWebApplicationFactory>
     {
         var (testUserId, testProductId, branch1Id, _) = await SeedTestDataAsync();
 
+        // Remove PosApplyDiscount so the service-layer check fails as intended
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var perm = await db.UserPermissions
+                .FirstOrDefaultAsync(up => up.UserId == testUserId && up.Permission == Permission.PosApplyDiscount);
+            if (perm != null)
+            {
+                db.UserPermissions.Remove(perm);
+                await db.SaveChangesAsync();
+            }
+        }
+
         const int tenantId = 1;
         var token = TestHelpers.GenerateTestToken(
             userId: testUserId,
@@ -732,6 +745,13 @@ public class OrderCreationFlowTests : IClassFixture<CustomWebApplicationFactory>
             IsActive = true
         };
         db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        // Seed cashier permissions required by service-layer checks
+        db.UserPermissions.AddRange(
+            new UserPermission { UserId = user.Id, Permission = Permission.OrdersCreate },
+            new UserPermission { UserId = user.Id, Permission = Permission.PosApplyDiscount }
+        );
         await db.SaveChangesAsync();
 
         // Create Category

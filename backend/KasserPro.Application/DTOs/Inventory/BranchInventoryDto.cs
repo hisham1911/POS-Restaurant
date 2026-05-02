@@ -10,6 +10,7 @@ public class BranchInventoryDto
     public string? ProductSku { get; set; }
     public string? ProductBarcode { get; set; }
     public int Quantity { get; set; }
+    public int? BatchAvailableQuantity { get; set; }
     public int ReorderLevel { get; set; }
     public bool IsLowStock { get; set; }
     public DateTime LastUpdatedAt { get; set; }

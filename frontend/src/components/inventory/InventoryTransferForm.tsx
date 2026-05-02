@@ -42,8 +42,8 @@ export default function InventoryTransferForm({
   });
 
   const [createTransfer, { isLoading }] = useCreateTransferMutation();
-  const { data: productsResponse } = useGetProductsQuery({});
-  const products = productsResponse?.data ?? [];
+  const { data: productsResponse } = useGetProductsQuery({ page: 1, pageSize: 1000 });
+  const products = productsResponse?.data?.items ?? [];
 
   // Update fromBranchId when currentBranch changes
   useEffect(() => {

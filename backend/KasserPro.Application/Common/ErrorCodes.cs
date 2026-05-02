@@ -40,10 +40,15 @@ public static class ErrorCodes
     public const string PRODUCT_NAME_TOO_LONG = "PRODUCT_NAME_TOO_LONG";
     public const string PRODUCT_SERVICE_NOT_PURCHASABLE = "PRODUCT_SERVICE_NOT_PURCHASABLE";
     public const string INSUFFICIENT_STOCK = "INSUFFICIENT_STOCK";
+    public const string PRODUCT_SKU_DUPLICATE = "PRODUCT_SKU_DUPLICATE";
+    public const string PRODUCT_BARCODE_DUPLICATE = "PRODUCT_BARCODE_DUPLICATE";
+    public const string PRODUCT_TYPE_CANNOT_CHANGE = "PRODUCT_TYPE_CANNOT_CHANGE";
 
     // Category Errors (1500-1599)
     public const string CATEGORY_NOT_FOUND = "CATEGORY_NOT_FOUND";
     public const string CATEGORY_HAS_PRODUCTS = "CATEGORY_HAS_PRODUCTS";
+    public const string CATEGORY_NAME_REQUIRED = "CATEGORY_NAME_REQUIRED";
+    public const string CATEGORY_NAME_DUPLICATE = "CATEGORY_NAME_DUPLICATE";
 
     // Order Errors (1600-1699)
     public const string ORDER_NOT_FOUND = "ORDER_NOT_FOUND";
@@ -74,6 +79,7 @@ public static class ErrorCodes
     public const string CUSTOMER_NOT_FOUND = "CUSTOMER_NOT_FOUND";
     public const string CUSTOMER_NOT_ACTIVE = "CUSTOMER_NOT_ACTIVE";
     public const string CUSTOMER_CREDIT_LIMIT_EXCEEDED = "CUSTOMER_CREDIT_LIMIT_EXCEEDED";
+    public const string CUSTOMER_CONCURRENCY_CONFLICT = "CONCURRENCY_CONFLICT";
 
     // Shift Errors (1800-1899)
     public const string SHIFT_NOT_FOUND = "SHIFT_NOT_FOUND";
@@ -180,6 +186,7 @@ public static class ErrorCodes
     public const string BATCH_HAS_QUANTITY = "BATCH_HAS_QUANTITY";
     public const string BATCH_HAS_ORDERS = "BATCH_HAS_ORDERS";
     public const string BATCH_HAS_MOVEMENTS = "BATCH_HAS_MOVEMENTS";
+    public const string BATCH_NUMBER_DUPLICATE = "BATCH_NUMBER_DUPLICATE";
 }
 
 /// <summary>
@@ -223,10 +230,17 @@ public static class ErrorMessages
         { ErrorCodes.PRODUCT_NAME_TOO_LONG, "اسم المنتج يجب ألا يتجاوز 200 حرف" },
         { ErrorCodes.PRODUCT_SERVICE_NOT_PURCHASABLE, "لا يمكن إضافة منتجات خدمية في فواتير الشراء" },
         { ErrorCodes.INSUFFICIENT_STOCK, "الكمية المطلوبة غير متوفرة" },
+        { ErrorCodes.PRODUCT_SKU_DUPLICATE, "كود المنتج (SKU) مستخدم بالفعل" },
+        { ErrorCodes.PRODUCT_BARCODE_DUPLICATE, "الباركود مستخدم بالفعل لمنتج آخر" },
+
+        { ErrorCodes.PRODUCT_TYPE_CANNOT_CHANGE, "لا يمكن تغيير نوع المنتج مع وجود مخزون أو دفعات نشطة" },
 
         // Category
         { ErrorCodes.CATEGORY_NOT_FOUND, "الفئة غير موجودة" },
         { ErrorCodes.CATEGORY_HAS_PRODUCTS, "لا يمكن حذف فئة تحتوي على منتجات" },
+
+        { ErrorCodes.CATEGORY_NAME_REQUIRED, "اسم التصنيف مطلوب ولا يتجاوز 100 حرف" },
+        { ErrorCodes.CATEGORY_NAME_DUPLICATE, "يوجد تصنيف بنفس الاسم بالفعل" },
 
         // Order
         { ErrorCodes.ORDER_NOT_FOUND, "الطلب غير موجود" },
@@ -257,6 +271,7 @@ public static class ErrorMessages
         { ErrorCodes.CUSTOMER_NOT_FOUND, "العميل غير موجود" },
         { ErrorCodes.CUSTOMER_NOT_ACTIVE, "العميل غير نشط" },
         { ErrorCodes.CUSTOMER_CREDIT_LIMIT_EXCEEDED, "تجاوز حد الائتمان المسموح للعميل" },
+        { ErrorCodes.CUSTOMER_CONCURRENCY_CONFLICT, "تم تعديل بيانات العميل من مكان آخر. أعد تحميل الصفحة وحاول مرة أخرى." },
 
         // Shift
         { ErrorCodes.SHIFT_NOT_FOUND, "الوردية غير موجودة" },
@@ -356,7 +371,8 @@ public static class ErrorMessages
         // Product Batch
         { ErrorCodes.BATCH_HAS_QUANTITY, "لا يمكن حذف باتش له كمية في المخزون" },
         { ErrorCodes.BATCH_HAS_ORDERS, "لا يمكن حذف باتش مرتبط بطلبات" },
-        { ErrorCodes.BATCH_HAS_MOVEMENTS, "لا يمكن حذف باتش له حركات مخزون" }
+        { ErrorCodes.BATCH_HAS_MOVEMENTS, "لا يمكن حذف باتش له حركات مخزون" },
+        { ErrorCodes.BATCH_NUMBER_DUPLICATE, "رقم الدفعة مستخدم بالفعل لهذا المنتج في هذا الفرع" }
     };
 
     public static string Get(string code) => Messages.TryGetValue(code, out var msg) ? msg : code;

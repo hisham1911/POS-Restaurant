@@ -6,6 +6,7 @@ using KasserPro.Application.Common.Interfaces;
 using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Reports;
 using KasserPro.Application.Services.Interfaces;
+using KasserPro.Domain.Entities;
 using KasserPro.Domain.Enums;
 using static KasserPro.Application.Common.DateTimeHelper;
 
@@ -28,6 +29,30 @@ public class ReportService : IReportService
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
         _logger = logger;
+    }
+
+    private static decimal SumAppliedPayments(IEnumerable<Order> orders, PaymentMethod method)
+        => Math.Round(orders.Sum(order => GetAppliedPaymentAmount(order, method)), 2);
+
+    private static decimal GetAppliedPaymentAmount(Order order, PaymentMethod method)
+    {
+        var remaining = Math.Max(0, Math.Round(order.Total, 2));
+        var total = 0m;
+
+        foreach (var payment in (order.Payments ?? Enumerable.Empty<Payment>()).OrderBy(p => p.Id))
+        {
+            if (remaining <= 0)
+                break;
+
+            var amount = Math.Max(0, Math.Round(payment.Amount, 2));
+            var applied = Math.Min(amount, remaining);
+            if (payment.Method == method)
+                total += applied;
+
+            remaining -= applied;
+        }
+
+        return Math.Round(total, 2);
     }
 
     public async Task<ApiResponse<DailyReportDto>> GetDailyReportAsync(DateTime? date = null)
@@ -77,7 +102,6 @@ public class ReportService : IReportService
             reportDate, shifts.Count, orders.Count, completedOrders.Count, returnOrders.Count);
 
         // Calculate payment breakdown
-        var allPayments = completedOrders.SelectMany(o => o.Payments).ToList();
         // FIX: Include return order payments in breakdown to account for refunded cash
         var returnPayments = returnOrders.SelectMany(o => o.Payments).ToList();
         var refundedCash = Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount));
@@ -88,12 +112,10 @@ public class ReportService : IReportService
                                                               && p.Method != PaymentMethod.Fawry).Sum(p => p.Amount));
 
         // FIX H-4: Ensure payment breakdown doesn't go negative (display as 0 minimum)
-        var totalCash = Math.Round(Math.Max(0, allPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount) - refundedCash), 2);
-        var totalCard = Math.Round(Math.Max(0, allPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount) - refundedCard), 2);
-        var totalFawry = Math.Round(Math.Max(0, allPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount) - refundedFawry), 2);
-        var totalOther = Math.Round(Math.Max(0, allPayments.Where(p => p.Method != PaymentMethod.Cash
-                                              && p.Method != PaymentMethod.Card
-                                              && p.Method != PaymentMethod.Fawry).Sum(p => p.Amount) - refundedOther), 2);
+        var totalCash = Math.Round(Math.Max(0, SumAppliedPayments(completedOrders, PaymentMethod.Cash) - refundedCash), 2);
+        var totalCard = Math.Round(Math.Max(0, SumAppliedPayments(completedOrders, PaymentMethod.Card) - refundedCard), 2);
+        var totalFawry = Math.Round(Math.Max(0, SumAppliedPayments(completedOrders, PaymentMethod.Fawry) - refundedFawry), 2);
+        var totalOther = Math.Round(Math.Max(0, SumAppliedPayments(completedOrders, PaymentMethod.BankTransfer) - refundedOther), 2);
 
         // Calculate sales totals (INCLUDING refund adjustments)
         var grossSales = completedOrders.Sum(o => o.Subtotal);
@@ -263,30 +285,27 @@ public class ReportService : IReportService
             .Where(o => o.OrderType == OrderType.Return)
             .ToList();
 
-        var salesPayments = salesOrders
-            .SelectMany(o => o.Payments ?? new List<Domain.Entities.Payment>())
-            .ToList();
         var returnPayments = returnOrders
             .SelectMany(o => o.Payments ?? new List<Domain.Entities.Payment>())
             .ToList();
 
         var collectedCash = Math.Round(
-            salesPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)
+            SumAppliedPayments(salesOrders, PaymentMethod.Cash)
             - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)), 2);
         var collectedCard = Math.Round(
-            salesPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)
+            SumAppliedPayments(salesOrders, PaymentMethod.Card)
             - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)), 2);
         var collectedFawry = Math.Round(
-            salesPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)
+            SumAppliedPayments(salesOrders, PaymentMethod.Fawry)
             - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)), 2);
         var collectedOther = Math.Round(
-            salesPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)
+            SumAppliedPayments(salesOrders, PaymentMethod.BankTransfer)
             - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)), 2);
         var totalSales = Math.Round(
             salesOrders.Sum(o => o.Total)
             - Math.Abs(returnOrders.Sum(o => o.Total)), 2);
         var totalCollected = Math.Round(collectedCash + collectedCard + collectedFawry + collectedOther, 2);
-        var deferredAmount = Math.Round(totalSales - totalCollected, 2);
+        var deferredAmount = Math.Max(0, Math.Round(totalSales - totalCollected, 2));
 
         return new ShiftSummaryFinancials(
             collectedCash,

@@ -7,6 +7,7 @@ import {
   updateQuantity,
   updateNotes,
   clearCart,
+  updateItemBatch,
   selectCartItems,
   selectItemsCount,
   selectSubtotal,
@@ -51,16 +52,46 @@ export const useCart = () => {
     toast.error("ليس لديك صلاحية تطبيق أو تعديل الخصومات");
   };
 
-  const add = (product: Product, quantity = 1) => {
-    dispatch(addItem({ product, quantity }));
+  const add = (
+    product: Product, 
+    quantity = 1,
+    batchInfo?: {
+      batchId: number;
+      batchNumber?: string;
+      expiryDate: string;
+      sellingPrice?: number;
+      batchQuantity?: number;
+    }
+  ) => {
+    dispatch(addItem({ 
+      product, 
+      quantity,
+      batchId: batchInfo?.batchId,
+      batchNumber: batchInfo?.batchNumber,
+      expiryDate: batchInfo?.expiryDate,
+      batchSellingPrice: batchInfo?.sellingPrice,
+      batchQuantity: batchInfo?.batchQuantity,
+    }));
   };
 
-  const remove = (productId: number) => {
-    dispatch(removeItem(productId));
+  const changeBatch = (
+    productId: number,
+    currentBatchId: number | undefined,
+    batchId: number,
+    batchNumber: string | undefined,
+    expiryDate: string,
+    sellingPrice?: number,
+    batchQuantity?: number,
+  ) => {
+    dispatch(updateItemBatch({ productId, currentBatchId, batchId, batchNumber, expiryDate, sellingPrice, batchQuantity }));
   };
 
-  const setQuantity = (productId: number, quantity: number) => {
-    dispatch(updateQuantity({ productId, quantity }));
+  const remove = (productId: number, batchId?: number) => {
+    dispatch(removeItem({ productId, batchId }));
+  };
+
+  const setQuantity = (productId: number, quantity: number, batchId?: number) => {
+    dispatch(updateQuantity({ productId, quantity, batchId }));
   };
 
   const setNotes = (productId: number, notes: string) => {
@@ -126,6 +157,7 @@ export const useCart = () => {
     removeItem: remove,
     updateQuantity: setQuantity,
     updateNotes: setNotes,
+    updateItemBatch: changeBatch,
     clearCart: clear,
     applyDiscount,
     removeDiscount,

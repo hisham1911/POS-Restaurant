@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using KasserPro.Application.DTOs.CashRegister;
 using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.PurchaseInvoices;
 using KasserPro.Domain.Entities;
@@ -497,5 +498,141 @@ public class PurchaseInvoiceIntegrationTests : IClassFixture<CustomWebApplicatio
         await db.SaveChangesAsync();
 
         return (tenant.Id, branch.Id, adminUser.Id, supplier.Id, product.Id);
+    }
+
+    // ---- HTTP-based integration tests (added) ----
+
+    [Fact]
+    public async Task AddPayment_Cash_RecordsSupplierPaymentInCashRegister()
+    {
+        var testData = await SeedPurchaseInvoiceDataAsync(0m);
+        using var client = CreateAuthenticatedAdminClient(testData);
+        var invoice = await CreateAndConfirmInvoiceAsync(client, testData.SupplierId, testData.ProductId, 1000m);
+
+        var payResponse = await client.PostAsJsonAsync(
+            $"/api/purchaseinvoices/{invoice.Id}/payments",
+            new AddPaymentRequest
+            {
+                Amount = invoice.Total,
+                PaymentDate = DateTime.UtcNow,
+                Method = PaymentMethod.Cash,
+                Notes = "Cash payment test"
+            });
+
+        payResponse.EnsureSuccessStatusCode();
+
+        var txResponse = await client.GetAsync("/api/cash-register/transactions");
+        var result = await txResponse.Content.ReadFromJsonAsync<ApiResponse<PagedResult<CashRegisterTransactionDto>>>();
+        result!.Data!.Items.Should().Contain(t =>
+            t.Type == CashRegisterTransactionType.SupplierPayment.ToString() &&
+            t.Amount == invoice.Total);
+    }
+
+    [Fact]
+    public async Task AddPayment_BankTransfer_DoesNotAffectCashRegister()
+    {
+        var testData = await SeedPurchaseInvoiceDataAsync(0m);
+        using var client = CreateAuthenticatedAdminClient(testData);
+        var invoice = await CreateAndConfirmInvoiceAsync(client, testData.SupplierId, testData.ProductId, 1000m);
+
+        var balanceBefore = await GetCurrentBalanceAsync(client, testData.BranchId);
+
+        await client.PostAsJsonAsync(
+            $"/api/purchaseinvoices/{invoice.Id}/payments",
+            new AddPaymentRequest
+            {
+                Amount = invoice.Total,
+                PaymentDate = DateTime.UtcNow,
+                Method = PaymentMethod.BankTransfer,
+                ReferenceNumber = "TXN123",
+                Notes = "Bank transfer test"
+            });
+
+        var balanceAfter = await GetCurrentBalanceAsync(client, testData.BranchId);
+        balanceAfter.Should().Be(balanceBefore,
+            "Bank transfer should NOT affect cash register balance");
+    }
+
+    [Fact]
+    public async Task AddPayment_Fawry_DoesNotAffectCashRegister()
+    {
+        var testData = await SeedPurchaseInvoiceDataAsync(0m);
+        using var client = CreateAuthenticatedAdminClient(testData);
+        var invoice = await CreateAndConfirmInvoiceAsync(client, testData.SupplierId, testData.ProductId, 1000m);
+
+        var balanceBefore = await GetCurrentBalanceAsync(client, testData.BranchId);
+
+        await client.PostAsJsonAsync(
+            $"/api/purchaseinvoices/{invoice.Id}/payments",
+            new AddPaymentRequest
+            {
+                Amount = invoice.Total,
+                PaymentDate = DateTime.UtcNow,
+                Method = PaymentMethod.Fawry,
+                ReferenceNumber = "FWR456",
+                Notes = "Fawry payment test"
+            });
+
+        var balanceAfter = await GetCurrentBalanceAsync(client, testData.BranchId);
+        balanceAfter.Should().Be(balanceBefore);
+    }
+
+    [Fact]
+    public async Task AddPayment_ExceedsTotalAmount_ReturnsBadRequest()
+    {
+        var testData = await SeedPurchaseInvoiceDataAsync(0m);
+        using var client = CreateAuthenticatedAdminClient(testData);
+        var invoice = await CreateAndConfirmInvoiceAsync(client, testData.SupplierId, testData.ProductId, 1000m);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/purchaseinvoices/{invoice.Id}/payments",
+            new AddPaymentRequest
+            {
+                Amount = 1500m,
+                PaymentDate = DateTime.UtcNow,
+                Method = PaymentMethod.Cash,
+                Notes = "Overpayment test"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task AddPayment_ToCancelledInvoice_ReturnsBadRequest()
+    {
+        var testData = await SeedPurchaseInvoiceDataAsync(0m);
+        using var client = CreateAuthenticatedAdminClient(testData);
+        var invoice = await CreateAndConfirmInvoiceAsync(client, testData.SupplierId, testData.ProductId, 1000m);
+
+        var cancelResponse = await client.PostAsJsonAsync(
+            $"/api/purchaseinvoices/{invoice.Id}/cancel",
+            new CancelInvoiceRequest { Reason = "خطأ", AdjustInventory = false });
+        cancelResponse.EnsureSuccessStatusCode();
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/purchaseinvoices/{invoice.Id}/payments",
+            new AddPaymentRequest
+            {
+                Amount = 500m,
+                PaymentDate = DateTime.UtcNow,
+                Method = PaymentMethod.Cash,
+                Notes = "Payment after cancel"
+            });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    private async Task<PurchaseInvoiceDto> CreateAndConfirmInvoiceAsync(HttpClient client, int supplierId, int productId, decimal purchasePrice)
+    {
+        var invoice = await CreateInvoiceAsync(client, supplierId, productId, purchasePrice);
+        await ConfirmInvoiceAsync(client, invoice.Id);
+        return invoice;
+    }
+
+    private async Task<decimal> GetCurrentBalanceAsync(HttpClient client, int branchId)
+    {
+        var res = await client.GetAsync($"/api/cash-register/balance?branchId={branchId}");
+        var result = await res.Content.ReadFromJsonAsync<ApiResponse<CashRegisterBalanceDto>>();
+        return result!.Data!.CurrentBalance;
     }
 }

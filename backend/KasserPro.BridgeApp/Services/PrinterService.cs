@@ -355,7 +355,7 @@ public class PrinterService : IPrinterService
                     {
                         DrawRow("الباقي", $"{receipt.ChangeAmount:F2} ج.م", font);
                     }
-                    if (receipt.AmountDue > 0)
+                    if (receipt.AmountDue > 0 && receipt.ChangeAmount == 0)
                     {
                         DrawRow("المتبقي على العميل", $"{receipt.AmountDue:F2} ج.م", fontBold);
                     }

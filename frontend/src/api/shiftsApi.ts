@@ -1,6 +1,7 @@
 import { baseApi } from "./baseApi";
 import {
   Shift,
+  ShiftOrder,
   OpenShiftRequest,
   CloseShiftRequest,
   ForceCloseShiftRequest,
@@ -21,6 +22,11 @@ export const shiftsApi = baseApi.injectEndpoints({
     getShifts: builder.query<ApiResponse<Shift[]>, void>({
       query: () => "/shifts/history",
       providesTags: ["Shifts"],
+    }),
+
+    getShiftById: builder.query<ApiResponse<Shift>, number>({
+      query: (id) => `/shifts/${id}`,
+      providesTags: (_result, _error, id) => [{ type: "Shifts", id }],
     }),
 
     // فتح وردية
@@ -84,6 +90,12 @@ export const shiftsApi = baseApi.injectEndpoints({
       providesTags: ["Shifts"],
     }),
 
+    // جلب طلبات وردية معينة
+    getShiftOrders: builder.query<ApiResponse<ShiftOrder[]>, number>({
+      query: (id) => `/shifts/${id}/orders`,
+      providesTags: ["Shifts"],
+    }),
+
     // جلب تحذيرات الوردية
     getShiftWarnings: builder.query<ApiResponse<ShiftWarning>, void>({
       query: () => "/shifts/warnings",
@@ -95,11 +107,13 @@ export const shiftsApi = baseApi.injectEndpoints({
 export const {
   useGetCurrentShiftQuery,
   useGetShiftsQuery,
+  useGetShiftByIdQuery,
   useOpenShiftMutation,
   useCloseShiftMutation,
   useForceCloseShiftMutation,
   useHandoverShiftMutation,
   useUpdateShiftActivityMutation,
   useGetActiveShiftsQuery,
+  useGetShiftOrdersQuery,
   useGetShiftWarningsQuery,
 } = shiftsApi;

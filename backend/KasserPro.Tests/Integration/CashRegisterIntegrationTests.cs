@@ -232,4 +232,147 @@ public class CashRegisterIntegrationTests : IClassFixture<CustomWebApplicationFa
 
         return (tenant.Id, sourceBranch.Id, targetBranch.Id, adminUser.Id);
     }
+
+    // ---- HTTP-based integration tests (added) ----
+
+    [Fact]
+    public async Task Transfer_WithoutPermission_Returns403()
+    {
+        var testData = await SeedCashRegisterDataAsync();
+        var cashier = await CreateCashierAsync(testData.TenantId, testData.SourceBranchId);
+        using var client = CreateClientWithRole(cashier.Id, testData.TenantId, testData.SourceBranchId, "Cashier");
+
+        var response = await client.PostAsJsonAsync("/api/cash-register/transfer", new
+        {
+            sourceBranchId  = testData.SourceBranchId,
+            targetBranchId  = testData.TargetBranchId,
+            amount          = 500,
+            transactionDate = DateTime.UtcNow
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Transfer_ValidRequest_CreatesTwoLinkedTransactions()
+    {
+        var testData = await SeedCashRegisterDataAsync();
+        using var client = CreateAuthenticatedAdminClient(testData.TenantId, testData.AdminUserId, testData.SourceBranchId);
+
+        await OpenShiftAsync(client, 5000m);
+
+        var response = await client.PostAsJsonAsync("/api/cash-register/transfer", new TransferCashRequest
+        {
+            SourceBranchId = testData.SourceBranchId,
+            TargetBranchId = testData.TargetBranchId,
+            Amount = 1000m,
+            Description = "تحويل تست",
+            TransactionDate = DateTime.UtcNow
+        });
+
+        response.EnsureSuccessStatusCode();
+
+        var txBranch1 = await client.GetAsync($"/api/cash-register/transactions?branchId={testData.SourceBranchId}");
+        var result1   = await DeserializeResponse<PagedResult<CashRegisterTransactionDto>>(txBranch1);
+        result1!.Data!.Items.Should().Contain(t =>
+            t.Type == CashRegisterTransactionType.Transfer.ToString() &&
+            t.Amount == 1000m);
+
+        var txBranch2 = await client.GetAsync($"/api/cash-register/transactions?branchId={testData.TargetBranchId}");
+        var result2   = await DeserializeResponse<PagedResult<CashRegisterTransactionDto>>(txBranch2);
+        result2!.Data!.Items.Should().Contain(t =>
+            t.Type == CashRegisterTransactionType.Transfer.ToString() &&
+            t.Amount == 1000m);
+    }
+
+    [Fact]
+    public async Task Reconcile_WithoutPermission_Returns403()
+    {
+        var testData = await SeedCashRegisterDataAsync();
+        var cashier = await CreateCashierAsync(testData.TenantId, testData.SourceBranchId);
+        using var client = CreateClientWithRole(cashier.Id, testData.TenantId, testData.SourceBranchId, "Cashier");
+
+        await OpenShiftAsync(client, 1000m);
+
+        var response = await client.PostAsJsonAsync($"/api/cash-register/reconcile?shiftId=1", new ReconcileCashRegisterRequest
+        {
+            ActualBalance = 1000m,
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task Reconcile_WhenBalanceMatches_ReturnsZeroDifference()
+    {
+        var testData = await SeedCashRegisterDataAsync();
+        using var client = CreateAuthenticatedAdminClient(testData.TenantId, testData.AdminUserId, testData.SourceBranchId);
+
+        await OpenShiftAsync(client, 5000m);
+
+        var withdrawResponse = await client.PostAsJsonAsync(
+            "/api/cash-register/withdraw",
+            new CreateCashRegisterTransactionRequest
+            {
+                Amount = 100m,
+                Description = "Reconcile test withdrawal",
+                TransactionDate = DateTime.UtcNow
+            });
+        withdrawResponse.EnsureSuccessStatusCode();
+
+        var currentShiftResponse = await client.GetAsync("/api/shifts/current");
+        currentShiftResponse.EnsureSuccessStatusCode();
+        var currentShift = await DeserializeResponse<ShiftDto>(currentShiftResponse);
+        var shiftId = currentShift.Data!.Id;
+
+        var response = await client.PostAsJsonAsync($"/api/cash-register/reconcile?shiftId={shiftId}", new ReconcileCashRegisterRequest
+        {
+            ActualBalance = 4900m,
+        });
+
+        response.EnsureSuccessStatusCode();
+        var result = await DeserializeResponse<bool>(response);
+        result!.Data.Should().BeTrue();
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var shift = await db.Shifts.FindAsync(shiftId);
+        shift.Should().NotBeNull();
+        shift!.Difference.Should().Be(0m);
+    }
+
+    private async Task<User> CreateCashierAsync(int tenantId, int branchId)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var cashier = new User
+        {
+            TenantId = tenantId,
+            BranchId = branchId,
+            Name = "Cashier",
+            Email = $"cashier-{Guid.NewGuid():N}@test.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Test123!"),
+            Role = UserRole.Cashier,
+            IsActive = true
+        };
+        db.Users.Add(cashier);
+        await db.SaveChangesAsync();
+        return cashier;
+    }
+
+    private HttpClient CreateClientWithRole(int userId, int tenantId, int branchId, string role)
+    {
+        var client = _factory.CreateClient();
+        var token = TestHelpers.GenerateTestToken(
+            userId: userId,
+            tenantId: tenantId,
+            branchId: branchId,
+            email: $"{role.ToLowerInvariant()}-test@test.com",
+            name: $"{role} Test User",
+            role: role);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        client.DefaultRequestHeaders.Add("X-Branch-Id", branchId.ToString());
+        return client;
+    }
 }

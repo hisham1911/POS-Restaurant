@@ -6,47 +6,26 @@ import {
   ProductsQueryParams,
   QuickCreateProductRequest,
 } from "../types/product.types";
-import { ApiResponse } from "../types/api.types";
-
-interface PagedProductsResult {
-  items: Product[];
-  totalCount: number;
-  page: number;
-  pageSize: number;
-  totalPages: number;
-}
-
-const normalizeProductsResponse = (
-  response: ApiResponse<Product[] | PagedProductsResult>,
-): ApiResponse<Product[]> => {
-  const rawData = response.data;
-  if (Array.isArray(rawData)) {
-    return response as ApiResponse<Product[]>;
-  }
-
-  return {
-    ...response,
-    data: rawData?.items ?? [],
-  };
-};
+import { ApiResponse, PagedResult } from "../types/api.types";
 
 export const productsApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    // جلب كل المنتجات مع الفلاتر
     getProducts: builder.query<
-      ApiResponse<Product[]>,
+      ApiResponse<PagedResult<Product>>,
       ProductsQueryParams | void
     >({
       query: (params) => {
         const safeParams: ProductsQueryParams = (params ??
           {}) as ProductsQueryParams;
         const queryParams = new URLSearchParams();
+
         if (
           safeParams.categoryId !== undefined &&
           safeParams.categoryId !== null
         ) {
           queryParams.append("categoryId", safeParams.categoryId.toString());
         }
+
         if (
           safeParams.search !== undefined &&
           safeParams.search !== null &&
@@ -54,10 +33,14 @@ export const productsApi = baseApi.injectEndpoints({
         ) {
           queryParams.append("search", safeParams.search.trim());
         }
-        if (safeParams.isActive !== undefined)
+
+        if (safeParams.isActive !== undefined) {
           queryParams.append("isActive", safeParams.isActive.toString());
-        if (safeParams.lowStock !== undefined)
+        }
+
+        if (safeParams.lowStock !== undefined) {
           queryParams.append("lowStock", safeParams.lowStock.toString());
+        }
 
         if (safeParams.page !== undefined && safeParams.page !== null) {
           queryParams.append("page", safeParams.page.toString());
@@ -71,7 +54,7 @@ export const productsApi = baseApi.injectEndpoints({
         return `/products${queryString ? `?${queryString}` : ""}`;
       },
       providesTags: (result) => {
-        const items = result?.data ?? [];
+        const items = result?.data?.items ?? [];
 
         return [
           ...items.map(({ id }: { id: number }) => ({
@@ -81,16 +64,13 @@ export const productsApi = baseApi.injectEndpoints({
           { type: "Products" as const, id: "LIST" },
         ];
       },
-      transformResponse: normalizeProductsResponse,
     }),
 
-    // جلب منتج واحد
     getProduct: builder.query<ApiResponse<Product>, number>({
       query: (id) => `/products/${id}`,
       providesTags: (_result, _error, id) => [{ type: "Products", id }],
     }),
 
-    // إضافة منتج
     createProduct: builder.mutation<ApiResponse<Product>, CreateProductRequest>(
       {
         query: (product) => ({
@@ -102,7 +82,6 @@ export const productsApi = baseApi.injectEndpoints({
       },
     ),
 
-    // تحديث منتج
     updateProduct: builder.mutation<
       ApiResponse<Product>,
       { id: number; data: UpdateProductRequest }
@@ -118,7 +97,6 @@ export const productsApi = baseApi.injectEndpoints({
       ],
     }),
 
-    // حذف منتج
     deleteProduct: builder.mutation<ApiResponse<boolean>, number>({
       query: (id) => ({
         url: `/products/${id}`,
@@ -127,7 +105,6 @@ export const productsApi = baseApi.injectEndpoints({
       invalidatesTags: [{ type: "Products", id: "LIST" }],
     }),
 
-    // إنشاء سريع من POS
     quickCreateProduct: builder.mutation<
       ApiResponse<Product>,
       QuickCreateProductRequest

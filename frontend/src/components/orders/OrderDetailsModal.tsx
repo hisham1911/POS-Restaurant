@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { X, Printer, RotateCcw, User, Phone, Tag } from "lucide-react";
+import { X, Printer, RotateCcw, User, Phone, Tag, CheckCircle } from "lucide-react";
 import { Order } from "@/types/order.types";
 import { formatCurrency, formatDateTime } from "@/utils/formatters";
 import { ORDER_STATUS, PAYMENT_METHODS } from "@/utils/constants";
@@ -7,7 +7,7 @@ import { Button } from "@/components/common/Button";
 import { RefundModal } from "./RefundModal";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentUser } from "@/store/slices/authSlice";
-import { usePrintReceiptMutation } from "@/api/ordersApi";
+import { usePrintReceiptMutation, useMarkAsDeliveredMutation } from "@/api/ordersApi";
 import { useGetCurrentTenantQuery } from "@/api/branchesApi";
 import { printOrderReceiptFallback } from "@/utils/browserReceiptPrinter";
 import { toast } from "sonner";
@@ -29,6 +29,7 @@ export const OrderDetailsModal = ({
   const { data: tenantData } = useGetCurrentTenantQuery();
   const { printMode } = useDevicePrintPreferences();
   const [printReceipt, { isLoading: isPrinting }] = usePrintReceiptMutation();
+  const [markAsDelivered, { isLoading: isMarkingDelivered }] = useMarkAsDeliveredMutation();
   const isReturnOrder = order.orderType === "Return";
 
   // Only Admin or SystemOwner can refund - can also do additional partial refund on PartiallyRefunded orders
@@ -36,6 +37,10 @@ export const OrderDetailsModal = ({
     (user?.role === "Admin" || user?.role === "SystemOwner") &&
     !isReturnOrder &&
     (order.status === "Completed" || order.status === "PartiallyRefunded");
+
+  const canMarkAsDelivered = 
+    order.status === "Pending" && 
+    order.orderType === "Delivery";
 
   const isFullyRefunded = order.status === "Refunded";
   const isPartiallyRefunded = order.status === "PartiallyRefunded";
@@ -117,6 +122,21 @@ export const OrderDetailsModal = ({
     }
   };
 
+  const handleMarkAsDelivered = async () => {
+    try {
+      const result = await markAsDelivered(order.id).unwrap();
+      if (result.success) {
+        toast.success("تم تحديد الطلب كـ تم التسليم بنجاح");
+        onClose(); // Close modal after success
+      } else {
+        toast.error(result.message || "حدث خطأ أثناء تحديث حالة الطلب");
+      }
+    } catch (error: any) {
+      const errorMessage = error?.data?.message || "حدث خطأ أثناء تحديث حالة الطلب";
+      toast.error(errorMessage);
+    }
+  };
+
   return (
     <Portal>
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4">
@@ -130,6 +150,17 @@ export const OrderDetailsModal = ({
               </p>
             </div>
             <div className="flex gap-2">
+              {canMarkAsDelivered && (
+                <Button
+                  variant="success"
+                  size="sm"
+                  onClick={handleMarkAsDelivered}
+                  disabled={isMarkingDelivered}
+                  title="تحديد كـ تم التسليم"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                </Button>
+              )}
               {canRefund && (
                 <Button
                   variant="danger"

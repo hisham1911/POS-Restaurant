@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using KasserPro.Infrastructure.Data;
+using KasserPro.Domain.Entities;
 using KasserPro.Domain.Enums;
 using KasserPro.Application.Services.Interfaces;
 
@@ -28,6 +29,30 @@ public class AutoCloseShiftBackgroundService : BackgroundService
         _serviceProvider = serviceProvider;
         _logger = logger;
         _configuration = configuration;
+    }
+
+    private static decimal SumAppliedPayments(IEnumerable<Order> orders, PaymentMethod method)
+        => Math.Round(orders.Sum(order => GetAppliedPaymentAmount(order, method)), 2);
+
+    private static decimal GetAppliedPaymentAmount(Order order, PaymentMethod method)
+    {
+        var remaining = Math.Max(0, Math.Round(order.Total, 2));
+        var total = 0m;
+
+        foreach (var payment in (order.Payments ?? Enumerable.Empty<Payment>()).OrderBy(p => p.Id))
+        {
+            if (remaining <= 0)
+                break;
+
+            var amount = Math.Max(0, Math.Round(payment.Amount, 2));
+            var applied = Math.Min(amount, remaining);
+            if (payment.Method == method)
+                total += applied;
+
+            remaining -= applied;
+        }
+
+        return Math.Round(total, 2);
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -102,14 +127,8 @@ public class AutoCloseShiftBackgroundService : BackgroundService
                     .Where(o => o.Status == OrderStatus.Completed)
                     .ToList();
 
-                var allPayments = completedOrders
-                    .SelectMany(o => o.Payments ?? Enumerable.Empty<Domain.Entities.Payment>())
-                    .ToList();
-
-                var totalCash = Math.Round(
-                    allPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount), 2);
-                var totalCard = Math.Round(
-                    allPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount), 2);
+                var totalCash = SumAppliedPayments(completedOrders, PaymentMethod.Cash);
+                var totalCard = SumAppliedPayments(completedOrders, PaymentMethod.Card);
 
                 // Set closing values
                 shift.ClosingBalance = shift.OpeningBalance + totalCash;

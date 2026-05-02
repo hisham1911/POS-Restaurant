@@ -150,6 +150,9 @@ export const customersApi = baseApi.injectEndpoints({
         { type: "Customers", id: "LIST" },
         { type: "Customers", id: "DEBT-LIST" },
         { type: "Customers", id: `debt-${customerId}` },
+        // ✅ Invalidate shift data to refresh debt payment totals
+        { type: "Shifts", id: "CURRENT" },
+        "Shifts",
       ],
     }),
 

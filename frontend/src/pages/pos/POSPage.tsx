@@ -8,6 +8,7 @@ import { LowStockAlert } from "@/components/pos/LowStockAlert";
 import { BatchExpiryAlertBanner } from "@/components/inventory";
 import { ProductQuickCreateModal } from "@/components/pos/ProductQuickCreateModal";
 import { CustomItemModal } from "@/components/pos/CustomItemModal";
+import { BatchSelectionModal } from "@/components/pos/BatchSelectionModal";
 import { Loading } from "@/components/common/Loading";
 import {
   Menu,
@@ -22,19 +23,24 @@ import { useShift } from "@/hooks/useShift";
 import { usePOSShortcuts } from "@/hooks/usePOSShortcuts";
 import { useGetShiftWarningsQuery } from "@/api/shiftsApi";
 import { useGetBranchInventoryQuery } from "@/api/inventoryApi";
+import { useGetAvailableBatchesQuery } from "@/api/productBatchApi";
 import { usePOSMode } from "@/hooks/usePOSMode";
 import { Customer } from "@/types/customer.types";
+import { Product, ProductType } from "@/types/product.types";
+import { ProductBatch } from "@/types/productBatch.types";
 import { toast } from "sonner";
 import clsx from "clsx";
 import { Link, Navigate } from "react-router-dom";
 import { ShiftWarningBanner } from "@/components/shifts";
 import {
   buildBranchInventoryStockMap,
+  getProductAvailableStock,
   getProductCurrentStock,
 } from "@/utils/productStock";
 import { usePermission } from "@/hooks/usePermission";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentBranch } from "@/store/slices/branchSlice";
+import { selectAllowNegativeStock } from "@/store/slices/cartSlice";
 
 export const POSPage = () => {
   const { mode } = usePOSMode();
@@ -58,12 +64,18 @@ export const POSPage = () => {
   const [searchInput, setSearchInput] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
 
+  // Batch selection state
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [selectedProductForBatch, setSelectedProductForBatch] = useState<Product | null>(null);
+  const [pendingBatchQuantity, setPendingBatchQuantity] = useState(1);
+
   // Hooks must be called at the top level before any callbacks that use their data
   const { products, isLoading } = useProducts();
   const { categories } = useCategories();
-  const { addItem, itemsCount } = useCart();
+  const { addItem, items, itemsCount, taxRate } = useCart();
   const { hasActiveShift, isLoading: isLoadingShift } = useShift();
   const currentBranch = useAppSelector(selectCurrentBranch);
+  const allowNegativeStock = useAppSelector(selectAllowNegativeStock);
   const { hasPermission } = usePermission();
   const canQuickCreateProduct =
     hasPermission("ProductsCreateFromPOS") || hasPermission("ProductsManage");
@@ -100,6 +112,69 @@ export const POSPage = () => {
     }
   }, []);
 
+  const handleAddProductToCart = useCallback(
+    (product: Product, options?: { showToast?: boolean }) => {
+      const quantityInCart = items
+        .filter((item) => item.product.id === product.id)
+        .reduce((sum, item) => sum + item.quantity, 0);
+      const totalStock = getProductCurrentStock(product, stockByProductId);
+      const availableStock = hasInventorySnapshot
+        ? getProductAvailableStock(product, quantityInCart, stockByProductId)
+        : Number.POSITIVE_INFINITY;
+      const canAddMore = product.isBatchTracked
+        ? !hasInventorySnapshot || availableStock > 0
+        : allowNegativeStock ||
+          !product.trackInventory ||
+          !hasInventorySnapshot ||
+          availableStock > 0;
+      const isOutOfStock =
+        !allowNegativeStock &&
+        product.trackInventory &&
+        hasInventorySnapshot &&
+        totalStock <= 0;
+
+      if (!product.isActive) {
+        toast.error(`المنتج غير متاح الآن: ${product.name}`);
+        return false;
+      }
+
+      if (isOutOfStock || !canAddMore) {
+        toast.error(`لا يمكن إضافة ${product.name} لعدم توفر مخزون كافٍ`);
+        return false;
+      }
+
+      if (product.isBatchTracked && currentBranch?.id) {
+        setSelectedProductForBatch(product);
+        setPendingBatchQuantity(1);
+        setShowBatchModal(true);
+        return true;
+      }
+
+      const productForCart = hasInventorySnapshot
+        ? ({
+            ...product,
+            branchInventoryQuantity: totalStock,
+          } as Product)
+        : product;
+
+      addItem(productForCart, 1);
+
+      if (options?.showToast) {
+        toast.success(`تمت الإضافة: ${product.name}`);
+      }
+
+      return true;
+    },
+    [
+      addItem,
+      allowNegativeStock,
+      hasInventorySnapshot,
+      items,
+      stockByProductId,
+      currentBranch,
+    ],
+  );
+
   // Handle search/barcode scan (Enter key)
   const handleSearchSubmit = useCallback(
     (value: string) => {
@@ -116,27 +191,16 @@ export const POSPage = () => {
       );
 
       if (foundProduct) {
-        const branchInventoryQuantity = getProductCurrentStock(
-          foundProduct,
-          stockByProductId,
-        );
-        const productForCart = hasInventorySnapshot
-          ? ({
-              ...foundProduct,
-              branchInventoryQuantity,
-            } as typeof foundProduct)
-          : foundProduct;
-
-        addItem(productForCart, 1);
-        toast.success(`تمت الإضافة: ${foundProduct.name}`);
-        // Clear input and refocus
-        setSearchInput("");
-        searchInputRef.current?.focus();
+        const added = handleAddProductToCart(foundProduct, { showToast: true });
+        if (added) {
+          setSearchInput("");
+          searchInputRef.current?.focus();
+        }
       } else {
         toast.error(`لم يتم العثور على منتج: ${trimmedValue}`);
       }
     },
-    [products, addItem, hasInventorySnapshot, stockByProductId],
+    [handleAddProductToCart, products],
   );
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -433,6 +497,7 @@ export const POSPage = () => {
           <ProductGrid
             products={filteredProducts}
             categories={categories}
+            onAddProduct={(product) => handleAddProductToCart(product)}
             stockByProductId={stockByProductId}
             hasInventorySnapshot={hasInventorySnapshot}
             isInventoryLoading={isInventoryLoading}
@@ -516,9 +581,119 @@ export const POSPage = () => {
 
       {/* Custom Item Modal */}
       {showCustomItem && (
-        <CustomItemModal onClose={() => setShowCustomItem(false)} />
+        <CustomItemModal
+          onClose={() => setShowCustomItem(false)}
+          onSuccess={(item) => {
+            const customProduct: Product = {
+              id: -Date.now(),
+              name: item.name,
+              price: item.unitPrice,
+              taxRate: item.taxRate ?? taxRate,
+              taxInclusive: item.taxInclusive ?? false,
+              categoryId: 0,
+              isActive: true,
+              type: ProductType.Service,
+              trackInventory: false,
+              isBatchTracked: false,
+              createdAt: new Date().toISOString(),
+            };
+
+            addItem(customProduct, item.quantity ?? 1);
+            toast.success(`تمت إضافة: ${item.name}`);
+          }}
+        />
+      )}
+
+      {/* Batch Selection Modal */}
+      {showBatchModal && selectedProductForBatch && currentBranch && (
+        <BatchSelectionModalWithData
+          product={selectedProductForBatch}
+          branchId={currentBranch.id}
+          onClose={() => {
+            setShowBatchModal(false);
+            setSelectedProductForBatch(null);
+          }}
+          onSelectBatch={(batch) => {
+            const productForCart = hasInventorySnapshot
+              ? ({
+                  ...selectedProductForBatch,
+                  branchInventoryQuantity: batch.quantity,
+                } as Product)
+              : selectedProductForBatch;
+
+            addItem(productForCart, pendingBatchQuantity, {
+              batchId: batch.id,
+              batchNumber: batch.batchNumber,
+              expiryDate: batch.expiryDate,
+              sellingPrice: batch.sellingPrice,
+              batchQuantity: batch.quantity,
+            });
+
+            toast.success(`تمت الإضافة: ${selectedProductForBatch.name} من ${batch.batchNumber || "بدون رقم دفعة"}`);
+            setShowBatchModal(false);
+            setSelectedProductForBatch(null);
+          }}
+        />
       )}
     </div>
+  );
+};
+
+// Helper component to fetch batches and show modal
+const BatchSelectionModalWithData = ({
+  product,
+  branchId,
+  selectedBatchId,
+  onClose,
+  onSelectBatch,
+}: {
+  product: Product;
+  branchId: number;
+  selectedBatchId?: number;
+  onClose: () => void;
+  onSelectBatch: (batch: ProductBatch) => void;
+}) => {
+  const { data: batchesResponse, isLoading, isSuccess } = useGetAvailableBatchesQuery({
+    productId: product.id,
+    branchId,
+  });
+
+  const batches = batchesResponse?.data ?? [];
+  const firstBatch = batches[0];
+  const autoSelectedBatchIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isLoading || !firstBatch) return;
+    if (autoSelectedBatchIdRef.current === firstBatch.id) return;
+
+    autoSelectedBatchIdRef.current = firstBatch.id;
+    onSelectBatch(firstBatch);
+    onClose();
+  }, [firstBatch, isLoading, onClose, onSelectBatch]);
+
+  useEffect(() => {
+    if (isLoading || !isSuccess || batches.length > 0) return;
+    toast.error(`لا توجد دفعات متاحة للبيع للمنتج: ${product.name}`);
+    onClose();
+  }, [batches.length, isLoading, isSuccess, onClose, product.name]);
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (batches.length > 0) {
+    return isLoading ? <Loading /> : null;
+  }
+
+  return (
+    <BatchSelectionModal
+      isOpen={true}
+      onClose={onClose}
+      productName={product.name}
+      batches={batches}
+      selectedBatchId={selectedBatchId}
+      onSelectBatch={onSelectBatch}
+    />
   );
 };
 

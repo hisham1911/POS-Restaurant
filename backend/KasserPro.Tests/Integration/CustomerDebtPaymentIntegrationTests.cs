@@ -105,7 +105,7 @@ public class CustomerDebtPaymentIntegrationTests : IClassFixture<CustomWebApplic
 
         var cashTransaction = await db.CashRegisterTransactions
             .SingleAsync(t => t.ReferenceType == "DebtPayment" && t.ReferenceId == debtPayment.Id);
-        cashTransaction.Type.Should().Be(CashRegisterTransactionType.Sale);
+        cashTransaction.Type.Should().Be(CashRegisterTransactionType.DebtPayment);
         cashTransaction.Amount.Should().Be(250m);
         cashTransaction.ShiftId.Should().Be(shiftId);
     }

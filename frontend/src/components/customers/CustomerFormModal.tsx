@@ -106,6 +106,9 @@ export const CustomerFormModal = ({
           email: formData.email || undefined,
           address: formData.address || undefined,
           notes: formData.notes || undefined,
+          creditLimit: formData.creditLimit
+            ? parseFloat(formData.creditLimit)
+            : undefined,
         };
 
         await createCustomer(createData).unwrap();
@@ -113,8 +116,12 @@ export const CustomerFormModal = ({
         onSuccess?.();
         onClose();
       }
-    } catch {
-      // baseApi.ts already shows error toast
+    } catch (err) {
+      const error = err as { data?: { errorCode?: string; message?: string } };
+      if (error.data?.errorCode === "CONCURRENCY_CONFLICT") {
+        toast.error(error.data.message || "تم تعديل بيانات العميل من مكان آخر — أعد تحميل الصفحة");
+      }
+      // baseApi.ts already shows other error toasts
     }
   };
 

@@ -1445,7 +1445,6 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<string>("BatchNumber")
-                        .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
@@ -1458,7 +1457,7 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTime>("ExpiryDate")
+                    b.Property<DateTime?>("ExpiryDate")
                         .HasColumnType("TEXT");
 
                     b.Property<int>("InitialQuantity")
@@ -1485,6 +1484,9 @@ namespace KasserPro.Infrastructure.Migrations
 
                     b.Property<int>("Quantity")
                         .HasColumnType("INTEGER");
+
+                    b.Property<decimal?>("SellingPrice")
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
@@ -2248,6 +2250,9 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasColumnType("INTEGER");
 
                     b.Property<int>("SupplierId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TenantId")
                         .HasColumnType("INTEGER");
 
                     b.Property<decimal>("TotalAmountSpent")

@@ -58,6 +58,7 @@ export const useOrders = () => {
     const orderItems = items.map((item) => ({
       productId: item.product.id,
       quantity: item.quantity,
+      batchId: item.batchId,
       notes: item.notes,
       ...(item.discount
         ? {
@@ -103,56 +104,62 @@ export const useOrders = () => {
         "تعذر إكمال الطلب",
       );
 
-      if (printMode === "browser") {
-        const isPrintWindowOpened = printOrderReceiptFallback(
-          order,
-          tenantData?.data,
-        );
-
-        if (isPrintWindowOpened) {
-          toast.info("تم فتح طباعة المتصفح حسب إعدادات هذا الجهاز");
-        } else {
-          toast.error(
-            "تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة",
-          );
-        }
-      } else {
-        const shouldFallbackToBrowserPrint =
-          printMode === "auto" &&
-          response.printAttempted === true &&
-          response.printDelivered === false;
-
-        if (shouldFallbackToBrowserPrint) {
+      // ✅ Defer printing to next tick to avoid blocking the UI
+      setTimeout(() => {
+        if (printMode === "browser") {
           const isPrintWindowOpened = printOrderReceiptFallback(
             order,
             tenantData?.data,
           );
 
           if (isPrintWindowOpened) {
-            toast.info(
-              "تعذر الوصول لتطبيق الطابعة. تم التحويل تلقائيًا لطباعة المتصفح",
-            );
+            toast.info("تم فتح طباعة المتصفح حسب إعدادات هذا الجهاز");
           } else {
             toast.error(
               "تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة",
             );
           }
+        } else {
+          const shouldFallbackToBrowserPrint =
+            printMode === "auto" &&
+            response.printAttempted === true &&
+            response.printDelivered === false;
+
+          if (shouldFallbackToBrowserPrint) {
+            const isPrintWindowOpened = printOrderReceiptFallback(
+              order,
+              tenantData?.data,
+            );
+
+            if (isPrintWindowOpened) {
+              toast.info(
+                "تعذر الوصول لتطبيق الطابعة. تم التحويل تلقائيًا لطباعة المتصفح",
+              );
+            } else {
+              toast.error(
+                "تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة",
+              );
+            }
+          }
+
+          if (
+            printMode === "bridge" &&
+            response.printAttempted === true &&
+            response.printDelivered === false
+          ) {
+            toast.error(
+              "تعذر الوصول لتطبيق الطابعة. راجع حالة اتصال Bridge في إعدادات الجهاز",
+            );
+          }
         }
 
-        if (
-          printMode === "bridge" &&
-          response.printAttempted === true &&
-          response.printDelivered === false
-        ) {
-          toast.error(
-            "تعذر الوصول لتطبيق الطابعة. راجع حالة اتصال Bridge في إعدادات الجهاز",
-          );
-        }
-      }
+        toast.success("تم إكمال الطلب بنجاح");
+      }, 0);
 
-      toast.success("تم إكمال الطلب بنجاح");
       return order;
-    } catch {
+    } catch (error) {
+      console.error("❌ Complete Order Error:", error);
+      console.error("❌ Error details:", JSON.stringify(error, null, 2));
       return null;
     }
   };

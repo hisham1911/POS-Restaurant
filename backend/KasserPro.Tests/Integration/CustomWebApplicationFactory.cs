@@ -19,9 +19,15 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
     private readonly bool _includeJwtIssuerAudience;
     private SqliteConnection? _connection;
 
-    public CustomWebApplicationFactory(
-        bool includeJwtExpiry = true,
-        bool includeJwtIssuerAudience = true)
+    public CustomWebApplicationFactory()
+    {
+        _includeJwtExpiry = true;
+        _includeJwtIssuerAudience = true;
+    }
+
+    internal CustomWebApplicationFactory(
+        bool includeJwtExpiry,
+        bool includeJwtIssuerAudience)
     {
         _includeJwtExpiry = includeJwtExpiry;
         _includeJwtIssuerAudience = includeJwtIssuerAudience;
@@ -29,32 +35,32 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        Environment.SetEnvironmentVariable("KASSERPRO_DB_PASSWORD", "TestDummyPassword!");
+
         builder.ConfigureAppConfiguration((_, configBuilder) =>
         {
-            var configuration = new Dictionary<string, string?>
-            {
-                ["Jwt:Key"] = "YourSuperSecretKeyHere_MustBe32Characters!"
-            };
+            var configuration = new Dictionary<string, string?>();
+
+            // Note: Jwt:Key is NOT overridden here because Program.cs reads builder.Configuration
+            // before WebApplicationFactory.ConfigureAppConfiguration is applied. We rely on the
+            // Jwt__Key environment variable (same source Program.cs falls back to).
+            // This ensures AuthService (which sees the DI IConfiguration) and Program.cs use the same key.
 
             if (_includeJwtIssuerAudience)
             {
                 configuration["Jwt:Issuer"] = "KasserPro";
                 configuration["Jwt:Audience"] = "KasserPro";
             }
-            else
-            {
-                configuration["Jwt:Issuer"] = null;
-                configuration["Jwt:Audience"] = null;
-            }
+            // When _includeJwtIssuerAudience is false, we intentionally do NOT add the keys at all.
+            // Setting them to null produces empty-string in MemoryConfigurationProvider, which
+            // breaks the ?? fallback in AuthService vs the default fallback in Program.cs.
 
             if (_includeJwtExpiry)
             {
                 configuration["Jwt:ExpiryInHours"] = "24";
             }
-            else
-            {
-                configuration["Jwt:ExpiryInHours"] = null;
-            }
+            // When expiry is disabled, we omit the key so AuthService falls back to default (24).
+            // Program.cs never reads this value.
 
             configBuilder.AddInMemoryCollection(configuration);
         });
@@ -110,6 +116,7 @@ public class CustomWebApplicationFactory : WebApplicationFactory<Program>
         {
             _connection?.Close();
             _connection?.Dispose();
+            Environment.SetEnvironmentVariable("KASSERPRO_DB_PASSWORD", null);
         }
     }
 }

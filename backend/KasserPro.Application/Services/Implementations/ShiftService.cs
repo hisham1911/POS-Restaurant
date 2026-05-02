@@ -23,13 +23,60 @@ public class ShiftService : IShiftService
         decimal TotalBankTransfer,
         decimal TotalSales,
         decimal TotalCollected,
-        decimal DeferredAmount);
+        decimal DeferredAmount,
+        decimal TotalCashSales,
+        decimal TotalCardSales,
+        decimal TotalFawrySales,
+        decimal TotalBankTransferSales,
+        decimal TotalRefunds,
+        int RefundsCount,
+        int TotalOrdersCount,
+        int CompletedOrdersCount,
+        int CancelledOrdersCount,
+        int RefundedOrdersCount,
+        decimal TotalCreditSales,
+        int CreditOrdersCount,
+        decimal NetCash,
+        decimal TotalExpenses);
 
     public ShiftService(IUnitOfWork unitOfWork, ICurrentUserService currentUser, ICashRegisterService cashRegisterService)
     {
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
         _cashRegisterService = cashRegisterService;
+    }
+
+    private IQueryable<Shift> QueryShiftDetails()
+    {
+        return _unitOfWork.Shifts.Query()
+            .Include(s => s.User)
+            .Include(s => s.Orders)
+                .ThenInclude(o => o.Payments)
+            .Include(s => s.Expenses);
+    }
+
+    private static decimal SumAppliedPayments(IEnumerable<Order> orders, PaymentMethod method)
+        => Math.Round(orders.Sum(order => GetAppliedPaymentAmount(order, method)), 2);
+
+    private static decimal GetAppliedPaymentAmount(Order order, PaymentMethod method)
+    {
+        var remaining = Math.Max(0, Math.Round(order.Total, 2));
+        var total = 0m;
+
+        foreach (var payment in (order.Payments ?? Enumerable.Empty<Payment>()).OrderBy(p => p.Id))
+        {
+            if (remaining <= 0)
+                break;
+
+            var amount = Math.Max(0, Math.Round(payment.Amount, 2));
+            var applied = Math.Min(amount, remaining);
+            if (payment.Method == method)
+                total += applied;
+
+            remaining -= applied;
+        }
+
+        return Math.Round(total, 2);
     }
 
     public async Task<ApiResponse<ShiftDto>> GetCurrentAsync(int userId)
@@ -46,10 +93,7 @@ public class ShiftService : IShiftService
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.TENANT_NOT_FOUND, "سياق المستأجر غير صالح");
 
         // Query shift for this user in the current branch with Orders and Payments eager loaded
-        var shift = await _unitOfWork.Shifts.Query()
-            .Include(s => s.User)
-            .Include(s => s.Orders.OrderByDescending(o => o.CreatedAt))
-                .ThenInclude(o => o.Payments)
+        var shift = await QueryShiftDetails()
             .FirstOrDefaultAsync(s => s.UserId == userId
                                    && s.TenantId == tenantId
                                    && s.BranchId == branchId
@@ -58,6 +102,28 @@ public class ShiftService : IShiftService
         // Return success with null data if no shift is open (not an error)
         if (shift == null)
             return ApiResponse<ShiftDto>.Ok(null!, "لا توجد وردية مفتوحة");
+
+        return ApiResponse<ShiftDto>.Ok(await MapToDtoAsync(shift));
+    }
+
+    public async Task<ApiResponse<ShiftDto>> GetByIdAsync(int shiftId)
+    {
+        var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
+
+        if (tenantId <= 0)
+            return ApiResponse<ShiftDto>.Fail(ErrorCodes.TENANT_NOT_FOUND, "Ø³ÙŠØ§Ù‚ Ø§Ù„Ù…Ø³ØªØ£Ø¬Ø± ØºÙŠØ± ØµØ§Ù„Ø­");
+
+        if (shiftId <= 0)
+            return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_NOT_FOUND, "Ø§Ù„ÙˆØ±Ø¯ÙŠØ© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©");
+
+        var shift = await QueryShiftDetails()
+            .FirstOrDefaultAsync(s => s.Id == shiftId
+                                   && s.TenantId == tenantId
+                                   && s.BranchId == branchId);
+
+        if (shift == null)
+            return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_NOT_FOUND, "Ø§Ù„ÙˆØ±Ø¯ÙŠØ© ØºÙŠØ± Ù…ÙˆØ¬ÙˆØ¯Ø©");
 
         return ApiResponse<ShiftDto>.Ok(await MapToDtoAsync(shift));
     }
@@ -170,9 +236,7 @@ public class ShiftService : IShiftService
 
         try
         {
-            var shift = await _unitOfWork.Shifts.Query()
-                .Include(s => s.User)
-                .Include(s => s.Orders).ThenInclude(o => o.Payments)
+            var shift = await QueryShiftDetails()
                 .FirstOrDefaultAsync(s => s.UserId == userId
                                        && s.TenantId == tenantId
                                        && s.BranchId == branchId
@@ -213,6 +277,27 @@ public class ShiftService : IShiftService
             shift.IsClosed = true;
             shift.Notes = request.Notes;
 
+            // Task 1.2: Auto-reconcile on close
+            shift.IsReconciled = true;
+            shift.ReconciledByUserId = userId;
+            shift.ReconciledByUserName = shift.User?.Name ?? string.Empty;
+            shift.ReconciledAt = DateTime.UtcNow;
+
+            // Task 1.1: Record adjustment in cash register if there's a difference
+            if (shift.Difference != 0)
+            {
+                await _cashRegisterService.RecordTransactionAsync(
+                    type: CashRegisterTransactionType.Adjustment,
+                    amount: shift.Difference,
+                    description: shift.Difference > 0
+                        ? $"فائض عند إغلاق الوردية: {shift.Difference:F2}"
+                        : $"عجز عند إغلاق الوردية: {Math.Abs(shift.Difference):F2}",
+                    referenceType: "Shift",
+                    referenceId: shift.Id,
+                    shiftId: shift.Id,
+                    branchId: shift.BranchId);
+            }
+
             _unitOfWork.Shifts.Update(shift);
 
             // This will throw DbUpdateConcurrencyException if RowVersion doesn't match
@@ -249,8 +334,7 @@ public class ShiftService : IShiftService
         if (tenantId <= 0)
             return ApiResponse<List<ShiftDto>>.Fail(ErrorCodes.TENANT_NOT_FOUND, "سياق المستأجر غير صالح");
 
-        var shifts = await _unitOfWork.Shifts.Query()
-            .Include(s => s.User)
+        var shifts = await QueryShiftDetails()
             .Where(s => s.UserId == userId && s.TenantId == tenantId && s.BranchId == branchId)
             .OrderByDescending(s => s.OpenedAt)
             .Take(30)
@@ -263,6 +347,39 @@ public class ShiftService : IShiftService
         }
 
         return ApiResponse<List<ShiftDto>>.Ok(shiftDtos);
+    }
+
+    public async Task<ApiResponse<List<ShiftOrderDto>>> GetShiftOrdersAsync(int shiftId)
+    {
+        var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
+
+        if (tenantId <= 0)
+            return ApiResponse<List<ShiftOrderDto>>.Fail(ErrorCodes.TENANT_NOT_FOUND, "سياق المستأجر غير صالح");
+
+        var shift = await _unitOfWork.Shifts.Query()
+            .Include(s => s.Orders).ThenInclude(o => o.Payments)
+            .FirstOrDefaultAsync(s => s.Id == shiftId && s.TenantId == tenantId && s.BranchId == branchId);
+
+        if (shift == null)
+            return ApiResponse<List<ShiftOrderDto>>.Fail(ErrorCodes.SHIFT_NOT_FOUND, "الوردية غير موجودة");
+
+        var orders = shift.Orders?.Select(o => new ShiftOrderDto
+        {
+            Id = o.Id,
+            OrderNumber = o.OrderNumber,
+            Status = o.Status.ToString(),
+            OrderType = o.OrderType.ToString(),
+            Total = o.Total,
+            CustomerName = o.CustomerName,
+            CreatedAt = o.CreatedAt,
+            CompletedAt = o.CompletedAt,
+            PaymentMethod = o.Payments?.Any() == true
+                ? string.Join(", ", o.Payments.Select(p => p.Method.ToString()).Distinct())
+                : string.Empty
+        }).ToList() ?? new List<ShiftOrderDto>();
+
+        return ApiResponse<List<ShiftOrderDto>>.Ok(orders);
     }
 
     /// <summary>
@@ -294,8 +411,7 @@ public class ShiftService : IShiftService
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_FORCE_CLOSE_REASON_REQUIRED, "سبب الإغلاق مطلوب");
 
         // Get shift with user info
-        var shift = await _unitOfWork.Shifts.Query()
-            .Include(s => s.User)
+        var shift = await QueryShiftDetails()
             .FirstOrDefaultAsync(s => s.Id == shiftId && s.TenantId == tenantId && s.BranchId == branchId);
 
         if (shift == null)
@@ -338,6 +454,27 @@ public class ShiftService : IShiftService
             shift.ForceCloseReason = request.Reason;
             shift.Notes = request.Notes ?? shift.Notes;
 
+            // Task 1.2: Auto-reconcile on force close
+            shift.IsReconciled = true;
+            shift.ReconciledByUserId = currentUserId;
+            shift.ReconciledByUserName = currentUser.Name;
+            shift.ReconciledAt = DateTime.UtcNow;
+
+            // Task 1.1: Record adjustment in cash register if there's a difference
+            if (shift.Difference != 0)
+            {
+                await _cashRegisterService.RecordTransactionAsync(
+                    type: CashRegisterTransactionType.Adjustment,
+                    amount: shift.Difference,
+                    description: shift.Difference > 0
+                        ? $"فائض عند إغلاق الوردية بالقوة: {shift.Difference:F2}"
+                        : $"عجز عند إغلاق الوردية بالقوة: {Math.Abs(shift.Difference):F2}",
+                    referenceType: "Shift",
+                    referenceId: shift.Id,
+                    shiftId: shift.Id,
+                    branchId: shift.BranchId);
+            }
+
             _unitOfWork.Shifts.Update(shift);
             await _unitOfWork.SaveChangesAsync();
             await _unitOfWork.CommitTransactionAsync();
@@ -374,8 +511,7 @@ public class ShiftService : IShiftService
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_HANDOVER_TO_SAME_USER, "لا يمكن تسليم الوردية لنفس المستخدم");
 
         // Get shift
-        var shift = await _unitOfWork.Shifts.Query()
-            .Include(s => s.User)
+        var shift = await QueryShiftDetails()
             .FirstOrDefaultAsync(s => s.Id == shiftId && s.TenantId == tenantId && s.BranchId == branchId);
 
         if (shift == null)
@@ -467,10 +603,7 @@ public class ShiftService : IShiftService
         var tenantId = _currentUser.TenantId;
         var branchId = _currentUser.BranchId;
 
-        var shifts = await _unitOfWork.Shifts.Query()
-            .Include(s => s.User)
-            .Include(s => s.Orders)
-                .ThenInclude(o => o.Payments)
+        var shifts = await QueryShiftDetails()
             .Where(s => s.TenantId == tenantId && s.BranchId == branchId && !s.IsClosed)
             .OrderBy(s => s.OpenedAt)
             .ToListAsync();
@@ -582,26 +715,48 @@ public class ShiftService : IShiftService
         var salesOrders = completedOrders.Where(o => o.OrderType != OrderType.Return).ToList();
         var returnOrders = completedOrders.Where(o => o.OrderType == OrderType.Return).ToList();
 
-        var salesPayments = salesOrders.SelectMany(o => o.Payments ?? Enumerable.Empty<Payment>()).ToList();
         var returnPayments = returnOrders.SelectMany(o => o.Payments ?? Enumerable.Empty<Payment>()).ToList();
 
+        // Sales by payment method use applied amounts only, so cash change never inflates shift totals.
+        var totalCashSales = SumAppliedPayments(salesOrders, PaymentMethod.Cash);
+        var totalCardSales = SumAppliedPayments(salesOrders, PaymentMethod.Card);
+        var totalFawrySales = SumAppliedPayments(salesOrders, PaymentMethod.Fawry);
+        var totalBankTransferSales = SumAppliedPayments(salesOrders, PaymentMethod.BankTransfer);
+        // Net after returns
         var totalCash = Math.Round(
-            salesPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)
-            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)), 2);
+            totalCashSales - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)), 2);
         var totalCard = Math.Round(
-            salesPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)
-            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)), 2);
+            totalCardSales - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)), 2);
         var totalFawry = Math.Round(
-            salesPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)
-            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)), 2);
+            totalFawrySales - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)), 2);
         var totalBankTransfer = Math.Round(
-            salesPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)
-            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)), 2);
+            totalBankTransferSales - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)), 2);
         var totalSales = Math.Round(
             salesOrders.Sum(o => o.Total)
             - Math.Abs(returnOrders.Sum(o => o.Total)), 2);
         var totalCollected = Math.Round(totalCash + totalCard + totalFawry + totalBankTransfer, 2);
-        var deferredAmount = Math.Round(totalSales - totalCollected, 2);
+        var deferredAmount = Math.Max(0, Math.Round(totalSales - totalCollected, 2));
+
+        // Refunds
+        var totalRefunds = Math.Round(returnPayments.Sum(p => p.Amount), 2);
+        var refundsCount = returnOrders.Count;
+
+        // Order counts
+        var completedOrdersCount = orders.Count(o => o.Status == OrderStatus.Completed && o.OrderType != OrderType.Return);
+        var cancelledOrdersCount = orders.Count(o => o.Status == OrderStatus.Cancelled);
+        var refundedOrdersCount = orders.Count(o => o.Status == OrderStatus.Refunded || o.Status == OrderStatus.PartiallyRefunded);
+        var totalOrdersCount = salesOrders.Count + returnOrders.Count;
+
+        // Credit sales
+        var creditOrders = salesOrders.Where(o => o.AmountDue > 0).ToList();
+        var totalCreditSales = Math.Round(creditOrders.Sum(o => o.AmountDue), 2);
+        var creditOrdersCount = creditOrders.Count;
+
+        // Net cash = opening + totalCash (cash collected - cash refunded)
+        var netCash = totalCash;
+
+        // Expenses: we'll fetch separately in MapToDtoAsync via shift.Expenses
+        var totalExpenses = 0m;
 
         return new ShiftFinancialSnapshot(
             salesOrders.Count,
@@ -611,7 +766,21 @@ public class ShiftService : IShiftService
             totalBankTransfer,
             totalSales,
             totalCollected,
-            deferredAmount);
+            deferredAmount,
+            totalCashSales,
+            totalCardSales,
+            totalFawrySales,
+            totalBankTransferSales,
+            totalRefunds,
+            refundsCount,
+            totalOrdersCount,
+            completedOrdersCount,
+            cancelledOrdersCount,
+            refundedOrdersCount,
+            totalCreditSales,
+            creditOrdersCount,
+            netCash,
+            totalExpenses);
     }
 
     private async Task<decimal> CalculateExpectedBalanceAsync(int branchId, decimal openingBalance, decimal totalCash)
@@ -640,6 +809,26 @@ public class ShiftService : IShiftService
         var totalSales = financials.TotalSales;
         var totalCollected = financials.TotalCollected;
         var deferredAmount = financials.DeferredAmount;
+
+        // Calculate debt payments for this shift
+        var debtPayments = await _unitOfWork.DebtPayments.Query()
+            .Where(dp => dp.ShiftId == shift.Id && dp.TenantId == shift.TenantId)
+            .ToListAsync();
+
+        var totalDebtPayments = debtPayments.Sum(dp => dp.Amount);
+        var debtPaymentsCount = debtPayments.Count;
+        var totalDebtPaymentsCash = debtPayments
+            .Where(dp => dp.PaymentMethod == Domain.Enums.PaymentMethod.Cash)
+            .Sum(dp => dp.Amount);
+        var totalDebtPaymentsCard = debtPayments
+            .Where(dp => dp.PaymentMethod == Domain.Enums.PaymentMethod.Card)
+            .Sum(dp => dp.Amount);
+        var totalDebtPaymentsFawry = debtPayments
+            .Where(dp => dp.PaymentMethod == Domain.Enums.PaymentMethod.Fawry)
+            .Sum(dp => dp.Amount);
+        var totalDebtPaymentsBankTransfer = debtPayments
+            .Where(dp => dp.PaymentMethod == Domain.Enums.PaymentMethod.BankTransfer)
+            .Sum(dp => dp.Amount);
 
         // Calculate duration
         var endTime = shift.ClosedAt ?? DateTime.UtcNow;
@@ -695,6 +884,46 @@ public class ShiftService : IShiftService
             DurationHours = durationHours,
             DurationMinutes = durationMinutes,
 
+            // Reconciliation
+            IsReconciled = shift.IsReconciled,
+            ReconciledByUserName = shift.ReconciledByUserName,
+            ReconciledAt = shift.ReconciledAt,
+
+            // Detailed sales by payment method
+            TotalCashSales = financials.TotalCashSales,
+            TotalCardSales = financials.TotalCardSales,
+            TotalFawrySales = financials.TotalFawrySales,
+            TotalBankTransferSales = financials.TotalBankTransferSales,
+
+            // Refunds
+            TotalRefunds = financials.TotalRefunds,
+            RefundsCount = financials.RefundsCount,
+
+            // Order breakdown
+            TotalOrdersCount = financials.TotalOrdersCount,
+            CompletedOrdersCount = financials.CompletedOrdersCount,
+            CancelledOrdersCount = financials.CancelledOrdersCount,
+            RefundedOrdersCount = financials.RefundedOrdersCount,
+
+            // Credit
+            TotalCreditSales = financials.TotalCreditSales,
+            CreditOrdersCount = financials.CreditOrdersCount,
+            TotalVodafoneCashSales = 0m,
+
+            // Net cash and expenses
+            NetCash = financials.NetCash,
+            TotalExpenses = shift.Expenses?.Sum(e => e.Amount) ?? 0m,
+
+            // Debt Payments
+            TotalDebtPayments = totalDebtPayments,
+            DebtPaymentsCount = debtPaymentsCount,
+            TotalDebtPaymentsCash = totalDebtPaymentsCash,
+            TotalDebtPaymentsCard = totalDebtPaymentsCard,
+            TotalDebtPaymentsFawry = totalDebtPaymentsFawry,
+            TotalDebtPaymentsBankTransfer = totalDebtPaymentsBankTransfer,
+
+            RowVersion = shift.RowVersion,
+
             Orders = shift.Orders?.Select(o => new ShiftOrderDto
             {
                 Id = o.Id,
@@ -704,7 +933,10 @@ public class ShiftService : IShiftService
                 Total = o.Total,
                 CustomerName = o.CustomerName,
                 CreatedAt = o.CreatedAt,
-                CompletedAt = o.CompletedAt
+                CompletedAt = o.CompletedAt,
+                PaymentMethod = o.Payments?.Any() == true
+                    ? string.Join(", ", o.Payments.Select(p => p.Method.ToString()).Distinct())
+                    : string.Empty
             }).ToList() ?? new()
         };
     }

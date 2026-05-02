@@ -10,6 +10,10 @@ export interface Supplier {
   notes?: string;
   isActive: boolean;
   createdAt: string;
+  totalDue: number;
+  totalPaid: number;
+  totalPurchases: number;
+  lastPurchaseDate?: string;
 }
 
 export interface CreateSupplierRequest {

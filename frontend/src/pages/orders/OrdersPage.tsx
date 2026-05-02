@@ -10,6 +10,7 @@ import {
   ChevronRight,
   X,
   ChevronDown,
+  CheckCircle,
 } from "lucide-react";
 import { useOrders } from "@/hooks/useOrders";
 import { Button, ConfirmDialog } from "@/components/common";
@@ -20,19 +21,23 @@ import { formatCurrency, formatDateTime } from "@/utils/formatters";
 import { ORDER_STATUS, PAYMENT_METHODS, ORDER_TYPES } from "@/utils/constants";
 import type { Order, OrdersQueryParams } from "@/types/order.types";
 import { OrderDetailsModal } from "@/components/orders/OrderDetailsModal";
-import { useGetOrdersQuery } from "@/api/ordersApi";
+import { useGetOrdersQuery, useMarkAsDeliveredMutation } from "@/api/ordersApi";
 import clsx from "clsx";
+import { toast } from "react-hot-toast";
 
 export const OrdersPage = () => {
   const { todayOrders, isLoadingOrders, cancelOrder } = useOrders();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
+  const [markingDeliveredOrderId, setMarkingDeliveredOrderId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"today" | "all" | "date">("today");
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [orderTypeFilter, setOrderTypeFilter] = useState<"all" | "delivery">(
     "all",
   );
+
+  const [markAsDelivered] = useMarkAsDeliveredMutation();
 
   const [filters, setFilters] = useState<OrdersQueryParams>({
     page: 1,
@@ -130,6 +135,28 @@ export const OrdersPage = () => {
     if (cancellingOrderId === null) return;
     await cancelOrder(cancellingOrderId, "إلغاء من المستخدم");
     setCancellingOrderId(null);
+  };
+
+  const handleMarkDeliveredClick = (orderId: number) => {
+    setMarkingDeliveredOrderId(orderId);
+  };
+
+  const handleConfirmMarkDelivered = async () => {
+    if (markingDeliveredOrderId === null) return;
+    
+    try {
+      const result = await markAsDelivered(markingDeliveredOrderId).unwrap();
+      if (result.success) {
+        toast.success("تم تحديد الطلب كـ تم التسليم بنجاح");
+      } else {
+        toast.error(result.message || "حدث خطأ أثناء تحديث حالة الطلب");
+      }
+    } catch (error: any) {
+      const errorMessage = error?.data?.message || "حدث خطأ أثناء تحديث حالة الطلب";
+      toast.error(errorMessage);
+    } finally {
+      setMarkingDeliveredOrderId(null);
+    }
   };
 
   const handleFilterChange = <K extends keyof OrdersQueryParams>(
@@ -272,6 +299,7 @@ export const OrdersPage = () => {
                     className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm text-sm"
                   >
                     <option value="">الكل</option>
+                    <option value="Draft">مسودة</option>
                     <option value="Completed">مكتمل</option>
                     <option value="Cancelled">ملغي</option>
                     <option value="Pending">قيد الانتظار</option>
@@ -530,13 +558,24 @@ export const OrdersPage = () => {
                           <button
                             onClick={() => setSelectedOrder(order)}
                             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="عرض التفاصيل"
                           >
                             <Eye className="w-4 h-4 text-gray-500" />
                           </button>
-                          {order.status === "Pending" && (
+                          {order.status === "Pending" && order.orderType === "Delivery" && (
+                            <button
+                              onClick={() => handleMarkDeliveredClick(order.id)}
+                              className="p-2 hover:bg-success-50 rounded-lg transition-colors"
+                              title="تحديد كـ تم التسليم"
+                            >
+                              <CheckCircle className="w-4 h-4 text-success-500" />
+                            </button>
+                          )}
+                          {(order.status === "Pending" || order.status === "Draft") && (
                             <button
                               onClick={() => handleCancelClick(order.id)}
                               className="p-2 hover:bg-danger-50 rounded-lg transition-colors"
+                              title={order.status === "Draft" ? "حذف المسودة" : "إلغاء الطلب"}
                             >
                               <XCircle className="w-4 h-4 text-danger-500" />
                             </button>
@@ -646,6 +685,16 @@ export const OrdersPage = () => {
         title="إلغاء الطلب"
         description="هل أنت متأكد من إلغاء هذا الطلب؟"
         confirmText="إلغاء"
+        cancelText="تراجع"
+      />
+
+      <ConfirmDialog
+        open={markingDeliveredOrderId !== null}
+        onOpenChange={(open) => !open && setMarkingDeliveredOrderId(null)}
+        onConfirm={handleConfirmMarkDelivered}
+        title="تأكيد التسليم"
+        description="هل تم تسليم هذا الطلب للعميل بالفعل؟ سيتم تحديث حالة الطلب إلى 'مكتمل'."
+        confirmText="نعم، تم التسليم"
         cancelText="تراجع"
       />
     </div>

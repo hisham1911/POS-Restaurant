@@ -23,7 +23,7 @@ public class FreshInstallSeedDataTests
                 .Options;
 
             await using var context = new AppDbContext(options);
-            await context.Database.MigrateAsync();
+            await context.Database.EnsureCreatedAsync();
 
             await ButcherDataSeeder.SeedAsync(context);
             context.ChangeTracker.Clear();
@@ -186,7 +186,7 @@ public class FreshInstallSeedDataTests
                 .Options;
 
             await using var context = new AppDbContext(options);
-            await context.Database.MigrateAsync();
+            await context.Database.EnsureCreatedAsync();
 
             await ButcherDataSeeder.SeedAsync(context);
             context.ChangeTracker.Clear();

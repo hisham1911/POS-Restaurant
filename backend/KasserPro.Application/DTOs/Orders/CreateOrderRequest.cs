@@ -25,6 +25,7 @@ public class CreateOrderItemRequest
 {
     public int ProductId { get; set; }
     public int Quantity { get; set; } = 1;
+    public int? BatchId { get; set; } // Optional - for batch selection
     public string? Notes { get; set; }
 
     // Item-level discount
@@ -37,6 +38,7 @@ public class AddOrderItemRequest
 {
     public int ProductId { get; set; }
     public int Quantity { get; set; } = 1;
+    public int? BatchId { get; set; } // Optional - for batch selection
     public string? Notes { get; set; }
     // Item-level discount (parity with CreateOrderItemRequest)
     public string? DiscountType { get; set; }

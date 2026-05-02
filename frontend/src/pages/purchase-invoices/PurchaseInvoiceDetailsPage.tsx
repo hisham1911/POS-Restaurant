@@ -4,20 +4,26 @@ import {
   useGetPurchaseInvoiceByIdQuery,
   useConfirmPurchaseInvoiceMutation,
   useDeletePurchaseInvoiceMutation,
+  useDeletePaymentMutation,
 } from "../../api/purchaseInvoiceApi";
 import { Button, ConfirmDialog } from "../../components/common";
 import { Card } from "../../components/common/Card";
 import { Loading } from "../../components/common/Loading";
 import { formatCurrency, formatDateOnly } from "../../utils/formatters";
 import { toast } from "sonner";
+import {
+  purchaseInvoiceStatusColors,
+  purchaseInvoiceStatusLabels,
+} from "../../constants/purchaseInvoiceStatuses";
 import { AddPaymentModal } from "../../components/purchase-invoices/AddPaymentModal";
 import { CancelInvoiceModal } from "../../components/purchase-invoices/CancelInvoiceModal";
+import { Trash2 } from "lucide-react";
 
 const getPaymentMethodLabel = (method: string) => {
   const labels: Record<string, string> = {
     Cash: "نقدي",
     Card: "فيزا",
-    Fawry: "فودافون كاش",
+    Fawry: "فوري",
     BankTransfer: "تحويل بنكي",
   };
 
@@ -31,6 +37,10 @@ export function PurchaseInvoiceDetailsPage() {
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deletingPayment, setDeletingPayment] = useState<{
+    id: number;
+    amount: number;
+  } | null>(null);
 
   const { data: invoiceResponse, isLoading } = useGetPurchaseInvoiceByIdQuery(
     Number(id),
@@ -38,6 +48,7 @@ export function PurchaseInvoiceDetailsPage() {
   const [confirmInvoice, { isLoading: isConfirming }] =
     useConfirmPurchaseInvoiceMutation();
   const [deleteInvoice, { isLoading: isDeleting }] = useDeletePurchaseInvoiceMutation();
+  const [deletePayment, { isLoading: isDeletingPayment }] = useDeletePaymentMutation();
 
   const invoice = invoiceResponse?.data;
 
@@ -61,28 +72,26 @@ export function PurchaseInvoiceDetailsPage() {
     }
   };
 
+  const handleDeletePayment = async () => {
+    if (!deletingPayment || !invoice) return;
+    try {
+      await deletePayment({
+        invoiceId: invoice.id,
+        paymentId: deletingPayment.id,
+      }).unwrap();
+      toast.success("تم حذف الدفعة بنجاح");
+      setDeletingPayment(null);
+    } catch {
+      setDeletingPayment(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
-    const statusColors: Record<string, string> = {
-      Draft: "bg-gray-100 text-gray-800",
-      Confirmed: "bg-blue-100 text-blue-800",
-      Paid: "bg-green-100 text-green-800",
-      PartiallyPaid: "bg-yellow-100 text-yellow-800",
-      Cancelled: "bg-red-100 text-red-800",
-    };
-
-    const statusLabels: Record<string, string> = {
-      Draft: "مسودة",
-      Confirmed: "مؤكدة",
-      Paid: "مدفوعة",
-      PartiallyPaid: "مدفوعة جزئياً",
-      Cancelled: "ملغاة",
-    };
-
     return (
       <span
-        className={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[status] || "bg-gray-100 text-gray-800"}`}
+        className={`px-3 py-1 rounded-full text-sm font-medium ${purchaseInvoiceStatusColors[status] || "bg-gray-100 text-gray-800"}`}
       >
-        {statusLabels[status] || status}
+        {purchaseInvoiceStatusLabels[status] || status}
       </span>
     );
   };
@@ -190,6 +199,12 @@ export function PurchaseInvoiceDetailsPage() {
                   سعر الشراء
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  رقم الدُفعة
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                  تاريخ الانتهاء
+                </th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                   الإجمالي
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
@@ -212,11 +227,19 @@ export function PurchaseInvoiceDetailsPage() {
                   <td className="px-4 py-3 text-sm">
                     {formatCurrency(item.purchasePrice)}
                   </td>
+                  <td className="px-4 py-3 text-sm text-gray-500">
+                    {item.batchNumber || "—"}
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-500">
+                    {item.expiryDate
+                      ? formatDateOnly(item.expiryDate)
+                      : "—"}
+                  </td>
                   <td className="px-4 py-3 text-sm font-medium">
                     {formatCurrency(item.total)}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">
-                    {item.notes || "-"}
+                    {item.notes || "—"}
                   </td>
                 </tr>
               ))}
@@ -296,6 +319,9 @@ export function PurchaseInvoiceDetailsPage() {
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                     بواسطة
                   </th>
+                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                    إجراءات
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -315,6 +341,22 @@ export function PurchaseInvoiceDetailsPage() {
                     </td>
                     <td className="px-4 py-3 text-sm">
                       {payment.createdByUserName}
+                    </td>
+                    <td className="px-4 py-3 text-sm">
+                      {invoice.status !== "Cancelled" && (
+                        <button
+                          onClick={() =>
+                            setDeletingPayment({
+                              id: payment.id,
+                              amount: payment.amount,
+                            })
+                          }
+                          className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="حذف الدفعة"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -384,6 +426,19 @@ export function PurchaseInvoiceDetailsPage() {
         title="حذف الفاتورة"
         description="هل أنت متأكد من حذف الفاتورة؟"
         isLoading={isDeleting}
+      />
+
+      <ConfirmDialog
+        open={deletingPayment !== null}
+        onOpenChange={(open) => !open && setDeletingPayment(null)}
+        onConfirm={handleDeletePayment}
+        title="حذف الدفعة"
+        description={
+          deletingPayment
+            ? "هل تريد حذف هذه الدفعة؟ سيتم إعادة حساب المبالغ تلقائياً."
+            : ""
+        }
+        isLoading={isDeletingPayment}
       />
     </div>
   );

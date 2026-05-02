@@ -176,7 +176,24 @@ public class OrderService : IOrderService
             if (!tenant.IsTaxEnabled)
                 taxRate = 0m;
 
-            var unitPrice = ResolveNetUnitPrice(product.Price, product.TaxInclusive, taxRate);
+            // Price Priority: 1) ProductBatch.SellingPrice, 2) BranchProductPrice.Price, 3) Product.Price
+            var (sellingPrice, batchId, batchNumber, expiryDate, batchCost, priceError) = await ResolveBatchSaleSnapshotAsync(
+                product.Id, branchId, tenantId, product.Price, item.BatchId);
+            if (priceError != null)
+                return ApiResponse<OrderDto>.Fail(priceError.Value.ErrorCode, priceError.Value.Message);
+
+            var unitPrice = ResolveNetUnitPrice(sellingPrice, product.TaxInclusive, taxRate);
+
+            // Validate batch quantity if batch is selected
+            if (batchId.HasValue)
+            {
+                var batch = await _unitOfWork.ProductBatches.GetByIdAsync(batchId.Value);
+                if (batch == null || batch.Quantity < item.Quantity)
+                {
+                    return ApiResponse<OrderDto>.Fail(ErrorCodes.INSUFFICIENT_STOCK,
+                        $"الكمية المتاحة في الباتش {batchNumber} غير كافية. المتاح: {batch?.Quantity ?? 0}، المطلوب: {item.Quantity}");
+                }
+            }
 
             var orderItem = new OrderItem
             {
@@ -188,8 +205,8 @@ public class OrderService : IOrderService
                 ProductBarcode = product.Barcode,
                 // Price Snapshot - UnitPrice is NET (excluding tax)
                 UnitPrice = unitPrice,
-                UnitCost = product.Cost ?? product.AverageCost,
-                OriginalPrice = product.Price,
+                UnitCost = batchCost ?? product.AverageCost ?? product.Cost,
+                OriginalPrice = sellingPrice, // Use resolved selling price
                 Quantity = item.Quantity,
                 DiscountType = NormalizeDiscountType(item.DiscountType),
                 DiscountValue = item.DiscountValue,
@@ -197,7 +214,11 @@ public class OrderService : IOrderService
                 // Tax Snapshot - Dynamic from Product or Tenant
                 TaxRate = taxRate,
                 TaxInclusive = product.TaxInclusive,
-                Notes = item.Notes
+                Notes = item.Notes,
+                // Batch Info
+                BatchId = batchId,
+                BatchNumber = batchNumber,
+                ExpiryDate = expiryDate
             };
 
             // Calculate tax amount and totals with proper rounding
@@ -402,7 +423,24 @@ public class OrderService : IOrderService
         if (tenant?.IsTaxEnabled != true)
             taxRate = 0m;
 
-        var unitPrice = ResolveNetUnitPrice(product.Price, product.TaxInclusive, taxRate);
+        // Price Priority: 1) ProductBatch.SellingPrice, 2) BranchProductPrice.Price, 3) Product.Price
+        var (sellingPrice, batchId, batchNumber, expiryDate, batchCost, priceError) = await ResolveBatchSaleSnapshotAsync(
+            product.Id, order.BranchId, order.TenantId, product.Price, request.BatchId);
+        if (priceError != null)
+            return ApiResponse<OrderDto>.Fail(priceError.Value.ErrorCode, priceError.Value.Message);
+
+        var unitPrice = ResolveNetUnitPrice(sellingPrice, product.TaxInclusive, taxRate);
+
+        // Validate batch quantity if batch is selected
+        if (batchId.HasValue)
+        {
+            var batch = await _unitOfWork.ProductBatches.GetByIdAsync(batchId.Value);
+            if (batch == null || batch.Quantity < request.Quantity)
+            {
+                return ApiResponse<OrderDto>.Fail(ErrorCodes.INSUFFICIENT_STOCK,
+                    $"الكمية المتاحة في الباتش {batchNumber} غير كافية. المتاح: {batch?.Quantity ?? 0}، المطلوب: {request.Quantity}");
+            }
+        }
 
         var orderItem = new OrderItem
         {
@@ -414,8 +452,8 @@ public class OrderService : IOrderService
             ProductBarcode = product.Barcode,
             // Price Snapshot
             UnitPrice = unitPrice,
-            UnitCost = product.Cost,
-            OriginalPrice = product.Price,
+            UnitCost = batchCost ?? product.AverageCost ?? product.Cost,
+            OriginalPrice = sellingPrice, // Use resolved selling price
             Quantity = request.Quantity,
             DiscountType = NormalizeDiscountType(request.DiscountType),
             DiscountValue = request.DiscountValue,
@@ -423,7 +461,11 @@ public class OrderService : IOrderService
             // Tax Snapshot
             TaxRate = taxRate,
             TaxInclusive = product.TaxInclusive,
-            Notes = request.Notes
+            Notes = request.Notes,
+            // Batch Info
+            BatchId = batchId,
+            BatchNumber = batchNumber,
+            ExpiryDate = expiryDate
         };
 
         // Calculate tax amount and totals with proper rounding
@@ -582,11 +624,43 @@ public class OrderService : IOrderService
             if (!validationResult.Success)
                 return ApiResponse<OrderDto>.Fail(ErrorCodes.ORDER_INVALID_STATE_TRANSITION, validationResult.Message!);
 
-            // Validate payment amount
-            decimal totalPaymentAmount = request.Payments.Sum(p => p.Amount);
+            // Validate payment amount against the authoritative order total.
+            var orderTotal = Math.Round(order.Total, 2);
+            decimal totalPaymentAmount = Math.Round(
+                request.Payments
+                    .Where(p => p.Amount > 0)
+                    .Sum(p => Math.Round(p.Amount, 2)),
+                2);
+
+            // ✅ Allow zero payment ONLY for credit sales (customer linked + permission)
+            if (totalPaymentAmount <= 0)
+            {
+                // Check if this is a valid credit sale (zero payment)
+                var hasCreditPermission = await _permissionService.HasPermissionAsync(_currentUser.UserId, Permission.PosCreditSale);
+                if (!hasCreditPermission)
+                {
+                    return ApiResponse<OrderDto>.Fail(ErrorCodes.PAYMENT_CREDIT_NOT_ALLOWED,
+                        ErrorMessages.Get(ErrorCodes.PAYMENT_CREDIT_NOT_ALLOWED));
+                }
+
+                if (!order.CustomerId.HasValue)
+                {
+                    return ApiResponse<OrderDto>.Fail(ErrorCodes.PAYMENT_INVALID_AMOUNT,
+                        "البيع الآجل بدون دفع يتطلب ربط عميل بالطلب.");
+                }
+
+                // Validate credit limit for full amount
+                var canTakeCredit = await _customerService.ValidateCreditLimitAsync(order.CustomerId.Value, orderTotal);
+                if (!canTakeCredit)
+                {
+                    var customer = await _unitOfWork.Customers.GetByIdAsync(order.CustomerId.Value);
+                    return ApiResponse<OrderDto>.Fail(ErrorCodes.CUSTOMER_CREDIT_LIMIT_EXCEEDED,
+                        $"تجاوز حد الائتمان. الحد المسموح: {customer?.CreditLimit:F2} ج.م، الرصيد الحالي: {customer?.TotalDue:F2} ج.م");
+                }
+            }
 
             // Allow partial payment ONLY if customer is linked AND user has credit sale permission
-            if (totalPaymentAmount < order.Total)
+            if (totalPaymentAmount > 0 && totalPaymentAmount < orderTotal)
             {
                 var hasCreditPermission = await _permissionService.HasPermissionAsync(_currentUser.UserId, Permission.PosCreditSale);
                 if (!hasCreditPermission)
@@ -602,7 +676,7 @@ public class OrderService : IOrderService
                 }
 
                 // Validate credit limit
-                var amountDue = order.Total - totalPaymentAmount;
+                var amountDue = orderTotal - totalPaymentAmount;
                 var canTakeCredit = await _customerService.ValidateCreditLimitAsync(order.CustomerId.Value, amountDue);
 
                 if (!canTakeCredit)
@@ -613,10 +687,14 @@ public class OrderService : IOrderService
                 }
             }
 
-            // VALIDATION: Overpayment limit (max 2x Total to prevent money laundering/errors)
-            decimal maxAllowedPayment = order.Total * 2;
-            if (totalPaymentAmount > maxAllowedPayment)
-                return ApiResponse<OrderDto>.Fail(ErrorCodes.PAYMENT_OVERPAYMENT_LIMIT,
+            // Cash overpayment is change; non-cash overpayment must not enter accounting.
+            var hasNonCashOverpayment = totalPaymentAmount > orderTotal
+                && request.Payments
+                    .Where(p => p.Amount > 0)
+                    .Any(p => !Enum.TryParse<PaymentMethod>(p.Method, out var method) || method != PaymentMethod.Cash);
+            var maxAllowedPayment = Math.Max(orderTotal * 10, orderTotal + 1000m);
+            if (hasNonCashOverpayment || totalPaymentAmount > maxAllowedPayment)
+                return ApiResponse<OrderDto>.Fail(ErrorCodes.PAYMENT_EXCEEDS_DUE,
                     $"المبلغ المدفوع ({totalPaymentAmount:F2}) يتجاوز الحد المسموح ({maxAllowedPayment:F2})");
 
             // Add payments
@@ -643,10 +721,15 @@ public class OrderService : IOrderService
                     TenantId = _currentUser.TenantId,
                     BranchId = _currentUser.BranchId,
                     OrderId = order.Id,
-                    Amount = Math.Round(paymentReq.Amount, 2),
+                    Amount = Math.Min(
+                        Math.Round(paymentReq.Amount, 2),
+                        Math.Max(0, orderTotal - totalPaid)),
                     Method = paymentMethod,
                     Reference = paymentReq.Reference
                 };
+                if (payment.Amount <= 0)
+                    continue;
+
                 await _unitOfWork.Payments.AddAsync(payment);
                 order.Payments.Add(payment);
                 totalPaid += payment.Amount;
@@ -657,10 +740,20 @@ public class OrderService : IOrderService
             }
 
             // Update order status and payment info
-            order.Status = OrderStatus.Completed;
-            order.AmountPaid = Math.Round(totalPaid, 2);
-            order.AmountDue = Math.Round(order.Total - totalPaid, 2);
-            order.ChangeAmount = totalPaid > order.Total ? Math.Round(totalPaid - order.Total, 2) : 0;
+            // ✅ Delivery orders should be Pending until delivered, not Completed
+            if (order.OrderType == OrderType.Delivery)
+            {
+                order.Status = OrderStatus.Pending;
+                order.DeliveryStatus = DeliveryStatus.PendingAssignment;
+            }
+            else
+            {
+                order.Status = OrderStatus.Completed;
+            }
+            
+            order.AmountPaid = Math.Min(Math.Round(totalPaid, 2), orderTotal);
+            order.AmountDue = Math.Max(0, Math.Round(orderTotal - totalPaid, 2));
+            order.ChangeAmount = Math.Max(0, Math.Round(totalPaymentAmount - orderTotal, 2));
             order.CompletedAt = DateTime.UtcNow;
 
             await _unitOfWork.SaveChangesAsync();
@@ -708,7 +801,7 @@ public class OrderService : IOrderService
                          && !i.IsCustomItem
                          && products.ContainsKey(i.ProductId.Value)
                          && products[i.ProductId.Value].TrackInventory)
-                .Select(i => (i.Id, i.ProductId!.Value, i.Quantity))
+                .Select(i => (i.Id, i.ProductId!.Value, i.Quantity, i.BatchId))
                 .ToList();
 
             if (stockItems.Any())
@@ -1416,6 +1509,70 @@ public class OrderService : IOrderService
     private static bool RequestContainsDiscount(string? discountType, decimal? discountValue)
         => !string.IsNullOrWhiteSpace(discountType) || discountValue.HasValue;
 
+    /// <summary>
+    /// Resolves the selling price with priority: 1) ProductBatch.SellingPrice, 2) BranchProductPrice.Price, 3) Product.Price
+    /// </summary>
+    private async Task<(decimal price, int? batchId, string? batchNumber, DateTime? expiryDate, decimal? batchCost, (string ErrorCode, string Message)? error)> ResolveBatchSaleSnapshotAsync(
+        int productId, int branchId, int tenantId, decimal defaultPrice, int? preferredBatchId = null)
+    {
+        var product = await _unitOfWork.Products.GetByIdAsync(productId);
+        
+        if (product != null && product.IsBatchTracked)
+        {
+            var batchQuery = _unitOfWork.ProductBatches.Query()
+                .Where(pb => pb.TenantId == tenantId
+                    && pb.BranchId == branchId
+                    && pb.ProductId == productId
+                    && !pb.IsDeleted
+                    && pb.Status == BatchStatus.Active
+                    && pb.Quantity > 0);
+
+            var oldestBatch = await batchQuery
+                .OrderBy(pb => pb.PurchaseDate)
+                .ThenBy(pb => pb.CreatedAt)
+                .ThenBy(pb => pb.Id)
+                .FirstOrDefaultAsync();
+
+            if (oldestBatch == null)
+                return (defaultPrice, null, null, null, null,
+                    (ErrorCodes.INSUFFICIENT_STOCK, "لا توجد دفعات متاحة لهذا المنتج في الفرع الحالي"));
+
+            ProductBatch selectedBatch = oldestBatch;
+            if (preferredBatchId.HasValue)
+            {
+                var requestedBatch = await batchQuery
+                    .FirstOrDefaultAsync(pb => pb.Id == preferredBatchId.Value);
+
+                if (requestedBatch == null)
+                {
+                    return (defaultPrice, null, null, null, null,
+                        (ErrorCodes.VALIDATION_ERROR, "الباتش المحدد غير متاح أو غير صالح"));
+                }
+
+                if (requestedBatch.Id != oldestBatch.Id)
+                {
+                    var canChangeBatch = await _permissionService.HasPermissionAsync(_currentUser.UserId, Permission.PosChangeBatch);
+                    if (!canChangeBatch)
+                    {
+                        return (defaultPrice, null, null, null, null,
+                            (ErrorCodes.INSUFFICIENT_PRIVILEGES, ErrorMessages.Get(ErrorCodes.INSUFFICIENT_PRIVILEGES)));
+                    }
+                }
+
+                selectedBatch = requestedBatch;
+            }
+
+            var price = selectedBatch.SellingPrice ?? defaultPrice;
+            return (price, selectedBatch.Id, selectedBatch.BatchNumber, selectedBatch.ExpiryDate, selectedBatch.CostPrice, null);
+        }
+
+        var branchPrice = await _inventoryService.GetEffectivePriceAsync(productId, branchId);
+        if (branchPrice > 0 && branchPrice != defaultPrice)
+            return (branchPrice, null, null, null, null, null);
+
+        return (defaultPrice, null, null, null, null, null);
+    }
+
     private static decimal ResolveNetUnitPrice(decimal configuredPrice, bool taxInclusive, decimal taxRate)
     {
         if (taxInclusive && taxRate > 0)
@@ -1515,7 +1672,11 @@ public class OrderService : IOrderService
             TaxInclusive = i.TaxInclusive,
             Subtotal = i.Subtotal,
             Total = i.Total,
-            Notes = i.Notes
+            Notes = i.Notes,
+            // Batch Info
+            BatchId = i.BatchId,
+            BatchNumber = i.BatchNumber,
+            ExpiryDate = i.ExpiryDate
         }).ToList(),
         Payments = order.Payments?.Select(p => new PaymentDto
         {
@@ -1526,4 +1687,36 @@ public class OrderService : IOrderService
             CreatedAt = p.CreatedAt
         }).ToList() ?? new()
     };
+
+    /// <summary>
+    /// Mark a delivery order as delivered and complete it
+    /// </summary>
+    public async Task<ApiResponse<OrderDto>> MarkAsDeliveredAsync(int orderId)
+    {
+        var order = await _unitOfWork.Orders.Query()
+            .Include(o => o.Items)
+            .Include(o => o.Payments)
+            .Include(o => o.DeliveryPerson)
+            .FirstOrDefaultAsync(o => o.Id == orderId && o.TenantId == _currentUser.TenantId);
+
+        if (order == null)
+            return ApiResponse<OrderDto>.Fail(ErrorCodes.ORDER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.ORDER_NOT_FOUND));
+
+        // Validate this is a delivery order
+        if (order.OrderType != OrderType.Delivery)
+            return ApiResponse<OrderDto>.Fail(ErrorCodes.ORDER_INVALID_STATE_TRANSITION, "هذا الطلب ليس طلب توصيل");
+
+        // Validate current status is Pending
+        if (order.Status != OrderStatus.Pending)
+            return ApiResponse<OrderDto>.Fail(ErrorCodes.ORDER_INVALID_STATE_TRANSITION, "الطلب يجب أن يكون في حالة معلق");
+
+        // Update status to Completed and delivery status to Delivered
+        order.Status = OrderStatus.Completed;
+        order.DeliveryStatus = DeliveryStatus.Delivered;
+        order.DeliveredAt = DateTime.UtcNow;
+
+        await _unitOfWork.SaveChangesAsync();
+
+        return ApiResponse<OrderDto>.Ok(MapToDto(order), "تم تسليم الطلب بنجاح");
+    }
 }

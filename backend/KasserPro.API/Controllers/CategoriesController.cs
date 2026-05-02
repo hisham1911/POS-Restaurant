@@ -19,9 +19,9 @@ public class CategoriesController : ControllerBase
 
     [HttpGet]
     [HasPermission(Permission.CategoriesView)]
-    public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+    public async Task<IActionResult> GetAll([FromQuery] string? search, [FromQuery] bool? isActive, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
     {
-        var result = await _categoryService.GetAllAsync(search, page, pageSize);
+        var result = await _categoryService.GetAllAsync(search, isActive, page, pageSize);
         return Ok(result);
     }
 

@@ -37,7 +37,7 @@ public interface IInventoryService
     Task<int> GetAvailableQuantityAsync(int productId, int branchId);
 
     // Legacy compatibility methods for OrderService
-    Task BatchDecrementStockAsync(List<(int OrderItemId, int ProductId, int Quantity)> items, int orderId);
+    Task BatchDecrementStockAsync(List<(int OrderItemId, int ProductId, int Quantity, int? BatchId)> items, int orderId);
     Task<int> GetCurrentStockAsync(int productId);
     Task<int> IncrementStockAsync(int productId, int quantity, int referenceId, int? batchId = null);
 

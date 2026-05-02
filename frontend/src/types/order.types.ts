@@ -150,6 +150,7 @@ export interface CreateOrderRequest {
   items: {
     productId: number;
     quantity: number;
+    batchId?: number; // ✅ NEW - Optional batch selection
     notes?: string;
     // Item-level discount
     discountType?: "percentage" | "fixed";

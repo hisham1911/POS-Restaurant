@@ -53,5 +53,15 @@ public enum CashRegisterTransactionType
     /// <summary>
     /// P3: Shift closing balance record
     /// </summary>
-    ShiftClose = 9
+    ShiftClose = 9,
+
+    /// <summary>
+    /// Debt payment from customer
+    /// </summary>
+    DebtPayment = 10,
+
+    /// <summary>
+    /// Reversal of a deleted supplier cash payment
+    /// </summary>
+    SupplierPaymentReversal = 11
 }

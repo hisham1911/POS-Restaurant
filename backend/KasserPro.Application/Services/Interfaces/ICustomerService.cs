@@ -31,7 +31,7 @@ public interface ICustomerService
     /// <summary>
     /// Update an existing customer
     /// </summary>
-    Task<CustomerDto?> UpdateAsync(int id, UpdateCustomerRequest request);
+    Task<ApiResponse<CustomerDto>> UpdateAsync(int id, UpdateCustomerRequest request);
 
     /// <summary>
     /// Get or create customer by phone (auto-create if not exists)

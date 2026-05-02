@@ -46,6 +46,42 @@ export interface Shift {
   durationHours: number;
   durationMinutes: number;
 
+  // Reconciliation
+  isReconciled?: boolean;
+  reconciledByUserName?: string;
+  reconciledAt?: string;
+
+  // Detailed sales by payment method
+  totalCashSales?: number;
+  totalCardSales?: number;
+  totalFawrySales?: number;
+  totalBankTransferSales?: number;
+  totalVodafoneCashSales?: number;
+
+  // Refunds & orders breakdown
+  totalRefunds?: number;
+  refundsCount?: number;
+  totalOrdersCount?: number;
+  completedOrdersCount?: number;
+  cancelledOrdersCount?: number;
+  refundedOrdersCount?: number;
+
+  // Credit & net
+  totalCreditSales?: number;
+  creditOrdersCount?: number;
+  netCash?: number;
+
+  // Expenses
+  totalExpenses?: number;
+
+  // Debt Payments (سداد الديون)
+  totalDebtPayments?: number;
+  debtPaymentsCount?: number;
+  totalDebtPaymentsCash?: number;
+  totalDebtPaymentsCard?: number;
+  totalDebtPaymentsFawry?: number;
+  totalDebtPaymentsBankTransfer?: number;
+
   // Concurrency Token (for optimistic locking)
   rowVersion?: string;
 }
@@ -59,6 +95,7 @@ export interface ShiftOrder {
   customerName?: string;
   createdAt: string;
   completedAt?: string;
+  paymentMethod?: string;
 }
 
 export interface OpenShiftRequest {

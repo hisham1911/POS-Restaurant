@@ -270,7 +270,7 @@ export const navigationItems: NavigationItem[] = [
     icon: ClipboardList,
     sectionId: "catalog",
     audience: "non-system-owner",
-    permission: "InventoryManage",
+    permission: "InventoryView",
   },
   {
     path: "/product-batches",

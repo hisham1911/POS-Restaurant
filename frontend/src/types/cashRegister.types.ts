@@ -8,7 +8,8 @@ export type CashRegisterTransactionType =
   | "Expense"
   | "SupplierPayment"
   | "Adjustment"
-  | "Transfer";
+  | "Transfer"
+  | "DebtPayment";
 
 // Cash Register Transaction Interface
 export interface CashRegisterTransaction {

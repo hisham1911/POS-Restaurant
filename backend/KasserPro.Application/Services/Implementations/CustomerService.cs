@@ -70,11 +70,26 @@ public class CustomerService : ICustomerService
     public async Task<CustomerDto?> GetByIdAsync(int id)
     {
         var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
 
         var customer = await _unitOfWork.Customers.Query()
             .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId);
 
-        return customer == null ? null : MapToDto(customer);
+        if (customer == null) return null;
+
+        var dto = MapToDto(customer);
+
+        // Get branch-specific balance
+        var branchBalance = await _unitOfWork.CustomerBranchBalances.Query()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(b =>
+                b.CustomerId == id &&
+                b.BranchId == branchId &&
+                b.TenantId == tenantId);
+
+        dto.BranchAmountDue = branchBalance?.AmountDue ?? 0m;
+
+        return dto;
     }
 
     public async Task<CustomerDto?> GetByPhoneAsync(string phone)
@@ -145,7 +160,7 @@ public class CustomerService : ICustomerService
         return MapToDto(customer);
     }
 
-    public async Task<CustomerDto?> UpdateAsync(int id, UpdateCustomerRequest request)
+    public async Task<ApiResponse<CustomerDto>> UpdateAsync(int id, UpdateCustomerRequest request)
     {
         var tenantId = _currentUser.TenantId;
 
@@ -153,7 +168,15 @@ public class CustomerService : ICustomerService
             .FirstOrDefaultAsync(c => c.Id == id && c.TenantId == tenantId);
 
         if (customer == null)
-            return null;
+            return ApiResponse<CustomerDto>.Fail(ErrorCodes.CUSTOMER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CUSTOMER_NOT_FOUND));
+
+        // Check RowVersion for optimistic concurrency
+        if (request.RowVersion?.Length > 0 &&
+            !customer.RowVersion.SequenceEqual(request.RowVersion))
+        {
+            return ApiResponse<CustomerDto>.Fail(ErrorCodes.CUSTOMER_CONCURRENCY_CONFLICT,
+                ErrorMessages.Get(ErrorCodes.CUSTOMER_CONCURRENCY_CONFLICT));
+        }
 
         // Update only provided fields
         if (request.Name != null)
@@ -167,7 +190,7 @@ public class CustomerService : ICustomerService
         if (request.IsActive.HasValue)
         {
             if (!request.IsActive.Value && customer.TotalDue > 0)
-                throw new ArgumentException("لا يمكن تعطيل عميل لديه ديون مستحقة");
+                return ApiResponse<CustomerDto>.Fail(ErrorCodes.VALIDATION_ERROR, "لا يمكن تعطيل عميل لديه ديون مستحقة");
 
             customer.IsActive = request.IsActive.Value;
         }
@@ -176,7 +199,7 @@ public class CustomerService : ICustomerService
 
         await _unitOfWork.SaveChangesAsync();
 
-        return MapToDto(customer);
+        return ApiResponse<CustomerDto>.Ok(MapToDto(customer), "تم تحديث بيانات العميل بنجاح");
     }
 
     public async Task<(CustomerDto Customer, bool WasCreated)> GetOrCreateByPhoneAsync(string phone, string? name = null)
@@ -185,7 +208,7 @@ public class CustomerService : ICustomerService
             throw new ArgumentException("Phone number is required", nameof(phone));
 
         var existingCustomer = await GetByPhoneAsync(phone);
-        if (existingCustomer != null)
+        if (existingCustomer != null && existingCustomer.IsActive)
             return (existingCustomer, false);
 
         // Auto-create customer
@@ -475,7 +498,7 @@ public class CustomerService : ICustomerService
             if (request.PaymentMethod == Domain.Enums.PaymentMethod.Cash)
             {
                 await _cashRegisterService.RecordTransactionAsync(
-                    type: Domain.Enums.CashRegisterTransactionType.Sale, // Debt payment is income
+                    type: Domain.Enums.CashRegisterTransactionType.DebtPayment,
                     amount: request.Amount,
                     description: $"تسديد دين - عميل: {customer.Name ?? customer.Phone}",
                     referenceType: "DebtPayment",
@@ -708,6 +731,7 @@ public class CustomerService : ICustomerService
         IsActive = c.IsActive,
         CreatedAt = c.CreatedAt,
         TotalDue = c.TotalDue,
+        BranchAmountDue = 0m,
         CreditLimit = c.CreditLimit
     };
 

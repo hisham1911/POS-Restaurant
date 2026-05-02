@@ -2,7 +2,7 @@ import { useState } from "react";
 import { X, User, Phone, Mail, MapPin, FileText } from "lucide-react";
 import { useCreateCustomerMutation } from "@/api/customersApi";
 import { Customer } from "@/types/customer.types";
-import toast from "react-hot-toast";
+import { toast } from "sonner";
 import { Portal } from "@/components/common/Portal";
 import { extractApiData } from "@/utils/apiResponse";
 

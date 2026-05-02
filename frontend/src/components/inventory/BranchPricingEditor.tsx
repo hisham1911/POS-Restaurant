@@ -49,8 +49,8 @@ export default function BranchPricingEditor() {
       skip: !selectedBranchId,
     },
   );
-  const { data: productsResponse } = useGetProductsQuery({});
-  const products = productsResponse?.data ?? [];
+  const { data: productsResponse } = useGetProductsQuery({ page: 1, pageSize: 1000 });
+  const products = productsResponse?.data?.items ?? [];
 
   const [setBranchPrice, { isLoading: isSaving }] = useSetBranchPriceMutation();
   const [removeBranchPrice, { isLoading: isRemoving }] = useRemoveBranchPriceMutation();

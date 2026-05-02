@@ -26,6 +26,7 @@ const isImageSource = (value?: string): boolean => {
 interface ProductCardProps {
   product: Product;
   category?: Category;
+  onAddProduct?: (product: Product) => void;
   onStockAdjust?: (product: Product) => void;
   showStockAdjust?: boolean;
   stockByProductId?: BranchInventoryStockMap;
@@ -36,6 +37,7 @@ interface ProductCardProps {
 export const ProductCard = ({
   product,
   category,
+  onAddProduct,
   onStockAdjust,
   showStockAdjust,
   stockByProductId,
@@ -53,8 +55,9 @@ export const ProductCard = ({
   const hasCategoryImage = isImageSource(categoryIcon) && !categoryImageError;
 
   // Get quantity in cart for this product
-  const cartItem = items.find((item) => item.product.id === product.id);
-  const quantityInCart = cartItem?.quantity ?? 0;
+  const cartItems = items.filter((item) => item.product.id === product.id);
+  const quantityInCart = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const displayPrice = cartItems[0]?.product.price ?? product.price;
 
   // Calculate available stock (stock - what's in cart)
   const totalStock = getProductCurrentStock(product, stockByProductId);
@@ -63,14 +66,20 @@ export const ProductCard = ({
     : Number.POSITIVE_INFINITY;
 
   // If allowNegativeStock is enabled, always allow adding
-  const canAddMore =
-    allowNegativeStock ||
-    !product.trackInventory ||
-    !hasInventorySnapshot ||
-    availableStock > 0;
+  const canAddMore = product.isBatchTracked
+    ? !hasInventorySnapshot || availableStock > 0
+    : allowNegativeStock ||
+      !product.trackInventory ||
+      !hasInventorySnapshot ||
+      availableStock > 0;
 
   const handleClick = () => {
     if (product.isActive && canAddMore) {
+      if (onAddProduct) {
+        onAddProduct(product);
+        return;
+      }
+
       const productForCart = hasInventorySnapshot
         ? ({
             ...product,
@@ -166,7 +175,7 @@ export const ProductCard = ({
         !canAddMore && !isDisabled && "cursor-not-allowed opacity-60",
         isInCart && "border-primary-500 bg-primary-50",
       )}
-      aria-label={`إضافة ${product.name} - ${formatCurrency(product.price)}`}
+      aria-label={`إضافة ${product.name} - ${formatCurrency(displayPrice)}`}
       aria-disabled={isDisabled}
     >
       {/* Image */}
@@ -204,7 +213,7 @@ export const ProductCard = ({
 
       {/* Price */}
       <p className="text-lg font-bold text-primary-600">
-        {formatCurrency(product.price)}
+        {formatCurrency(displayPrice)}
       </p>
 
       {/* In cart indicator */}

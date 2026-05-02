@@ -103,6 +103,7 @@ public class PurchaseInvoicesController : ControllerBase
     }
 
     [HttpPost("{id}/confirm")]
+    [Authorize(Roles = "Admin")]
     [HasPermission(Permission.PurchaseInvoicesManage)]
     public async Task<IActionResult> Confirm(int id)
     {

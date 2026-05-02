@@ -258,7 +258,7 @@ public class SimplePrinterService : IPrinterService
     <div class='line'></div>
     <div class='item'><span>المبلغ المدفوع</span><span>{receipt.AmountPaid:F2} ج.م</span></div>
     {(receipt.ChangeAmount > 0 ? $"<div class='item'><span>الباقي</span><span>{receipt.ChangeAmount:F2} ج.م</span></div>" : "")}
-    {(receipt.AmountDue > 0 ? $"<div class='item total' style='color:red'><span>المتبقي على العميل</span><span>{receipt.AmountDue:F2} ج.م</span></div>" : "")}
+    {(receipt.AmountDue > 0 && receipt.ChangeAmount == 0 ? $"<div class='item total' style='color:red'><span>المتبقي على العميل</span><span>{receipt.AmountDue:F2} ج.م</span></div>" : "")}
     " : "")}
     {footerHtml}
     {footerMessageHtml}

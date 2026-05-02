@@ -15,6 +15,8 @@ interface PagedResult<T> {
   items: T[];
   totalCount: number;
   totalAmount: number;
+  totalSpentAmount: number;
+  totalDueAmount: number;
   page: number;
   pageSize: number;
   totalPages: number;
@@ -126,6 +128,7 @@ export const purchaseInvoiceApi = baseApi.injectEndpoints({
         { type: 'PurchaseInvoice', id },
         { type: 'PurchaseInvoice', id: 'LIST' },
         { type: 'Products', id: 'LIST' },
+        "Inventory",
         { type: 'ProductBatch', id: 'LIST' },
         { type: 'ProductBatch', id: 'ALERTS' },
       ],
@@ -145,6 +148,7 @@ export const purchaseInvoiceApi = baseApi.injectEndpoints({
         { type: 'PurchaseInvoice', id },
         { type: 'PurchaseInvoice', id: 'LIST' },
         { type: 'Products', id: 'LIST' }, // Invalidate products if inventory adjusted
+        "Inventory",
       ],
     }),
 

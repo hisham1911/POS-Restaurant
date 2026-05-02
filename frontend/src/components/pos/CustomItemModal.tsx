@@ -53,6 +53,7 @@ export const CustomItemModal = ({
     isActive: true,
     type: ProductType.Service,
     trackInventory: false,
+    isBatchTracked: false,
     createdAt: "",
   };
   const previewItem = {

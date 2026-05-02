@@ -53,7 +53,7 @@ export function PurchaseInvoiceFormPage() {
   const [preview, setPreview] = useState<PurchaseInvoicePreview | null>(null);
 
   const { data: suppliersResponse } = useGetSuppliersQuery();
-  const { data: productsResponse } = useGetProductsQuery();
+  const { data: productsResponse } = useGetProductsQuery({ page: 1, pageSize: 1000 });
   const { data: tenantResponse } = useGetCurrentTenantQuery();
   const { data: invoiceResponse, isLoading: isLoadingInvoice } =
     useGetPurchaseInvoiceByIdQuery(Number(id), { skip: !isEditMode });
@@ -66,7 +66,7 @@ export function PurchaseInvoiceFormPage() {
     usePreparePurchaseInvoiceMutation();
 
   const suppliers = suppliersResponse?.data || [];
-  const products = productsResponse?.data || [];
+  const products = productsResponse?.data?.items || [];
   const invoice = invoiceResponse?.data;
   const purchaseTaxRate = tenantResponse?.data?.taxRate ?? 14;
 
@@ -115,14 +115,18 @@ export function PurchaseInvoiceFormPage() {
       notes,
     };
 
-    void prepareInvoice(requestData)
-      .unwrap()
-      .then((response) => {
-        setPreview(response.data || null);
-      })
-      .catch(() => {
-        setPreview(null);
-      });
+    const timer = setTimeout(() => {
+      void prepareInvoice(requestData)
+        .unwrap()
+        .then((response) => {
+          setPreview(response.data || null);
+        })
+        .catch(() => {
+          setPreview(null);
+        });
+    }, 500);
+
+    return () => clearTimeout(timer);
   }, [supplierId, invoiceDate, items, notes, prepareInvoice]);
 
   const handleAddItem = () => {
@@ -430,20 +434,28 @@ export function PurchaseInvoiceFormPage() {
               placeholder="رقم الباتش (اختياري)"
             />
             <div className="flex gap-3">
-              <input
-                type="date"
-                value={expiryDate}
-                onChange={(e) => setExpiryDate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg"
-                placeholder="تاريخ الانتهاء"
-              />
-              <input
-                type="date"
-                value={productionDate}
-                onChange={(e) => setProductionDate(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg"
-                placeholder="تاريخ الانتاج"
-              />
+              <div className="w-full">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  تاريخ الانتهاء (اختياري)
+                </label>
+                <input
+                  type="date"
+                  value={expiryDate}
+                  onChange={(e) => setExpiryDate(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
+              <div className="w-full">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  تاريخ الإنتاج (اختياري)
+                </label>
+                <input
+                  type="date"
+                  value={productionDate}
+                  onChange={(e) => setProductionDate(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-lg"
+                />
+              </div>
             </div>
           </div>
         </Card>
@@ -602,4 +614,3 @@ export function PurchaseInvoiceFormPage() {
     </div>
   );
 }
-

@@ -33,6 +33,12 @@ public class OrdersController : ControllerBase
         _logger = logger;
     }
 
+    private int GetUserId()
+    {
+        var claim = User.FindFirst("userId");
+        return claim != null && int.TryParse(claim.Value, out var id) ? id : 0;
+    }
+
     [HttpGet]
     [HasPermission(Permission.OrdersView)]
     public async Task<IActionResult> GetAllOrders(
@@ -78,7 +84,8 @@ public class OrdersController : ControllerBase
     [HasPermission(Permission.OrdersCreate)]
     public async Task<IActionResult> Create([FromBody] CreateOrderRequest request)
     {
-        var userId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+        var userId = GetUserId();
+        if (userId == 0) return Unauthorized(ApiResponse<object>.Fail(ErrorCodes.UNAUTHORIZED, ErrorMessages.Get(ErrorCodes.UNAUTHORIZED)));
         var result = await _orderService.CreateAsync(request, userId);
         return result.Success ? CreatedAtAction(nameof(GetById), new { id = result.Data?.Id }, result) : BadRequest(result);
     }
@@ -272,7 +279,8 @@ public class OrdersController : ControllerBase
         if (!isPartialRefund && string.IsNullOrWhiteSpace(request?.Reason))
             return BadRequest(ApiResponse<object>.Fail(ErrorCodes.VALIDATION_ERROR, "سبب الاسترجاع مطلوب للاسترجاع الكامل"));
 
-        var userId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+        var userId = GetUserId();
+        if (userId == 0) return Unauthorized(ApiResponse<object>.Fail(ErrorCodes.UNAUTHORIZED, ErrorMessages.Get(ErrorCodes.UNAUTHORIZED)));
 
         // Convert to service model
         var refundItems = request?.Items?.Select(i => new Application.DTOs.RefundItemDto
@@ -542,6 +550,17 @@ public class OrdersController : ControllerBase
             groupName);
 
         return true;
+    }
+
+    /// <summary>
+    /// Mark a delivery order as delivered and complete it
+    /// </summary>
+    [HttpPost("{id}/mark-delivered")]
+    [HasPermission(Permission.OrdersCreate)]
+    public async Task<IActionResult> MarkAsDelivered(int id)
+    {
+        var result = await _orderService.MarkAsDeliveredAsync(id);
+        return result.Success ? Ok(result) : BadRequest(result);
     }
 }
 

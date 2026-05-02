@@ -34,6 +34,12 @@ public class CustomersController : ControllerBase
         _logger = logger;
     }
 
+    private int GetUserId()
+    {
+        var claim = User.FindFirst("userId");
+        return claim != null && int.TryParse(claim.Value, out var id) ? id : 0;
+    }
+
     [HttpGet]
     [HasPermission(Permission.CustomersView)]
     public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20, [FromQuery] string? search = null)
@@ -93,18 +99,18 @@ public class CustomersController : ControllerBase
     [HasPermission(Permission.CustomersManage)]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateCustomerRequest request)
     {
-        try
+        var result = await _customerService.UpdateAsync(id, request);
+
+        if (!result.Success)
         {
-            var result = await _customerService.UpdateAsync(id, request);
-            return result != null
-                ? Ok(ApiResponse<CustomerDto>.Ok(result, "تم تحديث بيانات العميل بنجاح"))
-                : NotFound(ApiResponse<object>.Fail(ErrorCodes.CUSTOMER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CUSTOMER_NOT_FOUND)));
+            if (result.ErrorCode == ErrorCodes.CUSTOMER_NOT_FOUND)
+                return NotFound(result);
+            if (result.ErrorCode == ErrorCodes.CUSTOMER_CONCURRENCY_CONFLICT)
+                return Conflict(result);
+            return BadRequest(result);
         }
-        catch (ArgumentException ex)
-        {
-            _logger.LogWarning(ex, "Customer update validation failed for customer {CustomerId}", id);
-            return BadRequest(ApiResponse<object>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR)));
-        }
+
+        return Ok(result);
     }
 
     [HttpPost("get-or-create")]
@@ -138,7 +144,7 @@ public class CustomersController : ControllerBase
     }
 
     [HttpPost("{id}/loyalty/add")]
-    [Authorize(Roles = "Admin,Manager")]
+    [HasPermission(Permission.CustomersManage)]
     public async Task<IActionResult> AddLoyaltyPoints(int id, [FromBody] LoyaltyPointsRequest request)
     {
         if (request.Points <= 0)
@@ -149,6 +155,7 @@ public class CustomersController : ControllerBase
     }
 
     [HttpPost("{id}/loyalty/redeem")]
+    [HasPermission(Permission.CustomersManage)]
     public async Task<IActionResult> RedeemLoyaltyPoints(int id, [FromBody] LoyaltyPointsRequest request)
     {
         if (request.Points <= 0)
@@ -179,7 +186,7 @@ public class CustomersController : ControllerBase
     [HasPermission(Permission.CustomersManage)]
     public async Task<IActionResult> PayDebt(int id, [FromBody] PayDebtRequest request)
     {
-        var userId = int.Parse(User.FindFirst("userId")?.Value ?? "0");
+        var userId = GetUserId();
         var result = await _customerService.PayDebtAsync(id, request, userId);
         if (!result.Success)
         {

@@ -616,7 +616,7 @@ const AppRoutes = () => (
         path="/stock-taking"
         element={
           <NonSystemOwnerRoute>
-            <PermissionRoute permission="InventoryManage">
+            <PermissionRoute permission="InventoryView">
               <StockTakingPage />
             </PermissionRoute>
           </NonSystemOwnerRoute>

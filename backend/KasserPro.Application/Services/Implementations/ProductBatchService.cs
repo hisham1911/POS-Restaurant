@@ -3,8 +3,8 @@ namespace KasserPro.Application.Services.Implementations;
 using Microsoft.EntityFrameworkCore;
 using KasserPro.Application.Common;
 using KasserPro.Application.Common.Interfaces;
-using KasserPro.Application.DTOs;
 using KasserPro.Application.DTOs.Common;
+using KasserPro.Application.DTOs.ProductBatches;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Entities;
 using KasserPro.Domain.Enums;
@@ -54,7 +54,9 @@ public class ProductBatchService : IProductBatchService
 
         var totalCount = await query.CountAsync();
         var items = await query
-            .OrderBy(pb => pb.ExpiryDate)
+            .OrderBy(pb => pb.PurchaseDate)
+            .ThenBy(pb => pb.CreatedAt)
+            .ThenBy(pb => pb.Id)
             .Skip((pageNumber - 1) * pageSize)
             .Take(pageSize)
             .Include(pb => pb.Product)
@@ -71,6 +73,9 @@ public class ProductBatchService : IProductBatchService
         var tenantId = _currentUser.TenantId;
         var branchId = _currentUser.BranchId;
         var userId = _currentUser.UserId;
+        var batchNumber = string.IsNullOrWhiteSpace(dto.BatchNumber)
+            ? null
+            : dto.BatchNumber.Trim();
 
         var product = await _unitOfWork.Products.Query()
             .FirstOrDefaultAsync(p => p.Id == dto.ProductId && p.TenantId == tenantId);
@@ -78,15 +83,42 @@ public class ProductBatchService : IProductBatchService
         if (product == null)
             return ApiResponse<ProductBatchDto>.Fail(ErrorCodes.PRODUCT_NOT_FOUND, "المنتج غير موجود");
 
+        if (dto.Quantity <= 0)
+            return ApiResponse<ProductBatchDto>.Fail(ErrorCodes.VALIDATION_ERROR, "كمية الدفعة مطلوبة");
+
+        if (!dto.CostPrice.HasValue || dto.CostPrice.Value < 0)
+            return ApiResponse<ProductBatchDto>.Fail(ErrorCodes.VALIDATION_ERROR, "سعر تكلفة الدفعة مطلوب");
+
+        if (!dto.SellingPrice.HasValue || dto.SellingPrice.Value <= 0)
+            return ApiResponse<ProductBatchDto>.Fail(ErrorCodes.VALIDATION_ERROR, "سعر بيع الدفعة مطلوب");
+
+        if (!string.IsNullOrWhiteSpace(batchNumber))
+        {
+            var batchExists = await _unitOfWork.ProductBatches.Query()
+                .AnyAsync(b => b.BatchNumber == batchNumber
+                            && b.ProductId == dto.ProductId
+                            && b.BranchId == branchId
+                            && b.TenantId == tenantId
+                            && !b.IsDeleted
+                            && b.Status != BatchStatus.Depleted);
+            if (batchExists)
+            {
+                return ApiResponse<ProductBatchDto>.Fail(
+                    ErrorCodes.BATCH_NUMBER_DUPLICATE,
+                    ErrorMessages.Get(ErrorCodes.BATCH_NUMBER_DUPLICATE));
+            }
+        }
+
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
             var batch = new ProductBatch
             {
                 TenantId = tenantId, BranchId = branchId, ProductId = dto.ProductId,
-                BatchNumber = dto.BatchNumber, Quantity = dto.Quantity, InitialQuantity = dto.Quantity,
+                BatchNumber = batchNumber, Quantity = dto.Quantity, InitialQuantity = dto.Quantity,
                 ExpiryDate = dto.ExpiryDate, PurchaseDate = DateTime.UtcNow,
                 ProductionDate = dto.ProductionDate, CostPrice = dto.CostPrice,
+                SellingPrice = dto.SellingPrice,
                 SupplierName = dto.SupplierName, Status = BatchStatus.Active,
                 Notes = dto.Notes, CreatedAt = DateTime.UtcNow
             };
@@ -112,13 +144,13 @@ public class ProductBatchService : IProductBatchService
                 _unitOfWork.BranchInventories.Update(bi);
             }
 
-            // Stock movement
+            // T-4: Stock movement - use Receiving type for batch creation
             var sm = new StockMovement
             {
                 TenantId = tenantId, BranchId = branchId, ProductId = dto.ProductId,
-                Type = StockMovementType.Adjustment, Quantity = dto.Quantity,
+                Type = StockMovementType.Receiving, Quantity = dto.Quantity,
                 ReferenceType = "BatchManual", BalanceBefore = bi.Quantity - dto.Quantity,
-                BalanceAfter = bi.Quantity, Reason = $"إنشاء باتش: {dto.BatchNumber}",
+                BalanceAfter = bi.Quantity, Reason = $"Batch created: {batchNumber}",
                 UserId = userId, CreatedAt = DateTime.UtcNow
             };
             await _unitOfWork.StockMovements.AddAsync(sm);
@@ -174,11 +206,12 @@ public class ProductBatchService : IProductBatchService
         var batches = await query.Include(pb => pb.Product).ToListAsync();
         var tenant = await _unitOfWork.Tenants.Query().FirstOrDefaultAsync(t => t.Id == tenantId);
         var alertDays = tenant?.ExpiryAlertDays ?? 30;
+        var today = DateTime.UtcNow.Date;
         if (alertDays <= 0)
             return ApiResponse<BatchExpirySummaryDto>.Ok(new BatchExpirySummaryDto
             {
                 TotalBatches = batches.Count,
-                ExpiredBatches = 0,
+                ExpiredBatches = batches.Count(b => (b.ExpiryDate.HasValue && b.ExpiryDate.Value.Date < today) || b.Status == BatchStatus.Expired),
                 NearExpiryBatches = 0,
                 Alerts = new List<BatchExpiryAlertDto>()
             });
@@ -186,12 +219,13 @@ public class ProductBatchService : IProductBatchService
 
         foreach (var batch in batches)
         {
-            var days = (batch.ExpiryDate.Date - DateTime.UtcNow.Date).Days;
+            if (!batch.ExpiryDate.HasValue)
+                continue;
+
+            var days = (batch.ExpiryDate.Value.Date - today).Days;
             if (days < 0 || days <= alertDays)
             {
                 var level = days < 0 || days <= 7 ? "critical" : "warning";
-                if (days < 0 && batch.Status == BatchStatus.Active)
-                { batch.Status = BatchStatus.Expired; _unitOfWork.ProductBatches.Update(batch); }
                 alerts.Add(new BatchExpiryAlertDto
                 {
                     Id = batch.Id, BatchNumber = batch.BatchNumber,
@@ -203,14 +237,41 @@ public class ProductBatchService : IProductBatchService
                 });
             }
         }
-        await _unitOfWork.SaveChangesAsync();
+
         return ApiResponse<BatchExpirySummaryDto>.Ok(new BatchExpirySummaryDto
         {
             TotalBatches = batches.Count,
-            ExpiredBatches = batches.Count(b => b.Status == BatchStatus.Expired),
+            ExpiredBatches = batches.Count(b => (b.ExpiryDate.HasValue && b.ExpiryDate.Value.Date < today) || b.Status == BatchStatus.Expired),
             NearExpiryBatches = alerts.Count(a => a.AlertLevel == "warning"),
             Alerts = alerts.OrderBy(a => a.DaysUntilExpiry).ToList()
         });
+    }
+
+    public async Task<ApiResponse<int>> UpdateExpiredBatchesStatusAsync(CancellationToken ct = default)
+    {
+        var today = DateTime.UtcNow.Date;
+        var expiredBatches = await _unitOfWork.ProductBatches.Query()
+            .Where(b => b.TenantId == _currentUser.TenantId
+                     && !b.IsDeleted
+                     && b.Status == BatchStatus.Active
+                     && b.ExpiryDate.HasValue
+                     && b.ExpiryDate.Value.Date < today)
+            .ToListAsync(ct);
+
+        foreach (var batch in expiredBatches)
+        {
+            batch.Status = BatchStatus.Expired;
+            batch.StatusUpdatedAt = DateTime.UtcNow;
+            batch.UpdatedAt = DateTime.UtcNow;
+            _unitOfWork.ProductBatches.Update(batch);
+        }
+
+        if (expiredBatches.Count > 0)
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
+
+        return ApiResponse<int>.Ok(expiredBatches.Count);
     }
 
     public async Task<ApiResponse<List<ProductBatchDto>>> GetByProductAsync(int productId, int? branchId = null)
@@ -222,17 +283,50 @@ public class ProductBatchService : IProductBatchService
         if (branchId.HasValue)
             query = query.Where(pb => pb.BranchId == branchId.Value);
 
-        var items = await query
-            .OrderBy(pb => pb.ExpiryDate)
+        var batches = await query
+            .OrderBy(pb => pb.PurchaseDate)
+            .ThenBy(pb => pb.CreatedAt)
+            .ThenBy(pb => pb.Id)
             .Include(pb => pb.Product)
-            .Select(pb => MapToDto(pb))
             .ToListAsync();
+        var items = batches.Select(MapToDto).ToList();
+        return ApiResponse<List<ProductBatchDto>>.Ok(items);
+    }
+
+    public async Task<ApiResponse<List<ProductBatchDto>>> GetAvailableBatchesAsync(int productId, int branchId)
+    {
+        var tenantId = _currentUser.TenantId;
+        
+        // Get only Active batches with quantity > 0, ordered by FIFO (oldest received first)
+        var batches = await _unitOfWork.ProductBatches.Query()
+            .AsNoTracking() // ✅ Performance - read-only query
+            .Where(pb => pb.TenantId == tenantId
+                && pb.BranchId == branchId
+                && pb.ProductId == productId
+                && !pb.IsDeleted
+                && pb.Status == BatchStatus.Active
+                && pb.Quantity > 0)
+            .OrderBy(pb => pb.PurchaseDate)
+            .ThenBy(pb => pb.CreatedAt)
+            .ThenBy(pb => pb.Id)
+            .Include(pb => pb.Product)
+            .Include(pb => pb.Branch)
+            .ToListAsync();
+
+        var items = batches.Select(MapToDto).ToList();
+
+        // Mark first batch as recommended (FIFO)
+        if (items.Count > 0)
+            items[0].IsRecommended = true;
+
         return ApiResponse<List<ProductBatchDto>>.Ok(items);
     }
 
     private static ProductBatchDto MapToDto(ProductBatch pb)
     {
-        var days = (pb.ExpiryDate.Date - DateTime.UtcNow.Date).Days;
+        int? days = pb.ExpiryDate.HasValue
+            ? (pb.ExpiryDate.Value.Date - DateTime.UtcNow.Date).Days
+            : null;
         return new ProductBatchDto
         {
             Id = pb.Id, BatchNumber = pb.BatchNumber,
@@ -240,9 +334,97 @@ public class ProductBatchService : IProductBatchService
             Quantity = pb.Quantity, InitialQuantity = pb.InitialQuantity,
             ExpiryDate = pb.ExpiryDate, PurchaseDate = pb.PurchaseDate,
             ProductionDate = pb.ProductionDate, CostPrice = pb.CostPrice,
+            SellingPrice = pb.SellingPrice,
             SupplierName = pb.SupplierName, Status = pb.Status.ToString(),
             Notes = pb.Notes, DaysUntilExpiry = days,
             BranchId = pb.BranchId, BranchName = pb.Branch?.Name ?? ""
         };
     }
+
+    public async Task<ApiResponse<ProductBatchDto>> UpdateAsync(int id, UpdateProductBatchDto dto)
+    {
+        var tenantId = _currentUser.TenantId;
+        var batch = await _unitOfWork.ProductBatches.Query()
+            .FirstOrDefaultAsync(pb => pb.Id == id && pb.TenantId == tenantId && !pb.IsDeleted);
+
+        if (batch == null)
+            return ApiResponse<ProductBatchDto>.Fail(ErrorCodes.NOT_FOUND, "الباتش غير موجود");
+
+        if (!dto.SellingPrice.HasValue || dto.SellingPrice.Value <= 0)
+            return ApiResponse<ProductBatchDto>.Fail(ErrorCodes.VALIDATION_ERROR, "سعر بيع الدفعة مطلوب");
+
+        // Update allowed fields only (Quantity is NOT allowed here - use Adjustment instead)
+        batch.BatchNumber = string.IsNullOrWhiteSpace(dto.BatchNumber)
+            ? null
+            : dto.BatchNumber.Trim();
+        batch.ExpiryDate = dto.ExpiryDate;
+        batch.ProductionDate = dto.ProductionDate;
+        batch.SellingPrice = dto.SellingPrice;
+        batch.Notes = dto.Notes;
+        batch.UpdatedAt = DateTime.UtcNow;
+
+        _unitOfWork.ProductBatches.Update(batch);
+        await _unitOfWork.SaveChangesAsync();
+
+        return await GetByIdAsync(id);
+    }
+
+    public async Task<ApiResponse<ProductBatchDto>> HoldAsync(int id, string reason)
+    {
+        var tenantId = _currentUser.TenantId;
+        var batch = await _unitOfWork.ProductBatches.Query()
+            .FirstOrDefaultAsync(pb => pb.Id == id && pb.TenantId == tenantId && !pb.IsDeleted);
+
+        if (batch == null)
+            return ApiResponse<ProductBatchDto>.Fail(ErrorCodes.NOT_FOUND, "الباتش غير موجود");
+
+        if (batch.Status == BatchStatus.OnHold)
+            return ApiResponse<ProductBatchDto>.Fail(ErrorCodes.VALIDATION_ERROR, "الباتش موقوف بالفعل");
+
+        var oldStatus = batch.Status;
+        batch.Status = BatchStatus.OnHold;
+        batch.StatusUpdatedAt = DateTime.UtcNow;
+        batch.Notes = string.IsNullOrWhiteSpace(batch.Notes)
+            ? $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm}] تم الإيقاف: {reason}"
+            : $"{batch.Notes}\n[{DateTime.UtcNow:yyyy-MM-dd HH:mm}] تم الإيقاف من {oldStatus}: {reason}";
+        batch.UpdatedAt = DateTime.UtcNow;
+
+        _unitOfWork.ProductBatches.Update(batch);
+        await _unitOfWork.SaveChangesAsync();
+
+        return await GetByIdAsync(id);
+    }
+
+    public async Task<ApiResponse<ProductBatchDto>> ReleaseAsync(int id, string reason)
+    {
+        var tenantId = _currentUser.TenantId;
+        var batch = await _unitOfWork.ProductBatches.Query()
+            .FirstOrDefaultAsync(pb => pb.Id == id && pb.TenantId == tenantId && !pb.IsDeleted);
+
+        if (batch == null)
+            return ApiResponse<ProductBatchDto>.Fail(ErrorCodes.NOT_FOUND, "الباتش غير موجود");
+
+        if (batch.Status != BatchStatus.OnHold)
+            return ApiResponse<ProductBatchDto>.Fail(ErrorCodes.VALIDATION_ERROR, "الباتش ليس موقوفاً");
+
+        // Determine new status based on current state
+        var newStatus = BatchStatus.Active;
+        if (batch.Quantity <= 0)
+            newStatus = BatchStatus.Depleted;
+        else if (batch.ExpiryDate.HasValue && batch.ExpiryDate.Value.Date < DateTime.UtcNow.Date)
+            newStatus = BatchStatus.Expired;
+
+        batch.Status = newStatus;
+        batch.StatusUpdatedAt = DateTime.UtcNow;
+        batch.Notes = string.IsNullOrWhiteSpace(batch.Notes)
+            ? $"[{DateTime.UtcNow:yyyy-MM-dd HH:mm}] تم التفعيل: {reason}"
+            : $"{batch.Notes}\n[{DateTime.UtcNow:yyyy-MM-dd HH:mm}] تم التفعيل إلى {newStatus}: {reason}";
+        batch.UpdatedAt = DateTime.UtcNow;
+
+        _unitOfWork.ProductBatches.Update(batch);
+        await _unitOfWork.SaveChangesAsync();
+
+        return await GetByIdAsync(id);
+    }
 }
+

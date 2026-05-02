@@ -1,6 +1,10 @@
 namespace KasserPro.Tests.Integration;
 
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
 using FluentAssertions;
+using KasserPro.Application.DTOs.CashRegister;
 using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Expenses;
 using KasserPro.Application.Services.Implementations;
@@ -9,6 +13,7 @@ using KasserPro.Domain.Entities;
 using KasserPro.Domain.Enums;
 using KasserPro.Infrastructure.Data;
 using KasserPro.Infrastructure.Repositories;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
@@ -176,6 +181,186 @@ public class ExpenseIntegrationTests : IClassFixture<CustomWebApplicationFactory
         return (tenant, branch, user, category);
     }
 
+    // ---- HTTP-based integration tests (added) ----
+
+    [Fact]
+    public async Task ApproveExpense_WithoutPermission_Returns403()
+    {
+        var data = await SeedExpenseHttpDataAsync("Cashier", new[] { "ExpensesView", "ExpensesCreate" });
+        var expenseId = await CreateDraftExpenseDirectlyAsync(data);
+        var response = await data.Client.PostAsync($"/api/expenses/{expenseId}/approve",
+            JsonContent.Create(new ApproveExpenseRequest { Notes = "approved" }));
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+
+    [Fact]
+    public async Task ApproveExpense_WithPermission_Returns200()
+    {
+        var data = await SeedExpenseHttpDataAsync("Admin", new[] { "ExpensesView", "ExpensesCreate", "ExpensesApprove" });
+        var expenseId = await CreateDraftExpenseDirectlyAsync(data);
+        var response = await data.Client.PostAsync($"/api/expenses/{expenseId}/approve",
+            JsonContent.Create(new ApproveExpenseRequest { Notes = "approved" }));
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task PayExpense_Cash_RecordsInCashRegister()
+    {
+        var data = await SeedExpenseHttpDataAsync("Admin", new[] { "ExpensesView", "ExpensesCreate", "ExpensesApprove" });
+        var expenseId = await CreateDraftExpenseDirectlyAsync(data);
+
+        var approveResponse = await data.Client.PostAsync($"/api/expenses/{expenseId}/approve",
+            JsonContent.Create(new ApproveExpenseRequest { Notes = "approved" }));
+        approveResponse.EnsureSuccessStatusCode();
+
+        var payResponse = await data.Client.PostAsync($"/api/expenses/{expenseId}/pay",
+            JsonContent.Create(new PayExpenseRequest { PaymentMethod = PaymentMethod.Cash, PaymentDate = DateTime.UtcNow }));
+        payResponse.EnsureSuccessStatusCode();
+
+        var txResponse = await data.Client.GetAsync("/api/cash-register/transactions");
+        var transactions = await txResponse.Content.ReadFromJsonAsync<ApiResponse<PagedResult<CashRegisterTransactionDto>>>();
+        transactions!.Data!.Items.Should().Contain(t =>
+            t.Type == CashRegisterTransactionType.Expense.ToString() &&
+            t.Amount == 100m);
+    }
+
+    [Fact]
+    public async Task RejectExpense_WithValidReason_ChangesStatusToRejected()
+    {
+        var data = await SeedExpenseHttpDataAsync("Admin", new[] { "ExpensesView", "ExpensesCreate", "ExpensesApprove" });
+        var expenseId = await CreateDraftExpenseDirectlyAsync(data);
+
+        var response = await data.Client.PostAsync($"/api/expenses/{expenseId}/reject",
+            JsonContent.Create(new RejectExpenseRequest { RejectionReason = "غير مبرر" }));
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<ExpenseDto>>();
+        result!.Data!.Status.Should().Be(ExpenseStatus.Rejected.ToString());
+    }
+
+    private async Task<ExpenseHttpData> SeedExpenseHttpDataAsync(string role, string[] permissions)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var tenant = new Tenant
+        {
+            Name = $"Expense HTTP Tenant {Guid.NewGuid():N}",
+            Slug = $"exp-http-{Guid.NewGuid():N}",
+            IsActive = true,
+            TaxRate = 14m,
+            IsTaxEnabled = true
+        };
+        db.Tenants.Add(tenant);
+        await db.SaveChangesAsync();
+
+        var branch = new Branch
+        {
+            TenantId = tenant.Id,
+            Name = "Expense HTTP Branch",
+            Code = $"EHB-{Guid.NewGuid().ToString("N")[..4]}",
+            Address = "Expense Street",
+            Phone = "01000000033",
+            CurrencyCode = "EGP",
+            DefaultTaxRate = 14m,
+            IsActive = true
+        };
+        db.Branches.Add(branch);
+        await db.SaveChangesAsync();
+
+        var userRole = role == "Admin" ? UserRole.Admin : UserRole.Cashier;
+        var user = new User
+        {
+            TenantId = tenant.Id,
+            BranchId = branch.Id,
+            Name = $"Expense {role}",
+            Email = $"expense-{role.ToLowerInvariant()}-{Guid.NewGuid():N}@test.com",
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Test123!"),
+            Role = userRole,
+            IsActive = true
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        var category = new ExpenseCategory
+        {
+            TenantId = tenant.Id,
+            Name = "Expense HTTP Category",
+            IsActive = true
+        };
+        db.ExpenseCategories.Add(category);
+        await db.SaveChangesAsync();
+
+        var shift = new Shift
+        {
+            TenantId = tenant.Id,
+            BranchId = branch.Id,
+            UserId = user.Id,
+            IsClosed = false,
+            OpenedAt = DateTime.UtcNow,
+            OpeningBalance = 5000m
+        };
+        db.Shifts.Add(shift);
+
+        db.CashRegisterTransactions.Add(new CashRegisterTransaction
+        {
+            TenantId = tenant.Id,
+            BranchId = branch.Id,
+            TransactionNumber = $"CR-SEED-{Guid.NewGuid().ToString("N")[..6]}",
+            Type = CashRegisterTransactionType.Opening,
+            Amount = 5000m,
+            BalanceBefore = 0,
+            BalanceAfter = 5000m,
+            TransactionDate = DateTime.UtcNow,
+            Description = "Seed opening balance",
+            UserId = user.Id,
+            UserName = user.Name
+        });
+        await db.SaveChangesAsync();
+
+        var client = _factory.CreateClient();
+        var token = TestHelpers.GenerateTestToken(
+            userId: user.Id,
+            tenantId: tenant.Id,
+            branchId: branch.Id,
+            email: user.Email,
+            name: user.Name,
+            role: role,
+            permissions: permissions);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        client.DefaultRequestHeaders.Add("X-Branch-Id", branch.Id.ToString());
+
+        return new ExpenseHttpData(tenant.Id, branch.Id, user.Id, category.Id, client);
+    }
+
+    private async Task<int> CreateDraftExpenseDirectlyAsync(ExpenseHttpData data)
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var shift = await db.Shifts.FirstOrDefaultAsync(s => s.UserId == data.UserId && !s.IsClosed);
+        shift.Should().NotBeNull("An open shift must exist for the test user");
+
+        var expense = new Expense
+        {
+            TenantId = data.TenantId,
+            BranchId = data.BranchId,
+            ExpenseNumber = $"EXP-TEST-{Guid.NewGuid().ToString("N")[..8]}",
+            CategoryId = data.CategoryId,
+            Amount = 100m,
+            Description = "Test expense",
+            ExpenseDate = DateTime.UtcNow,
+            Status = ExpenseStatus.Draft,
+            ShiftId = shift!.Id,
+            CreatedByUserId = data.UserId,
+            CreatedByUserName = "Test User"
+        };
+        db.Expenses.Add(expense);
+        await db.SaveChangesAsync();
+        return expense.Id;
+    }
+
+    private record ExpenseHttpData(int TenantId, int BranchId, int UserId, int CategoryId, HttpClient Client);
+
     private sealed class NoOpCashRegisterService : ICashRegisterService
     {
         public Task<ApiResponse<KasserPro.Application.DTOs.CashRegister.CashRegisterBalanceDto>> GetCurrentBalanceAsync(int branchId)
@@ -215,7 +400,8 @@ public class ExpenseIntegrationTests : IClassFixture<CustomWebApplicationFactory
             string description,
             string? referenceType = null,
             int? referenceId = null,
-            int? shiftId = null)
+            int? shiftId = null,
+            int? branchId = null)
             => throw new NotSupportedException();
     }
 }

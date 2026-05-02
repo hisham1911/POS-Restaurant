@@ -72,8 +72,23 @@ public class ShiftsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("{id}")]
+    [HasPermission(Permission.OrdersView)]
+    public async Task<IActionResult> GetById(int id)
+    {
+        var result = await _shiftService.GetByIdAsync(id);
+        return Ok(result);
+    }
+
+    [HttpGet("{id}/orders")]
+    [HasPermission(Permission.OrdersView)]
+    public async Task<IActionResult> GetShiftOrders(int id)
+    {
+        var result = await _shiftService.GetShiftOrdersAsync(id);
+        return Ok(result);
+    }
+
     [HttpPost("{id}/force-close")]
-    [Authorize(Roles = "Admin")]
     [HasPermission(Permission.ShiftsManage)]
     public async Task<IActionResult> ForceClose(int id, [FromBody] ForceCloseShiftRequest request)
     {

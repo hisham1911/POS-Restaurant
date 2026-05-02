@@ -215,16 +215,16 @@ export const CustomerDetailsModal = ({
             <div className="text-center">
               <div className="flex items-center justify-center gap-1 text-orange-500 text-sm mb-1">
                 <Wallet className="w-4 h-4" />
-                المبلغ المستحق
+                دين هذا الفرع
               </div>
               <p className="font-bold text-lg text-orange-600">
-                {customer.totalDue > 0
-                  ? formatCurrency(customer.totalDue)
+                {customer.branchAmountDue > 0
+                  ? formatCurrency(customer.branchAmountDue)
                   : "—"}
               </p>
-              {customer.creditLimit > 0 && (
+              {customer.totalDue > customer.branchAmountDue && (
                 <p className="text-xs text-gray-500 mt-1">
-                  من {formatCurrency(customer.creditLimit)}
+                  إجمالي: {formatCurrency(customer.totalDue)}
                 </p>
               )}
             </div>
@@ -631,12 +631,24 @@ export const CustomerDetailsModal = ({
                       معلومات الائتمان
                     </h3>
                     <div className="space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-gray-600">المبلغ المستحق:</span>
-                        <span className="font-bold text-orange-600 text-lg">
-                          {formatCurrency(customer.totalDue)}
-                        </span>
+                      <div className="grid grid-cols-2 gap-3">
+                        {/* دين الفرع — الأهم للكاشير */}
+                        <div className="bg-white rounded-xl p-3">
+                          <p className="text-xs text-orange-600 mb-1">دين هذا الفرع</p>
+                          <p className="text-xl font-bold text-orange-700">
+                            {customer.branchAmountDue.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
+                          </p>
+                        </div>
+
+                        {/* إجمالي الدين — للمدير */}
+                        <div className="bg-white rounded-xl p-3">
+                          <p className="text-xs text-gray-500 mb-1">إجمالي الدين (كل الفروع)</p>
+                          <p className="text-xl font-bold text-gray-700">
+                            {customer.totalDue.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج.م
+                          </p>
+                        </div>
                       </div>
+
                       {customer.creditLimit > 0 && (
                         <>
                           <div className="flex items-center justify-between">
@@ -649,7 +661,7 @@ export const CustomerDetailsModal = ({
                             <span className="text-gray-600">المتاح:</span>
                             <span className="font-semibold text-green-600">
                               {formatCurrency(
-                                customer.creditLimit - customer.totalDue,
+                                Math.max(0, customer.creditLimit - customer.branchAmountDue),
                               )}
                             </span>
                           </div>
@@ -658,10 +670,9 @@ export const CustomerDetailsModal = ({
                             <div className="flex items-center justify-between text-xs text-gray-500 mb-1">
                               <span>استخدام الائتمان</span>
                               <span>
-                                {(
-                                  (customer.totalDue / customer.creditLimit) *
-                                  100
-                                ).toFixed(0)}
+                                {(customer.creditLimit > 0
+                                  ? Math.min((customer.branchAmountDue / customer.creditLimit) * 100, 100)
+                                  : 0).toFixed(0)}
                                 %
                               </span>
                             </div>
@@ -669,17 +680,17 @@ export const CustomerDetailsModal = ({
                               <div
                                 className={clsx(
                                   "h-2 rounded-full transition-all",
-                                  customer.totalDue / customer.creditLimit > 0.8
+                                  customer.creditLimit > 0 && customer.branchAmountDue / customer.creditLimit > 0.8
                                     ? "bg-red-500"
-                                    : customer.totalDue / customer.creditLimit >
-                                        0.5
+                                    : customer.creditLimit > 0 && customer.branchAmountDue / customer.creditLimit > 0.5
                                       ? "bg-orange-500"
                                       : "bg-green-500",
                                 )}
                                 style={{
                                   width: `${Math.min(
-                                    (customer.totalDue / customer.creditLimit) *
-                                      100,
+                                    customer.creditLimit > 0
+                                      ? (customer.branchAmountDue / customer.creditLimit) * 100
+                                      : 0,
                                     100,
                                   )}%`,
                                 }}
@@ -691,7 +702,7 @@ export const CustomerDetailsModal = ({
                     </div>
 
                     {/* Pay Debt Button */}
-                    {customer.totalDue > 0 && (
+                    {customer.branchAmountDue > 0 && (
                       <div className="mt-4 pt-4 border-t border-orange-200">
                         <Button
                           variant="primary"

@@ -7,6 +7,7 @@ using KasserPro.Application.Common.Interfaces;
 using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Reports;
 using KasserPro.Application.Services.Interfaces;
+using KasserPro.Domain.Entities;
 using KasserPro.Domain.Enums;
 using KasserPro.Infrastructure.Data;
 using static KasserPro.Application.Common.DateTimeHelper;
@@ -25,6 +26,30 @@ public class EmployeeReportService : IEmployeeReportService
         _context = context;
         _currentUserService = currentUserService;
         _logger = logger;
+    }
+
+    private static decimal SumAppliedPayments(IEnumerable<Order> orders, PaymentMethod method)
+        => Math.Round(orders.Sum(order => GetAppliedPaymentAmount(order, method)), 2);
+
+    private static decimal GetAppliedPaymentAmount(Order order, PaymentMethod method)
+    {
+        var remaining = Math.Max(0, Math.Round(order.Total, 2));
+        var total = 0m;
+
+        foreach (var payment in (order.Payments ?? Enumerable.Empty<Payment>()).OrderBy(p => p.Id))
+        {
+            if (remaining <= 0)
+                break;
+
+            var amount = Math.Max(0, Math.Round(payment.Amount, 2));
+            var applied = Math.Min(amount, remaining);
+            if (payment.Method == method)
+                total += applied;
+
+            remaining -= applied;
+        }
+
+        return Math.Round(total, 2);
     }
 
     public async Task<ApiResponse<CashierPerformanceReportDto>> GetCashierPerformanceReportAsync(
@@ -93,16 +118,15 @@ public class EmployeeReportService : IEmployeeReportService
                 var ordersPerHour = totalShiftHours > 0 ? totalOrders / (decimal)totalShiftHours : 0;
 
                 // Calculate payment method breakdown from actual Payment records
-                var salesPayments = salesOrders.SelectMany(o => o.Payments ?? Enumerable.Empty<Domain.Entities.Payment>()).ToList();
                 var returnPayments = returnOrdersCashier.SelectMany(o => o.Payments ?? Enumerable.Empty<Domain.Entities.Payment>()).ToList();
                 var cashSales = Math.Round(Math.Max(0,
-                    salesPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)
+                    SumAppliedPayments(salesOrders, PaymentMethod.Cash)
                     - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount))), 2);
                 var cardSales = Math.Round(Math.Max(0,
-                    salesPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)
+                    SumAppliedPayments(salesOrders, PaymentMethod.Card)
                     - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount))), 2);
                 var fawrySales = Math.Round(Math.Max(0,
-                    salesPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)
+                    SumAppliedPayments(salesOrders, PaymentMethod.Fawry)
                     - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount))), 2);
 
                 var completedShifts = userShifts.Count(s => s.IsClosed && !s.IsForceClosed);
@@ -202,27 +226,24 @@ public class EmployeeReportService : IEmployeeReportService
                     .ToList();
                 var salesOrders = completedOrders.Where(o => o.OrderType != OrderType.Return).ToList();
                 var returnOrders = completedOrders.Where(o => o.OrderType == OrderType.Return).ToList();
-                var salesPayments = salesOrders
-                    .SelectMany(o => o.Payments ?? new List<Domain.Entities.Payment>())
-                    .ToList();
                 var returnPayments = returnOrders
                     .SelectMany(o => o.Payments ?? new List<Domain.Entities.Payment>())
                     .ToList();
 
                 var shiftCash = Math.Round(
-                    salesPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)
+                    SumAppliedPayments(salesOrders, PaymentMethod.Cash)
                     - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)),
                     2);
                 var shiftCard = Math.Round(
-                    salesPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)
+                    SumAppliedPayments(salesOrders, PaymentMethod.Card)
                     - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)),
                     2);
                 var shiftFawry = Math.Round(
-                    salesPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)
+                    SumAppliedPayments(salesOrders, PaymentMethod.Fawry)
                     - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)),
                     2);
                 var shiftBankTransfer = Math.Round(
-                    salesPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)
+                    SumAppliedPayments(salesOrders, PaymentMethod.BankTransfer)
                     - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)),
                     2);
                 var totalSales = Math.Round(
@@ -231,7 +252,7 @@ public class EmployeeReportService : IEmployeeReportService
                 var totalCollected = Math.Round(
                     shiftCash + shiftCard + shiftFawry + shiftBankTransfer,
                     2);
-                var deferredAmount = Math.Round(totalSales - totalCollected, 2);
+                var deferredAmount = Math.Max(0, Math.Round(totalSales - totalCollected, 2));
 
                 return new DetailedShiftDto
                 {

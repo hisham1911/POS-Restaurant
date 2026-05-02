@@ -45,9 +45,52 @@ public class ShiftDto
     public decimal HandoverBalance { get; set; }
     public string? HandoverNotes { get; set; }
 
+    // Reconciliation
+    public bool IsReconciled { get; set; }
+    public string? ReconciledByUserName { get; set; }
+    public DateTime? ReconciledAt { get; set; }
+
     // Calculated fields
     public int DurationHours { get; set; }
     public int DurationMinutes { get; set; }
+
+    // Detailed sales by payment method (Task 5.2)
+    public decimal TotalCashSales { get; set; }
+    public decimal TotalCardSales { get; set; }
+    public decimal TotalFawrySales { get; set; }
+    public decimal TotalBankTransferSales { get; set; }
+    public decimal TotalVodafoneCashSales { get; set; }
+
+    // Refunds (Task 2.3 + 5.2)
+    public decimal TotalRefunds { get; set; }
+    public int RefundsCount { get; set; }
+
+    // Orders breakdown (Task 5.2)
+    public int TotalOrdersCount { get; set; }
+    public int CompletedOrdersCount { get; set; }
+    public int CancelledOrdersCount { get; set; }
+    public int RefundedOrdersCount { get; set; }
+
+    // Credit sales (Task 5.2)
+    public decimal TotalCreditSales { get; set; }
+    public int CreditOrdersCount { get; set; }
+
+    // Net cash (Task 5.2)
+    public decimal NetCash { get; set; }
+
+    // Expenses (Task 2.3)
+    public decimal TotalExpenses { get; set; }
+
+    // Debt Payments (سداد الديون)
+    public decimal TotalDebtPayments { get; set; }
+    public int DebtPaymentsCount { get; set; }
+    public decimal TotalDebtPaymentsCash { get; set; }
+    public decimal TotalDebtPaymentsCard { get; set; }
+    public decimal TotalDebtPaymentsFawry { get; set; }
+    public decimal TotalDebtPaymentsBankTransfer { get; set; }
+
+    // Concurrency Token (serialized as Base64 string in JSON)
+    public byte[] RowVersion { get; set; } = [];
 
     // Orders in this shift
     public List<ShiftOrderDto> Orders { get; set; } = new();
@@ -66,6 +109,7 @@ public class ShiftOrderDto
     public string? CustomerName { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? CompletedAt { get; set; }
+    public string PaymentMethod { get; set; } = string.Empty;
 }
 
 public class OpenShiftRequest
@@ -77,4 +121,5 @@ public class CloseShiftRequest
 {
     public decimal ClosingBalance { get; set; }
     public string? Notes { get; set; }
+    public byte[]? RowVersion { get; set; }
 }

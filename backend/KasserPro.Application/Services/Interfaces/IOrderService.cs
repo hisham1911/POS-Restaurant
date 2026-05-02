@@ -17,4 +17,5 @@ public interface IOrderService
     Task<ApiResponse<OrderDto>> CompleteAsync(int orderId, CompleteOrderRequest request);
     Task<ApiResponse<bool>> CancelAsync(int orderId, string? reason);
     Task<ApiResponse<OrderDto>> RefundAsync(int orderId, int userId, string? reason, List<RefundItemDto>? items = null);
+    Task<ApiResponse<OrderDto>> MarkAsDeliveredAsync(int orderId);
 }

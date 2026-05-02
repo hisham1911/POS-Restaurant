@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Trash2, Edit, Plus, Search } from "lucide-react";
 import { toast } from "sonner";
+import { formatCurrency, formatDateOnly } from "../../utils/formatters";
 import {
   useGetSuppliersQuery,
   useDeleteSupplierMutation,
@@ -91,7 +92,7 @@ export default function SuppliersPage() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <Card className="border-indigo-100">
             <p className="text-sm text-gray-600">إجمالي الموردين</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">
@@ -102,6 +103,22 @@ export default function SuppliersPage() {
             <p className="text-sm text-gray-600">الموردين النشطين</p>
             <p className="text-2xl font-bold text-green-700 mt-1">
               {activeSuppliers}
+            </p>
+          </Card>
+          <Card className="border-red-100">
+            <p className="text-sm text-gray-600">إجمالي المستحق للموردين</p>
+            <p className="text-2xl font-bold text-red-700 mt-1">
+              {formatCurrency(
+                filteredSuppliers.reduce((sum, s) => sum + (s.totalDue || 0), 0),
+              )}
+            </p>
+          </Card>
+          <Card className="border-blue-100">
+            <p className="text-sm text-gray-600">إجمالي المدفوع</p>
+            <p className="text-2xl font-bold text-blue-700 mt-1">
+              {formatCurrency(
+                filteredSuppliers.reduce((sum, s) => sum + (s.totalPaid || 0), 0),
+              )}
             </p>
           </Card>
         </div>
@@ -144,6 +161,12 @@ export default function SuppliersPage() {
                       جهة الاتصال
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      المستحق
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
+                      آخر شراء
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
                       الحالة
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">
@@ -174,6 +197,22 @@ export default function SuppliersPage() {
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         {supplier.contactPerson || "-"}
+                      </td>
+                      <td className="px-6 py-4 text-sm font-medium">
+                        {(supplier.totalDue || 0) > 0 ? (
+                          <span className="text-red-600">
+                            {formatCurrency(supplier.totalDue)}
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">
+                            {formatCurrency(supplier.totalDue || 0)}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {supplier.lastPurchaseDate
+                          ? formatDateOnly(supplier.lastPurchaseDate)
+                          : "—"}
                       </td>
                       <td className="px-6 py-4">
                         <span

@@ -33,17 +33,17 @@ public class ProductService : IProductService
         page = page < 1 ? 1 : page;
         pageSize = pageSize < 1 ? 20 : Math.Min(pageSize, 1000);
 
+        var branchInventoryQuery = _unitOfWork.BranchInventories.Query()
+            .Where(bi => bi.TenantId == tenantId && bi.BranchId == branchId);
         var query = _unitOfWork.Products.Query()
-            .Include(p => p.Category)
-            .Where(p => p.TenantId == tenantId);
+            .AsNoTracking()
+            .Where(p => p.TenantId == tenantId && !p.IsDeleted);
 
-        // Filter by category
         if (categoryId.HasValue)
         {
             query = query.Where(p => p.CategoryId == categoryId.Value);
         }
 
-        // Filter by search (name or SKU or barcode)
         if (!string.IsNullOrWhiteSpace(search))
         {
             var searchLower = search.ToLower();
@@ -51,69 +51,56 @@ public class ProductService : IProductService
                 p.Name.ToLower().Contains(searchLower) ||
                 (p.NameEn != null && p.NameEn.ToLower().Contains(searchLower)) ||
                 (p.Sku != null && p.Sku.ToLower().Contains(searchLower)) ||
-                (p.Barcode != null && p.Barcode.ToLower().Contains(searchLower))
-            );
+                (p.Barcode != null && p.Barcode.ToLower().Contains(searchLower)));
         }
 
-        // Filter by active status
         if (isActive.HasValue)
         {
             query = query.Where(p => p.IsActive == isActive.Value);
         }
 
-        var products = await query.ToListAsync();
-
-        // Get BranchInventory for current branch
-        var productIds = products.Select(p => p.Id).ToList();
-        var branchInventories = await _unitOfWork.BranchInventories.Query()
-            .Where(bi => bi.TenantId == tenantId && bi.BranchId == branchId && productIds.Contains(bi.ProductId))
-            .ToDictionaryAsync(bi => bi.ProductId, bi => bi.Quantity);
-
-        var productDtos = products.Select(p =>
+        var projectedQuery = query.Select(p => new ProductDto
         {
-            var branchQuantity = p.TrackInventory && branchInventories.ContainsKey(p.Id)
-                ? branchInventories[p.Id]
-                : (p.TrackInventory ? 0 : (int?)null);
+            Id = p.Id,
+            Name = p.Name,
+            NameEn = p.NameEn,
+            Description = p.Description,
+            Sku = p.Sku,
+            Barcode = p.Barcode,
+            Price = p.Price,
+            Cost = p.Cost,
+            TaxRate = p.TaxRate,
+            TaxInclusive = p.TaxInclusive,
+            ImageUrl = p.ImageUrl,
+            IsActive = p.IsActive,
+            Type = p.Type,
+            TrackInventory = p.TrackInventory,
+            IsBatchTracked = p.IsBatchTracked,
+            CurrentBranchStock = p.TrackInventory
+                ? branchInventoryQuery
+                    .Where(bi => bi.ProductId == p.Id)
+                    .Select(bi => (int?)bi.Quantity)
+                    .FirstOrDefault() ?? 0
+                : null,
+            CategoryId = p.CategoryId,
+            CategoryName = p.Category != null ? p.Category.Name : null,
+            LowStockThreshold = p.LowStockThreshold,
+            ReorderPoint = p.ReorderPoint,
+            LastStockUpdate = p.LastStockUpdate
+        });
 
-            return new ProductDto
-            {
-                Id = p.Id,
-                Name = p.Name,
-                NameEn = p.NameEn,
-                Description = p.Description,
-                Sku = p.Sku,
-                Barcode = p.Barcode,
-                Price = p.Price,
-                Cost = p.Cost,
-                TaxRate = p.TaxRate,
-                TaxInclusive = p.TaxInclusive,
-                ImageUrl = p.ImageUrl,
-                IsActive = p.IsActive,
-                Type = p.Type,
-                TrackInventory = p.TrackInventory,
-                IsBatchTracked = p.IsBatchTracked,
-                CurrentBranchStock = branchQuantity,
-                CategoryId = p.CategoryId,
-                CategoryName = p.Category?.Name,
-                LowStockThreshold = p.LowStockThreshold,
-                ReorderPoint = p.ReorderPoint,
-                LastStockUpdate = p.LastStockUpdate
-            };
-        }).ToList();
-
-        // Filter by low stock (after getting BranchInventory data)
-        if (lowStock.HasValue && lowStock.Value)
+        if (lowStock == true)
         {
-            productDtos = productDtos
-                .Where(p => p.TrackInventory && (p.CurrentBranchStock ?? 0) < (p.LowStockThreshold ?? 5))
-                .ToList();
+            projectedQuery = projectedQuery.Where(p =>
+                p.TrackInventory && (p.CurrentBranchStock ?? 0) < (p.LowStockThreshold ?? 5));
         }
 
-        var totalCount = productDtos.Count;
-        var pagedItems = productDtos
+        var totalCount = await projectedQuery.CountAsync();
+        var pagedItems = await projectedQuery
+            .OrderBy(p => p.Name)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
+            .ToListAsync();
 
         var pagedResult = new PagedResult<ProductDto>(pagedItems, totalCount, page, pageSize);
         return ApiResponse<PagedResult<ProductDto>>.Ok(pagedResult);
@@ -169,16 +156,46 @@ public class ProductService : IProductService
 
     public async Task<ApiResponse<ProductDto>> CreateAsync(CreateProductRequest request)
     {
-        // Validation: Price must be non-negative
-        if (request.Price < 0)
-            return ApiResponse<ProductDto>.Fail(ErrorCodes.PRODUCT_INVALID_PRICE, ErrorMessages.Get(ErrorCodes.PRODUCT_INVALID_PRICE));
+        // T-3: Wrap in transaction
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
+        try
+        {
+            // Validation: Price must be non-negative
+            if (request.Price < 0)
+                return ApiResponse<ProductDto>.Fail(ErrorCodes.PRODUCT_INVALID_PRICE, ErrorMessages.Get(ErrorCodes.PRODUCT_INVALID_PRICE));
 
-        // Validation: Category must exist
-        var category = await _unitOfWork.Categories.GetByIdAsync(request.CategoryId);
-        if (category == null)
-            return ApiResponse<ProductDto>.Fail(ErrorCodes.CATEGORY_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CATEGORY_NOT_FOUND));
+            // Validation: Category must exist
+            var category = await _unitOfWork.Categories.GetByIdAsync(request.CategoryId);
+            if (category == null)
+                return ApiResponse<ProductDto>.Fail(ErrorCodes.CATEGORY_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CATEGORY_NOT_FOUND));
 
-        var product = new Product
+            // T-5: SKU uniqueness validation
+            if (!string.IsNullOrWhiteSpace(request.Sku))
+            {
+                var skuExists = await _unitOfWork.Products.Query()
+                    .AnyAsync(p => p.Sku == request.Sku.Trim()
+                                && p.TenantId == _currentUser.TenantId
+                                && !p.IsDeleted);
+                if (skuExists)
+                    return ApiResponse<ProductDto>.Fail(
+                        ErrorCodes.PRODUCT_SKU_DUPLICATE,
+                        ErrorMessages.Get(ErrorCodes.PRODUCT_SKU_DUPLICATE));
+            }
+
+            // T-5: Barcode uniqueness validation
+            if (!string.IsNullOrWhiteSpace(request.Barcode))
+            {
+                var barcodeExists = await _unitOfWork.Products.Query()
+                    .AnyAsync(p => p.Barcode == request.Barcode.Trim()
+                                && p.TenantId == _currentUser.TenantId
+                                && !p.IsDeleted);
+                if (barcodeExists)
+                    return ApiResponse<ProductDto>.Fail(
+                        ErrorCodes.PRODUCT_BARCODE_DUPLICATE,
+                        ErrorMessages.Get(ErrorCodes.PRODUCT_BARCODE_DUPLICATE));
+            }
+
+            var product = new Product
         {
             TenantId = _currentUser.TenantId,
             Name = request.Name,
@@ -239,27 +256,55 @@ public class ProductService : IProductService
                 };
 
                 await _unitOfWork.BranchInventories.AddAsync(branchInventory);
+
+                // T-1: Create StockMovement for initial stock (only for current branch with quantity > 0)
+                if (quantity > 0 && branch.Id == _currentUser.BranchId)
+                {
+                    var movement = new StockMovement
+                    {
+                        ProductId = product.Id,
+                        BranchId = branch.Id,
+                        TenantId = _currentUser.TenantId,
+                        Type = StockMovementType.Receiving,
+                        Quantity = quantity,
+                        BalanceBefore = 0,
+                        BalanceAfter = quantity,
+                        ReferenceType = "InitialStock",
+                        Reason = "مخزون أولي عند إنشاء المنتج",
+                        UserId = _currentUser.UserId,
+                        CreatedAt = DateTime.UtcNow
+                    };
+                    await _unitOfWork.StockMovements.AddAsync(movement);
+                }
             }
 
             await _unitOfWork.SaveChangesAsync();
         }
 
-        return ApiResponse<ProductDto>.Ok(new ProductDto
+            await transaction.CommitAsync();
+
+            return ApiResponse<ProductDto>.Ok(new ProductDto
+            {
+                Id = product.Id,
+                Name = product.Name,
+                NameEn = product.NameEn,
+                Price = product.Price,
+                Cost = product.Cost,
+                TaxRate = product.TaxRate,
+                TaxInclusive = product.TaxInclusive,
+                IsActive = product.IsActive,
+                Type = product.Type,
+                TrackInventory = product.TrackInventory,
+                IsBatchTracked = product.IsBatchTracked,
+                CurrentBranchStock = request.InitialBranchStock, // Return requested quantity for consistency
+                CategoryId = product.CategoryId
+            }, "تم إنشاء المنتج بنجاح");
+        }
+        catch
         {
-            Id = product.Id,
-            Name = product.Name,
-            NameEn = product.NameEn,
-            Price = product.Price,
-            Cost = product.Cost,
-            TaxRate = product.TaxRate,
-            TaxInclusive = product.TaxInclusive,
-            IsActive = product.IsActive,
-            Type = product.Type,
-            TrackInventory = product.TrackInventory,
-            IsBatchTracked = product.IsBatchTracked,
-            CurrentBranchStock = request.InitialBranchStock, // Return requested quantity for consistency
-            CategoryId = product.CategoryId
-        }, "تم إنشاء المنتج بنجاح");
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<ApiResponse<ProductDto>> UpdateAsync(int id, UpdateProductRequest request)
@@ -268,67 +313,189 @@ public class ProductService : IProductService
         if (request.Price < 0)
             return ApiResponse<ProductDto>.Fail(ErrorCodes.PRODUCT_INVALID_PRICE, ErrorMessages.Get(ErrorCodes.PRODUCT_INVALID_PRICE));
 
-        var tenantId = _currentUser.TenantId;
-        var product = await _unitOfWork.Products.Query()
-            .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
-        if (product == null)
-            return ApiResponse<ProductDto>.Fail(ErrorCodes.PRODUCT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PRODUCT_NOT_FOUND));
-
-        // Validation: Category must exist
-        var category = await _unitOfWork.Categories.GetByIdAsync(request.CategoryId);
-        if (category == null)
-            return ApiResponse<ProductDto>.Fail(ErrorCodes.CATEGORY_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CATEGORY_NOT_FOUND));
-
-        product.Name = request.Name;
-        product.NameEn = request.NameEn;
-        product.Description = request.Description;
-        product.Sku = request.Sku;
-        product.Barcode = request.Barcode;
-        product.Price = request.Price;
-        product.Cost = request.Cost;
-        product.ImageUrl = request.ImageUrl;
-        product.IsActive = request.IsActive;
-        product.CategoryId = request.CategoryId;
-        // Tax settings
-        product.TaxRate = request.TaxRate;
-        product.TaxInclusive = request.TaxInclusive;
-        // Product Type determines inventory behavior
-        product.Type = request.Type;
-        // TrackInventory is automatically set based on Type
-        product.TrackInventory = request.Type == Domain.Enums.ProductType.Physical;
-        product.LowStockThreshold = request.LowStockThreshold;
-        product.ReorderPoint = request.ReorderPoint;
-        product.IsBatchTracked = request.IsBatchTracked;
-        product.LastStockUpdate = DateTime.UtcNow;
-
-        _unitOfWork.Products.Update(product);
-        await _unitOfWork.SaveChangesAsync();
-
-        // Get current branch inventory for response
-        var branchId = _currentUser.BranchId;
-        var branchInventory = await _unitOfWork.BranchInventories.Query()
-            .FirstOrDefaultAsync(bi => bi.TenantId == tenantId && bi.BranchId == branchId && bi.ProductId == product.Id);
-
-        var branchQuantity = product.TrackInventory && branchInventory != null
-            ? branchInventory.Quantity
-            : (product.TrackInventory ? 0 : (int?)null);
-
-        return ApiResponse<ProductDto>.Ok(new ProductDto
+        await using var transaction = await _unitOfWork.BeginTransactionAsync();
+        try
         {
-            Id = product.Id,
-            Name = product.Name,
-            NameEn = product.NameEn,
-            Price = product.Price,
-            Cost = product.Cost,
-            TaxRate = product.TaxRate,
-            TaxInclusive = product.TaxInclusive,
-            IsActive = product.IsActive,
-            Type = product.Type,
-            TrackInventory = product.TrackInventory,
-            IsBatchTracked = product.IsBatchTracked,
-            CurrentBranchStock = branchQuantity,
-            CategoryId = product.CategoryId
-        }, "تم تحديث المنتج بنجاح");
+            var tenantId = _currentUser.TenantId;
+            var product = await _unitOfWork.Products.Query()
+                .FirstOrDefaultAsync(p => p.Id == id && p.TenantId == tenantId);
+            if (product == null)
+                return ApiResponse<ProductDto>.Fail(ErrorCodes.PRODUCT_NOT_FOUND, ErrorMessages.Get(ErrorCodes.PRODUCT_NOT_FOUND));
+
+            // Validation: Category must exist
+            var category = await _unitOfWork.Categories.GetByIdAsync(request.CategoryId);
+            if (category == null)
+                return ApiResponse<ProductDto>.Fail(ErrorCodes.CATEGORY_NOT_FOUND, ErrorMessages.Get(ErrorCodes.CATEGORY_NOT_FOUND));
+
+            // T-5: SKU uniqueness validation (exclude current product)
+            if (!string.IsNullOrWhiteSpace(request.Sku))
+            {
+                var skuExists = await _unitOfWork.Products.Query()
+                    .AnyAsync(p => p.Sku == request.Sku.Trim()
+                                && p.TenantId == _currentUser.TenantId
+                                && !p.IsDeleted
+                                && p.Id != id);
+                if (skuExists)
+                    return ApiResponse<ProductDto>.Fail(
+                        ErrorCodes.PRODUCT_SKU_DUPLICATE,
+                        ErrorMessages.Get(ErrorCodes.PRODUCT_SKU_DUPLICATE));
+            }
+
+            // T-5: Barcode uniqueness validation (exclude current product)
+            if (!string.IsNullOrWhiteSpace(request.Barcode))
+            {
+                var barcodeExists = await _unitOfWork.Products.Query()
+                    .AnyAsync(p => p.Barcode == request.Barcode.Trim()
+                                && p.TenantId == _currentUser.TenantId
+                                && !p.IsDeleted
+                                && p.Id != id);
+                if (barcodeExists)
+                    return ApiResponse<ProductDto>.Fail(
+                        ErrorCodes.PRODUCT_BARCODE_DUPLICATE,
+                        ErrorMessages.Get(ErrorCodes.PRODUCT_BARCODE_DUPLICATE));
+            }
+
+            if (request.Type != product.Type)
+            {
+                var hasStock = await _unitOfWork.BranchInventories.Query()
+                    .AnyAsync(b => b.ProductId == product.Id
+                                && b.TenantId == _currentUser.TenantId
+                                && !b.IsDeleted
+                                && b.Quantity > 0);
+                var hasActiveBatches = await _unitOfWork.ProductBatches.Query()
+                    .AnyAsync(b => b.ProductId == product.Id
+                                && b.TenantId == _currentUser.TenantId
+                                && !b.IsDeleted
+                                && b.Status == BatchStatus.Active);
+                if (hasStock || hasActiveBatches)
+                {
+                    return ApiResponse<ProductDto>.Fail(
+                        ErrorCodes.PRODUCT_TYPE_CANNOT_CHANGE,
+                        ErrorMessages.Get(ErrorCodes.PRODUCT_TYPE_CANNOT_CHANGE));
+                }
+            }
+
+            var wasBatchTracked = product.IsBatchTracked;
+            var willTrackInventory = request.Type == Domain.Enums.ProductType.Physical;
+
+            if (wasBatchTracked && !request.IsBatchTracked)
+            {
+                var hasActiveBatches = await _unitOfWork.ProductBatches.Query()
+                    .AnyAsync(b => b.ProductId == product.Id
+                                && b.TenantId == tenantId
+                                && !b.IsDeleted
+                                && b.Status == BatchStatus.Active
+                                && b.Quantity > 0);
+                if (hasActiveBatches)
+                {
+                    return ApiResponse<ProductDto>.Fail(
+                        ErrorCodes.VALIDATION_ERROR,
+                        "لا يمكن إلغاء تتبع الدفعات طالما توجد دفعات نشطة بها كمية.");
+                }
+            }
+
+            product.Name = request.Name;
+            product.NameEn = request.NameEn;
+            product.Description = request.Description;
+            product.Sku = request.Sku;
+            product.Barcode = request.Barcode;
+            product.Price = request.Price;
+            product.Cost = request.Cost;
+            product.ImageUrl = request.ImageUrl;
+            product.IsActive = request.IsActive;
+            product.CategoryId = request.CategoryId;
+            // Tax settings
+            product.TaxRate = request.TaxRate;
+            product.TaxInclusive = request.TaxInclusive;
+            // Product Type determines inventory behavior
+            product.Type = request.Type;
+            // TrackInventory is automatically set based on Type
+            product.TrackInventory = willTrackInventory;
+            product.LowStockThreshold = request.LowStockThreshold;
+            product.ReorderPoint = request.ReorderPoint;
+            product.IsBatchTracked = request.IsBatchTracked;
+            product.LastStockUpdate = DateTime.UtcNow;
+
+            _unitOfWork.Products.Update(product);
+
+            // Convert existing branch inventory into opening batches when enabling batch tracking.
+            if (!wasBatchTracked && request.IsBatchTracked && willTrackInventory)
+            {
+                var now = DateTime.UtcNow;
+                var branchInventories = await _unitOfWork.BranchInventories.Query()
+                    .Where(bi => bi.TenantId == tenantId
+                              && bi.ProductId == product.Id
+                              && !bi.IsDeleted
+                              && bi.Quantity > 0)
+                    .ToListAsync();
+
+                foreach (var inventoryRow in branchInventories)
+                {
+                    var branchSellingPrice = await _unitOfWork.BranchProductPrices.Query()
+                        .Where(bp => bp.TenantId == tenantId
+                                  && bp.ProductId == product.Id
+                                  && bp.BranchId == inventoryRow.BranchId
+                                  && bp.IsActive
+                                  && !bp.IsDeleted
+                                  && bp.EffectiveFrom <= now
+                                  && (bp.EffectiveTo == null || bp.EffectiveTo >= now))
+                        .OrderByDescending(bp => bp.EffectiveFrom)
+                        .Select(bp => (decimal?)bp.Price)
+                        .FirstOrDefaultAsync();
+
+                    var openingBatch = new ProductBatch
+                    {
+                        TenantId = tenantId,
+                        BranchId = inventoryRow.BranchId,
+                        ProductId = product.Id,
+                        BatchNumber = $"رصيد افتتاحي - تفعيل الباتش - {now:yyyyMMddHHmmssfff}",
+                        Quantity = inventoryRow.Quantity,
+                        InitialQuantity = inventoryRow.Quantity,
+                        CostPrice = product.Cost,
+                        SellingPrice = branchSellingPrice ?? product.Price,
+                        PurchaseDate = now,
+                        Status = BatchStatus.Active,
+                        Notes = "Batch generated automatically from existing branch stock when batch tracking was enabled."
+                    };
+
+                    await _unitOfWork.ProductBatches.AddAsync(openingBatch);
+                }
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+            await transaction.CommitAsync();
+
+            // Get current branch inventory for response
+            var branchId = _currentUser.BranchId;
+            var branchInventory = await _unitOfWork.BranchInventories.Query()
+                .FirstOrDefaultAsync(bi => bi.TenantId == tenantId && bi.BranchId == branchId && bi.ProductId == product.Id);
+
+            var branchQuantity = product.TrackInventory && branchInventory != null
+                ? branchInventory.Quantity
+                : (product.TrackInventory ? 0 : (int?)null);
+
+            return ApiResponse<ProductDto>.Ok(new ProductDto
+            {
+                Id = product.Id,
+                Name = product.Name,
+                NameEn = product.NameEn,
+                Price = product.Price,
+                Cost = product.Cost,
+                TaxRate = product.TaxRate,
+                TaxInclusive = product.TaxInclusive,
+                IsActive = product.IsActive,
+                Type = product.Type,
+                TrackInventory = product.TrackInventory,
+                IsBatchTracked = product.IsBatchTracked,
+                CurrentBranchStock = branchQuantity,
+                CategoryId = product.CategoryId
+            }, "تم تحديث المنتج بنجاح");
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(int id)
@@ -394,6 +561,9 @@ public class ProductService : IProductService
 
         var previousBalance = branchInventory.Quantity;
         var newBalance = previousBalance + request.Quantity;
+        var adjustmentReason = string.IsNullOrWhiteSpace(request.Reason)
+            ? "تسوية مخزون يدوية"
+            : request.Reason;
 
         if (newBalance < 0)
             return ApiResponse<StockAdjustResultDto>.Fail(ErrorCodes.INVENTORY_INVALID_QUANTITY, ErrorMessages.Get(ErrorCodes.INVENTORY_INVALID_QUANTITY));
@@ -404,6 +574,57 @@ public class ProductService : IProductService
 
         _unitOfWork.BranchInventories.Update(branchInventory);
         _unitOfWork.Products.Update(product);
+
+        // T-2: Create StockMovement for adjustment
+        var movement = new StockMovement
+        {
+            ProductId = id,
+            BranchId = branchId,
+            TenantId = tenantId,
+            Type = StockMovementType.Adjustment,
+            Quantity = request.Quantity,
+            BalanceBefore = previousBalance,
+            BalanceAfter = newBalance,
+            ReferenceType = "ManualAdjustment",
+            Reason = adjustmentReason,
+            UserId = _currentUser.UserId,
+            CreatedAt = DateTime.UtcNow
+        };
+        await _unitOfWork.StockMovements.AddAsync(movement);
+
+        // Record a completed stock taking entry for manual adjustments
+        if (string.Equals(request.AdjustmentType, "Adjustment", StringComparison.OrdinalIgnoreCase))
+        {
+            var stockTakingCount = await _unitOfWork.StockTakings.Query()
+                .CountAsync(st => st.TenantId == tenantId);
+            var stockTakingNumber = $"ST-{DateTime.UtcNow:yyyy}-{(stockTakingCount + 1):D4}";
+
+            var stockTaking = new StockTaking
+            {
+                TenantId = tenantId,
+                BranchId = branchId,
+                StockTakingNumber = stockTakingNumber,
+                Type = StockTakingType.Partial,
+                CategoryId = product.CategoryId,
+                Status = StockTakingStatus.Completed,
+                StartedAt = DateTime.UtcNow,
+                CompletedAt = DateTime.UtcNow,
+                CreatedByUserId = _currentUser.UserId,
+                CompletedByUserId = _currentUser.UserId,
+                Notes = adjustmentReason
+            };
+
+            stockTaking.Items.Add(new StockTakingItem
+            {
+                ProductId = product.Id,
+                SystemQuantity = previousBalance,
+                ActualQuantity = newBalance,
+                Reason = adjustmentReason
+            });
+
+            await _unitOfWork.StockTakings.AddAsync(stockTaking);
+        }
+
         await _unitOfWork.SaveChangesAsync();
 
         return ApiResponse<StockAdjustResultDto>.Ok(new StockAdjustResultDto

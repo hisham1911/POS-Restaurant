@@ -19,7 +19,7 @@ public class AuthIntegrationTests
     [Fact]
     public async Task Login_WhenJwtExpiryIsMissing_ReturnsTokenWithDefaultExpiry()
     {
-        using var factory = new CustomWebApplicationFactory(includeJwtExpiry: false);
+        using var factory = new CustomWebApplicationFactory(includeJwtExpiry: false, includeJwtIssuerAudience: true);
         var email = await SeedLoginUserAsync(factory);
         using var client = factory.CreateClient();
         var beforeLogin = DateTime.UtcNow;
@@ -46,7 +46,7 @@ public class AuthIntegrationTests
     [Fact]
     public async Task Login_WhenJwtIssuerAndAudienceAreMissing_TokenCanAccessProtectedEndpoint()
     {
-        using var factory = new CustomWebApplicationFactory(includeJwtIssuerAudience: false);
+        using var factory = new CustomWebApplicationFactory(includeJwtExpiry: true, includeJwtIssuerAudience: false);
         var email = await SeedLoginUserAsync(factory);
         using var client = factory.CreateClient();
 

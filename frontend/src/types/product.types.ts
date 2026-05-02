@@ -76,7 +76,6 @@ export interface UpdateProductRequest {
   isBatchTracked?: boolean;
   /** @deprecated Use BranchInventory endpoint instead. Will be removed next sprint. */
   // الكمية في الفرع الحالي (تُحدّث في BranchInventories)
-  currentBranchStock?: number; // @deprecated
   lowStockThreshold?: number;
   reorderPoint?: number;
   isActive: boolean;

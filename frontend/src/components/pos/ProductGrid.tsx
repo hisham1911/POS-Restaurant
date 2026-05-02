@@ -1,16 +1,13 @@
-import { useState } from "react";
 import { Product } from "@/types/product.types";
 import { Category } from "@/types/category.types";
 import { ProductCard } from "./ProductCard";
-import { StockAdjustmentModal } from "./StockAdjustmentModal";
 import { Package } from "lucide-react";
-import { useAppSelector } from "@/store/hooks";
-import { selectCurrentUser } from "@/store/slices/authSlice";
 import { BranchInventoryStockMap } from "@/utils/productStock";
 
 interface ProductGridProps {
   products: Product[];
   categories?: Category[];
+  onAddProduct?: (product: Product, options?: { fromCard?: boolean }) => void;
   stockByProductId?: BranchInventoryStockMap;
   hasInventorySnapshot?: boolean;
   isInventoryLoading?: boolean;
@@ -19,23 +16,11 @@ interface ProductGridProps {
 export const ProductGrid = ({
   products,
   categories,
+  onAddProduct,
   stockByProductId,
   hasInventorySnapshot = false,
   isInventoryLoading = false,
 }: ProductGridProps) => {
-  const [adjustingProduct, setAdjustingProduct] = useState<Product | null>(
-    null,
-  );
-  const user = useAppSelector(selectCurrentUser);
-
-  // Only Admin or SystemOwner can adjust stock
-  const canAdjustStock = user?.role === "Admin" || user?.role === "SystemOwner";
-
-  const handleStockAdjust = (product: Product) => {
-    if (canAdjustStock && product.trackInventory) {
-      setAdjustingProduct(product);
-    }
-  };
 
   if (products.length === 0) {
     return (
@@ -59,22 +44,13 @@ export const ProductGrid = ({
             key={product.id}
             product={product}
             category={categories?.find((c) => c.id === product.categoryId)}
-            onStockAdjust={handleStockAdjust}
-            showStockAdjust={canAdjustStock && product.trackInventory}
+            onAddProduct={onAddProduct}
             stockByProductId={stockByProductId}
             hasInventorySnapshot={hasInventorySnapshot}
             isInventoryLoading={isInventoryLoading}
           />
         ))}
       </div>
-
-      {/* Stock Adjustment Modal */}
-      {adjustingProduct && (
-        <StockAdjustmentModal
-          product={adjustingProduct}
-          onClose={() => setAdjustingProduct(null)}
-        />
-      )}
     </>
   );
 };

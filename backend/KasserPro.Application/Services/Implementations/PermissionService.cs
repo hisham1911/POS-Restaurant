@@ -341,6 +341,16 @@ public class PermissionService : IPermissionService
                 IsDefault = false,
                 IsSensitive = true
             },
+            new PermissionInfoDto
+            {
+                Key = Permission.PosChangeBatch.ToString(),
+                Group = "Point of Sale",
+                GroupAr = "Ù†Ù‚Ø·Ø© Ø§Ù„Ø¨ÙŠØ¹",
+                Description = "Change selected product batch during sale",
+                DescriptionAr = "ØªØºÙŠÙŠØ± Ø¯ÙØ¹Ø© Ø§Ù„Ù…Ù†ØªØ¬ Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„Ø¨ÙŠØ¹",
+                IsDefault = false,
+                IsSensitive = true
+            },
 
             // Orders
             new PermissionInfoDto

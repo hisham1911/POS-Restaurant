@@ -339,6 +339,15 @@ public class DeliveryService : IDeliveryService
         if (newStatus == DeliveryStatus.Delivered)
         {
             order.DeliveredAt = DateTime.UtcNow;
+            // تحديث حالة الطلب إلى مكتمل عند تسليم الطلب
+            order.Status = OrderStatus.Completed;
+        }
+        else if (newStatus == DeliveryStatus.Cancelled)
+        {
+            // تحديث حالة الطلب إلى ملغي عند إلغاء التوصيل
+            order.Status = OrderStatus.Cancelled;
+            order.CancelledAt = DateTime.UtcNow;
+            order.CancellationReason = request.DeliveryNotes ?? "تم إلغاء التوصيل";
         }
         else if (newStatus == DeliveryStatus.OutForDelivery && order.AssignedAt == null)
         {

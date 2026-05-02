@@ -29,7 +29,7 @@ export const useProducts = () => {
   const [deleteMutation, { isLoading: isDeleting }] =
     useDeleteProductMutation();
 
-  const products = productsData?.data || [];
+  const products = productsData?.data?.items || [];
 
   const createProduct = async (data: CreateProductRequest) => {
     try {

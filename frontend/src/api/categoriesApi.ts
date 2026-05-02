@@ -2,18 +2,36 @@ import { baseApi } from "./baseApi";
 import { Category } from "../types/category.types";
 import { ApiResponse } from "../types/api.types";
 
+type CategoryQueryParams = {
+  search?: string;
+  isActive?: boolean;
+  page?: number;
+  pageSize?: number;
+};
+
+type CategoryMutationRequest = {
+  name: string;
+  nameEn?: string;
+  description?: string;
+  imageUrl?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+};
+
 export const categoriesApi = baseApi.injectEndpoints({
   endpoints: (builder) => ({
-    // جلب كل التصنيفات
     getCategories: builder.query<
       ApiResponse<Category[]>,
-      { search?: string; page?: number; pageSize?: number } | void
+      CategoryQueryParams | void
     >({
       query: (params) => {
         const queryParams: Record<string, string | number> = {};
 
         if (params) {
           if (params.search) queryParams.search = params.search;
+          if (params.isActive !== undefined) {
+            queryParams.isActive = params.isActive.toString();
+          }
           if (params.page) queryParams.page = params.page;
           if (params.pageSize) queryParams.pageSize = params.pageSize;
         }
@@ -35,22 +53,14 @@ export const categoriesApi = baseApi.injectEndpoints({
           : [{ type: "Categories", id: "LIST" }],
     }),
 
-    // جلب تصنيف واحد
     getCategory: builder.query<ApiResponse<Category>, number>({
       query: (id) => `/categories/${id}`,
       providesTags: (_result, _error, id) => [{ type: "Categories", id }],
     }),
 
-    // إضافة تصنيف
     createCategory: builder.mutation<
       ApiResponse<Category>,
-      {
-        name: string;
-        nameEn?: string;
-        description?: string;
-        imageUrl?: string;
-        sortOrder?: number;
-      }
+      CategoryMutationRequest
     >({
       query: (category) => ({
         url: "/categories",
@@ -60,10 +70,9 @@ export const categoriesApi = baseApi.injectEndpoints({
       invalidatesTags: [{ type: "Categories", id: "LIST" }],
     }),
 
-    // تحديث تصنيف
     updateCategory: builder.mutation<
       ApiResponse<Category>,
-      { id: number; data: Partial<Category> }
+      { id: number; data: CategoryMutationRequest }
     >({
       query: ({ id, data }) => ({
         url: `/categories/${id}`,
@@ -76,7 +85,6 @@ export const categoriesApi = baseApi.injectEndpoints({
       ],
     }),
 
-    // حذف تصنيف
     deleteCategory: builder.mutation<ApiResponse<boolean>, number>({
       query: (id) => ({
         url: `/categories/${id}`,

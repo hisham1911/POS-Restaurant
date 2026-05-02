@@ -23,8 +23,9 @@ public class SupplierService : ISupplierService
     public async Task<ApiResponse<List<SupplierDto>>> GetAllAsync()
     {
         var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
         var suppliers = await _unitOfWork.Suppliers.Query()
-            .Where(s => s.TenantId == tenantId && !s.IsDeleted)
+            .Where(s => s.TenantId == tenantId && s.BranchId == branchId && !s.IsDeleted)
             .OrderBy(s => s.Name)
             .Select(s => new SupplierDto
             {
@@ -38,7 +39,11 @@ public class SupplierService : ISupplierService
                 ContactPerson = s.ContactPerson,
                 Notes = s.Notes,
                 IsActive = s.IsActive,
-                CreatedAt = s.CreatedAt
+                CreatedAt = s.CreatedAt,
+                TotalDue = s.TotalDue,
+                TotalPaid = s.TotalPaid,
+                TotalPurchases = s.TotalPurchases,
+                LastPurchaseDate = s.LastPurchaseDate
             })
             .ToListAsync();
 
@@ -48,8 +53,9 @@ public class SupplierService : ISupplierService
     public async Task<ApiResponse<SupplierDto>> GetByIdAsync(int id)
     {
         var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
         var supplier = await _unitOfWork.Suppliers.Query()
-            .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == tenantId && !s.IsDeleted);
+            .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == tenantId && s.BranchId == branchId && !s.IsDeleted);
         
         if (supplier == null)
             return ApiResponse<SupplierDto>.Fail(ErrorCodes.SUPPLIER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.SUPPLIER_NOT_FOUND));
@@ -66,7 +72,11 @@ public class SupplierService : ISupplierService
             ContactPerson = supplier.ContactPerson,
             Notes = supplier.Notes,
             IsActive = supplier.IsActive,
-            CreatedAt = supplier.CreatedAt
+            CreatedAt = supplier.CreatedAt,
+            TotalDue = supplier.TotalDue,
+            TotalPaid = supplier.TotalPaid,
+            TotalPurchases = supplier.TotalPurchases,
+            LastPurchaseDate = supplier.LastPurchaseDate
         });
     }
 
@@ -107,7 +117,11 @@ public class SupplierService : ISupplierService
             ContactPerson = supplier.ContactPerson,
             Notes = supplier.Notes,
             IsActive = supplier.IsActive,
-            CreatedAt = supplier.CreatedAt
+            CreatedAt = supplier.CreatedAt,
+            TotalDue = supplier.TotalDue,
+            TotalPaid = supplier.TotalPaid,
+            TotalPurchases = supplier.TotalPurchases,
+            LastPurchaseDate = supplier.LastPurchaseDate
         }, "تم إضافة المورد بنجاح");
     }
 
@@ -118,8 +132,9 @@ public class SupplierService : ISupplierService
             return ApiResponse<SupplierDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
 
         var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
         var supplier = await _unitOfWork.Suppliers.Query()
-            .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == tenantId && !s.IsDeleted);
+            .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == tenantId && s.BranchId == branchId && !s.IsDeleted);
         
         if (supplier == null)
             return ApiResponse<SupplierDto>.Fail(ErrorCodes.SUPPLIER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.SUPPLIER_NOT_FOUND));
@@ -157,15 +172,20 @@ public class SupplierService : ISupplierService
             ContactPerson = supplier.ContactPerson,
             Notes = supplier.Notes,
             IsActive = supplier.IsActive,
-            CreatedAt = supplier.CreatedAt
+            CreatedAt = supplier.CreatedAt,
+            TotalDue = supplier.TotalDue,
+            TotalPaid = supplier.TotalPaid,
+            TotalPurchases = supplier.TotalPurchases,
+            LastPurchaseDate = supplier.LastPurchaseDate
         }, "تم تحديث المورد بنجاح");
     }
 
     public async Task<ApiResponse<bool>> DeleteAsync(int id)
     {
         var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
         var supplier = await _unitOfWork.Suppliers.Query()
-            .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == tenantId && !s.IsDeleted);
+            .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == tenantId && s.BranchId == branchId && !s.IsDeleted);
         
         if (supplier == null)
             return ApiResponse<bool>.Fail(ErrorCodes.SUPPLIER_NOT_FOUND, ErrorMessages.Get(ErrorCodes.SUPPLIER_NOT_FOUND));

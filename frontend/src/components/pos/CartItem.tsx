@@ -1,14 +1,19 @@
-import { useState } from "react";
-import { Plus, Minus, Trash2, Tag } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Plus, Minus, Trash2, Tag, Layers } from "lucide-react";
 import { CartItem } from "@/store/slices/cartSlice";
 import { useCart } from "@/hooks/useCart";
 import { formatCurrency } from "@/utils/formatters";
 import {
   getCartItemDiscountAmount,
-  getCartItemSubtotal,
+  getCartItemTotal,
   getProductNetUnitPrice,
 } from "@/utils/cartPricing";
 import { ItemDiscountModal } from "./ItemDiscountModal";
+import { BatchSelectionModal } from "./BatchSelectionModal";
+import { useGetAvailableBatchesQuery } from "@/api/productBatchApi";
+import { usePermission } from "@/hooks/usePermission";
+import { useAppSelector } from "@/store/hooks";
+import { selectCurrentBranch } from "@/store/slices/branchSlice";
 
 interface CartItemProps {
   item: CartItem;
@@ -20,16 +25,58 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
     removeItem,
     applyItemDiscount,
     removeItemDiscount,
+    updateItemBatch,
     taxRate,
     isTaxEnabled,
     canManageDiscounts,
   } = useCart();
+  const { hasPermission } = usePermission();
+  const currentBranch = useAppSelector(selectCurrentBranch);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [showBatchModal, setShowBatchModal] = useState(false);
   const { product, quantity, discount } = item;
+  const canChangeBatch = hasPermission("PosChangeBatch");
+  const { data: batchesResponse } = useGetAvailableBatchesQuery(
+    { productId: product.id, branchId: currentBranch?.id ?? 0 },
+    {
+      skip:
+        (!showBatchModal && Boolean(item.batchId)) ||
+        !currentBranch?.id ||
+        !product.isBatchTracked,
+    },
+  );
+  const batches = batchesResponse?.data ?? [];
+
+  useEffect(() => {
+    if (!product.isBatchTracked || item.batchId || batches.length === 0) {
+      return;
+    }
+
+    const batch = batches[0];
+    updateItemBatch(
+      product.id,
+      item.batchId,
+      batch.id,
+      batch.batchNumber,
+      batch.expiryDate,
+      batch.sellingPrice,
+      batch.quantity,
+    );
+  }, [
+    batches,
+    item.batchId,
+    product.id,
+    product.isBatchTracked,
+    updateItemBatch,
+  ]);
+
   const unitPrice = getProductNetUnitPrice(product, taxRate, isTaxEnabled);
-  const subtotal = getCartItemSubtotal(item, taxRate, isTaxEnabled);
   const discountAmount = getCartItemDiscountAmount(item, taxRate, isTaxEnabled);
-  const total = subtotal - discountAmount;
+  const total = getCartItemTotal(item, taxRate, isTaxEnabled);
+  const originalTotal =
+    discountAmount > 0
+      ? getCartItemTotal({ ...item, discount: undefined }, taxRate, isTaxEnabled)
+      : total;
 
   return (
     <>
@@ -44,6 +91,15 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
           <h4 className="truncate text-sm font-bold text-gray-900">
             {product.name}
           </h4>
+          
+          {/* Batch Info - small text below product name */}
+          {item.batchId && (
+            <p className="text-[10px] text-gray-500 mt-0.5">
+              {item.batchNumber || "بدون رقم دفعة"}
+              {item.expiryDate ? ` • ${new Date(item.expiryDate).toLocaleDateString("ar-EG", { year: "numeric", month: "2-digit", day: "2-digit" })}` : ""}
+            </p>
+          )}
+          
           <p className="text-xs font-medium text-gray-500">
             {formatCurrency(unitPrice)} × {quantity}
           </p>
@@ -62,7 +118,7 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
           {/* Quantity Controls - with brand colors */}
           <div className="mt-3 flex items-center gap-2">
             <button
-              onClick={() => updateQuantity(product.id, quantity - 1)}
+              onClick={() => updateQuantity(product.id, quantity - 1, item.batchId)}
               className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-gray-50 hover:border-red-300 hover:bg-red-50 hover:text-red-500"
               aria-label={
                 quantity === 1
@@ -80,7 +136,7 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
             <span className="w-8 text-center text-base font-bold text-gray-900">{quantity}</span>
 
             <button
-              onClick={() => updateQuantity(product.id, quantity + 1)}
+              onClick={() => updateQuantity(product.id, quantity + 1, item.batchId)}
               className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-600 text-white hover:bg-primary-700"
               aria-label={`زيادة كمية ${product.name}`}
             >
@@ -101,6 +157,16 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
                 <Tag className="w-5 h-5" />
               </button>
             )}
+
+            {product.isBatchTracked && canChangeBatch && (
+              <button
+                onClick={() => setShowBatchModal(true)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 bg-gray-50 text-gray-600 hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600"
+                aria-label={`تغيير دفعة ${product.name}`}
+              >
+                <Layers className="h-5 w-5" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -110,7 +176,7 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
             {discountAmount > 0 ? (
               <>
                 <p className="text-xs text-gray-400 line-through">
-                  {formatCurrency(subtotal)}
+                  {formatCurrency(originalTotal)}
                 </p>
                 <p className="text-base font-bold text-green-600">
                   {formatCurrency(total)}
@@ -123,7 +189,7 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
             )}
           </div>
           <button
-            onClick={() => removeItem(product.id)}
+            onClick={() => removeItem(product.id, item.batchId)}
             className="text-xs font-medium text-red-500 hover:text-red-600"
           >
             حذف
@@ -137,6 +203,28 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
           onApply={(disc) => applyItemDiscount(product.id, disc)}
           onRemove={() => removeItemDiscount(product.id)}
           onClose={() => setShowDiscountModal(false)}
+        />
+      )}
+
+      {product.isBatchTracked && canChangeBatch && showBatchModal && (
+        <BatchSelectionModal
+          isOpen={true}
+          onClose={() => setShowBatchModal(false)}
+          productName={product.name}
+          batches={batches}
+          selectedBatchId={item.batchId}
+          onSelectBatch={(batch) => {
+            updateItemBatch(
+              product.id,
+              item.batchId,
+              batch.id,
+              batch.batchNumber,
+              batch.expiryDate,
+              batch.sellingPrice,
+              batch.quantity,
+            );
+            setShowBatchModal(false);
+          }}
         />
       )}
     </>

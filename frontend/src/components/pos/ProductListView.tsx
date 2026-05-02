@@ -21,6 +21,7 @@ import {
 interface ProductListViewProps {
   products: Product[];
   categories: Category[];
+  onAddProduct?: (product: Product) => void;
   stockByProductId?: BranchInventoryStockMap;
   hasInventorySnapshot?: boolean;
   isInventoryLoading?: boolean;
@@ -29,6 +30,7 @@ interface ProductListViewProps {
 export const ProductListView = ({
   products,
   categories,
+  onAddProduct,
   stockByProductId,
   hasInventorySnapshot = false,
   isInventoryLoading = false,
@@ -37,17 +39,18 @@ export const ProductListView = ({
   const allowNegativeStock = useAppSelector(selectAllowNegativeStock);
 
   const handleProductClick = (product: Product) => {
-    const cartItem = items.find((item) => item.product.id === product.id);
-    const quantityInCart = cartItem?.quantity ?? 0;
+    const cartItems = items.filter((item) => item.product.id === product.id);
+    const quantityInCart = cartItems.reduce((sum, item) => sum + item.quantity, 0);
     const totalStock = getProductCurrentStock(product, stockByProductId);
     const availableStock = hasInventorySnapshot
       ? getProductAvailableStock(product, quantityInCart, stockByProductId)
       : Number.POSITIVE_INFINITY;
-    const canAddMore =
-      allowNegativeStock ||
-      !product.trackInventory ||
-      !hasInventorySnapshot ||
-      availableStock > 0;
+    const canAddMore = product.isBatchTracked
+      ? !hasInventorySnapshot || availableStock > 0
+      : allowNegativeStock ||
+        !product.trackInventory ||
+        !hasInventorySnapshot ||
+        availableStock > 0;
     const isOutOfStock =
       !allowNegativeStock &&
       product.trackInventory &&
@@ -55,6 +58,11 @@ export const ProductListView = ({
       totalStock <= 0;
 
     if (product.isActive && canAddMore && !isOutOfStock) {
+      if (onAddProduct) {
+        onAddProduct(product);
+        return;
+      }
+
       const productForCart = hasInventorySnapshot
         ? ({
             ...product,
@@ -100,10 +108,14 @@ export const ProductListView = ({
             {/* Products List */}
             <div className="space-y-1.5">
               {categoryProducts.map((product) => {
-                const cartItem = items.find(
+                const cartItems = items.filter(
                   (item) => item.product.id === product.id,
                 );
-                const quantityInCart = cartItem?.quantity ?? 0;
+                const quantityInCart = cartItems.reduce(
+                  (sum, item) => sum + item.quantity,
+                  0,
+                );
+                const displayPrice = cartItems[0]?.product.price ?? product.price;
                 const totalStock = getProductCurrentStock(
                   product,
                   stockByProductId,
@@ -115,11 +127,12 @@ export const ProductListView = ({
                       stockByProductId,
                     )
                   : Number.POSITIVE_INFINITY;
-                const canAddMore =
-                  allowNegativeStock ||
-                  !product.trackInventory ||
-                  !hasInventorySnapshot ||
-                  availableStock > 0;
+                const canAddMore = product.isBatchTracked
+                  ? !hasInventorySnapshot || availableStock > 0
+                  : allowNegativeStock ||
+                    !product.trackInventory ||
+                    !hasInventorySnapshot ||
+                    availableStock > 0;
                 const isOutOfStock =
                   !allowNegativeStock &&
                   product.trackInventory &&
@@ -211,7 +224,7 @@ export const ProductListView = ({
                     {/* Right: Price */}
                     <div className="text-end shrink-0">
                       <div className="text-base font-bold text-gray-900">
-                        {formatCurrency(product.price)}
+                        {formatCurrency(displayPrice)}
                       </div>
                       {product.sku && (
                         <div className="text-[10px] text-gray-400 font-mono mt-0.5">

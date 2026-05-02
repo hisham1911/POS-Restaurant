@@ -26,8 +26,6 @@ import { Modal } from "@/components/common/Modal";
 import { numberToDisplay, displayToNumber } from "@/hooks/useNumberInput";
 import clsx from "clsx";
 
-const LEGACY_CURRENT_BRANCH_FIELD = ["current", "Branch", "Stock"].join("");
-
 interface ProductFormModalProps {
   product: Product | null;
   onClose: () => void;
@@ -169,17 +167,6 @@ export const ProductFormModal = ({
     }
   }, [branches?.data, formData.branchQuantity, isEditing]);
 
-  useEffect(() => {
-    if (!isEditing || !product || product.type !== ProductType.Physical) {
-      return;
-    }
-
-    setFormData((prev) => ({
-      ...prev,
-      branchQuantity: currentBranchQuantity,
-    }));
-  }, [isEditing, product, currentBranchQuantity]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -204,13 +191,7 @@ export const ProductFormModal = ({
         isActive: formData.isActive,
       };
 
-      // Keep backend compatibility while frontend migrates away from deprecated naming.
-      const updateData = {
-        ...baseUpdateData,
-        [LEGACY_CURRENT_BRANCH_FIELD]: formData.branchQuantity,
-      } as UpdateProductRequest;
-
-      await updateProduct(product.id, updateData);
+      await updateProduct(product.id, baseUpdateData as UpdateProductRequest);
     } else {
       // إنشاء منتج جديد
       const createData: CreateProductRequest = {
@@ -622,117 +603,185 @@ export const ProductFormModal = ({
               المخزون
             </h3>
 
-            {!isEditing && (
-              <div className="space-y-3">
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            {isEditing ? (
+              <div className="space-y-4">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                   <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                      <Package className="w-4 h-4 text-blue-600" />
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-amber-100">
+                      <Eye className="h-4 w-4 text-amber-700" />
                     </div>
-                    <div className="flex-1">
-                      <h4 className="text-sm font-semibold text-blue-900 mb-1">
-                        توزيع المخزون على الفروع
+                    <div className="space-y-1">
+                      <h4 className="text-sm font-semibold text-amber-900">
+                        تعديل الكمية يتم من شاشة المخزون
                       </h4>
-                      <p className="text-xs text-blue-700 mb-3">
-                        الكمية المدخلة ستُضاف للفرع الحالي فقط. الفروع الأخرى
-                        ستبدأ بصفر.
+                      <p className="text-xs leading-6 text-amber-800">
+                        كمية المنتج الحالية أصبحت مرتبطة بمخزون الفرع. استخدم
+                        حركات المخزون أو شاشة الجرد لتعديل الكمية الفعلية.
                       </p>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id="branchSpecific"
-                          checked={useBranchSpecificStock}
-                          onChange={(e) =>
-                            setUseBranchSpecificStock(e.target.checked)
-                          }
-                          className="w-4 h-4 text-primary-600 rounded"
-                        />
-                        <label
-                          htmlFor="branchSpecific"
-                          className="text-sm font-medium text-blue-900 cursor-pointer"
-                        >
-                          تحديد كمية مخصصة لكل فرع
-                        </label>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+                    <p className="text-xs font-medium text-gray-500">
+                      الكمية الحالية في الفرع
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-gray-900">
+                      {numberToDisplay(currentBranchQuantity)}
+                    </p>
+                    {currentBranch?.name && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        {currentBranch.name}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+                    <Input
+                      label="حد التنبيه"
+                      type="number"
+                      min="0"
+                      value={formData.lowStockThreshold || ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          lowStockThreshold: parseInt(e.target.value) || 5,
+                        })
+                      }
+                      placeholder="5"
+                    />
+                    <Input
+                      label="نقطة إعادة الطلب"
+                      type="number"
+                      min="0"
+                      value={formData.reorderPoint ?? ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          reorderPoint: e.target.value
+                            ? parseInt(e.target.value)
+                            : null,
+                        })
+                      }
+                      placeholder="اختياري"
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="space-y-3">
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Package className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="text-sm font-semibold text-blue-900 mb-1">
+                          توزيع المخزون على الفروع
+                        </h4>
+                        <p className="text-xs text-blue-700 mb-3">
+                          الكمية المدخلة ستُضاف للفرع الحالي فقط. الفروع الأخرى
+                          ستبدأ بصفر.
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="branchSpecific"
+                            checked={useBranchSpecificStock}
+                            onChange={(e) =>
+                              setUseBranchSpecificStock(e.target.checked)
+                            }
+                            className="w-4 h-4 text-primary-600 rounded"
+                          />
+                          <label
+                            htmlFor="branchSpecific"
+                            className="text-sm font-medium text-blue-900 cursor-pointer"
+                          >
+                            تحديد كمية مخصصة لكل فرع
+                          </label>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
 
-            {!useBranchSpecificStock ? (
-              <div className="grid grid-cols-3 gap-4">
-                <Input
-                  label="الكمية المتاحة *"
-                  type="number"
-                  min="0"
-                  value={numberToDisplay(formData.branchQuantity)}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      branchQuantity: displayToNumber(e.target.value),
-                    })
-                  }
-                  placeholder="0"
-                  required
-                />
-                <Input
-                  label="حد التنبيه"
-                  type="number"
-                  min="0"
-                  value={formData.lowStockThreshold || ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      lowStockThreshold: parseInt(e.target.value) || 5,
-                    })
-                  }
-                  placeholder="5"
-                />
-                <Input
-                  label="نقطة إعادة الطلب"
-                  type="number"
-                  min="0"
-                  value={formData.reorderPoint ?? ""}
-                  onChange={(e) =>
-                    setFormData({
-                      ...formData,
-                      reorderPoint: e.target.value
-                        ? parseInt(e.target.value)
-                        : null,
-                    })
-                  }
-                  placeholder="اختياري"
-                />
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-gray-600">
-                  حدد الكمية المبدئية لكل فرع:
-                </p>
-                <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto p-3 bg-gray-50 rounded-lg">
-                  {branches?.data?.map((branch) => (
-                    <div key={branch.id} className="flex items-center gap-2">
-                      <label className="text-sm font-medium text-gray-700 flex-1">
-                        {branch.name}
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={branchStocks[branch.id] || ""}
-                        onChange={(e) =>
-                          setBranchStocks({
-                            ...branchStocks,
-                            [branch.id]: parseInt(e.target.value) || 0,
-                          })
-                        }
-                        placeholder="0"
-                        className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
-                      />
+                {!useBranchSpecificStock ? (
+                  <div className="grid grid-cols-3 gap-4">
+                    <Input
+                      label="الكمية المتاحة *"
+                      type="number"
+                      min="0"
+                      value={numberToDisplay(formData.branchQuantity)}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          branchQuantity: displayToNumber(e.target.value),
+                        })
+                      }
+                      placeholder="0"
+                      required
+                    />
+                    <Input
+                      label="حد التنبيه"
+                      type="number"
+                      min="0"
+                      value={formData.lowStockThreshold || ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          lowStockThreshold: parseInt(e.target.value) || 5,
+                        })
+                      }
+                      placeholder="5"
+                    />
+                    <Input
+                      label="نقطة إعادة الطلب"
+                      type="number"
+                      min="0"
+                      value={formData.reorderPoint ?? ""}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          reorderPoint: e.target.value
+                            ? parseInt(e.target.value)
+                            : null,
+                        })
+                      }
+                      placeholder="اختياري"
+                    />
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-gray-600">
+                      حدد الكمية المبدئية لكل فرع:
+                    </p>
+                    <div className="grid grid-cols-2 gap-3 max-h-48 overflow-y-auto p-3 bg-gray-50 rounded-lg">
+                      {branches?.data?.map((branch) => (
+                        <div key={branch.id} className="flex items-center gap-2">
+                          <label className="text-sm font-medium text-gray-700 flex-1">
+                            {branch.name}
+                          </label>
+                          <input
+                            type="number"
+                            min="0"
+                            value={branchStocks[branch.id] || ""}
+                            onChange={(e) =>
+                              setBranchStocks({
+                                ...branchStocks,
+                                [branch.id]: parseInt(e.target.value) || 0,
+                              })
+                            }
+                            placeholder="0"
+                            className="w-24 px-3 py-1.5 border border-gray-300 rounded-lg text-sm"
+                          />
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         )}

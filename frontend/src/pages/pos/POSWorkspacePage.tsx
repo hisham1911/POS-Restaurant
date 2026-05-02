@@ -14,10 +14,12 @@ import { useOrders } from "@/hooks/useOrders";
 import { usePOSShortcuts } from "@/hooks/usePOSShortcuts";
 import { useGetShiftWarningsQuery } from "@/api/shiftsApi";
 import { useGetBranchInventoryQuery } from "@/api/inventoryApi";
+import { useGetAvailableBatchesQuery } from "@/api/productBatchApi";
 import { usePOSMode } from "@/hooks/usePOSMode";
 import { Customer } from "@/types/customer.types";
 import { PaymentMethod } from "@/types/order.types";
 import { Product, ProductType } from "@/types/product.types";
+import { ProductBatch } from "@/types/productBatch.types";
 import { toast } from "sonner";
 import { Link, Navigate } from "react-router-dom";
 import {
@@ -57,6 +59,10 @@ import { CartItemComponent } from "@/components/pos/CartItem";
 import { CustomerQuickCreateModal } from "@/components/pos/CustomerQuickCreateModal";
 import { ProductQuickCreateModal } from "@/components/pos/ProductQuickCreateModal";
 import { CustomItemModal } from "@/components/pos/CustomItemModal";
+import { BatchSelectionModal } from "@/components/pos/BatchSelectionModal";
+import { LowStockAlert } from "@/components/pos/LowStockAlert";
+import { ShiftWarningBanner } from "@/components/shifts";
+import { BatchExpiryAlertBanner } from "@/components/inventory";
 import { Loading } from "@/components/common/Loading";
 import { Button } from "@/components/common/Button";
 import { formatCurrency } from "@/utils/formatters";
@@ -186,6 +192,7 @@ export const POSWorkspacePage = () => {
   const [showPaymentError, setShowPaymentError] = useState(false);
   const [showDiscountInput, setShowDiscountInput] = useState(false);
   const [discountInputValue, setDiscountInputValue] = useState("");
+  const [dismissedWarning, setDismissedWarning] = useState(false);
   const [discountInputType, setDiscountInputType] = useState<
     "Percentage" | "Fixed"
   >("Percentage");
@@ -193,6 +200,11 @@ export const POSWorkspacePage = () => {
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryFee, setDeliveryFee] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
+
+  // Batch selection state
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [selectedProductForBatch, setSelectedProductForBatch] = useState<Product | null>(null);
+  const [pendingBatchQuantity, setPendingBatchQuantity] = useState(1);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const customerPhoneRef = useRef<HTMLInputElement>(null);
@@ -223,7 +235,7 @@ export const POSWorkspacePage = () => {
     isLoading: isLoadingShift,
     currentShift,
   } = useShift();
-  const { createOrder, completeOrder, isCreating, isCompleting } = useOrders();
+  const { createOrder, completeOrder, cancelOrder, isCreating, isCompleting } = useOrders();
   const currentBranch = useAppSelector(selectCurrentBranch);
   const allowNegativeStock = useAppSelector(selectAllowNegativeStock);
   const { hasPermission } = usePermission();
@@ -258,6 +270,10 @@ export const POSWorkspacePage = () => {
   const displayWorkspaceTotal =
     activeTab === "payment" ? paymentTotal : checkoutTotal;
 
+  useEffect(() => {
+    setDismissedWarning(false);
+  }, [shiftWarning?.message]);
+
   const openPaymentWorkspace = useCallback(() => {
     if (items.length === 0) {
       return;
@@ -289,17 +305,19 @@ export const POSWorkspacePage = () => {
 
   const handleAddProductToCart = useCallback(
     (product: Product, options?: { showToast?: boolean }) => {
-      const cartItem = items.find((item) => item.product.id === product.id);
-      const quantityInCart = cartItem?.quantity ?? 0;
+      const quantityInCart = items
+        .filter((item) => item.product.id === product.id)
+        .reduce((sum, item) => sum + item.quantity, 0);
       const totalStock = getProductCurrentStock(product, stockByProductId);
       const availableStock = hasInventorySnapshot
         ? getProductAvailableStock(product, quantityInCart, stockByProductId)
         : Number.POSITIVE_INFINITY;
-      const canAddMore =
-        allowNegativeStock ||
-        !product.trackInventory ||
-        !hasInventorySnapshot ||
-        availableStock > 0;
+      const canAddMore = product.isBatchTracked
+        ? !hasInventorySnapshot || availableStock > 0
+        : allowNegativeStock ||
+          !product.trackInventory ||
+          !hasInventorySnapshot ||
+          availableStock > 0;
       const isOutOfStock =
         !allowNegativeStock &&
         product.trackInventory &&
@@ -314,6 +332,13 @@ export const POSWorkspacePage = () => {
       if (isOutOfStock || !canAddMore) {
         toast.error(`لا يمكن إضافة ${product.name} لعدم توفر مخزون كافٍ`);
         return false;
+      }
+
+      if (product.isBatchTracked && currentBranch?.id) {
+        setSelectedProductForBatch(product);
+        setPendingBatchQuantity(1);
+        setShowBatchModal(true);
+        return true;
       }
 
       const productForCart = hasInventorySnapshot
@@ -337,6 +362,7 @@ export const POSWorkspacePage = () => {
       hasInventorySnapshot,
       items,
       stockByProductId,
+      currentBranch,
     ],
   );
 
@@ -574,9 +600,34 @@ export const POSWorkspacePage = () => {
         ],
       });
 
-      if (completedOrder) {
-        const changeAmount = numericAmount - paymentTotal;
+      if (!completedOrder) {
+        // ✅ فشل إكمال الطلب - نلغي المسودة تلقائيًا
+        await cancelOrder(order.id, "فشل إكمال الدفع", { silent: true });
+        return;
+      }
 
+      const changeAmount = completedOrder.changeAmount ?? 0;
+      const completedAmountDue = completedOrder.amountDue ?? 0;
+      const amountDue = completedAmountDue;
+
+      // ✅ CRITICAL: Change tab FIRST to hide payment UI immediately
+      setActiveTab("cart");
+
+      // ✅ Then clear cart and reset state in next tick
+      // This ensures tab change renders before cleanup
+      setTimeout(() => {
+        clearCart();
+        setSelectedCustomer(null);
+        setCustomerPhone("");
+        setTransactionReference("");
+        setAmountPaid("");
+        setAllowPartialPayment(false);
+        setOrderType("Standard");
+        setDeliveryAddress("");
+        setDeliveryFee("");
+        setDeliveryNotes("");
+
+        // Show success toasts after UI is cleared
         if (changeAmount > 0) {
           toast.success(
             `تم إتمام الدفع! الباقي: ${formatCurrency(changeAmount)}`,
@@ -594,19 +645,7 @@ export const POSWorkspacePage = () => {
             "تم إنشاء طلب التوصيل — يمكن تعيين المندوب من شاشة إدارة التوصيل",
           );
         }
-
-        clearCart();
-        setSelectedCustomer(null);
-        setCustomerPhone("");
-        setTransactionReference("");
-        setAmountPaid("");
-        setAllowPartialPayment(false);
-        setOrderType("Standard");
-        setDeliveryAddress("");
-        setDeliveryFee("");
-        setDeliveryNotes("");
-        setActiveTab("cart");
-      }
+      }, 0);
     } catch {
       toast.error("حدث خطأ غير متوقع");
     }
@@ -1650,6 +1689,7 @@ export const POSWorkspacePage = () => {
           <ProductListView
             products={filteredProducts}
             categories={categories}
+            onAddProduct={(product) => handleAddProductToCart(product)}
             stockByProductId={stockByProductId}
             hasInventorySnapshot={hasInventorySnapshot}
             isInventoryLoading={isInventoryLoading}
@@ -1698,11 +1738,12 @@ export const POSWorkspacePage = () => {
                     stockByProductId,
                   )
                 : Number.POSITIVE_INFINITY;
-              const canAddMore =
-                allowNegativeStock ||
-                !product.trackInventory ||
-                !hasInventorySnapshot ||
-                availableStock > 0;
+              const canAddMore = product.isBatchTracked
+                ? !hasInventorySnapshot || availableStock > 0
+                : allowNegativeStock ||
+                  !product.trackInventory ||
+                  !hasInventorySnapshot ||
+                  availableStock > 0;
               const isOutOfStock =
                 !allowNegativeStock &&
                 product.trackInventory &&
@@ -2053,23 +2094,17 @@ export const POSWorkspacePage = () => {
   return (
     <div className="h-full overflow-hidden bg-gray-100">
       <div className="flex h-full flex-col overflow-hidden p-1.5 md:p-2.5">
-        {shiftWarning && shiftWarning.shouldWarn && (
-          <div className="mb-1.5 rounded-[1.2rem] border border-warning-200 bg-warning-50 px-3 py-2.5">
-            <div className="flex items-start gap-2.5">
-              <AlertCircle className="mt-0.5 h-4.5 w-4.5 shrink-0 text-warning-600" />
-              <div className="flex-1">
-                <p className="text-xs font-semibold text-warning-800">
-                  {shiftWarning.message}
-                </p>
-                {shiftWarning.hoursOpen && (
-                  <p className="mt-0.5 text-[11px] text-warning-700">
-                    الوردية مفتوحة منذ {shiftWarning.hoursOpen.toFixed(1)} ساعة
-                  </p>
-                )}
-              </div>
-            </div>
+        {shiftWarning && shiftWarning.shouldWarn && !dismissedWarning && (
+          <div className="mb-1.5">
+            <ShiftWarningBanner
+              warning={shiftWarning}
+              onClose={() => setDismissedWarning(true)}
+            />
           </div>
         )}
+
+        <LowStockAlert />
+        <BatchExpiryAlertBanner />
 
         {renderSearchWorkspaceLayout()}
         {renderMobileWorkspace()}
@@ -2219,6 +2254,7 @@ export const POSWorkspacePage = () => {
                 <ProductListView
                   products={filteredProducts}
                   categories={categories}
+                  onAddProduct={(product) => handleAddProductToCart(product)}
                   stockByProductId={stockByProductId}
                   hasInventorySnapshot={hasInventorySnapshot}
                   isInventoryLoading={isInventoryLoading}
@@ -2360,11 +2396,44 @@ export const POSWorkspacePage = () => {
               isActive: true,
               type: ProductType.Service,
               trackInventory: false,
+              isBatchTracked: false,
               createdAt: new Date().toISOString(),
             };
 
             addItem(customProduct, item.quantity ?? 1);
             toast.success(`تم إضافة: ${item.name}`);
+          }}
+        />
+      )}
+
+      {/* Batch Selection Modal */}
+      {showBatchModal && selectedProductForBatch && currentBranch && (
+        <BatchSelectionModalWithData
+          product={selectedProductForBatch}
+          branchId={currentBranch.id}
+          onClose={() => {
+            setShowBatchModal(false);
+            setSelectedProductForBatch(null);
+          }}
+          onSelectBatch={(batch) => {
+            const productForCart = hasInventorySnapshot
+              ? ({
+                  ...selectedProductForBatch,
+                  branchInventoryQuantity: batch.quantity,
+                } as Product)
+              : selectedProductForBatch;
+
+            addItem(productForCart, pendingBatchQuantity, {
+              batchId: batch.id,
+              batchNumber: batch.batchNumber,
+              expiryDate: batch.expiryDate,
+              sellingPrice: batch.sellingPrice,
+              batchQuantity: batch.quantity,
+            });
+
+            toast.success(`تمت الإضافة: ${selectedProductForBatch.name} من ${batch.batchNumber || "بدون رقم دفعة"}`);
+            setShowBatchModal(false);
+            setSelectedProductForBatch(null);
           }}
         />
       )}
@@ -2380,6 +2449,64 @@ export const POSWorkspacePage = () => {
         />
       )}
     </div>
+  );
+};
+
+// Helper component to fetch batches and show modal
+const BatchSelectionModalWithData = ({
+  product,
+  branchId,
+  selectedBatchId,
+  onClose,
+  onSelectBatch,
+}: {
+  product: Product;
+  branchId: number;
+  selectedBatchId?: number;
+  onClose: () => void;
+  onSelectBatch: (batch: ProductBatch) => void;
+}) => {
+  const { data: batchesResponse, isLoading, isSuccess } = useGetAvailableBatchesQuery({
+    productId: product.id,
+    branchId,
+  });
+
+  const batches = batchesResponse?.data ?? [];
+  const firstBatch = batches[0];
+  const autoSelectedBatchIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (isLoading || !firstBatch) return;
+    if (autoSelectedBatchIdRef.current === firstBatch.id) return;
+
+    autoSelectedBatchIdRef.current = firstBatch.id;
+    onSelectBatch(firstBatch);
+    onClose();
+  }, [firstBatch, isLoading, onClose, onSelectBatch]);
+
+  useEffect(() => {
+    if (isLoading || !isSuccess || batches.length > 0) return;
+    toast.error(`لا توجد دفعات متاحة للبيع للمنتج: ${product.name}`);
+    onClose();
+  }, [batches.length, isLoading, isSuccess, onClose, product.name]);
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (batches.length > 0) {
+    return isLoading ? <Loading /> : null;
+  }
+
+  return (
+    <BatchSelectionModal
+      isOpen={true}
+      onClose={onClose}
+      productName={product.name}
+      batches={batches}
+      selectedBatchId={selectedBatchId}
+      onSelectBatch={onSelectBatch}
+    />
   );
 };
 

@@ -10,7 +10,6 @@ import {
   Users,
 } from "lucide-react";
 import { useShift } from "@/hooks/useShift";
-import { useAuth } from "@/hooks/useAuth";
 import { useGetShiftWarningsQuery } from "@/api/shiftsApi";
 import { Button } from "@/components/common/Button";
 import { Input } from "@/components/common/Input";
@@ -19,11 +18,8 @@ import { Modal } from "@/components/common/Modal";
 import { Loading } from "@/components/common/Loading";
 import { formatCurrency, formatDateTime } from "@/utils/formatters";
 import { shiftPersistence } from "@/utils/shiftPersistence";
-import type { Shift } from "@/types/shift.types";
 import {
   HandoverShiftModal,
-  ActiveShiftsList,
-  ForceCloseShiftModal,
   ShiftWarningBanner,
 } from "@/components/shifts";
 import clsx from "clsx";
@@ -32,16 +28,10 @@ export const ShiftPage = () => {
   const [showOpenModal, setShowOpenModal] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [showHandoverModal, setShowHandoverModal] = useState(false);
-  const [showForceCloseModal, setShowForceCloseModal] = useState(false);
-  const [selectedShiftForForceClose, setSelectedShiftForForceClose] =
-    useState<Shift | null>(null);
   const [openingBalance, setOpeningBalance] = useState("");
   const [closingBalance, setClosingBalance] = useState("");
   const [notes, setNotes] = useState("");
   const [dismissedWarning, setDismissedWarning] = useState(false);
-
-  const { user } = useAuth();
-  const isAdmin = user?.role === "Admin";
 
   const {
     currentShift,
@@ -80,10 +70,11 @@ export const ShiftPage = () => {
     setNotes("");
   };
 
-  const handleForceClose = (shift: Shift) => {
-    setSelectedShiftForForceClose(shift);
-    setShowForceCloseModal(true);
-  };
+  const nonCashCollected = currentShift
+    ? currentShift.collectedCard +
+      currentShift.collectedFawry +
+      currentShift.collectedBankTransfer
+    : 0;
 
   if (isLoading) return <Loading />;
 
@@ -226,29 +217,31 @@ export const ShiftPage = () => {
                   <CreditCard className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">Ø§Ù„Ù…Ø­ØµÙ„</p>
+                  <p className="text-sm text-gray-500">إجمالي التحصيل</p>
                   <p className="text-xl font-bold text-gray-800">
                     {formatCurrency(currentShift.totalCollected)}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">Collected</p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    نقدي + إلكتروني
+                  </p>
                 </div>
               </div>
             </Card>
           </div>
 
           {/* Payment Methods Breakdown */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
             <Card>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
                   <Banknote className="w-6 h-6 text-green-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">المبيعات النقدية</p>
+                  <p className="text-sm text-gray-500">التحصيل النقدي</p>
                   <p className="text-xl font-bold text-gray-800">
-                    {formatCurrency(currentShift.deferredAmount)}
+                    {formatCurrency(currentShift.collectedCash)}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">Deferred</p>
+                  <p className="text-xs text-gray-400 mt-1">نقدي</p>
                 </div>
               </div>
             </Card>
@@ -259,15 +252,14 @@ export const ShiftPage = () => {
                   <CreditCard className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <p className="text-sm text-gray-500">مبيعات إلكترونية</p>
+                  <p className="text-sm text-gray-500">التحصيل الإلكتروني</p>
                   <p className="text-xl font-bold text-gray-800">
-                    {formatCurrency(currentShift.totalCollected)}
+                    {formatCurrency(nonCashCollected)}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    Cash and non-cash collections
+                    بطاقات + فوري + تحويل
                   </p>
-                  {(currentShift.collectedFawry > 0 ||
-                    currentShift.collectedBankTransfer > 0) && (
+                  {nonCashCollected > 0 && (
                     <div className="text-xs text-gray-400 mt-1 space-y-0.5">
                       <p>
                         بطاقة:{" "}
@@ -287,17 +279,40 @@ export const ShiftPage = () => {
                 </div>
               </div>
             </Card>
+
+            <Card>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">المبيعات الآجلة</p>
+                  <p className="text-xl font-bold text-gray-800">
+                    {formatCurrency(currentShift.deferredAmount)}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">غير محصلة بعد</p>
+                </div>
+              </div>
+            </Card>
+
+            <Card>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-teal-50 rounded-xl flex items-center justify-center">
+                  <DollarSign className="w-6 h-6 text-teal-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">ديون مسددة</p>
+                  <p className="text-xl font-bold text-gray-800">
+                    {formatCurrency(currentShift.totalDebtPayments ?? 0)}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {currentShift.debtPaymentsCount ?? 0} دفعة
+                  </p>
+                </div>
+              </div>
+            </Card>
           </div>
         </>
-      )}
-
-      {/* Active Shifts List (Admin Only) */}
-      {isAdmin && (
-        <ActiveShiftsList
-          onForceClose={handleForceClose}
-          currentUserId={user?.id}
-          isAdmin={isAdmin}
-        />
       )}
 
       {/* Handover Modal */}
@@ -318,22 +333,6 @@ export const ShiftPage = () => {
         />
       )}
 
-      {/* Force Close Modal (Admin Only) */}
-      {selectedShiftForForceClose && (
-        <ForceCloseShiftModal
-          shift={selectedShiftForForceClose}
-          isOpen={showForceCloseModal}
-          onClose={() => {
-            setShowForceCloseModal(false);
-            setSelectedShiftForForceClose(null);
-          }}
-          onSuccess={() => {
-            setShowForceCloseModal(false);
-            setSelectedShiftForForceClose(null);
-            // Shifts will be refreshed automatically via RTK Query
-          }}
-        />
-      )}
 
       {/* Open Shift Modal */}
       <Modal
@@ -378,7 +377,7 @@ export const ShiftPage = () => {
       >
         <div className="space-y-4">
           {currentShift && (
-            <div className="p-4 bg-gray-50 rounded-xl space-y-2">
+            <div className="p-4 bg-gray-50 rounded-xl space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-gray-500">رصيد الافتتاح:</span>
                 <span className="font-medium">
@@ -386,12 +385,34 @@ export const ShiftPage = () => {
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">المبيعات النقدية:</span>
-                <span className="font-medium">
-                  {formatCurrency(currentShift.collectedCash)}
+                <span className="text-gray-500">إجمالي المبيعات:</span>
+                <span className="font-medium text-success-600">
+                  {formatCurrency(currentShift.totalSales)}
                 </span>
               </div>
-              <div className="flex justify-between border-t pt-2">
+              <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 ps-3">
+                <span>نقدي: {formatCurrency(currentShift.collectedCash)}</span>
+                <span>فيزا: {formatCurrency(currentShift.collectedCard)}</span>
+                <span>فوري: {formatCurrency(currentShift.collectedFawry)}</span>
+                <span>تحويل: {formatCurrency(currentShift.collectedBankTransfer)}</span>
+              </div>
+              {currentShift.totalRefunds != null && currentShift.totalRefunds > 0 && (
+                <div className="flex justify-between text-red-600">
+                  <span>المرتجعات:</span>
+                  <span className="font-medium">
+                    -{formatCurrency(currentShift.totalRefunds)}
+                  </span>
+                </div>
+              )}
+              {currentShift.totalExpenses != null && currentShift.totalExpenses > 0 && (
+                <div className="flex justify-between text-red-600">
+                  <span>المصروفات:</span>
+                  <span className="font-medium">
+                    -{formatCurrency(currentShift.totalExpenses)}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between border-t pt-2 mt-2">
                 <span className="text-gray-700 font-medium">
                   الرصيد المتوقع:
                 </span>

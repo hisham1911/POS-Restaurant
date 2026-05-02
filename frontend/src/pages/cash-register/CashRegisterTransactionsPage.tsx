@@ -69,6 +69,7 @@ export function CashRegisterTransactionsPage() {
       SupplierPayment: "دفع لمورد",
       Adjustment: "تسوية",
       Transfer: "تحويل",
+      DebtPayment: "تسديد دين",
     };
     return labels[type];
   };
@@ -84,6 +85,7 @@ export function CashRegisterTransactionsPage() {
       SupplierPayment: "bg-red-100 text-red-800",
       Adjustment: "bg-yellow-100 text-yellow-800",
       Transfer: "bg-purple-100 text-purple-800",
+      DebtPayment: "bg-green-100 text-green-800",
     };
     return badges[type];
   };
@@ -179,6 +181,7 @@ export function CashRegisterTransactionsPage() {
                   <option value="SupplierPayment">دفع لمورد</option>
                   <option value="Adjustment">تسوية</option>
                   <option value="Transfer">تحويل</option>
+                  <option value="DebtPayment">تسديد دين</option>
                 </select>
                 <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
               </div>

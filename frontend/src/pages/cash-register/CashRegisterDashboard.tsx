@@ -148,6 +148,7 @@ export function CashRegisterDashboard() {
       SupplierPayment: "دفع لمورد",
       Adjustment: "تسوية",
       Transfer: "تحويل",
+      DebtPayment: "تسديد دين",
     };
     return labels[type];
   };
@@ -163,6 +164,7 @@ export function CashRegisterDashboard() {
       SupplierPayment: "text-red-600",
       Adjustment: "text-yellow-600",
       Transfer: "text-purple-600",
+      DebtPayment: "text-green-600",
     };
     return colors[type];
   };

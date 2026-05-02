@@ -1,42 +1,14 @@
-import { useState, FormEvent } from "react";
-import { Plus, Edit2, Trash2, FolderOpen, Search } from "lucide-react";
-import {
-  useGetCategoriesQuery,
-  useCreateCategoryMutation,
-  useUpdateCategoryMutation,
-  useDeleteCategoryMutation,
-} from "@/api/categoriesApi";
+import { useState } from "react";
+import clsx from "clsx";
+import { Edit2, FolderOpen, Plus, Search, Trash2 } from "lucide-react";
+import { toast } from "sonner";
+import { useDeleteCategoryMutation, useGetCategoriesQuery } from "@/api/categoriesApi";
+import { CategoryFormModal } from "@/components/categories/CategoryFormModal";
 import { Button, ConfirmDialog } from "@/components/common";
-import { Input } from "@/components/common/Input";
 import { Card } from "@/components/common/Card";
-import { Modal } from "@/components/common/Modal";
+import { Input } from "@/components/common/Input";
 import { Loading } from "@/components/common/Loading";
 import type { Category } from "@/types/category.types";
-import { toast } from "sonner";
-import clsx from "clsx";
-
-const CATEGORY_ICONS = [
-  "🛒",
-  "🥤",
-  "🍞",
-  "🥩",
-  "🥦",
-  "🍫",
-  "🧴",
-  "🧼",
-  "🧻",
-  "🧃",
-  "🥫",
-  "🍚",
-  "🧂",
-  "☕",
-  "🍗",
-  "🍟",
-  "🧀",
-  "🥛",
-  "🍎",
-  "🧺",
-];
 
 const isImageSource = (value?: string): boolean => {
   if (!value) return false;
@@ -46,17 +18,11 @@ const isImageSource = (value?: string): boolean => {
 };
 
 export const CategoriesPage = () => {
-  const [searchTerm, setSearchTerm] = useState("");
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [deletingCategoryId, setDeletingCategoryId] = useState<number | null>(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    nameEn: "",
-    description: "",
-    imageUrl: "",
-  });
-  const [showIconPicker, setShowIconPicker] = useState(false);
+  const [deletingCategoryId, setDeletingCategoryId] = useState<number | null>(
+    null,
+  );
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
 
@@ -67,30 +33,27 @@ export const CategoriesPage = () => {
   });
   const categories = response?.data || [];
 
-  const [createCategory, { isLoading: isCreating }] =
-    useCreateCategoryMutation();
-  const [updateCategory, { isLoading: isUpdating }] =
-    useUpdateCategoryMutation();
   const [deleteCategory, { isLoading: isDeleting }] =
     useDeleteCategoryMutation();
 
   const handleEdit = (category: Category) => {
     setEditingCategory(category);
-    setFormData({
-      name: category.name,
-      nameEn: category.nameEn || "",
-      description: category.description || "",
-      imageUrl: category.imageUrl || "",
-    });
     setShowForm(true);
   };
 
-  const handleDeleteClick = (id: number) => {
-    setDeletingCategoryId(id);
+  const handleCreate = () => {
+    setEditingCategory(null);
+    setShowForm(true);
+  };
+
+  const handleCloseForm = () => {
+    setShowForm(false);
+    setEditingCategory(null);
   };
 
   const handleConfirmDelete = async () => {
     if (deletingCategoryId === null) return;
+
     try {
       await deleteCategory(deletingCategoryId).unwrap();
       toast.success("تم حذف التصنيف بنجاح");
@@ -100,47 +63,22 @@ export const CategoriesPage = () => {
     }
   };
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingCategory) {
-        await updateCategory({
-          id: editingCategory.id,
-          data: formData,
-        }).unwrap();
-        toast.success("تم تحديث التصنيف بنجاح");
-      } else {
-        await createCategory(formData).unwrap();
-        toast.success("تم إضافة التصنيف بنجاح");
-      }
-      handleCloseForm();
-    } catch {
-      // baseApi.ts already shows error toast
-    }
-  };
-
-  const handleCloseForm = () => {
-    setShowForm(false);
-    setEditingCategory(null);
-    setFormData({ name: "", nameEn: "", description: "", imageUrl: "" });
-    setShowIconPicker(false);
-  };
-
   if (isLoading) return <Loading />;
 
-  const activeCategories = categories.filter((c) => c.isActive).length;
+  const activeCategories = categories.filter((category) => category.isActive)
+    .length;
   const totalProducts = categories.reduce(
-    (sum, c) => sum + (c.productCount || 0),
+    (sum, category) => sum + (category.productCount || 0),
     0,
   );
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 lg:py-8 space-y-4 sm:space-y-6">
+      <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 sm:space-y-6 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-              <FolderOpen className="w-5 h-5 text-purple-600" />
+          <div className="mb-2 flex items-center gap-3">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100">
+              <FolderOpen className="h-5 w-5 text-purple-600" />
             </div>
             <h1 className="text-3xl font-bold text-gray-900">
               إدارة التصنيفات
@@ -154,29 +92,29 @@ export const CategoriesPage = () => {
         <div className="flex justify-end">
           <Button
             variant="primary"
-            onClick={() => setShowForm(true)}
-            rightIcon={<Plus className="w-5 h-5" />}
+            onClick={handleCreate}
+            rightIcon={<Plus className="h-5 w-5" />}
           >
             إضافة تصنيف
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <Card className="border-purple-100">
             <p className="text-sm text-gray-600">إجمالي التصنيفات</p>
-            <p className="text-2xl font-bold text-gray-900 mt-1">
+            <p className="mt-1 text-2xl font-bold text-gray-900">
               {categories.length}
             </p>
           </Card>
           <Card className="border-green-100">
             <p className="text-sm text-gray-600">التصنيفات النشطة</p>
-            <p className="text-2xl font-bold text-green-700 mt-1">
+            <p className="mt-1 text-2xl font-bold text-green-700">
               {activeCategories}
             </p>
           </Card>
           <Card className="border-blue-100">
             <p className="text-sm text-gray-600">إجمالي المنتجات</p>
-            <p className="text-2xl font-bold text-blue-700 mt-1">
+            <p className="mt-1 text-2xl font-bold text-blue-700">
               {totalProducts}
             </p>
           </Card>
@@ -184,13 +122,13 @@ export const CategoriesPage = () => {
 
         <Card>
           <div className="relative">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
             <Input
               type="text"
               placeholder="ابحث عن تصنيف..."
               value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
+              onChange={(event) => {
+                setSearch(event.target.value);
                 setPage(1);
               }}
               className="pr-10"
@@ -198,24 +136,24 @@ export const CategoriesPage = () => {
           </div>
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {categories.map((category) => (
             <Card key={category.id} className="relative">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-primary-100 rounded-xl flex items-center justify-center">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary-100">
                     {category.imageUrl ? (
                       isImageSource(category.imageUrl) ? (
                         <img
                           src={category.imageUrl}
                           alt={category.name}
-                          className="w-8 h-8 rounded object-cover"
+                          className="h-8 w-8 rounded object-cover"
                         />
                       ) : (
                         <span className="text-2xl">{category.imageUrl}</span>
                       )
                     ) : (
-                      <FolderOpen className="w-6 h-6 text-primary-600" />
+                      <FolderOpen className="h-6 w-6 text-primary-600" />
                     )}
                   </div>
                   <div>
@@ -227,34 +165,42 @@ export const CategoriesPage = () => {
                     )}
                   </div>
                 </div>
+
                 <div className="flex items-center gap-1">
                   <button
                     onClick={() => handleEdit(category)}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                    className="rounded-lg p-2 transition-colors hover:bg-gray-100"
                   >
-                    <Edit2 className="w-4 h-4 text-gray-500" />
+                    <Edit2 className="h-4 w-4 text-gray-500" />
                   </button>
                   <button
-                    onClick={() => handleDeleteClick(category.id)}
+                    onClick={() => setDeletingCategoryId(category.id)}
                     disabled={isDeleting}
-                    className="p-2 hover:bg-danger-50 rounded-lg transition-colors"
+                    className="rounded-lg p-2 transition-colors hover:bg-danger-50"
                   >
-                    <Trash2 className="w-4 h-4 text-danger-500" />
+                    <Trash2 className="h-4 w-4 text-danger-500" />
                   </button>
                 </div>
               </div>
+
               {category.description && (
                 <p className="mt-3 text-sm text-gray-500">
                   {category.description}
                 </p>
               )}
-              <div className="mt-4 pt-4 border-t flex items-center justify-between">
-                <span className="text-sm text-gray-500">
-                  {category.productCount || 0} منتج
-                </span>
+
+              <div className="mt-4 flex items-center justify-between border-t pt-4">
+                <div className="space-y-1">
+                  <span className="text-sm text-gray-500">
+                    {category.productCount || 0} منتج
+                  </span>
+                  <p className="text-xs text-gray-400">
+                    ترتيب {category.sortOrder}
+                  </p>
+                </div>
                 <span
                   className={clsx(
-                    "px-2.5 py-0.5 rounded-full text-xs font-medium",
+                    "rounded-full px-2.5 py-0.5 text-xs font-medium",
                     category.isActive
                       ? "bg-success-50 text-success-500"
                       : "bg-gray-100 text-gray-500",
@@ -267,8 +213,8 @@ export const CategoriesPage = () => {
           ))}
 
           {categories.length === 0 && (
-            <div className="col-span-full text-center py-12 text-gray-400">
-              <FolderOpen className="w-12 h-12 mx-auto mb-3" />
+            <div className="col-span-full py-12 text-center text-gray-400">
+              <FolderOpen className="mx-auto mb-3 h-12 w-12" />
               <p>{search ? "لا توجد نتائج للبحث" : "لا توجد تصنيفات"}</p>
             </div>
           )}
@@ -278,7 +224,7 @@ export const CategoriesPage = () => {
           <div className="flex items-center justify-center gap-2">
             <Button
               variant="secondary"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              onClick={() => setPage((prev) => Math.max(1, prev - 1))}
               disabled={page === 1}
             >
               السابق
@@ -286,7 +232,7 @@ export const CategoriesPage = () => {
             <span className="px-4 py-2 text-sm text-gray-600">صفحة {page}</span>
             <Button
               variant="secondary"
-              onClick={() => setPage((p) => p + 1)}
+              onClick={() => setPage((prev) => prev + 1)}
               disabled={categories.length < 20}
             >
               التالي
@@ -294,133 +240,12 @@ export const CategoriesPage = () => {
           </div>
         )}
 
-        <Modal
+        <CategoryFormModal
           isOpen={showForm}
           onClose={handleCloseForm}
-          title={editingCategory ? "تعديل التصنيف" : "إضافة تصنيف جديد"}
-        >
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="اسم التصنيف (عربي)"
-              value={formData.name}
-              onChange={(e) =>
-                setFormData({ ...formData, name: e.target.value })
-              }
-              placeholder="مثال: المشروبات"
-              required
-            />
-            <Input
-              label="اسم التصنيف (إنجليزي)"
-              value={formData.nameEn}
-              onChange={(e) =>
-                setFormData({ ...formData, nameEn: e.target.value })
-              }
-              placeholder="مثال بالإنجليزية: Beverages"
-            />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                الوصف
-              </label>
-              <textarea
-                value={formData.description}
-                onChange={(e) =>
-                  setFormData({ ...formData, description: e.target.value })
-                }
-                placeholder="وصف اختياري للتصنيف..."
-                rows={3}
-                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                أيقونة التصنيف
-              </label>
-
-              <div className="flex gap-2 mb-3">
-                <button
-                  type="button"
-                  onClick={() => setShowIconPicker((prev) => !prev)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
-                >
-                  {formData.imageUrl ? (
-                    isImageSource(formData.imageUrl) ? (
-                      <img
-                        src={formData.imageUrl}
-                        alt="category-icon"
-                        className="w-7 h-7 rounded object-cover"
-                      />
-                    ) : (
-                      <span className="text-2xl">{formData.imageUrl}</span>
-                    )
-                  ) : (
-                    <FolderOpen className="w-5 h-5 text-gray-400" />
-                  )}
-                  <span className="text-sm">اختر أيقونة</span>
-                </button>
-
-                {formData.imageUrl && (
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, imageUrl: "" })}
-                    className="px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-
-              {showIconPicker && (
-                <div className="mb-3 p-3 border border-gray-200 rounded-lg bg-gray-50 grid grid-cols-10 gap-2 max-h-44 overflow-y-auto">
-                  {CATEGORY_ICONS.map((icon) => (
-                    <button
-                      key={icon}
-                      type="button"
-                      onClick={() => {
-                        setFormData({ ...formData, imageUrl: icon });
-                        setShowIconPicker(false);
-                      }}
-                      className={clsx(
-                        "text-2xl p-2 rounded hover:bg-white transition-colors",
-                        formData.imageUrl === icon &&
-                          "bg-primary-100 ring-2 ring-primary-500",
-                      )}
-                    >
-                      {icon}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              <Input
-                label="أيقونة مخصصة (إيموجي أو رابط صورة)"
-                value={formData.imageUrl}
-                onChange={(e) =>
-                  setFormData({ ...formData, imageUrl: e.target.value })
-                }
-                placeholder="مثال: 🥤 أو https://example.com/icon.png"
-              />
-            </div>
-            <div className="flex gap-3 pt-4">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleCloseForm}
-                className="flex-1"
-              >
-                إلغاء
-              </Button>
-              <Button
-                type="submit"
-                variant="primary"
-                isLoading={isCreating || isUpdating}
-                className="flex-1"
-              >
-                {editingCategory ? "تحديث" : "إضافة"}
-              </Button>
-            </div>
-          </form>
-        </Modal>
+          onSuccess={handleCloseForm}
+          category={editingCategory ?? undefined}
+        />
 
         <ConfirmDialog
           open={deletingCategoryId !== null}
@@ -431,9 +256,8 @@ export const CategoriesPage = () => {
           isLoading={isDeleting}
         />
 
-        {/* Help Section */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold text-blue-900 mb-3">
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-6">
+          <h3 className="mb-3 text-lg font-semibold text-blue-900">
             💡 نصائح إدارة التصنيفات
           </h3>
           <ul className="space-y-2 text-sm text-blue-800">
@@ -446,14 +270,14 @@ export const CategoriesPage = () => {
             <li className="flex items-start gap-2">
               <span className="font-bold">•</span>
               <span>
-                <strong>الأسماء:</strong> أضف اسم بالعربية والإنجليزية لسهولة
+                <strong>الأسماء:</strong> أضف اسمًا بالعربية والإنجليزية لسهولة
                 البحث
               </span>
             </li>
             <li className="flex items-start gap-2">
               <span className="font-bold">•</span>
               <span>
-                <strong>عدد المنتجات:</strong> يظهر تلقائياً كم منتج في كل تصنيف
+                <strong>عدد المنتجات:</strong> يظهر تلقائيًا كم منتج في كل تصنيف
               </span>
             </li>
             <li className="flex items-start gap-2">
@@ -466,8 +290,7 @@ export const CategoriesPage = () => {
             <li className="flex items-start gap-2">
               <span className="font-bold">•</span>
               <span>
-                <strong>البحث:</strong> استخدم البحث للعثور على تصنيف معين
-                سريعاً
+                <strong>البحث:</strong> استخدم البحث للوصول إلى تصنيف معين بسرعة
               </span>
             </li>
           </ul>
@@ -478,4 +301,3 @@ export const CategoriesPage = () => {
 };
 
 export default CategoriesPage;
-

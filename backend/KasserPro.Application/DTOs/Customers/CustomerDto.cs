@@ -24,6 +24,13 @@ public class CustomerDto
     /// Tenant-wide, not branch-scoped.
     /// </summary>
     public decimal TotalDue { get; set; }
+
+    /// <summary>
+    /// مديونية العميل في الفرع الحالي فقط.
+    /// Branch-scoped.
+    /// </summary>
+    public decimal BranchAmountDue { get; set; }
+
     public decimal CreditLimit { get; set; }
 }
 
@@ -56,6 +63,11 @@ public class CreateCustomerRequest
     /// Notes about the customer (optional)
     /// </summary>
     public string? Notes { get; set; }
+
+    /// <summary>
+    /// Credit limit for the customer (optional, defaults to 0 for unlimited)
+    /// </summary>
+    public decimal? CreditLimit { get; set; }
 }
 
 /// <summary>
@@ -69,6 +81,11 @@ public class UpdateCustomerRequest
     public string? Notes { get; set; }
     public bool? IsActive { get; set; }
     public decimal? CreditLimit { get; set; }
+
+    /// <summary>
+    /// Concurrency token for optimistic locking
+    /// </summary>
+    public byte[] RowVersion { get; set; } = [];
 }
 
 /// <summary>

@@ -100,7 +100,10 @@ export const Cart = ({
 
       <div className="flex-1 space-y-2 overflow-y-auto px-3 py-3 lg:px-4">
         {items.map((item) => (
-          <CartItemComponent key={item.product.id} item={item} />
+          <CartItemComponent
+            key={`${item.product.id}-${item.batchId ?? "default"}`}
+            item={item}
+          />
         ))}
       </div>
 

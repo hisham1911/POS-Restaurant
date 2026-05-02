@@ -53,12 +53,10 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
     const newErrors: Record<string, string> = {};
 
     const numAmount = Number(formData.amount) || 0;
-    if (!formData.amount || numAmount <= 0) {
-      newErrors.amount = "المبلغ يجب أن يكون أكبر من صفر";
-    }
-
-    if (numAmount > customer.totalDue) {
-      newErrors.amount = `المبلغ أكبر من الدين المستحق (${customer.totalDue.toFixed(2)} ج.م)`;
+    if (!formData.amount || Number(formData.amount) <= 0) {
+      newErrors.amount = "المبلغ مطلوب";
+    } else if (Number(formData.amount) > customer.branchAmountDue) {
+      newErrors.amount = `المبلغ لا يمكن أن يتجاوز دين هذا الفرع (${formatCurrency(customer.branchAmountDue)})`;
     }
 
     if (
@@ -118,6 +116,11 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
     { id: "Cash", label: "نقدي", icon: <Banknote className="w-5 h-5" /> },
     { id: "Card", label: "فيزا", icon: <CreditCard className="w-5 h-5" /> },
     {
+      id: "BankTransfer",
+      label: "تحويل بنكي",
+      icon: <DollarSign className="w-5 h-5" />,
+    },
+    {
       id: "Fawry",
       label: "فودافون كاش",
       icon: <DollarSign className="w-5 h-5" />,
@@ -166,11 +169,16 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
             {/* Customer Info */}
             <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200">
               <div className="flex justify-between items-center mb-3">
-                <span className="text-sm text-gray-600">الدين الحالي</span>
+                <span className="text-sm text-gray-600">دين هذا الفرع</span>
                 <span className="text-3xl font-bold text-orange-600">
-                  {formatCurrency(customer.totalDue)}
+                  {formatCurrency(customer.branchAmountDue)}
                 </span>
               </div>
+              {customer.totalDue > customer.branchAmountDue && (
+                <div className="text-xs text-gray-500 text-center mb-1">
+                  إجمالي الدين عبر جميع الفروع: {formatCurrency(customer.totalDue)}
+                </div>
+              )}
               {customer.creditLimit > 0 && (
                 <div className="text-xs text-gray-500 text-center">
                   حد الائتمان: {formatCurrency(customer.creditLimit)}
@@ -231,22 +239,22 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
                 <button
                   type="button"
                   onClick={() =>
-                    setFormData({ ...formData, amount: customer.totalDue })
+                    setFormData({ ...formData, amount: customer.branchAmountDue })
                   }
                   className="flex-1 text-sm px-3 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 font-medium rounded-lg transition-colors"
                   disabled={isLoading}
                 >
-                  الكل ({formatCurrency(customer.totalDue)})
+                  الكل ({formatCurrency(customer.branchAmountDue)})
                 </button>
                 <button
                   type="button"
                   onClick={() =>
-                    setFormData({ ...formData, amount: customer.totalDue / 2 })
+                    setFormData({ ...formData, amount: customer.branchAmountDue / 2 })
                   }
                   className="flex-1 text-sm px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors"
                   disabled={isLoading}
                 >
-                  النصف ({formatCurrency(customer.totalDue / 2)})
+                  النصف ({formatCurrency(customer.branchAmountDue / 2)})
                 </button>
               </div>
             </div>
@@ -256,7 +264,7 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
               <label className="block text-sm font-semibold text-gray-700 mb-3">
                 طريقة الدفع <span className="text-red-500">*</span>
               </label>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-4 gap-3">
                 {paymentMethods.map((method) => (
                   <button
                     key={method.id}

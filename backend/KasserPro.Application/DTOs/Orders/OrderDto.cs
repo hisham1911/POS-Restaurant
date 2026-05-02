@@ -113,6 +113,11 @@ public class OrderItemDto
     public decimal Subtotal { get; set; }
     public decimal Total { get; set; }
     public string? Notes { get; set; }
+
+    // Batch Info (for batch-tracked products)
+    public int? BatchId { get; set; }
+    public string? BatchNumber { get; set; }
+    public DateTime? ExpiryDate { get; set; }
 }
 
 public class PaymentDto

@@ -9,7 +9,7 @@ export type PurchaseInvoiceStatus =
   | 'Returned' 
   | 'PartiallyReturned';
 
-export type PaymentMethod = 'Cash' | 'Card' | 'Fawry';
+export type PaymentMethod = 'Cash' | 'Card' | 'Fawry' | 'BankTransfer';
 
 export interface PurchaseInvoiceItem {
   id: number;

@@ -32,6 +32,10 @@ export interface CartItem {
   quantity: number;
   notes?: string;
   discount?: ItemDiscount;
+  // Batch tracking fields
+  batchId?: number;
+  batchNumber?: string;
+  expiryDate?: string;
 }
 
 interface CartState {
@@ -61,30 +65,49 @@ const cartSlice = createSlice({
   reducers: {
     addItem: (
       state,
-      action: PayloadAction<{ product: Product; quantity?: number }>,
+      action: PayloadAction<{ 
+        product: Product; 
+        quantity?: number;
+        batchId?: number;
+        batchNumber?: string;
+        expiryDate?: string;
+        batchSellingPrice?: number;
+        batchQuantity?: number;
+      }>,
     ) => {
-      const { product, quantity = 1 } = action.payload;
+      const { product, quantity = 1, batchId, batchNumber, expiryDate, batchSellingPrice, batchQuantity } = action.payload;
+      const productForCart = {
+        ...product,
+        ...(typeof batchSellingPrice === "number" ? { price: batchSellingPrice } : {}),
+        ...(typeof batchQuantity === "number" ? { branchInventoryQuantity: batchQuantity } : {}),
+      } as ProductWithBranchInventoryQuantity;
       const existingItem = state.items.find(
-        (item) => item.product.id === product.id,
+        (item) => item.product.id === product.id && item.batchId === batchId,
       );
 
       // Check stock availability
       const currentQty = existingItem?.quantity ?? 0;
       const newQty = currentQty + quantity;
-      const branchInventoryQuantity = product.trackInventory
-        ? getBranchInventoryQuantity(product)
+      const branchInventoryQuantity = productForCart.trackInventory
+        ? getBranchInventoryQuantity(productForCart)
         : undefined;
       const hasInventoryData = typeof branchInventoryQuantity === "number";
       const availableStock = hasInventoryData
         ? branchInventoryQuantity
         : Infinity;
 
-      // If allowNegativeStock is enabled, skip stock check
-      if (state.allowNegativeStock) {
+      // Negative stock is never allowed for batch-tracked lines without a real batch quantity.
+      if (state.allowNegativeStock && !productForCart.isBatchTracked) {
         if (existingItem) {
           existingItem.quantity = newQty;
         } else {
-          state.items.push({ product, quantity });
+          state.items.push({ 
+            product: productForCart, 
+            quantity,
+            batchId,
+            batchNumber,
+            expiryDate,
+          });
         }
         return;
       }
@@ -102,7 +125,13 @@ const cartSlice = createSlice({
         if (existingItem) {
           existingItem.quantity = availableStock;
         } else {
-          state.items.push({ product, quantity: maxAddable });
+          state.items.push({ 
+            product: productForCart, 
+            quantity: maxAddable,
+            batchId,
+            batchNumber,
+            expiryDate,
+          });
         }
         return;
       }
@@ -110,33 +139,42 @@ const cartSlice = createSlice({
       if (existingItem) {
         existingItem.quantity = newQty;
       } else {
-        state.items.push({ product, quantity });
+        state.items.push({ 
+            product: productForCart, 
+            quantity,
+            batchId,
+            batchNumber,
+          expiryDate,
+        });
       }
     },
 
-    removeItem: (state, action: PayloadAction<number>) => {
+    removeItem: (state, action: PayloadAction<{ productId: number; batchId?: number }>) => {
       state.items = state.items.filter(
-        (item) => item.product.id !== action.payload,
+        (item) =>
+          item.product.id !== action.payload.productId ||
+          item.batchId !== action.payload.batchId,
       );
     },
 
     updateQuantity: (
       state,
-      action: PayloadAction<{ productId: number; quantity: number }>,
+      action: PayloadAction<{ productId: number; quantity: number; batchId?: number }>,
     ) => {
-      const { productId, quantity } = action.payload;
+      const { productId, quantity, batchId } = action.payload;
 
       if (quantity <= 0) {
         state.items = state.items.filter(
-          (item) => item.product.id !== productId,
+          (item) => item.product.id !== productId || item.batchId !== batchId,
         );
         return;
       }
 
-      const item = state.items.find((item) => item.product.id === productId);
+      const item = state.items.find(
+        (item) => item.product.id === productId && item.batchId === batchId,
+      );
       if (item) {
-        // If allowNegativeStock is enabled, skip stock check
-        if (state.allowNegativeStock) {
+        if (state.allowNegativeStock && !item.product.isBatchTracked) {
           item.quantity = quantity;
           return;
         }
@@ -241,6 +279,56 @@ const cartSlice = createSlice({
         item.discount = action.payload.discount;
       }
     },
+
+    // تحديث الباتش لمنتج في السلة
+    updateItemBatch: (
+      state,
+      action: PayloadAction<{
+        productId: number;
+        currentBatchId?: number;
+        batchId: number;
+        batchNumber?: string;
+        expiryDate: string;
+        sellingPrice?: number;
+        batchQuantity?: number;
+      }>,
+    ) => {
+      const item = state.items.find(
+        (i) =>
+          i.product.id === action.payload.productId &&
+          i.batchId === action.payload.currentBatchId,
+      );
+      if (item) {
+        const duplicate = state.items.find(
+          (i) =>
+            i !== item &&
+            i.product.id === action.payload.productId &&
+            i.batchId === action.payload.batchId,
+        );
+
+        if (duplicate) {
+          duplicate.quantity += item.quantity;
+          state.items = state.items.filter((i) => i !== item);
+          return;
+        }
+
+        item.batchId = action.payload.batchId;
+        item.batchNumber = action.payload.batchNumber;
+        item.expiryDate = action.payload.expiryDate;
+        if (typeof action.payload.sellingPrice === "number") {
+          item.product = { ...item.product, price: action.payload.sellingPrice };
+        }
+        if (typeof action.payload.batchQuantity === "number") {
+          item.product = {
+            ...item.product,
+            branchInventoryQuantity: action.payload.batchQuantity,
+          } as ProductWithBranchInventoryQuantity;
+          if (item.quantity > action.payload.batchQuantity) {
+            item.quantity = action.payload.batchQuantity;
+          }
+        }
+      }
+    },
   },
 });
 
@@ -254,6 +342,7 @@ export const {
   setServiceChargeRate,
   setDiscount,
   setItemDiscount,
+  updateItemBatch,
 } = cartSlice.actions;
 
 // Selectors

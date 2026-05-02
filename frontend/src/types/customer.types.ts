@@ -17,6 +17,7 @@ export interface Customer {
   createdAt: string;
   // Credit Sales Fields
   totalDue: number;
+  branchAmountDue: number;
   creditLimit: number;
   // Concurrency Token (for optimistic locking)
   rowVersion?: string;
@@ -37,6 +38,7 @@ export interface CreateCustomerRequest {
   email?: string;
   address?: string;
   notes?: string;
+  creditLimit?: number;
 }
 
 export interface UpdateCustomerRequest {

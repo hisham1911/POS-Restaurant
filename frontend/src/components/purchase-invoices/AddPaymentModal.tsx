@@ -121,6 +121,7 @@ export function AddPaymentModal({
               <option value="Cash">نقدي</option>
               <option value="Card">فيزا</option>
               <option value="Fawry">فودافون كاش</option>
+              <option value="BankTransfer">تحويل بنكي</option>
             </select>
             <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
           </div>

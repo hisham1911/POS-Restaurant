@@ -112,52 +112,44 @@ public class SupplierReportService : ISupplierReportService
             var branchId = _currentUserService.BranchId;
             var branch = await _context.Branches.FindAsync(branchId);
 
-            var suppliersWithDebt = await _context.Suppliers
+            var supplierDebts = await _context.Suppliers
+                .AsNoTracking()
                 .Where(s => s.TenantId == tenantId
-                          && s.BranchId == branchId
-                          && s.IsActive
-                          && s.TotalDue > 0)
+                         && s.BranchId == branchId
+                         && !s.IsDeleted
+                         && s.TotalDue > 0)
+                .Select(s => new SupplierDebtDetailDto
+                {
+                    SupplierId = s.Id,
+                    SupplierName = s.Name,
+                    Phone = s.Phone,
+                    TotalDue = s.TotalDue,
+                    UnpaidInvoicesCount = s.PurchaseInvoices
+                        .Count(pi => !pi.IsDeleted
+                                  && pi.AmountDue > 0
+                                  && pi.Status != PurchaseInvoiceStatus.Cancelled),
+                    OldestUnpaidInvoiceDate = s.PurchaseInvoices
+                        .Where(pi => !pi.IsDeleted
+                                  && pi.AmountDue > 0
+                                  && pi.Status != PurchaseInvoiceStatus.Cancelled)
+                        .OrderBy(pi => pi.InvoiceDate)
+                        .Select(pi => (DateTime?)pi.InvoiceDate)
+                        .FirstOrDefault(),
+                    LastPaymentDate = s.PurchaseInvoices
+                        .Where(pi => !pi.IsDeleted
+                                  && pi.Status != PurchaseInvoiceStatus.Cancelled)
+                        .SelectMany(pi => pi.Payments)
+                        .OrderByDescending(p => p.CreatedAt)
+                        .Select(p => (DateTime?)p.CreatedAt)
+                        .FirstOrDefault()
+                })
                 .ToListAsync();
 
-            var supplierDebts = new List<SupplierDebtDetailDto>();
-
-            foreach (var supplier in suppliersWithDebt)
-            {
-                var unpaidInvoices = await _context.PurchaseInvoices
-                    .Where(pi => pi.TenantId == tenantId
-                              && pi.SupplierId == supplier.Id
-                              && pi.Status != PurchaseInvoiceStatus.Cancelled
-                              && pi.AmountDue > 0)
-                    .OrderBy(pi => pi.InvoiceDate)
-                    .ToListAsync();
-
-                var lastPayment = await _context.PurchaseInvoices
-                    .Include(pi => pi.Payments)
-                    .Where(pi => pi.TenantId == tenantId && pi.SupplierId == supplier.Id)
-                    .SelectMany(pi => pi.Payments)
-                    .OrderByDescending(p => p.CreatedAt)
-                    .FirstOrDefaultAsync();
-
-                var oldestUnpaid = unpaidInvoices.FirstOrDefault();
-                var daysSinceOldest = oldestUnpaid != null
-                    ? (int)(DateTime.UtcNow - oldestUnpaid.InvoiceDate).TotalDays
-                    : 0;
-
-                supplierDebts.Add(new SupplierDebtDetailDto
-                {
-                    SupplierId = supplier.Id,
-                    SupplierName = supplier.Name,
-                    Phone = supplier.Phone,
-                    TotalDue = supplier.TotalDue,
-                    UnpaidInvoicesCount = unpaidInvoices.Count,
-                    OldestUnpaidInvoiceDate = oldestUnpaid?.InvoiceDate,
-                    DaysSinceOldestInvoice = daysSinceOldest,
-                    LastPaymentDate = lastPayment?.CreatedAt
-                });
-            }
-
             var totalOutstanding = supplierDebts.Sum(s => s.TotalDue);
-            var overdueInvoices = supplierDebts.Where(s => s.DaysSinceOldestInvoice > 30).ToList();
+            var overdueInvoices = supplierDebts
+                .Where(s => s.OldestUnpaidInvoiceDate.HasValue
+                         && (DateTime.UtcNow - s.OldestUnpaidInvoiceDate.Value).TotalDays > 30)
+                .ToList();
 
             var report = new SupplierDebtsReportDto
             {

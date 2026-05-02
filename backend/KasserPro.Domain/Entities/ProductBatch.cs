@@ -18,7 +18,7 @@ public class ProductBatch : BaseEntity
     /// Batch number / lot number (e.g., "LOT-2026-001")
     /// </summary>
     [MaxLength(100)]
-    public string BatchNumber { get; set; } = string.Empty;
+    public string? BatchNumber { get; set; }
 
     /// <summary>
     /// Date of production (optional)
@@ -28,7 +28,7 @@ public class ProductBatch : BaseEntity
     /// <summary>
     /// Expiry date — critical for FEFO
     /// </summary>
-    public DateTime ExpiryDate { get; set; }
+    public DateTime? ExpiryDate { get; set; }
 
     /// <summary>
     /// Date the batch was received (purchase date)
@@ -54,6 +54,11 @@ public class ProductBatch : BaseEntity
     /// Cost price per unit at time of purchase
     /// </summary>
     public decimal? CostPrice { get; set; }
+
+    /// <summary>
+    /// Optional selling price specific to this batch (overrides Product.Price)
+    /// </summary>
+    public decimal? SellingPrice { get; set; }
 
     /// <summary>
     /// Supplier name snapshot

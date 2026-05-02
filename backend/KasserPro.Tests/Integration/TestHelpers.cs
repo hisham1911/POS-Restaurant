@@ -10,8 +10,9 @@ using Microsoft.IdentityModel.Tokens;
 /// </summary>
 public static class TestHelpers
 {
-    // Must match appsettings.json
-    private const string JwtKey = "YourSuperSecretKeyHere_MustBe32Characters!";
+    // Must match appsettings.json or Jwt__Key env var (Program.cs fallback)
+    private static readonly string JwtKey = Environment.GetEnvironmentVariable("Jwt__Key")
+        ?? "YourSuperSecretKeyHere_MustBe32Characters!";
     private const string JwtIssuer = "KasserPro";
     private const string JwtAudience = "KasserPro";
 

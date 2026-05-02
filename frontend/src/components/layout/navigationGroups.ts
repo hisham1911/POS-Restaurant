@@ -75,7 +75,7 @@ export const moduleSections: ModuleSectionConfig[] = [
     id: "products",
     title: "الأصناف والمخزون",
     icon: Package,
-    paths: ["/products", "/categories", "/inventory"],
+    paths: ["/products", "/categories", "/inventory", "/stock-taking", "/product-batches"],
     tone: "emerald",
   },
   {

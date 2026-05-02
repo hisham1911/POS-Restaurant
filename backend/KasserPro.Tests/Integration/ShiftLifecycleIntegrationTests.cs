@@ -196,16 +196,15 @@ public class ShiftLifecycleIntegrationTests : IClassFixture<CustomWebApplication
 
         var completedOrder = completeOrderResult.Data!;
         completedOrder.Status.Should().Be("Completed", because: "Order status should be Completed");
-        completedOrder.AmountPaid.Should().Be(120m, because: "Amount paid should be 120 EGP");
+        completedOrder.AmountPaid.Should().Be(114m, because: "Applied payment should equal the order total");
         completedOrder.ChangeAmount.Should().Be(6m, because: "Change should be 120 - 114 = 6 EGP");
-        completedOrder.AmountDue.Should().Be(-6m, because: "Amount due should be negative (overpaid)");
+        completedOrder.AmountDue.Should().Be(0m, because: "Amount due must never go negative");
 
         // ═══════════════════════════════════════════════════════════════════
         // PHASE 7: CLOSE SHIFT AND VERIFY TOTALS
         // Opening Balance = 500 EGP
-        // Cash Sales = 120 EGP (paid) - 6 EGP (change given) = 114 EGP net cash received
-        // But TotalCash tracks payment amounts, not net
-        // Expected Balance = Opening + TotalCash = 500 + 120 = 620 EGP
+        // Cash Sales = 114 EGP net cash received after change
+        // Expected Balance = Opening + TotalCash = 500 + 114 = 614 EGP
         // ═══════════════════════════════════════════════════════════════════
         var closeShiftRequest = new CloseShiftRequest
         {
@@ -226,20 +225,112 @@ public class ShiftLifecycleIntegrationTests : IClassFixture<CustomWebApplication
         closedShift.OpeningBalance.Should().Be(500m);
         closedShift.ClosingBalance.Should().Be(614m);
         closedShift.TotalOrders.Should().Be(1, because: "One order was completed");
-        closedShift.TotalCash.Should().Be(120m, because: "Total cash payments = 120 EGP");
+        closedShift.TotalCash.Should().Be(114m, because: "Total cash should be the applied sale amount after change");
         closedShift.TotalCard.Should().Be(0m, because: "No card payments were made");
         
-        // Expected balance = Opening + TotalCash = 500 + 120 = 620
-        // Actual closing = 614 (after giving 6 EGP change)
-        // Difference = 614 - 620 = -6 (which is the change given)
-        closedShift.ExpectedBalance.Should().Be(620m, 
-            because: "Expected = Opening (500) + TotalCash (120)");
-        closedShift.Difference.Should().Be(-6m, 
-            because: "Difference = Closing (614) - Expected (620) = -6 (change given)");
+        // Expected balance = Opening + TotalCash = 500 + 114 = 614
+        closedShift.ExpectedBalance.Should().Be(614m,
+            because: "Expected = Opening (500) + applied cash sale (114)");
+        closedShift.Difference.Should().Be(0m,
+            because: "Change is not counted as collected sales cash");
 
         // ═══════════════════════════════════════════════════════════════════
         // 🎉 ALL TESTS PASSED - SYSTEM IS PRODUCTION READY 🎉
         // ═══════════════════════════════════════════════════════════════════
+    }
+
+    /// <summary>
+    /// Verify shift details endpoint returns the full financial payload used by the frontend drawer.
+    /// </summary>
+    [Fact]
+    public async Task GetShiftById_ShouldReturnDetailedFinancialSnapshot()
+    {
+        var testData = await SeedTestDataAsync();
+
+        var client = _factory.CreateClient();
+        var token = TestHelpers.GenerateTestToken(
+            userId: testData.UserId,
+            tenantId: testData.TenantId,
+            branchId: testData.BranchId,
+            role: "Cashier"
+        );
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var openShiftResponse = await client.PostAsJsonAsync("/api/shifts/open", new OpenShiftRequest
+        {
+            OpeningBalance = 500m
+        });
+        var openShiftResult = await DeserializeResponse<ShiftDto>(openShiftResponse);
+        openShiftResult.Success.Should().BeTrue();
+        openShiftResult.Data.Should().NotBeNull();
+
+        var shiftId = openShiftResult.Data!.Id;
+
+        var createOrderResponse = await client.PostAsJsonAsync("/api/orders", new CreateOrderRequest
+        {
+            OrderType = OrderType.DineIn,
+            CustomerName = "Shift Details Test",
+            Items = new List<CreateOrderItemRequest>
+            {
+                new() { ProductId = testData.ActiveProductId, Quantity = 1 }
+            }
+        });
+        var createOrderResult = await DeserializeResponse<OrderDto>(createOrderResponse);
+        createOrderResult.Success.Should().BeTrue();
+        createOrderResult.Data.Should().NotBeNull();
+
+        await client.PostAsJsonAsync($"/api/orders/{createOrderResult.Data!.Id}/complete", new CompleteOrderRequest
+        {
+            Payments = new List<PaymentRequest>
+            {
+                new() { Method = "Cash", Amount = 120m }
+            }
+        });
+
+        var closeShiftResponse = await client.PostAsJsonAsync("/api/shifts/close", new CloseShiftRequest
+        {
+            ClosingBalance = 614m,
+            Notes = "Shift details API verification",
+            RowVersion = openShiftResult.Data.RowVersion
+        });
+        var closeShiftResult = await DeserializeResponse<ShiftDto>(closeShiftResponse);
+        closeShiftResult.Success.Should().BeTrue();
+
+        var detailsResponse = await client.GetAsync($"/api/shifts/{shiftId}");
+        detailsResponse.IsSuccessStatusCode.Should().BeTrue();
+
+        var detailsJson = await detailsResponse.Content.ReadAsStringAsync();
+        Console.WriteLine($"SHIFT_DETAILS_JSON: {detailsJson}");
+
+        var detailsResult = JsonSerializer.Deserialize<ApiResponse<ShiftDto>>(detailsJson, _jsonOptions);
+        detailsResult.Should().NotBeNull();
+        detailsResult!.Success.Should().BeTrue();
+        detailsResult.Data.Should().NotBeNull();
+
+        var detailedShift = detailsResult.Data!;
+        detailedShift.Id.Should().Be(shiftId);
+        detailedShift.TotalSales.Should().Be(114m);
+        detailedShift.TotalCash.Should().Be(114m);
+        detailedShift.TotalCollected.Should().Be(114m);
+        detailedShift.ExpectedBalance.Should().Be(614m);
+        detailedShift.Difference.Should().Be(0m);
+        detailedShift.TotalRefunds.Should().Be(0m);
+        detailedShift.TotalExpenses.Should().Be(0m);
+        detailedShift.TotalOrders.Should().Be(1);
+        detailedShift.TotalOrdersCount.Should().Be(1);
+        detailedShift.CompletedOrdersCount.Should().Be(1);
+        detailedShift.Orders.Should().HaveCount(1);
+        detailedShift.Orders[0].PaymentMethod.Should().Be("Cash");
+
+        var historyResponse = await client.GetAsync("/api/shifts/history");
+        historyResponse.IsSuccessStatusCode.Should().BeTrue();
+
+        var historyResult = await DeserializeResponse<List<ShiftDto>>(historyResponse);
+        historyResult.Success.Should().BeTrue();
+        historyResult.Data.Should().NotBeNullOrEmpty();
+        historyResult.Data![0].Id.Should().Be(shiftId);
+        historyResult.Data[0].TotalSales.Should().Be(114m);
+        historyResult.Data[0].TotalOrdersCount.Should().Be(1);
     }
 
     /// <summary>
@@ -410,6 +501,13 @@ public class ShiftLifecycleIntegrationTests : IClassFixture<CustomWebApplication
             IsActive = true
         };
         db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        // Seed cashier permissions required by service-layer checks
+        db.UserPermissions.AddRange(
+            new UserPermission { UserId = user.Id, Permission = Permission.OrdersCreate },
+            new UserPermission { UserId = user.Id, Permission = Permission.PosCreditSale }
+        );
         await db.SaveChangesAsync();
 
         // Create Category

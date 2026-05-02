@@ -8,8 +8,10 @@ export interface BranchInventory {
   productSku?: string;
   productBarcode?: string;
   quantity: number;
+  batchAvailableQuantity?: number;
   reorderLevel: number;
   isLowStock: boolean;
+  isBatchTracked: boolean;
   lastUpdatedAt: string;
 }
 

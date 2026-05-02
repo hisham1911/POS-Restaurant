@@ -2,8 +2,8 @@ namespace KasserPro.API.Controllers;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using KasserPro.Application.DTOs;
 using KasserPro.Application.DTOs.Common;
+using KasserPro.Application.DTOs.ProductBatches;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.Domain.Enums;
 using KasserPro.API.Middleware;
@@ -33,10 +33,30 @@ public class ProductBatchesController : ControllerBase
     public async Task<ActionResult<ApiResponse<List<ProductBatchDto>>>> GetByProduct(int productId, [FromQuery] int? branchId)
         => Ok(await _service.GetByProductAsync(productId, branchId));
 
+    [HttpGet("available")]
+    [HasPermission(Permission.InventoryView)]
+    public async Task<ActionResult<ApiResponse<List<ProductBatchDto>>>> GetAvailableBatches([FromQuery] int productId, [FromQuery] int branchId)
+        => Ok(await _service.GetAvailableBatchesAsync(productId, branchId));
+
     [HttpPost]
     [HasPermission(Permission.InventoryManage)]
     public async Task<ActionResult<ApiResponse<ProductBatchDto>>> Create([FromBody] CreateProductBatchDto dto)
         => Ok(await _service.CreateAsync(dto));
+
+    [HttpPut("{id:int}")]
+    [HasPermission(Permission.InventoryManage)]
+    public async Task<ActionResult<ApiResponse<ProductBatchDto>>> Update(int id, [FromBody] UpdateProductBatchDto dto)
+        => Ok(await _service.UpdateAsync(id, dto));
+
+    [HttpPatch("{id:int}/hold")]
+    [HasPermission(Permission.InventoryManage)]
+    public async Task<ActionResult<ApiResponse<ProductBatchDto>>> Hold(int id, [FromBody] HoldBatchRequest request)
+        => Ok(await _service.HoldAsync(id, request.Reason));
+
+    [HttpPatch("{id:int}/release")]
+    [HasPermission(Permission.InventoryManage)]
+    public async Task<ActionResult<ApiResponse<ProductBatchDto>>> Release(int id, [FromBody] HoldBatchRequest request)
+        => Ok(await _service.ReleaseAsync(id, request.Reason));
 
     [HttpDelete("{id:int}")]
     [HasPermission(Permission.InventoryManage)]
@@ -47,4 +67,9 @@ public class ProductBatchesController : ControllerBase
     [HasPermission(Permission.InventoryView)]
     public async Task<ActionResult<ApiResponse<BatchExpirySummaryDto>>> GetExpiryAlerts([FromQuery] int? branchId)
         => Ok(await _service.GetExpiryAlertsAsync(branchId));
+
+    [HttpPost("update-expired")]
+    [HasPermission(Permission.InventoryView)]
+    public async Task<ActionResult<ApiResponse<int>>> UpdateExpiredBatches(CancellationToken ct)
+        => Ok(await _service.UpdateExpiredBatchesStatusAsync(ct));
 }

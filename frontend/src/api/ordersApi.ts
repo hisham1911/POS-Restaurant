@@ -109,7 +109,7 @@ export const ordersApi = baseApi.injectEndpoints({
       ApiResponse<Order>,
       {
         orderId: number;
-        item: { productId: number; quantity: number; notes?: string };
+        item: { productId: number; quantity: number; batchId?: number; notes?: string };
       }
     >({
       query: ({ orderId, item }) => ({
@@ -232,6 +232,18 @@ export const ordersApi = baseApi.injectEndpoints({
         method: "POST",
       }),
     }),
+
+    // تحديد طلب التوصيل كـ "تم التسليم"
+    markAsDelivered: builder.mutation<ApiResponse<Order>, number>({
+      query: (orderId) => ({
+        url: `/orders/${orderId}/mark-delivered`,
+        method: "POST",
+      }),
+      invalidatesTags: (_result, _error, orderId) => [
+        { type: "Orders", id: orderId },
+        { type: "Orders", id: "LIST" },
+      ],
+    }),
   }),
 });
 
@@ -248,4 +260,5 @@ export const {
   useCancelOrderMutation,
   useRefundOrderMutation,
   usePrintReceiptMutation,
+  useMarkAsDeliveredMutation,
 } = ordersApi;

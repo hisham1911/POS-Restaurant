@@ -13,6 +13,7 @@ public enum Permission
     PosEditPrice       = 103,
     PosDeleteItem      = 104,
     PosCancelOrder     = 105,
+    PosChangeBatch     = 106,
 
     // Orders
     OrdersView         = 200,

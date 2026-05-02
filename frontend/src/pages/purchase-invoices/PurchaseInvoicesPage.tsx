@@ -12,6 +12,10 @@ import { Loading } from "../../components/common/Loading";
 import { formatCurrency, formatDateOnly } from "../../utils/formatters";
 import { PurchaseInvoiceStatus } from "../../types/purchaseInvoice.types";
 import { toast } from "sonner";
+import {
+  purchaseInvoiceStatusColors,
+  purchaseInvoiceStatusLabels,
+} from "../../constants/purchaseInvoiceStatuses";
 
 export function PurchaseInvoicesPage() {
   const navigate = useNavigate();
@@ -58,27 +62,11 @@ export function PurchaseInvoicesPage() {
   };
 
   const getStatusBadge = (status: string) => {
-    const statusColors: Record<string, string> = {
-      Draft: "bg-gray-100 text-gray-800",
-      Confirmed: "bg-blue-100 text-blue-800",
-      Paid: "bg-green-100 text-green-800",
-      PartiallyPaid: "bg-yellow-100 text-yellow-800",
-      Cancelled: "bg-red-100 text-red-800",
-    };
-
-    const statusLabels: Record<string, string> = {
-      Draft: "مسودة",
-      Confirmed: "مؤكدة",
-      Paid: "مدفوعة",
-      PartiallyPaid: "مدفوعة جزئياً",
-      Cancelled: "ملغاة",
-    };
-
     return (
       <span
-        className={`px-2 py-1 rounded-full text-xs font-medium ${statusColors[status] || "bg-gray-100 text-gray-800"}`}
+        className={`px-2 py-1 rounded-full text-xs font-medium ${purchaseInvoiceStatusColors[status] || "bg-gray-100 text-gray-800"}`}
       >
-        {statusLabels[status] || status}
+        {purchaseInvoiceStatusLabels[status] || status}
       </span>
     );
   };
@@ -86,7 +74,8 @@ export function PurchaseInvoicesPage() {
   if (isLoading) return <Loading />;
 
   const totalAmount = invoicesResponse?.data?.totalAmount || 0;
-  const paidCount = invoices.filter((inv) => inv.status === "Paid").length;
+  const totalPaidAmount = invoicesResponse?.data?.totalSpentAmount || 0;
+  const totalDueAmount = invoicesResponse?.data?.totalDueAmount || 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -112,15 +101,16 @@ export function PurchaseInvoicesPage() {
           </Button>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Card className="border-violet-100">
             <p className="text-sm text-gray-600">إجمالي الفواتير</p>
             <p className="text-2xl font-bold text-gray-900 mt-1">
               {invoicesResponse?.data?.totalCount || 0}
             </p>
+            <p className="mt-2 text-xs text-gray-500">حسب الفلاتر الحالية</p>
           </Card>
           <Card className="border-blue-100">
-            <p className="text-sm text-gray-600">المبلغ الإجمالي</p>
+            <p className="text-sm text-gray-600">إجمالي قيمة الفواتير</p>
             <p className="text-2xl font-bold text-blue-700 mt-1">
               {formatCurrency(totalAmount)}
             </p>
@@ -129,10 +119,18 @@ export function PurchaseInvoicesPage() {
             </p>
           </Card>
           <Card className="border-green-100">
-            <p className="text-sm text-gray-600">الفواتير المدفوعة</p>
+            <p className="text-sm text-gray-600">إجمالي المدفوع</p>
             <p className="text-2xl font-bold text-green-700 mt-1">
-              {paidCount}
+              {formatCurrency(totalPaidAmount)}
             </p>
+            <p className="mt-2 text-xs text-gray-500">مبالغ مسددة</p>
+          </Card>
+          <Card className="border-amber-100">
+            <p className="text-sm text-gray-600">إجمالي المتبقي</p>
+            <p className="text-2xl font-bold text-amber-700 mt-1">
+              {formatCurrency(totalDueAmount)}
+            </p>
+            <p className="mt-2 text-xs text-gray-500">مبالغ مستحقة</p>
           </Card>
         </div>
 

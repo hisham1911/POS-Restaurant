@@ -63,6 +63,7 @@ export const POSPage = () => {
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [dismissedWarning, setDismissedWarning] = useState(false);
 
   // Batch selection state
   const [showBatchModal, setShowBatchModal] = useState(false);
@@ -96,6 +97,11 @@ export const POSPage = () => {
   });
 
   const shiftWarning = warningsData?.data;
+
+  // Reset dismissed warning when warning message changes
+  useEffect(() => {
+    setDismissedWarning(false);
+  }, [shiftWarning?.message]);
 
   // Shortcuts
   usePOSShortcuts({
@@ -285,9 +291,12 @@ export const POSPage = () => {
       {/* Products Section */}
       <div className="flex-1 flex flex-col p-4 min-w-0">
         {/* Shift Warning Banner */}
-        {shiftWarning && shiftWarning.shouldWarn && (
+        {shiftWarning && shiftWarning.shouldWarn && !dismissedWarning && (
           <div className="mb-4">
-            <ShiftWarningBanner warning={shiftWarning} />
+            <ShiftWarningBanner 
+              warning={shiftWarning} 
+              onClose={() => setDismissedWarning(true)}
+            />
           </div>
         )}
 

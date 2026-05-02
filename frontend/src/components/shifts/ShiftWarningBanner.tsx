@@ -78,14 +78,15 @@ export const ShiftWarningBanner = ({ warning, onClose }: ShiftWarningBannerProps
           <button
             onClick={onClose}
             className={clsx(
-              "p-1 rounded-lg hover:bg-opacity-20 transition-colors",
+              "p-2 rounded-lg hover:bg-opacity-20 transition-colors flex-shrink-0",
               isCritical
                 ? "hover:bg-red-600 text-red-600"
                 : "hover:bg-yellow-600 text-yellow-600"
             )}
             aria-label="إغلاق التحذير"
+            title="إغلاق التحذير"
           >
-            <XCircle className="w-5 h-5" />
+            <XCircle className="w-6 h-6" />
           </button>
         )}
       </div>

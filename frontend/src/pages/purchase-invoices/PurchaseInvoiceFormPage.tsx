@@ -53,7 +53,10 @@ export function PurchaseInvoiceFormPage() {
   const [preview, setPreview] = useState<PurchaseInvoicePreview | null>(null);
 
   const { data: suppliersResponse } = useGetSuppliersQuery();
-  const { data: productsResponse } = useGetProductsQuery({ page: 1, pageSize: 1000 });
+  const { data: productsResponse } = useGetProductsQuery({
+    page: 1,
+    pageSize: 1000,
+  });
   const { data: tenantResponse } = useGetCurrentTenantQuery();
   const { data: invoiceResponse, isLoading: isLoadingInvoice } =
     useGetPurchaseInvoiceByIdQuery(Number(id), { skip: !isEditMode });
@@ -158,7 +161,9 @@ export function PurchaseInvoiceFormPage() {
       notes: itemNotes,
       batchNumber: batchNumber || undefined,
       expiryDate: expiryDate ? new Date(expiryDate).toISOString() : undefined,
-      productionDate: productionDate ? new Date(productionDate).toISOString() : undefined,
+      productionDate: productionDate
+        ? new Date(productionDate).toISOString()
+        : undefined,
     };
 
     setItems([...items, newItem]);
@@ -520,7 +525,10 @@ export function PurchaseInvoiceFormPage() {
                         {item.batchNumber || "-"}
                         {item.expiryDate && (
                           <span className="block text-xs text-red-500">
-                            ينتهي: {new Date(item.expiryDate).toLocaleDateString("ar-EG")}
+                            ينتهي:{" "}
+                            {new Date(item.expiryDate).toLocaleDateString(
+                              "ar-EG",
+                            )}
                           </span>
                         )}
                       </td>

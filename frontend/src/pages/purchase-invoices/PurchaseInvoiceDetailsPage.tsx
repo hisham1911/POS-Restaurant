@@ -47,8 +47,10 @@ export function PurchaseInvoiceDetailsPage() {
   );
   const [confirmInvoice, { isLoading: isConfirming }] =
     useConfirmPurchaseInvoiceMutation();
-  const [deleteInvoice, { isLoading: isDeleting }] = useDeletePurchaseInvoiceMutation();
-  const [deletePayment, { isLoading: isDeletingPayment }] = useDeletePaymentMutation();
+  const [deleteInvoice, { isLoading: isDeleting }] =
+    useDeletePurchaseInvoiceMutation();
+  const [deletePayment, { isLoading: isDeletingPayment }] =
+    useDeletePaymentMutation();
 
   const invoice = invoiceResponse?.data;
 
@@ -231,9 +233,7 @@ export function PurchaseInvoiceDetailsPage() {
                     {item.batchNumber || "—"}
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-500">
-                    {item.expiryDate
-                      ? formatDateOnly(item.expiryDate)
-                      : "—"}
+                    {item.expiryDate ? formatDateOnly(item.expiryDate) : "—"}
                   </td>
                   <td className="px-4 py-3 text-sm font-medium">
                     {formatCurrency(item.total)}

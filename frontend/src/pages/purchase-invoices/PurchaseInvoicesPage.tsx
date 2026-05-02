@@ -408,4 +408,3 @@ export function PurchaseInvoicesPage() {
     </div>
   );
 }
-

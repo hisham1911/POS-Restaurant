@@ -21,7 +21,6 @@ export const ProductGrid = ({
   hasInventorySnapshot = false,
   isInventoryLoading = false,
 }: ProductGridProps) => {
-
   if (products.length === 0) {
     return (
       <div className="flex items-center justify-center py-16 text-gray-400">
@@ -30,7 +29,9 @@ export const ProductGrid = ({
             <Package className="w-10 h-10 text-gray-300" />
           </div>
           <p className="text-lg font-bold text-gray-600">لا توجد منتجات</p>
-          <p className="text-sm text-gray-400 mt-1">جرب تغيير الفلتر أو البحث</p>
+          <p className="text-sm text-gray-400 mt-1">
+            جرب تغيير الفلتر أو البحث
+          </p>
         </div>
       </div>
     );

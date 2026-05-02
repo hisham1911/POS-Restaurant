@@ -1,4 +1,4 @@
-import { baseApi } from './baseApi';
+import { baseApi } from "./baseApi";
 import type {
   PurchaseInvoice,
   PurchaseInvoicePreview,
@@ -8,8 +8,8 @@ import type {
   CancelInvoiceRequest,
   PurchaseInvoicePayment,
   PurchaseInvoiceFilters,
-} from '../types/purchaseInvoice.types';
-import type { ApiResponse } from '../types/api.types';
+} from "../types/purchaseInvoice.types";
+import type { ApiResponse } from "../types/api.types";
 
 interface PagedResult<T> {
   items: T[];
@@ -33,28 +33,34 @@ export const purchaseInvoiceApi = baseApi.injectEndpoints({
     >({
       query: (filters) => {
         const params = new URLSearchParams();
-        
+
         if (filters) {
-          if (filters.supplierId) params.append('supplierId', filters.supplierId.toString());
-          if (filters.status) params.append('status', filters.status);
-          if (filters.fromDate) params.append('fromDate', filters.fromDate);
-          if (filters.toDate) params.append('toDate', filters.toDate);
-          if (filters.pageNumber) params.append('pageNumber', filters.pageNumber.toString());
-          if (filters.pageSize) params.append('pageSize', filters.pageSize.toString());
+          if (filters.supplierId)
+            params.append("supplierId", filters.supplierId.toString());
+          if (filters.status) params.append("status", filters.status);
+          if (filters.fromDate) params.append("fromDate", filters.fromDate);
+          if (filters.toDate) params.append("toDate", filters.toDate);
+          if (filters.pageNumber)
+            params.append("pageNumber", filters.pageNumber.toString());
+          if (filters.pageSize)
+            params.append("pageSize", filters.pageSize.toString());
         }
-        
+
         return {
           url: `/purchaseinvoices?${params.toString()}`,
-          method: 'GET',
+          method: "GET",
         };
       },
       providesTags: (result) =>
         result?.data?.items
           ? [
-              ...result.data.items.map(({ id }) => ({ type: 'PurchaseInvoice' as const, id })),
-              { type: 'PurchaseInvoice', id: 'LIST' },
+              ...result.data.items.map(({ id }) => ({
+                type: "PurchaseInvoice" as const,
+                id,
+              })),
+              { type: "PurchaseInvoice", id: "LIST" },
             ]
-          : [{ type: 'PurchaseInvoice', id: 'LIST' }],
+          : [{ type: "PurchaseInvoice", id: "LIST" }],
     }),
 
     preparePurchaseInvoice: builder.mutation<
@@ -62,20 +68,22 @@ export const purchaseInvoiceApi = baseApi.injectEndpoints({
       CreatePurchaseInvoiceRequest
     >({
       query: (data) => ({
-        url: '/purchaseinvoices/prepare',
-        method: 'POST',
+        url: "/purchaseinvoices/prepare",
+        method: "POST",
         body: data,
       }),
     }),
 
     // Get purchase invoice by ID
-    getPurchaseInvoiceById: builder.query<ApiResponse<PurchaseInvoice>, number>({
-      query: (id) => ({
-        url: `/purchaseinvoices/${id}`,
-        method: 'GET',
-      }),
-      providesTags: (result, error, id) => [{ type: 'PurchaseInvoice', id }],
-    }),
+    getPurchaseInvoiceById: builder.query<ApiResponse<PurchaseInvoice>, number>(
+      {
+        query: (id) => ({
+          url: `/purchaseinvoices/${id}`,
+          method: "GET",
+        }),
+        providesTags: (result, error, id) => [{ type: "PurchaseInvoice", id }],
+      },
+    ),
 
     // Create new purchase invoice
     createPurchaseInvoice: builder.mutation<
@@ -83,11 +91,11 @@ export const purchaseInvoiceApi = baseApi.injectEndpoints({
       CreatePurchaseInvoiceRequest
     >({
       query: (data) => ({
-        url: '/purchaseinvoices',
-        method: 'POST',
+        url: "/purchaseinvoices",
+        method: "POST",
         body: data,
       }),
-      invalidatesTags: [{ type: 'PurchaseInvoice', id: 'LIST' }],
+      invalidatesTags: [{ type: "PurchaseInvoice", id: "LIST" }],
     }),
 
     // Update purchase invoice
@@ -97,12 +105,12 @@ export const purchaseInvoiceApi = baseApi.injectEndpoints({
     >({
       query: ({ id, data }) => ({
         url: `/purchaseinvoices/${id}`,
-        method: 'PUT',
+        method: "PUT",
         body: data,
       }),
       invalidatesTags: (result, error, { id }) => [
-        { type: 'PurchaseInvoice', id },
-        { type: 'PurchaseInvoice', id: 'LIST' },
+        { type: "PurchaseInvoice", id },
+        { type: "PurchaseInvoice", id: "LIST" },
       ],
     }),
 
@@ -110,27 +118,30 @@ export const purchaseInvoiceApi = baseApi.injectEndpoints({
     deletePurchaseInvoice: builder.mutation<ApiResponse<boolean>, number>({
       query: (id) => ({
         url: `/purchaseinvoices/${id}`,
-        method: 'DELETE',
+        method: "DELETE",
       }),
       invalidatesTags: (result, error, id) => [
-        { type: 'PurchaseInvoice', id },
-        { type: 'PurchaseInvoice', id: 'LIST' },
+        { type: "PurchaseInvoice", id },
+        { type: "PurchaseInvoice", id: "LIST" },
       ],
     }),
 
     // Confirm purchase invoice
-    confirmPurchaseInvoice: builder.mutation<ApiResponse<PurchaseInvoice>, number>({
+    confirmPurchaseInvoice: builder.mutation<
+      ApiResponse<PurchaseInvoice>,
+      number
+    >({
       query: (id) => ({
         url: `/purchaseinvoices/${id}/confirm`,
-        method: 'POST',
+        method: "POST",
       }),
       invalidatesTags: (result, error, id) => [
-        { type: 'PurchaseInvoice', id },
-        { type: 'PurchaseInvoice', id: 'LIST' },
-        { type: 'Products', id: 'LIST' },
+        { type: "PurchaseInvoice", id },
+        { type: "PurchaseInvoice", id: "LIST" },
+        { type: "Products", id: "LIST" },
         "Inventory",
-        { type: 'ProductBatch', id: 'LIST' },
-        { type: 'ProductBatch', id: 'ALERTS' },
+        { type: "ProductBatch", id: "LIST" },
+        { type: "ProductBatch", id: "ALERTS" },
       ],
     }),
 
@@ -141,13 +152,13 @@ export const purchaseInvoiceApi = baseApi.injectEndpoints({
     >({
       query: ({ id, data }) => ({
         url: `/purchaseinvoices/${id}/cancel`,
-        method: 'POST',
+        method: "POST",
         body: data,
       }),
       invalidatesTags: (result, error, { id }) => [
-        { type: 'PurchaseInvoice', id },
-        { type: 'PurchaseInvoice', id: 'LIST' },
-        { type: 'Products', id: 'LIST' }, // Invalidate products if inventory adjusted
+        { type: "PurchaseInvoice", id },
+        { type: "PurchaseInvoice", id: "LIST" },
+        { type: "Products", id: "LIST" }, // Invalidate products if inventory adjusted
         "Inventory",
       ],
     }),
@@ -159,12 +170,12 @@ export const purchaseInvoiceApi = baseApi.injectEndpoints({
     >({
       query: ({ invoiceId, payment }) => ({
         url: `/purchaseinvoices/${invoiceId}/payments`,
-        method: 'POST',
+        method: "POST",
         body: payment,
       }),
       invalidatesTags: (result, error, { invoiceId }) => [
-        { type: 'PurchaseInvoice', id: invoiceId },
-        { type: 'PurchaseInvoice', id: 'LIST' },
+        { type: "PurchaseInvoice", id: invoiceId },
+        { type: "PurchaseInvoice", id: "LIST" },
       ],
     }),
 
@@ -175,11 +186,11 @@ export const purchaseInvoiceApi = baseApi.injectEndpoints({
     >({
       query: ({ invoiceId, paymentId }) => ({
         url: `/purchaseinvoices/${invoiceId}/payments/${paymentId}`,
-        method: 'DELETE',
+        method: "DELETE",
       }),
       invalidatesTags: (result, error, { invoiceId }) => [
-        { type: 'PurchaseInvoice', id: invoiceId },
-        { type: 'PurchaseInvoice', id: 'LIST' },
+        { type: "PurchaseInvoice", id: invoiceId },
+        { type: "PurchaseInvoice", id: "LIST" },
       ],
     }),
   }),

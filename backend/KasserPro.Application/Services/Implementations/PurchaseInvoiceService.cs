@@ -643,7 +643,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                     product.LastPurchasePrice = item.PurchasePrice;
                     product.LastPurchaseDate = DateTime.UtcNow;
                     product.LastStockUpdate = DateTime.UtcNow;
-                    
+
                     // Update average cost using weighted average
                     var oldStock = balanceBefore;
                     var oldAvgCost = product.AverageCost ?? product.Cost ?? 0m;

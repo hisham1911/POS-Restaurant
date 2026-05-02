@@ -11,7 +11,10 @@ import {
   Trash2,
 } from "lucide-react";
 import { toast } from "react-hot-toast";
-import { useDeleteProductMutation, useGetProductsQuery } from "@/api/productsApi";
+import {
+  useDeleteProductMutation,
+  useGetProductsQuery,
+} from "@/api/productsApi";
 import { useGetBranchInventoryQuery } from "@/api/inventoryApi";
 import { Button, ConfirmDialog } from "@/components/common";
 import { Card } from "@/components/common/Card";
@@ -131,8 +134,9 @@ export const ProductsPage = () => {
 
   if (isLoading) return <Loading />;
 
-  const activeProducts = filteredProducts.filter((product) => product.isActive)
-    .length;
+  const activeProducts = filteredProducts.filter(
+    (product) => product.isActive,
+  ).length;
   const lowStockProducts = filteredProducts.filter(
     (product) =>
       hasInventorySnapshot &&
@@ -291,7 +295,8 @@ export const ProductsPage = () => {
               <tbody>
                 {filteredProducts.map((product, index) => {
                   const category = categories.find(
-                    (currentCategory) => currentCategory.id === product.categoryId,
+                    (currentCategory) =>
+                      currentCategory.id === product.categoryId,
                   );
                   const branchStock = getBranchStock(product);
                   const shouldShowStockLoading =
@@ -327,7 +332,8 @@ export const ProductsPage = () => {
                               ? "bg-gray-100 text-gray-500"
                               : branchStock <= 0
                                 ? "bg-danger-50 text-danger-600"
-                                : branchStock <= (product.lowStockThreshold ?? 5)
+                                : branchStock <=
+                                    (product.lowStockThreshold ?? 5)
                                   ? "bg-warning-50 text-warning-600"
                                   : "bg-gray-100 text-gray-700",
                           )}
@@ -372,7 +378,9 @@ export const ProductsPage = () => {
                             </>
                           )}
                           {!canManageProducts && (
-                            <span className="text-xs text-gray-400">عرض فقط</span>
+                            <span className="text-xs text-gray-400">
+                              عرض فقط
+                            </span>
                           )}
                         </div>
                       </td>
@@ -393,8 +401,9 @@ export const ProductsPage = () => {
           {totalPages > 1 && (
             <div className="flex items-center justify-between border-t border-gray-200 px-4 py-3">
               <p className="text-sm text-gray-700">
-                عرض {((currentPage - 1) * PAGE_SIZE) + 1} -{" "}
-                {Math.min(currentPage * PAGE_SIZE, totalCount)} من {totalCount} منتج
+                عرض {(currentPage - 1) * PAGE_SIZE + 1} -{" "}
+                {Math.min(currentPage * PAGE_SIZE, totalCount)} من {totalCount}{" "}
+                منتج
               </p>
               <div className="flex items-center gap-2">
                 <Button
@@ -428,7 +437,10 @@ export const ProductsPage = () => {
         </Card>
 
         {showForm && (
-          <ProductFormModal product={editingProduct} onClose={handleCloseForm} />
+          <ProductFormModal
+            product={editingProduct}
+            onClose={handleCloseForm}
+          />
         )}
 
         <ConfirmDialog

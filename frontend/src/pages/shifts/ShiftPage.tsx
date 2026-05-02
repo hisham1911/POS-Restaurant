@@ -18,10 +18,7 @@ import { Modal } from "@/components/common/Modal";
 import { Loading } from "@/components/common/Loading";
 import { formatCurrency, formatDateTime } from "@/utils/formatters";
 import { shiftPersistence } from "@/utils/shiftPersistence";
-import {
-  HandoverShiftModal,
-  ShiftWarningBanner,
-} from "@/components/shifts";
+import { HandoverShiftModal, ShiftWarningBanner } from "@/components/shifts";
 import clsx from "clsx";
 
 export const ShiftPage = () => {
@@ -221,9 +218,7 @@ export const ShiftPage = () => {
                   <p className="text-xl font-bold text-gray-800">
                     {formatCurrency(currentShift.totalCollected)}
                   </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    نقدي + إلكتروني
-                  </p>
+                  <p className="text-xs text-gray-400 mt-1">نقدي + إلكتروني</p>
                 </div>
               </div>
             </Card>
@@ -261,12 +256,11 @@ export const ShiftPage = () => {
                   </p>
                   {nonCashCollected > 0 && (
                     <div className="text-xs text-gray-400 mt-1 space-y-0.5">
-                      <p>
-                        بطاقة:{" "}
-                        {formatCurrency(currentShift.collectedCard)}
-                      </p>
+                      <p>بطاقة: {formatCurrency(currentShift.collectedCard)}</p>
                       {currentShift.collectedFawry > 0 && (
-                        <p>فوري: {formatCurrency(currentShift.collectedFawry)}</p>
+                        <p>
+                          فوري: {formatCurrency(currentShift.collectedFawry)}
+                        </p>
                       )}
                       {currentShift.collectedBankTransfer > 0 && (
                         <p>
@@ -333,7 +327,6 @@ export const ShiftPage = () => {
         />
       )}
 
-
       {/* Open Shift Modal */}
       <Modal
         isOpen={showOpenModal}
@@ -394,24 +387,28 @@ export const ShiftPage = () => {
                 <span>نقدي: {formatCurrency(currentShift.collectedCash)}</span>
                 <span>فيزا: {formatCurrency(currentShift.collectedCard)}</span>
                 <span>فوري: {formatCurrency(currentShift.collectedFawry)}</span>
-                <span>تحويل: {formatCurrency(currentShift.collectedBankTransfer)}</span>
+                <span>
+                  تحويل: {formatCurrency(currentShift.collectedBankTransfer)}
+                </span>
               </div>
-              {currentShift.totalRefunds != null && currentShift.totalRefunds > 0 && (
-                <div className="flex justify-between text-red-600">
-                  <span>المرتجعات:</span>
-                  <span className="font-medium">
-                    -{formatCurrency(currentShift.totalRefunds)}
-                  </span>
-                </div>
-              )}
-              {currentShift.totalExpenses != null && currentShift.totalExpenses > 0 && (
-                <div className="flex justify-between text-red-600">
-                  <span>المصروفات:</span>
-                  <span className="font-medium">
-                    -{formatCurrency(currentShift.totalExpenses)}
-                  </span>
-                </div>
-              )}
+              {currentShift.totalRefunds != null &&
+                currentShift.totalRefunds > 0 && (
+                  <div className="flex justify-between text-red-600">
+                    <span>المرتجعات:</span>
+                    <span className="font-medium">
+                      -{formatCurrency(currentShift.totalRefunds)}
+                    </span>
+                  </div>
+                )}
+              {currentShift.totalExpenses != null &&
+                currentShift.totalExpenses > 0 && (
+                  <div className="flex justify-between text-red-600">
+                    <span>المصروفات:</span>
+                    <span className="font-medium">
+                      -{formatCurrency(currentShift.totalExpenses)}
+                    </span>
+                  </div>
+                )}
               <div className="flex justify-between border-t pt-2 mt-2">
                 <span className="text-gray-700 font-medium">
                   الرصيد المتوقع:
@@ -465,4 +462,3 @@ export const ShiftPage = () => {
 };
 
 export default ShiftPage;
-

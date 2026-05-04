@@ -44,8 +44,8 @@ public class CashierPerformanceDetailDto
 
     // Payment Methods
     public decimal CashSales { get; set; }
-    public decimal CardSales { get; set; }
-    public decimal FawrySales { get; set; }
+    public decimal BankAccountSales { get; set; }
+    public decimal WalletSales { get; set; }
 
     // Performance Score
     public decimal PerformanceScore { get; set; } // 0-100
@@ -88,12 +88,14 @@ public class DetailedShiftDto
     // Sales
     public int TotalOrders { get; set; }
     public decimal TotalCash { get; set; }
-    public decimal TotalCard { get; set; }
-    public decimal TotalFawry { get; set; }
-    public decimal TotalBankTransfer { get; set; }
+    public decimal TotalBankAccount { get; set; }
+    public decimal TotalWallet { get; set; }
     public decimal TotalSales { get; set; }
     public decimal TotalCollected { get; set; }
     public decimal DeferredAmount { get; set; }
+
+    // Wallet Breakdown
+    public List<WalletPaymentBreakdownDto> WalletBreakdown { get; set; } = new();
 
     // Status
     public bool IsForceClosed { get; set; }

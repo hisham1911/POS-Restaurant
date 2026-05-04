@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import clsx from "clsx";
 import {
   X,
@@ -13,10 +13,11 @@ import {
   ShoppingBag,
   AlertCircle,
   StickyNote,
+  Printer,
 } from "lucide-react";
 import { Portal } from "@/components/common/Portal";
 import { Loading } from "@/components/common/Loading";
-import { useGetShiftByIdQuery } from "@/api/shiftsApi";
+import { useGetShiftByIdQuery, useGetShiftProductsSummaryQuery } from "@/api/shiftsApi";
 import type { Shift, ShiftOrder } from "@/types/shift.types";
 import { formatCurrency, formatDateTime } from "@/utils/formatters";
 
@@ -110,12 +111,240 @@ const getOrderTypeLabel = (order: ShiftOrder) => {
   return labels[order.orderType] ?? order.orderType;
 };
 
+// Aggregate products from all orders
+interface AggregatedProduct {
+  productName: string;
+  totalQuantity: number;
+  totalAmount: number;
+}
+
+const aggregateProducts = (orders: ShiftOrder[]): AggregatedProduct[] => {
+  const productMap = new Map<string, AggregatedProduct>();
+
+  // Note: ShiftOrder doesn't include items, so we can't aggregate here
+  // This would need to be fetched from the backend or passed separately
+  // For now, we'll return empty array and document this limitation
+  
+  return Array.from(productMap.values()).sort((a, b) => b.totalQuantity - a.totalQuantity);
+};
+
 export const ShiftDetailsDrawer = ({
   shift,
   isOpen,
   onClose,
 }: ShiftDetailsDrawerProps) => {
   const [activeTab, setActiveTab] = useState<TabType>("overview");
+
+  // Print handler
+  const handlePrint = () => {
+    const shiftDetails = shiftResponse?.data ?? shift;
+    if (!shiftDetails) return;
+
+    const html = generateShiftReceiptHtml(shiftDetails, productsSummary);
+    const printWindow = window.open("", "_blank", "width=350,height=700");
+    if (printWindow) {
+      printWindow.document.write(html);
+      printWindow.document.close();
+    }
+  };
+
+  const generateShiftReceiptHtml = (shiftData: Shift, products: typeof productsSummary): string => {
+    const fmt = (n: number) => n.toFixed(2);
+    
+    const openedAt = shiftData.openedAt ? new Date(shiftData.openedAt).toLocaleString("ar-EG") : "—";
+    const closedAt = shiftData.closedAt ? new Date(shiftData.closedAt).toLocaleString("ar-EG") : "—";
+    
+    const difference = shiftData.difference ?? 0;
+    const hasDifference = difference !== 0;
+    const isPositiveDifference = difference > 0;
+
+    // Products rows
+    const productsHtml = products?.length
+      ? products
+          .map(
+            (p, i) => `
+      <div class="product-row">
+        <span class="product-rank">${i + 1}.</span>
+        <span class="product-name">${p.productName}</span>
+        <span class="product-qty">×${p.totalQuantity}</span>
+        <span class="product-total">${fmt(p.totalAmount)}</span>
+      </div>
+    `,
+          )
+          .join("")
+      : '<p class="no-data">لا توجد منتجات</p>';
+
+    // Calculate totals
+    const totalQuantity = products?.reduce((sum, p) => sum + p.totalQuantity, 0) ?? 0;
+    const totalAmount = products?.reduce((sum, p) => sum + p.totalAmount, 0) ?? 0;
+
+    return `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <title>تقرير الوردية #${shiftData.id}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Arial', 'Tahoma', sans-serif;
+      max-width: 302px;
+      margin: 0 auto;
+      padding: 10px;
+      font-size: 11px;
+      color: #000;
+      direction: rtl;
+    }
+    .header {
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .header h1 {
+      font-size: 14px;
+      font-weight: bold;
+      margin-bottom: 2px;
+    }
+    .header h2 {
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .header .date {
+      font-size: 10px;
+      color: #333;
+    }
+    .line {
+      border-top: 1px dashed #000;
+      margin: 6px 0;
+    }
+    .double-line {
+      border-top: 2px solid #000;
+      margin: 8px 0;
+    }
+    .section-title {
+      font-size: 11px;
+      font-weight: bold;
+      text-align: center;
+      margin: 6px 0 4px;
+      background: #000;
+      color: #fff;
+      padding: 2px 0;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      margin: 3px 0;
+      font-size: 10px;
+    }
+    .row.total {
+      font-weight: bold;
+      font-size: 12px;
+    }
+    .row.highlight {
+      font-weight: bold;
+      font-size: 11px;
+    }
+    .row .label { }
+    .row .value { font-weight: bold; }
+    .product-row {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 9px;
+      margin: 2px 0;
+    }
+    .product-rank { width: 16px; }
+    .product-name { flex: 1; }
+    .product-qty { width: 30px; text-align: center; }
+    .product-total { width: 55px; text-align: left; }
+    .no-data {
+      text-align: center;
+      color: #999;
+      font-size: 9px;
+      padding: 6px 0;
+    }
+    .footer {
+      text-align: center;
+      margin-top: 10px;
+      font-size: 9px;
+      color: #666;
+    }
+    .warning {
+      background: #fff3cd;
+      border: 1px solid #ffc107;
+      padding: 4px;
+      margin: 4px 0;
+      font-size: 9px;
+      text-align: center;
+      border-radius: 2px;
+    }
+    @media print {
+      body { padding: 0; }
+      @page { margin: 2mm; size: 80mm auto; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>📊 تقرير الوردية</h1>
+    <h2>وردية #${shiftData.id}</h2>
+    <div class="date">${shiftData.userName ?? "—"}</div>
+  </div>
+
+  <div class="double-line"></div>
+
+  <!-- معلومات الوردية -->
+  <div class="section-title">⏰ معلومات الوردية</div>
+  <div class="row"><span>وقت الفتح</span><span class="value">${openedAt}</span></div>
+  ${shiftData.closedAt ? `<div class="row"><span>وقت الإغلاق</span><span class="value">${closedAt}</span></div>` : ""}
+  <div class="row"><span>الحالة</span><span class="value">${shiftData.closedAt ? "مغلقة" : "مفتوحة"}</span></div>
+
+  <div class="line"></div>
+
+  <!-- الأرصدة -->
+  <div class="section-title">💰 الأرصدة</div>
+  <div class="row"><span>رصيد الافتتاح</span><span class="value">${fmt(shiftData.openingBalance ?? 0)} ج.م</span></div>
+  ${shiftData.closedAt ? `<div class="row"><span>رصيد الإغلاق</span><span class="value">${fmt(shiftData.closingBalance ?? 0)} ج.م</span></div>` : ""}
+  ${shiftData.closedAt ? `<div class="row"><span>الرصيد المتوقع</span><span class="value">${fmt(shiftData.expectedBalance ?? 0)} ج.م</span></div>` : ""}
+  ${hasDifference ? `<div class="row ${isPositiveDifference ? "highlight" : ""}"><span>${isPositiveDifference ? "فائض" : "عجز"}</span><span class="value" style="color:${isPositiveDifference ? "green" : "red"}">${isPositiveDifference ? "+" : ""}${fmt(difference)} ج.م</span></div>` : ""}
+
+  <div class="line"></div>
+
+  <!-- المبيعات -->
+  <div class="section-title">💵 المبيعات</div>
+  <div class="row"><span>إجمالي المبيعات</span><span class="value">${fmt(shiftData.totalSales ?? 0)} ج.م</span></div>
+  <div class="row"><span>عدد الطلبات</span><span class="value">${shiftData.totalOrders ?? 0}</span></div>
+
+  <div class="line"></div>
+
+  <!-- طرق الدفع -->
+  <div class="section-title">💳 طرق الدفع</div>
+  <div class="row"><span>💵 نقدي</span><span class="value">${fmt(shiftData.totalCash ?? 0)} ج.م</span></div>
+  <div class="row"><span>🏦 حساب بنكي</span><span class="value">${fmt(shiftData.totalBankAccount ?? 0)} ج.م</span></div>
+  ${(shiftData.totalWallet ?? 0) > 0 ? `<div class="row"><span>📱 محفظة</span><span class="value">${fmt(shiftData.totalWallet ?? 0)} ج.م</span></div>` : ""}
+
+  <div class="double-line"></div>
+
+  <!-- المنتجات -->
+  <div class="section-title">📦 ملخص المنتجات</div>
+  ${productsHtml}
+  ${products?.length ? `
+  <div class="line"></div>
+  <div class="row total">
+    <span>الإجمالي</span>
+    <span class="value">×${totalQuantity} = ${fmt(totalAmount)} ج.م</span>
+  </div>
+  ` : ""}
+  <div class="double-line"></div>
+
+  <div class="footer">
+    <p>تم الطباعة: ${new Date().toLocaleString("ar-EG")}</p>
+    <p>نظام نقاط البيع TajerPro</p>
+  </div>
+
+  <script>window.onload = function() { window.print(); }</script>
+</body>
+</html>`;
+  };
 
   const shiftId = shift?.id ?? 0;
   const {
@@ -126,11 +355,19 @@ export const ShiftDetailsDrawer = ({
     skip: !isOpen || !shiftId,
   });
 
+  const {
+    data: productsSummaryResponse,
+    isLoading: isLoadingProducts,
+  } = useGetShiftProductsSummaryQuery(shiftId, {
+    skip: !isOpen || !shiftId,
+  });
+
   if (!isOpen || !shift) {
     return null;
   }
 
   const shiftDetails = shiftResponse?.data ?? shift;
+  const productsSummary = productsSummaryResponse?.data ?? [];
   const orders = shiftDetails.orders ?? [];
   const difference = shiftDetails.difference ?? 0;
   const hasDifference = difference !== 0;
@@ -163,6 +400,13 @@ export const ShiftDetailsDrawer = ({
             </div>
 
             <div className="flex items-center gap-2">
+              <button
+                onClick={handlePrint}
+                className="flex items-center gap-2 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+              >
+                <Printer className="h-4 w-4" />
+                طباعة التقرير
+              </button>
               <span
                 className={clsx(
                   "inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold",
@@ -395,30 +639,21 @@ export const ShiftDetailsDrawer = ({
                       </p>
                     </div>
                     <div className="rounded-xl bg-blue-50 p-3">
-                      <div className="mb-1 flex items-center gap-1 text-xs text-blue-700">
-                        <CreditCard className="h-3.5 w-3.5" />
-                        بطاقة
+                      <div className="mb-1 text-xs text-blue-700 flex items-center gap-1">
+                        <CreditCard className="h-3 w-3" />
+                        بنك
                       </div>
                       <p className="font-bold text-blue-800">
-                        {formatCurrency(shiftDetails.totalCard ?? 0)}
+                        {formatCurrency(shiftDetails.totalBankAccount ?? 0)}
                       </p>
                     </div>
                     <div className="rounded-xl bg-amber-50 p-3">
-                      <div className="mb-1 flex items-center gap-1 text-xs text-amber-700">
-                        <Wallet className="h-3.5 w-3.5" />
-                        فوري
+                      <div className="mb-1 text-xs text-amber-700 flex items-center gap-1">
+                        <Wallet className="h-3 w-3" />
+                        محفظة
                       </div>
                       <p className="font-bold text-amber-800">
-                        {formatCurrency(shiftDetails.totalFawry ?? 0)}
-                      </p>
-                    </div>
-                    <div className="rounded-xl bg-violet-50 p-3">
-                      <div className="mb-1 flex items-center gap-1 text-xs text-violet-700">
-                        <ArrowUpCircle className="h-3.5 w-3.5" />
-                        تحويل
-                      </div>
-                      <p className="font-bold text-violet-800">
-                        {formatCurrency(shiftDetails.totalBankTransfer ?? 0)}
+                        {formatCurrency(shiftDetails.totalWallet ?? 0)}
                       </p>
                     </div>
                   </div>
@@ -496,36 +731,25 @@ export const ShiftDetailsDrawer = ({
                               </p>
                             </div>
                           )}
-                          {(shiftDetails.totalDebtPaymentsCard ?? 0) > 0 && (
+                          {(shiftDetails.totalDebtPaymentsBankAccount ?? 0) > 0 && (
                             <div className="rounded-lg bg-white p-2">
                               <div className="mb-1 flex items-center gap-1 text-xs text-blue-700">
                                 <CreditCard className="h-3 w-3" />
-                                بطاقة
+                                بنك
                               </div>
                               <p className="text-sm font-bold text-blue-800">
-                                {formatCurrency(shiftDetails.totalDebtPaymentsCard ?? 0)}
+                                {formatCurrency(shiftDetails.totalDebtPaymentsBankAccount ?? 0)}
                               </p>
                             </div>
                           )}
-                          {(shiftDetails.totalDebtPaymentsFawry ?? 0) > 0 && (
+                          {(shiftDetails.totalDebtPaymentsWallet ?? 0) > 0 && (
                             <div className="rounded-lg bg-white p-2">
                               <div className="mb-1 flex items-center gap-1 text-xs text-amber-700">
                                 <Wallet className="h-3 w-3" />
-                                فوري
+                                محفظة
                               </div>
                               <p className="text-sm font-bold text-amber-800">
-                                {formatCurrency(shiftDetails.totalDebtPaymentsFawry ?? 0)}
-                              </p>
-                            </div>
-                          )}
-                          {(shiftDetails.totalDebtPaymentsBankTransfer ?? 0) > 0 && (
-                            <div className="rounded-lg bg-white p-2">
-                              <div className="mb-1 flex items-center gap-1 text-xs text-violet-700">
-                                <ArrowUpCircle className="h-3 w-3" />
-                                تحويل
-                              </div>
-                              <p className="text-sm font-bold text-violet-800">
-                                {formatCurrency(shiftDetails.totalDebtPaymentsBankTransfer ?? 0)}
+                                {formatCurrency(shiftDetails.totalDebtPaymentsWallet ?? 0)}
                               </p>
                             </div>
                           )}

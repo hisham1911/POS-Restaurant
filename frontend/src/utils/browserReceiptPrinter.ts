@@ -44,12 +44,10 @@ const DEFAULT_RECEIPT_SETTINGS: ReceiptTenantSettings = {
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   Cash: "💵 كاش",
   cash: "💵 كاش",
-  Card: "💳 فيزا",
-  card: "💳 فيزا",
+  BankAccount: "🏦 بنك",
+  bankAccount: "🏦 بنك",
   Wallet: "📱 محفظة",
   wallet: "📱 محفظة",
-  Fawry: "📱 فودافون كاش",
-  BankTransfer: "🏦 تحويل بنكي",
 };
 
 const escapeHtml = (value: string): string =>

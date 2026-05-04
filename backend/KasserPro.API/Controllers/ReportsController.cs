@@ -99,12 +99,10 @@ public class ReportsController : ControllerBase
             receiptItems.Add(new { Name = "طرق الدفع", Quantity = -1, UnitPrice = 0m, TotalPrice = 0m });
             if (report.TotalCash > 0)
                 receiptItems.Add(new { Name = "نقدي",  Quantity = 0, UnitPrice = 0m, TotalPrice = report.TotalCash });
-            if (report.TotalCard > 0)
-                receiptItems.Add(new { Name = "بطاقة", Quantity = 0, UnitPrice = 0m, TotalPrice = report.TotalCard });
-            if (report.TotalFawry > 0)
-                receiptItems.Add(new { Name = "فوري",  Quantity = 0, UnitPrice = 0m, TotalPrice = report.TotalFawry });
-            if (report.TotalOther > 0)
-                receiptItems.Add(new { Name = "أخرى",  Quantity = 0, UnitPrice = 0m, TotalPrice = report.TotalOther });
+            if (report.TotalBankAccount > 0)
+                receiptItems.Add(new { Name = "بنك", Quantity = 0, UnitPrice = 0m, TotalPrice = report.TotalBankAccount });
+            if (report.TotalWallet > 0)
+                receiptItems.Add(new { Name = "محفظة",  Quantity = 0, UnitPrice = 0m, TotalPrice = report.TotalWallet });
             // Deferred / credit: whatever wasn't covered by the above methods
             var totalDeferred = report.TotalDeferred;
             if (totalDeferred > 0.01m)
@@ -126,7 +124,7 @@ public class ReportsController : ControllerBase
             }
 
             // --- Section: Top Products ---
-            var topProducts = (report.TopProducts ?? new()).Take(10).ToList();
+            var topProducts = (report.TopProducts ?? new()).ToList();
             if (topProducts.Count > 0)
             {
                 receiptItems.Add(new { Name = "أعلى المنتجات", Quantity = -1, UnitPrice = 0m, TotalPrice = 0m });

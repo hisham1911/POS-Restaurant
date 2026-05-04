@@ -14,16 +14,14 @@ public class ShiftDto
     public bool IsClosed { get; set; }
     public string? Notes { get; set; }
     public decimal TotalCash { get; set; }
-    public decimal TotalCard { get; set; }
-    public decimal TotalFawry { get; set; }
-    public decimal TotalBankTransfer { get; set; }
+    public decimal TotalBankAccount { get; set; }
+    public decimal TotalWallet { get; set; }
     public decimal TotalSales { get; set; }
     public decimal TotalCollected { get; set; }
     public decimal DeferredAmount { get; set; }
     public decimal CollectedCash { get; set; }
-    public decimal CollectedCard { get; set; }
-    public decimal CollectedFawry { get; set; }
-    public decimal CollectedBankTransfer { get; set; }
+    public decimal CollectedBankAccount { get; set; }
+    public decimal CollectedWallet { get; set; }
     public int TotalOrders { get; set; }
     public string UserName { get; set; } = string.Empty;
 
@@ -56,10 +54,8 @@ public class ShiftDto
 
     // Detailed sales by payment method (Task 5.2)
     public decimal TotalCashSales { get; set; }
-    public decimal TotalCardSales { get; set; }
-    public decimal TotalFawrySales { get; set; }
-    public decimal TotalBankTransferSales { get; set; }
-    public decimal TotalVodafoneCashSales { get; set; }
+    public decimal TotalBankAccountSales { get; set; }
+    public decimal TotalWalletSales { get; set; }
 
     // Refunds (Task 2.3 + 5.2)
     public decimal TotalRefunds { get; set; }
@@ -85,9 +81,8 @@ public class ShiftDto
     public decimal TotalDebtPayments { get; set; }
     public int DebtPaymentsCount { get; set; }
     public decimal TotalDebtPaymentsCash { get; set; }
-    public decimal TotalDebtPaymentsCard { get; set; }
-    public decimal TotalDebtPaymentsFawry { get; set; }
-    public decimal TotalDebtPaymentsBankTransfer { get; set; }
+    public decimal TotalDebtPaymentsBankAccount { get; set; }
+    public decimal TotalDebtPaymentsWallet { get; set; }
 
     // Concurrency Token (serialized as Base64 string in JSON)
     public byte[] RowVersion { get; set; } = [];

@@ -9,6 +9,7 @@ import {
   Phone,
   Star,
   AlertCircle,
+  Wallet,
 } from "lucide-react";
 import { useOrders } from "@/hooks/useOrders";
 import { useCart } from "@/hooks/useCart";
@@ -16,6 +17,7 @@ import { usePermission } from "@/hooks/usePermission";
 import { formatCurrency } from "@/utils/formatters";
 import { PaymentMethod } from "@/types/order.types";
 import { Customer } from "@/types/customer.types";
+import { useGetActiveWalletsQuery } from "@/api/walletApi";
 import { Button } from "@/components/common/Button";
 import { toast } from "sonner";
 import clsx from "clsx";
@@ -31,20 +33,6 @@ interface PaymentModalProps {
   onOrderComplete?: () => void;
 }
 
-const paymentMethods: {
-  id: PaymentMethod;
-  label: string;
-  icon: React.ReactNode;
-}[] = [
-  { id: "Cash", label: "نقدي", icon: <Banknote className="w-8 h-8" /> },
-  { id: "Card", label: "فيزا", icon: <CreditCard className="w-8 h-8" /> },
-  {
-    id: "Fawry",
-    label: "فودافون كاش",
-    icon: <Building2 className="w-8 h-8" />,
-  },
-];
-
 export const PaymentModal = ({
   onClose,
   selectedCustomer,
@@ -56,7 +44,25 @@ export const PaymentModal = ({
 }: PaymentModalProps) => {
   const { createOrder, completeOrder, cancelOrder, isCreating, isCompleting } = useOrders();
   const { clearCart, total: cartTotal } = useCart();
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("Cash");
+  const { data: walletsData } = useGetActiveWalletsQuery();
+  const wallets = walletsData?.data ?? [];
+
+  const paymentMethods: Array<{
+    id: string;
+    label: string;
+    icon: React.ReactNode;
+    walletId?: number;
+  }> = [
+    { id: "Cash", label: "نقدي", icon: <Banknote className="w-8 h-8" /> },
+    ...wallets.map((wallet) => ({
+      id: `wallet-${wallet.id}`,
+      label: wallet.name,
+      icon: <Wallet className="w-8 h-8" />,
+      walletId: wallet.id,
+    })),
+  ];
+
+  const [selectedMethod, setSelectedMethod] = useState<string>("Cash");
   const [amountPaid, setAmountPaid] = useState<string>("");
   const [transactionReference, setTransactionReference] = useState("");
   const [showError, setShowError] = useState(false);
@@ -183,7 +189,7 @@ export const PaymentModal = ({
     }
 
     if (requiresTransactionReference && !transactionReference.trim()) {
-      toast.error("رقم المعاملة مطلوب عند الدفع بفودافون كاش أو فيزا");
+      toast.error("رقم المعاملة مطلوب لطرق الدفع غير النقدية");
       return;
     }
 
@@ -202,14 +208,19 @@ export const PaymentModal = ({
       }
 
       // 2. إكمال الطلب بالدفع
+      const selectedWallet = selectedMethod.startsWith("wallet-")
+        ? wallets.find((w) => w.id === parseInt(selectedMethod.replace("wallet-", ""), 10))
+        : null;
+
       const completedOrder = await completeOrder(order.id, {
         payments: [
           {
-            method: selectedMethod,
+            method: (selectedWallet ? selectedWallet.type : selectedMethod) as PaymentMethod,
             amount: numericAmount,
             reference: requiresTransactionReference
               ? transactionReference.trim()
               : undefined,
+            walletId: selectedWallet?.id,
           },
         ],
       });
@@ -452,7 +463,7 @@ export const PaymentModal = ({
                     setTransactionReference(event.target.value)
                   }
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
-                  placeholder="اكتب رقم العملية من فودافون كاش أو الفيزا"
+                  placeholder="اكتب رقم العملية من محفظة أو حساب بنكي"
                 />
               </div>
             )}

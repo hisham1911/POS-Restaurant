@@ -290,7 +290,7 @@ public static class DbInitializer
 
                 var orders = new List<Order>();
                 decimal totalCash = 0;
-                decimal totalCard = 0;
+                decimal totalBankAccount = 0;
 
                 for (int i = 0; i < orderCount; i++)
                 {
@@ -314,7 +314,7 @@ public static class DbInitializer
                             if (payment.Method == PaymentMethod.Cash)
                                 totalCash += payment.Amount;
                             else
-                                totalCard += payment.Amount;
+                                totalBankAccount += payment.Amount;
                         }
                     }
                 }
@@ -328,7 +328,7 @@ public static class DbInitializer
                     var completedCount = orders.Count(o => o.Status == OrderStatus.Completed);
                     shift.TotalOrders = completedCount;
                     shift.TotalCash = totalCash;
-                    shift.TotalCard = totalCard;
+                    shift.TotalBankAccount = totalBankAccount;
                     shift.ExpectedBalance = shift.OpeningBalance + totalCash;
                     shift.ClosingBalance = shift.ExpectedBalance + random.Next(-20, 50);
                     shift.Difference = shift.ClosingBalance - shift.ExpectedBalance;
@@ -434,7 +434,7 @@ public static class DbInitializer
             order.CompletedByUserId = userId;
 
             var paymentMethod = random.Next(10) < 7 ? PaymentMethod.Cash :
-                (random.Next(2) == 0 ? PaymentMethod.Card : PaymentMethod.Fawry);
+                (random.Next(2) == 0 ? PaymentMethod.BankAccount : PaymentMethod.Wallet);
 
             order.Payments.Add(new Payment
             {

@@ -164,7 +164,7 @@ public static class RestaurantSeeder
             var orderCount = day == 0 ? _random.Next(2, 4) : (isWeekend ? _random.Next(12, 20) : _random.Next(8, 15));
 
             decimal totalCash = 0;
-            decimal totalCard = 0;
+            decimal totalBankAccount = 0;
             int completedCount = 0;
 
             for (int i = 0; i < orderCount; i++)
@@ -190,7 +190,7 @@ public static class RestaurantSeeder
                         if (payment.Method == PaymentMethod.Cash)
                             totalCash += payment.Amount;
                         else
-                            totalCard += payment.Amount;
+                            totalBankAccount += payment.Amount;
                     }
                 }
             }
@@ -202,7 +202,7 @@ public static class RestaurantSeeder
             {
                 shift.TotalOrders = completedCount;
                 shift.TotalCash = totalCash;
-                shift.TotalCard = totalCard;
+                shift.TotalBankAccount = totalBankAccount;
                 shift.ExpectedBalance = shift.OpeningBalance + totalCash;
                 shift.ClosingBalance = shift.ExpectedBalance + _random.Next(-40, 60);
                 shift.Difference = shift.ClosingBalance - shift.ExpectedBalance;
@@ -315,7 +315,7 @@ public static class RestaurantSeeder
             order.CompletedAt = orderTime.AddMinutes(_random.Next(15, 45)); // Restaurant orders take longer
             order.CompletedByUserId = userId;
 
-            var paymentMethod = _random.Next(10) < 6 ? PaymentMethod.Card : PaymentMethod.Cash;
+            var paymentMethod = _random.Next(10) < 6 ? PaymentMethod.BankAccount : PaymentMethod.Cash;
 
             order.Payments.Add(new Payment
             {
@@ -364,7 +364,7 @@ public static class RestaurantSeeder
                 Description = description,
                 ExpenseDate = expenseDate,
                 Status = ExpenseStatus.Paid,
-                PaymentMethod = amount > 5000 ? PaymentMethod.Card : (_random.Next(2) == 0 ? PaymentMethod.Cash : PaymentMethod.Card),
+                PaymentMethod = amount > 5000 ? PaymentMethod.BankAccount : (_random.Next(2) == 0 ? PaymentMethod.Cash : PaymentMethod.BankAccount),
                 PaymentDate = expenseDate,
                 CreatedByUserId = admin.Id,
                 CreatedByUserName = admin.Name,

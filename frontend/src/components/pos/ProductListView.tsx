@@ -115,7 +115,7 @@ export const ProductListView = ({
                   (sum, item) => sum + item.quantity,
                   0,
                 );
-                const displayPrice = cartItems[0]?.product.price ?? product.price;
+                const displayPrice = cartItems[0]?.product.suggestedPrice ?? product.suggestedPrice;
                 const totalStock = getProductCurrentStock(
                   product,
                   stockByProductId,

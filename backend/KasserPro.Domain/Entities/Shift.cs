@@ -20,7 +20,7 @@ public class Shift : BaseEntity
     public string? Notes { get; set; }
 
     public decimal TotalCash { get; set; }
-    public decimal TotalCard { get; set; }
+    public decimal TotalBankAccount { get; set; }
     public int TotalOrders { get; set; }
 
     public int UserId { get; set; }

@@ -122,12 +122,12 @@ public class EmployeeReportService : IEmployeeReportService
                 var cashSales = Math.Round(Math.Max(0,
                     SumAppliedPayments(salesOrders, PaymentMethod.Cash)
                     - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount))), 2);
-                var cardSales = Math.Round(Math.Max(0,
-                    SumAppliedPayments(salesOrders, PaymentMethod.Card)
-                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount))), 2);
-                var fawrySales = Math.Round(Math.Max(0,
-                    SumAppliedPayments(salesOrders, PaymentMethod.Fawry)
-                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount))), 2);
+                var bankAccountSales = Math.Round(Math.Max(0,
+                    SumAppliedPayments(salesOrders, PaymentMethod.BankAccount)
+                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankAccount).Sum(p => p.Amount))), 2);
+                var walletSales = Math.Round(Math.Max(0,
+                    SumAppliedPayments(salesOrders, PaymentMethod.Wallet)
+                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Wallet).Sum(p => p.Amount))), 2);
 
                 var completedShifts = userShifts.Count(s => s.IsClosed && !s.IsForceClosed);
                 var forceClosedShifts = userShifts.Count(s => s.IsForceClosed);
@@ -162,8 +162,8 @@ public class EmployeeReportService : IEmployeeReportService
                     RefundedOrders = refundedOrders,
                     CancellationRate = Math.Round(cancellationRate, 2),
                     CashSales = cashSales,
-                    CardSales = cardSales,
-                    FawrySales = fawrySales,
+                    BankAccountSales = bankAccountSales,
+                    WalletSales = walletSales,
                     PerformanceScore = Math.Round((decimal)performanceScore, 2),
                     PerformanceRating = rating
                 });
@@ -217,6 +217,34 @@ public class EmployeeReportService : IEmployeeReportService
 
             var shifts = await query.OrderByDescending(s => s.OpenedAt).ToListAsync();
 
+            var shiftIds = shifts.Select(s => s.Id).ToList();
+
+            // Wallet breakdown per shift
+            var allWalletPayments = await _context.Payments
+                .AsNoTracking()
+                .Include(p => p.Wallet)
+                .Where(p => p.Order != null
+                         && p.Order.ShiftId.HasValue
+                         && shiftIds.Contains(p.Order.ShiftId.Value)
+                         && p.WalletId.HasValue
+                         && !p.Order.IsDeleted)
+                .ToListAsync();
+
+            var walletBreakdownByShift = allWalletPayments
+                .GroupBy(p => p.Order!.ShiftId!.Value)
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.GroupBy(p => new { p.WalletId, p.Wallet!.Name, p.Wallet.Type })
+                        .Select(wg => new WalletPaymentBreakdownDto
+                        {
+                            WalletId = wg.Key.WalletId!.Value,
+                            WalletName = wg.Key.Name,
+                            WalletType = wg.Key.Type,
+                            Total = wg.Sum(p => p.Amount),
+                            TransactionCount = wg.Count()
+                        })
+                        .ToList());
+
             var detailedShifts = shifts.Select(s =>
             {
                 var completedOrders = (s.Orders ?? new List<Domain.Entities.Order>())
@@ -234,23 +262,19 @@ public class EmployeeReportService : IEmployeeReportService
                     SumAppliedPayments(salesOrders, PaymentMethod.Cash)
                     - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)),
                     2);
-                var shiftCard = Math.Round(
-                    SumAppliedPayments(salesOrders, PaymentMethod.Card)
-                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)),
+                var shiftBankAccount = Math.Round(
+                    SumAppliedPayments(salesOrders, PaymentMethod.BankAccount)
+                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankAccount).Sum(p => p.Amount)),
                     2);
-                var shiftFawry = Math.Round(
-                    SumAppliedPayments(salesOrders, PaymentMethod.Fawry)
-                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)),
-                    2);
-                var shiftBankTransfer = Math.Round(
-                    SumAppliedPayments(salesOrders, PaymentMethod.BankTransfer)
-                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)),
+                var shiftWallet = Math.Round(
+                    SumAppliedPayments(salesOrders, PaymentMethod.Wallet)
+                    - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Wallet).Sum(p => p.Amount)),
                     2);
                 var totalSales = Math.Round(
                     salesOrders.Sum(o => o.Total) - Math.Abs(returnOrders.Sum(o => o.Total)),
                     2);
                 var totalCollected = Math.Round(
-                    shiftCash + shiftCard + shiftFawry + shiftBankTransfer,
+                    shiftCash + shiftBankAccount + shiftWallet,
                     2);
                 var deferredAmount = Math.Max(0, Math.Round(totalSales - totalCollected, 2));
 
@@ -269,12 +293,14 @@ public class EmployeeReportService : IEmployeeReportService
                     Variance = s.Difference,
                     TotalOrders = s.TotalOrders,
                     TotalCash = shiftCash,
-                    TotalCard = shiftCard,
-                    TotalFawry = shiftFawry,
-                    TotalBankTransfer = shiftBankTransfer,
+                    TotalBankAccount = shiftBankAccount,
+                    TotalWallet = shiftWallet,
                     TotalSales = totalSales,
                     TotalCollected = totalCollected,
                     DeferredAmount = deferredAmount,
+                    WalletBreakdown = walletBreakdownByShift.ContainsKey(s.Id)
+                        ? walletBreakdownByShift[s.Id]
+                        : new List<WalletPaymentBreakdownDto>(),
                     IsForceClosed = s.IsForceClosed,
                     ForceCloseReason = s.ForceCloseReason,
                     ClosedByUserName = s.IsForceClosed ? s.ForceClosedByUserName : s.User.Name

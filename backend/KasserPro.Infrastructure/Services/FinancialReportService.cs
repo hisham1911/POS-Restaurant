@@ -139,6 +139,31 @@ public class FinancialReportService : IFinancialReportService
                 ? Math.Round((netProfit / actualNetSales) * 100, 2)
                 : 0m;
 
+            // Wallet breakdown (client-side aggregation because SQLite cannot Sum(decimal) in SQL)
+            var walletPayments = await _context.Payments
+                .AsNoTracking()
+                .Include(p => p.Wallet)
+                .Where(p => p.Order != null
+                         && p.Order.TenantId == tenantId
+                         && p.Order.BranchId == branchId
+                         && p.Order.CompletedAt >= utcFrom
+                         && p.Order.CompletedAt < utcTo
+                         && p.WalletId.HasValue
+                         && !p.Order.IsDeleted)
+                .ToListAsync();
+
+            var walletBreakdown = walletPayments
+                .GroupBy(p => new { p.WalletId, p.Wallet!.Name, p.Wallet!.Type })
+                .Select(g => new WalletPaymentBreakdownDto
+                {
+                    WalletId = g.Key.WalletId!.Value,
+                    WalletName = g.Key.Name,
+                    WalletType = g.Key.Type,
+                    Total = Math.Round(g.Sum(p => p.Amount), 2),
+                    TransactionCount = g.Count()
+                })
+                .ToList();
+
             var report = new ProfitLossReportDto
             {
                 FromDate = fromDate,
@@ -173,7 +198,10 @@ public class FinancialReportService : IFinancialReportService
                         actualTotalRevenue / orders.Count(o => o.Status != OrderStatus.Refunded),
                         2)
                     : 0,
-                RefundsAmount = returnRevenue
+                RefundsAmount = returnRevenue,
+
+                // Wallet Breakdown
+                WalletBreakdown = walletBreakdown
             };
 
             return ApiResponse<ProfitLossReportDto>.Ok(report);
@@ -231,12 +259,11 @@ public class FinancialReportService : IFinancialReportService
             var cashExpenses = expenses
                 .Where(e => e.PaymentMethod == PaymentMethod.Cash)
                 .Sum(e => e.Amount);
-            var cardExpenses = expenses
-                .Where(e => e.PaymentMethod == PaymentMethod.Card)
+            var bankAccountExpenses = expenses
+                .Where(e => e.PaymentMethod == PaymentMethod.BankAccount)
                 .Sum(e => e.Amount);
-            var otherExpenses = expenses
-                .Where(e => e.PaymentMethod != PaymentMethod.Cash
-                         && e.PaymentMethod != PaymentMethod.Card)
+            var walletExpenses = expenses
+                .Where(e => e.PaymentMethod == PaymentMethod.Wallet)
                 .Sum(e => e.Amount);
 
             // Daily Breakdown
@@ -281,8 +308,8 @@ public class FinancialReportService : IFinancialReportService
                 ExpensesByCategory = expensesByCategory,
 
                 CashExpenses = cashExpenses,
-                CardExpenses = cardExpenses,
-                OtherExpenses = otherExpenses,
+                BankAccountExpenses = bankAccountExpenses,
+                WalletExpenses = walletExpenses,
 
                 DailyExpenses = dailyExpenses,
                 TopExpenses = topExpenses

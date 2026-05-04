@@ -35,7 +35,7 @@ public class ShiftConfiguration : IEntityTypeConfiguration<Shift>
         builder.Property(s => s.TotalCash)
             .HasColumnType("decimal(18,2)");
 
-        builder.Property(s => s.TotalCard)
+        builder.Property(s => s.TotalBankAccount)
             .HasColumnType("decimal(18,2)");
 
         builder.Property(s => s.HandoverBalance)

@@ -12,6 +12,7 @@ public class PurchaseInvoiceDto
     
     public decimal Subtotal { get; set; }
     public decimal TaxRate { get; set; }
+    public bool IsTaxEnabled { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal Total { get; set; }
     public decimal AmountPaid { get; set; }
@@ -33,6 +34,7 @@ public class PurchaseInvoicePreviewDto
 {
     public decimal Subtotal { get; set; }
     public decimal TaxRate { get; set; }
+    public bool IsTaxEnabled { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal Total { get; set; }
 }

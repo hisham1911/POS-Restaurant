@@ -46,7 +46,7 @@ export function AddPaymentModal({
     }
 
     if (requiresReference && !referenceNumber.trim()) {
-      toast.error("رقم المعاملة مطلوب عند الدفع بفودافون كاش أو فيزا");
+      toast.error("رقم المعاملة مطلوب عند الدفع بمحفظة أو حساب بنكي");
       return;
     }
 
@@ -119,9 +119,8 @@ export function AddPaymentModal({
               required
             >
               <option value="Cash">نقدي</option>
-              <option value="Card">فيزا</option>
-              <option value="Fawry">فودافون كاش</option>
-              <option value="BankTransfer">تحويل بنكي</option>
+              <option value="BankAccount">حساب بنكي</option>
+              <option value="Wallet">محفظة</option>
             </select>
             <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
           </div>

@@ -6,6 +6,7 @@ public class CreatePurchaseInvoiceRequest
     public DateTime InvoiceDate { get; set; } = DateTime.UtcNow;
     public List<CreatePurchaseInvoiceItemRequest> Items { get; set; } = new();
     public string? Notes { get; set; }
+    public bool IsTaxEnabled { get; set; } = true;
 }
 
 public class CreatePurchaseInvoiceItemRequest

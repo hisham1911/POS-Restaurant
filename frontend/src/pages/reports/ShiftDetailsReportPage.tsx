@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   Clock,
   Calendar,
@@ -10,6 +10,7 @@ import {
   CheckCircle,
   XCircle,
   Info,
+  Wallet,
 } from "lucide-react";
 import { Card } from "@/components/common/Card";
 import { formatCurrency, formatDateTime } from "@/utils/formatters";
@@ -193,7 +194,8 @@ export const ShiftDetailsReportPage = () => {
             <tbody>
               {report?.shifts && report.shifts.length > 0 ? (
                 report.shifts.map((shift) => (
-                  <tr key={shift.shiftId} className="border-b hover:bg-gray-50">
+                  <React.Fragment key={shift.shiftId}>
+                  <tr className="border-b hover:bg-gray-50">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
@@ -248,6 +250,27 @@ export const ShiftDetailsReportPage = () => {
                       )}
                     </td>
                   </tr>
+                  {shift.walletBreakdown && shift.walletBreakdown.length > 0 && (
+                    <tr className="bg-indigo-50 border-b">
+                      <td colSpan={7} className="px-4 py-2">
+                        <div className="flex items-center gap-4 flex-wrap">
+                          <Wallet className="w-4 h-4 text-indigo-600" />
+                          {shift.walletBreakdown.map((w) => (
+                            <div key={w.walletId} className="flex items-center gap-1">
+                              <span className="text-xs text-gray-600">{w.walletName}:</span>
+                              <span className="text-xs font-bold text-indigo-700">
+                                {formatCurrency(w.total)}
+                              </span>
+                              <span className="text-xs text-gray-400">
+                                ({w.transactionCount})
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))
               ) : (
                 <tr>

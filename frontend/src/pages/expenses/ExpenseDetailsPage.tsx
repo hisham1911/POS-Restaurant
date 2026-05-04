@@ -32,12 +32,10 @@ const getPaymentMethodLabel = (method?: string) => {
   switch (method) {
     case "Cash":
       return "نقدي";
-    case "Card":
-      return "فيزا";
-    case "BankTransfer":
-      return "تحويل بنكي";
-    case "Fawry":
-      return "فودافون كاش";
+    case "BankAccount":
+      return "حساب بنكي";
+    case "Wallet":
+      return "محفظة";
     default:
       return method || "غير محدد";
   }
@@ -89,7 +87,7 @@ export function ExpenseDetailsPage() {
 
   const handleApprove = async () => {
     if (requiresPaymentReference && !paymentReferenceNumber.trim()) {
-      toast.error("رقم المعاملة مطلوب عند الدفع بفودافون كاش أو فيزا");
+      toast.error("رقم المعاملة مطلوب عند الدفع بمحفظة أو حساب بنكي");
       return;
     }
 
@@ -533,8 +531,8 @@ export function ExpenseDetailsPage() {
                 className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
               >
                 <option value="Cash">نقدي</option>
-                <option value="Fawry">فودافون كاش</option>
-                <option value="Card">فيزا</option>
+                <option value="BankAccount">حساب بنكي</option>
+                <option value="Wallet">محفظة</option>
               </select>
               <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
             </div>
@@ -549,7 +547,7 @@ export function ExpenseDetailsPage() {
                 value={paymentReferenceNumber}
                 onChange={(e) => setPaymentReferenceNumber(e.target.value)}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="اكتب رقم العملية من فودافون كاش أو الفيزا"
+                placeholder="اكتب رقم العملية من محفظة أو حساب بنكي"
               />
             </div>
           )}
@@ -572,7 +570,7 @@ export function ExpenseDetailsPage() {
             </p>
             {paymentMethod !== "Cash" && (
               <p className="text-sm text-blue-800 mt-1">
-                دفعات فودافون كاش والفيزا لا تُسجل في معاملات الخزينة.
+                دفعات المحفظة والحساب البنكي لا تُسجل في معاملات الخزينة.
               </p>
             )}
           </div>

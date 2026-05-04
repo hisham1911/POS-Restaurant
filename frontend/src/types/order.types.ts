@@ -8,7 +8,7 @@ export type OrderStatus =
 
 export type OrderType = "DineIn" | "Takeaway" | "Delivery" | "Return";
 
-export type PaymentMethod = "Cash" | "Card" | "Fawry";
+export type PaymentMethod = "Cash" | "BankAccount" | "Wallet";
 
 // Query parameters for filtering orders
 export interface OrdersQueryParams {
@@ -175,6 +175,7 @@ export interface CompleteOrderRequest {
     method: PaymentMethod;
     amount: number;
     reference?: string;
+    walletId?: number;
   }[];
 }
 

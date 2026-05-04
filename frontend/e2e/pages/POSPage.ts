@@ -86,11 +86,11 @@ export class POSPage {
     await expect(this.page.locator('text=الإجمالي المطلوب')).toBeVisible();
   }
 
-  async selectPaymentMethod(method: 'cash' | 'card' | 'fawry') {
+  async selectPaymentMethod(method: 'cash' | 'bankAccount' | 'wallet') {
     const methodMap = {
       cash: 'نقدي',
-      card: 'بطاقة',
-      fawry: 'فوري'
+      bankAccount: 'حساب بنكي',
+      wallet: 'محفظة'
     };
     await this.page.locator(`text=${methodMap[method]}`).locator('..').click();
   }

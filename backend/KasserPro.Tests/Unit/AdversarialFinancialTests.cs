@@ -219,60 +219,57 @@ public class AdversarialFinancialTests
     #region ── CRITICAL-2: ShiftService TotalCard Normal vs ForceClose ──
 
     [Fact]
-    public void C2_NormalClose_TotalCardIncludesAllNonCash()
+    public void C2_NormalClose_TotalBankAccountAndWalletIncludesAllNonCash()
     {
         var payments = new List<Payment>
         {
             new() { Method = PaymentMethod.Cash, Amount = 100 },
-            new() { Method = PaymentMethod.Card, Amount = 200 },
-            new() { Method = PaymentMethod.Fawry, Amount = 150 },
-            new() { Method = PaymentMethod.BankTransfer, Amount = 50 },
+            new() { Method = PaymentMethod.BankAccount, Amount = 250 },
+            new() { Method = PaymentMethod.Wallet, Amount = 150 },
         };
 
         // Normal close logic: p.Method != PaymentMethod.Cash
-        var totalCard_NormalClose = payments
+        var totalNonCash_NormalClose = payments
             .Where(p => p.Method != PaymentMethod.Cash)
             .Sum(p => p.Amount);
 
-        totalCard_NormalClose.Should().Be(400m, "Normal close includes Card + Fawry + BankTransfer");
+        totalNonCash_NormalClose.Should().Be(400m, "Normal close includes BankAccount + Wallet");
     }
 
     [Fact]
-    public void C2_ForceClose_TotalCardMatchesNormalClose()
+    public void C2_ForceClose_TotalNonCashMatchesNormalClose()
     {
         var payments = new List<Payment>
         {
             new() { Method = PaymentMethod.Cash, Amount = 100 },
-            new() { Method = PaymentMethod.Card, Amount = 200 },
-            new() { Method = PaymentMethod.Fawry, Amount = 150 },
-            new() { Method = PaymentMethod.BankTransfer, Amount = 50 },
+            new() { Method = PaymentMethod.BankAccount, Amount = 250 },
+            new() { Method = PaymentMethod.Wallet, Amount = 150 },
         };
 
         // FIXED: ForceClose now uses unified CalculateShiftFinancials helper
         // Same formula as NormalClose: p.Method != PaymentMethod.Cash
-        var totalCard_ForceClose = payments
+        var totalNonCash_ForceClose = payments
             .Where(p => p.Method != PaymentMethod.Cash)
             .Sum(p => p.Amount);
 
-        totalCard_ForceClose.Should().Be(400m, "FIXED: ForceClose includes all non-cash payments");
+        totalNonCash_ForceClose.Should().Be(400m, "FIXED: ForceClose includes all non-cash payments");
     }
 
     [Fact]
-    public void C2_TotalCardConsistent_UnifiedHelper()
+    public void C2_TotalNonCashConsistent_UnifiedHelper()
     {
         var payments = new List<Payment>
         {
             new() { Method = PaymentMethod.Cash, Amount = 100 },
-            new() { Method = PaymentMethod.Card, Amount = 200 },
-            new() { Method = PaymentMethod.Fawry, Amount = 150 },
-            new() { Method = PaymentMethod.BankTransfer, Amount = 50 },
+            new() { Method = PaymentMethod.BankAccount, Amount = 250 },
+            new() { Method = PaymentMethod.Wallet, Amount = 150 },
         };
 
         // FIXED: Both NormalClose and ForceClose use unified CalculateShiftFinancials
-        var totalCard_Normal = payments.Where(p => p.Method != PaymentMethod.Cash).Sum(p => p.Amount);
-        var totalCard_Force = payments.Where(p => p.Method != PaymentMethod.Cash).Sum(p => p.Amount);
+        var totalNonCash_Normal = payments.Where(p => p.Method != PaymentMethod.Cash).Sum(p => p.Amount);
+        var totalNonCash_Force = payments.Where(p => p.Method != PaymentMethod.Cash).Sum(p => p.Amount);
 
-        totalCard_Normal.Should().Be(totalCard_Force,
+        totalNonCash_Normal.Should().Be(totalNonCash_Force,
             "FIXED: NormalClose and ForceClose use identical non-cash calculation");
     }
 

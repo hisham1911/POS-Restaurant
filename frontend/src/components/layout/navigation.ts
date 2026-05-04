@@ -295,6 +295,18 @@ export const navigationItems: NavigationItem[] = [
     permission: "ExpensesView",
   },
   {
+    path: "/wallets",
+    label: "المحافظ",
+    description:
+      "إدارة محافظ الدفع الإلكتروني وتتبع رصيد كل محفظة وحركاتها.",
+    spotlight: "الدفع الإلكتروني",
+    icon: Wallet,
+    sectionId: "finance",
+    audience: "non-system-owner",
+    permission: "WalletView",
+    featured: true,
+  },
+  {
     path: "/cash-register",
     label: "الخزينة",
     description:

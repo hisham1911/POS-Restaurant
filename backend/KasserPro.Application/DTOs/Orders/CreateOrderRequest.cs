@@ -56,4 +56,5 @@ public class PaymentRequest
     public string Method { get; set; } = "Cash";
     public decimal Amount { get; set; }
     public string? Reference { get; set; }
+    public int? WalletId { get; set; }
 }

@@ -200,10 +200,10 @@ export const CustomersPage = () => {
                     إجمالي الطلبات
                   </th>
                   <th className="text-right px-6 py-4 text-sm font-semibold text-gray-600 hidden lg:table-cell">
-                    إجمالي المشتريات
+                    المبلغ المستحق (كل الفروع)
                   </th>
                   <th className="text-right px-6 py-4 text-sm font-semibold text-gray-600 hidden xl:table-cell">
-                    المبلغ المستحق (كل الفروع)
+                    إجمالي المشتريات
                   </th>
                   <th className="text-center px-6 py-4 text-sm font-semibold text-gray-600">
                     الإجراءات
@@ -271,10 +271,7 @@ export const CustomersPage = () => {
                       <td className="px-6 py-4 text-gray-600 hidden lg:table-cell">
                         {customer.totalOrders} طلب
                       </td>
-                      <td className="px-6 py-4 text-gray-600 hidden lg:table-cell">
-                        {formatCurrency(customer.totalSpent)}
-                      </td>
-                      <td className="px-6 py-4 hidden xl:table-cell">
+                      <td className="px-6 py-4 hidden lg:table-cell">
                         {customer.totalDue > 0 ? (
                           <div className="flex flex-col gap-1">
                             <span className="font-semibold text-orange-600">
@@ -292,6 +289,9 @@ export const CustomersPage = () => {
                         ) : (
                           <span className="text-gray-400">—</span>
                         )}
+                      </td>
+                      <td className="px-6 py-4 text-gray-600 hidden xl:table-cell">
+                        {formatCurrency(customer.totalSpent)}
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-2">

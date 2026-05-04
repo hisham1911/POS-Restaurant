@@ -64,7 +64,7 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
       !String(formData.referenceNumber || "").trim()
     ) {
       newErrors.referenceNumber =
-        "رقم المعاملة مطلوب عند الدفع بفودافون كاش أو فيزا";
+        "رقم المعاملة مطلوب عند الدفع بمحفظة أو حساب بنكي";
     }
 
     setErrors(newErrors);
@@ -114,15 +114,10 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
 
   const paymentMethods = [
     { id: "Cash", label: "نقدي", icon: <Banknote className="w-5 h-5" /> },
-    { id: "Card", label: "فيزا", icon: <CreditCard className="w-5 h-5" /> },
+    { id: "BankAccount", label: "حساب بنكي", icon: <CreditCard className="w-5 h-5" /> },
     {
-      id: "BankTransfer",
-      label: "تحويل بنكي",
-      icon: <DollarSign className="w-5 h-5" />,
-    },
-    {
-      id: "Fawry",
-      label: "فودافون كاش",
+      id: "Wallet",
+      label: "محفظة",
       icon: <DollarSign className="w-5 h-5" />,
     },
   ];
@@ -312,7 +307,7 @@ export const DebtPaymentModal: React.FC<DebtPaymentModalProps> = ({
                       ? "border-red-500"
                       : "border-gray-200",
                   )}
-                  placeholder="اكتب رقم العملية من فودافون كاش أو الفيزا"
+                  placeholder="اكتب رقم العملية من محفظة أو حساب بنكي"
                   disabled={isLoading}
                 />
                 {errors.referenceNumber && (

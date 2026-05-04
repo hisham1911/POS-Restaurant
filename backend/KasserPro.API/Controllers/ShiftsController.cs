@@ -88,6 +88,14 @@ public class ShiftsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("{id}/products-summary")]
+    [HasPermission(Permission.OrdersView)]
+    public async Task<IActionResult> GetProductsSummary(int id)
+    {
+        var result = await _shiftService.GetProductsSummaryAsync(id);
+        return Ok(result);
+    }
+
     [HttpPost("{id}/force-close")]
     [HasPermission(Permission.ShiftsManage)]
     public async Task<IActionResult> ForceClose(int id, [FromBody] ForceCloseShiftRequest request)

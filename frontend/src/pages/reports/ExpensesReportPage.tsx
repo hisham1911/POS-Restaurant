@@ -19,12 +19,10 @@ const getPaymentMethodLabel = (method?: string) => {
   switch (method) {
     case "Cash":
       return "نقدي";
-    case "Card":
-      return "بطاقة";
-    case "BankTransfer":
-      return "تحويل بنكي";
-    case "Fawry":
-      return "فوري";
+    case "BankAccount":
+      return "حساب بنكي";
+    case "Wallet":
+      return "محفظة";
     default:
       return method || "-";
   }
@@ -160,18 +158,18 @@ export const ExpensesReportPage = () => {
           <div className="flex items-center gap-3 p-4 bg-blue-50 rounded-lg">
             <CreditCard className="w-8 h-8 text-blue-600" />
             <div>
-              <p className="text-sm text-gray-600">بطاقة</p>
+              <p className="text-sm text-gray-600">حساب بنكي</p>
               <p className="text-xl font-bold text-blue-600">
-                {formatCurrency(report?.cardExpenses || 0)}
+                {formatCurrency(report?.bankAccountExpenses || 0)}
               </p>
             </div>
           </div>
-          <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-lg">
-            <Receipt className="w-8 h-8 text-gray-600" />
+          <div className="flex items-center gap-3 p-4 bg-orange-50 rounded-lg">
+            <Receipt className="w-8 h-8 text-orange-600" />
             <div>
-              <p className="text-sm text-gray-600">أخرى</p>
-              <p className="text-xl font-bold text-gray-600">
-                {formatCurrency(report?.otherExpenses || 0)}
+              <p className="text-sm text-gray-600">محفظة</p>
+              <p className="text-xl font-bold text-orange-600">
+                {formatCurrency(report?.walletExpenses || 0)}
               </p>
             </div>
           </div>

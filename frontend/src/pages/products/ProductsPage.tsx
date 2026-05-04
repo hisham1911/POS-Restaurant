@@ -321,8 +321,10 @@ export const ProductsPage = () => {
                       <td className="px-4 py-3 text-gray-600">
                         {category?.name || "-"}
                       </td>
-                      <td className="px-4 py-3 font-semibold text-primary-600">
-                        {formatCurrency(product.price)}
+                      <td className="px-4 py-3">
+                        <span className="font-semibold text-primary-600">
+                          {formatCurrency(product.suggestedPrice)}
+                        </span>
                       </td>
                       <td className="px-4 py-3">
                         <span

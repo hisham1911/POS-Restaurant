@@ -128,14 +128,14 @@ public class AutoCloseShiftBackgroundService : BackgroundService
                     .ToList();
 
                 var totalCash = SumAppliedPayments(completedOrders, PaymentMethod.Cash);
-                var totalCard = SumAppliedPayments(completedOrders, PaymentMethod.Card);
+                var totalBankAccount = SumAppliedPayments(completedOrders, PaymentMethod.BankAccount);
 
                 // Set closing values
                 shift.ClosingBalance = shift.OpeningBalance + totalCash;
                 shift.ExpectedBalance = shift.OpeningBalance + totalCash;
                 shift.Difference = 0; // No difference since we're using expected balance
                 shift.TotalCash = totalCash;
-                shift.TotalCard = totalCard;
+                shift.TotalBankAccount = totalBankAccount;
                 shift.TotalOrders = completedOrders.Count;
                 shift.ClosedAt = DateTime.UtcNow;
                 shift.IsClosed = true;
@@ -190,8 +190,8 @@ public class AutoCloseShiftBackgroundService : BackgroundService
                 }
 
                 _logger.LogInformation(
-                    "Successfully auto-closed shift {ShiftId} - Total Cash: {TotalCash}, Total Card: {TotalCard}, Orders: {TotalOrders}",
-                    shift.Id, totalCash, totalCard, completedOrders.Count);
+                    "Successfully auto-closed shift {ShiftId} - Total Cash: {TotalCash}, Total BankAccount: {TotalBankAccount}, Orders: {TotalOrders}",
+                    shift.Id, totalCash, totalBankAccount, completedOrders.Count);
             }
             catch (Exception ex)
             {

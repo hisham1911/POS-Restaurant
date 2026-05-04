@@ -16,6 +16,7 @@ import {
   Info,
   Printer,
   Building2,
+  Wallet,
 } from "lucide-react";
 import { Card } from "@/components/common/Card";
 import { formatCurrency, formatDateTimeFull } from "@/utils/formatters";
@@ -58,9 +59,8 @@ const generateDailyReportReceiptHtml = (
         </div>
         <div class="shift-payments">
           <span>نقدي: ${fmt(s.totalCash)}</span>
-          <span>بطاقة: ${fmt(s.totalCard)}</span>
-          ${s.totalFawry > 0 ? `<span>فوري: ${fmt(s.totalFawry)}</span>` : ""}
-          ${s.totalOther > 0 ? `<span>تحويل: ${fmt(s.totalOther)}</span>` : ""}
+          <span>بنك: ${fmt(s.totalBankAccount)}</span>
+          ${s.totalWallet > 0 ? `<span>محفظة: ${fmt(s.totalWallet)}</span>` : ""}
         </div>
       </div>
     `,
@@ -71,7 +71,6 @@ const generateDailyReportReceiptHtml = (
   // Top products rows
   const topProductsHtml = report.topProducts?.length
     ? report.topProducts
-        .slice(0, 10)
         .map(
           (p, i) => `
       <div class="product-row">
@@ -233,11 +232,17 @@ const generateDailyReportReceiptHtml = (
   <!-- طرق الدفع -->
   <div class="section-title">💳 طرق الدفع</div>
   <div class="row"><span>💵 نقدي</span><span class="value">${fmt(report.totalCash)} ج.م</span></div>
-  <div class="row"><span>💳 بطاقة</span><span class="value">${fmt(report.totalCard)} ج.م</span></div>
-  ${report.totalFawry > 0 ? `<div class="row"><span>📱 فوري</span><span class="value">${fmt(report.totalFawry)} ج.م</span></div>` : ""}
-  ${report.totalOther > 0 ? `<div class="row"><span>🏦 تحويل</span><span class="value">${fmt(report.totalOther)} ج.م</span></div>` : ""}
+  <div class="row"><span>🏦 بنك</span><span class="value">${fmt(report.totalBankAccount)} ج.م</span></div>
+  ${report.totalWallet > 0 ? `<div class="row"><span>📱 محفظة</span><span class="value">${fmt(report.totalWallet)} ج.م</span></div>` : ""}
   <div class="row"><span>إجمالي التحصيل</span><span class="value">${fmt(report.totalCollected)} ج.م</span></div>
   <div class="row"><span>الآجل / فرق التحصيل</span><span class="value">${fmt(report.totalDeferred)} ج.م</span></div>
+
+  ${report.walletBreakdown?.length ? `
+  <div class="line"></div>
+  <div class="section-title">👛 المحافظ الإلكترونية</div>
+  ${report.walletBreakdown.map(w => `<div class="row"><span>${w.walletName} (${w.walletType})</span><span class="value">${fmt(w.total)} ج.م</span></div>`).join("\n  ")}
+  <div class="row total"><span>إجمالي المحافظ</span><span class="value">${fmt(report.walletBreakdown.reduce((s, w) => s + w.total, 0))} ج.م</span></div>
+  ` : ""}
 
   <div class="double-line"></div>
 
@@ -545,25 +550,16 @@ export const DailyReportPage = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <CreditCard className="w-4 h-4 text-blue-600" />
-                    <span className="text-sm text-gray-600">بطاقة:</span>
+                    <span className="text-sm text-gray-600">بنك:</span>
                     <span className="text-sm font-medium text-blue-600">
-                      {formatCurrency(shift.totalCard)}
+                      {formatCurrency(shift.totalBankAccount)}
                     </span>
                   </div>
-                  {shift.totalFawry > 0 && (
+                  {shift.totalWallet > 0 && (
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">فوري:</span>
+                      <span className="text-sm text-gray-600">محفظة:</span>
                       <span className="text-sm font-medium text-purple-600">
-                        {formatCurrency(shift.totalFawry)}
-                      </span>
-                    </div>
-                  )}
-                  {shift.totalOther > 0 && (
-                    <div className="flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-slate-600" />
-                      <span className="text-sm text-gray-600">تحويل:</span>
-                      <span className="text-sm font-medium text-slate-700">
-                        {formatCurrency(shift.totalOther)}
+                        {formatCurrency(shift.totalWallet)}
                       </span>
                     </div>
                   )}
@@ -667,31 +663,20 @@ export const DailyReportPage = () => {
           <div className="flex items-center gap-3">
             <CreditCard className="w-8 h-8 text-blue-600" />
             <div>
-              <p className="text-sm text-gray-500">بطاقة</p>
+              <p className="text-sm text-gray-500">بنك</p>
               <p className="text-xl font-bold text-blue-600">
-                {formatCurrency(report?.totalCard || 0)}
+                {formatCurrency(report?.totalBankAccount || 0)}
               </p>
             </div>
           </div>
         </Card>
         <Card>
           <div className="flex items-center gap-3">
-            <Receipt className="w-8 h-8 text-orange-600" />
+            <Wallet className="w-8 h-8 text-orange-600" />
             <div>
-              <p className="text-sm text-gray-500">فوري</p>
+              <p className="text-sm text-gray-500">محفظة</p>
               <p className="text-xl font-bold text-orange-600">
-                {formatCurrency(report?.totalFawry || 0)}
-              </p>
-            </div>
-          </div>
-        </Card>
-        <Card>
-          <div className="flex items-center gap-3">
-            <Building2 className="w-8 h-8 text-slate-600" />
-            <div>
-              <p className="text-sm text-gray-500">تحويل</p>
-              <p className="text-xl font-bold text-slate-700">
-                {formatCurrency(report?.totalOther || 0)}
+                {formatCurrency(report?.totalWallet || 0)}
               </p>
             </div>
           </div>
@@ -718,6 +703,19 @@ export const DailyReportPage = () => {
             </div>
           </div>
         </Card>
+        {report?.walletBreakdown?.map((wallet) => (
+          <Card key={wallet.walletId}>
+            <div className="flex items-center gap-3">
+              <Wallet className="w-8 h-8 text-indigo-600" />
+              <div>
+                <p className="text-sm text-gray-500">{wallet.walletName}</p>
+                <p className="text-xl font-bold text-indigo-600">
+                  {formatCurrency(wallet.total)}
+                </p>
+              </div>
+            </div>
+          </Card>
+        ))}
       </div>
 
       {/* Charts Row */}
@@ -735,21 +733,21 @@ export const DailyReportPage = () => {
                 color: "bg-green-500",
               },
               {
-                label: "بطاقة",
-                value: report?.totalCard || 0,
+                label: "بنك",
+                value: report?.totalBankAccount || 0,
                 color: "bg-blue-500",
               },
               {
-                label: "فوري",
-                value: report?.totalFawry || 0,
+                label: "محفظة",
+                value: report?.totalWallet || 0,
                 color: "bg-orange-500",
               },
-              {
-                label: "تحويل",
-                value: report?.totalOther || 0,
-                color: "bg-slate-500",
-              },
-            ].map((item) => {
+              ...(report?.walletBreakdown?.map((w) => ({
+                label: w.walletName,
+                value: w.total,
+                color: "bg-indigo-500",
+              })) ?? []),
+            ].filter((item) => item.value > 0).map((item) => {
               const total = report?.actualTotalSales || report?.totalSales || 1;
               const percentage = (item.value / total) * 100;
               return (

@@ -27,11 +27,14 @@ public class DailyReportDto
 
     // Payment Breakdown
     public decimal TotalCash { get; set; }
-    public decimal TotalCard { get; set; }
-    public decimal TotalFawry { get; set; }
-    public decimal TotalOther { get; set; }
+    public decimal TotalBankAccount { get; set; }
+    public decimal TotalWallet { get; set; }
     public decimal TotalCollected { get; set; }
     public decimal TotalDeferred { get; set; }
+
+    // Wallet Breakdown
+    public List<WalletPaymentBreakdownDto> WalletBreakdown { get; set; } = new();
+    public decimal TotalNonCash => WalletBreakdown.Sum(w => w.Total);
 
     // Top Products
     public List<TopProductDto> TopProducts { get; set; } = new();
@@ -48,16 +51,14 @@ public class ShiftSummaryDto
     public DateTime ClosedAt { get; set; }
     public int TotalOrders { get; set; }
     public decimal TotalCash { get; set; }
-    public decimal TotalCard { get; set; }
-    public decimal TotalFawry { get; set; }
-    public decimal TotalOther { get; set; }
+    public decimal TotalBankAccount { get; set; }
+    public decimal TotalWallet { get; set; }
     public decimal TotalSales { get; set; }
     public decimal TotalCollected { get; set; }
     public decimal DeferredAmount { get; set; }
     public decimal CollectedCash { get; set; }
-    public decimal CollectedCard { get; set; }
-    public decimal CollectedFawry { get; set; }
-    public decimal CollectedOther { get; set; }
+    public decimal CollectedBankAccount { get; set; }
+    public decimal CollectedWallet { get; set; }
     public bool IsForceClosed { get; set; }
     public string? ForceCloseReason { get; set; }
 }
@@ -77,6 +78,15 @@ public class HourlySalesDto
     public decimal Sales { get; set; }
 }
 
+public class WalletPaymentBreakdownDto
+{
+    public int WalletId { get; set; }
+    public string WalletName { get; set; } = string.Empty;
+    public string WalletType { get; set; } = string.Empty;
+    public decimal Total { get; set; }
+    public int TransactionCount { get; set; }
+}
+
 public class SalesReportDto
 {
     public DateTime FromDate { get; set; }
@@ -87,6 +97,7 @@ public class SalesReportDto
     public int TotalOrders { get; set; }
     public decimal AverageOrderValue { get; set; }
     public List<DailySalesDto> DailySales { get; set; } = new();
+    public List<WalletPaymentBreakdownDto> WalletBreakdown { get; set; } = new();
 }
 
 public class DailySalesDto

@@ -10,6 +10,7 @@ import {
   Calendar,
   PieChart,
   Info,
+  Wallet,
 } from "lucide-react";
 import { Card } from "@/components/common/Card";
 import { formatCurrency } from "@/utils/formatters";
@@ -175,6 +176,29 @@ export const ProfitLossReportPage = () => {
             </div>
           </Card>
         </div>
+
+        {/* Wallet Breakdown */}
+        {report?.walletBreakdown && report.walletBreakdown.length > 0 && (
+          <div className="mt-4">
+            <h3 className="text-sm font-bold text-gray-700 mb-2 flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-indigo-600" />
+              المحافظ الإلكترونية
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              {report.walletBreakdown.map((wallet) => (
+                <div
+                  key={wallet.walletId}
+                  className="flex items-center justify-between bg-indigo-50 rounded-lg px-4 py-2"
+                >
+                  <span className="text-sm text-gray-700">{wallet.walletName}</span>
+                  <span className="text-sm font-bold text-indigo-700">
+                    {formatCurrency(wallet.total)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Profit Analysis */}

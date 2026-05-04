@@ -8,7 +8,6 @@ import {
   ArrowDownCircle,
   RefreshCw,
   ArrowRightLeft,
-  ClipboardCheck,
 } from "lucide-react";
 import {
   useGetCurrentBalanceQuery,
@@ -21,7 +20,6 @@ import { Card } from "../../components/common/Card";
 import { Loading } from "../../components/common/Loading";
 import { Modal } from "../../components/common/Modal";
 import { TransferCashModal } from "../../components/cashRegister/TransferCashModal";
-import { ReconcileModal } from "../../components/cashRegister/ReconcileModal";
 import type { CashRegisterTransactionType } from "../../types/cashRegister.types";
 import { useAppSelector } from "../../store/hooks";
 import { selectCurrentBranch } from "../../store/slices/branchSlice";
@@ -34,7 +32,6 @@ export function CashRegisterDashboard() {
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [showTransferModal, setShowTransferModal] = useState(false);
-  const [showReconcileModal, setShowReconcileModal] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [depositDescription, setDepositDescription] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -217,15 +214,6 @@ export function CashRegisterDashboard() {
               >
                 <ArrowRightLeft className="w-4 h-4" />
                 تحويل نقدي
-              </Button>
-            )}
-            {hasPermission("CashRegisterReconcile") && (
-              <Button
-                variant="outline"
-                onClick={() => setShowReconcileModal(true)}
-              >
-                <ClipboardCheck className="w-4 h-4" />
-                مطابقة وإغلاق الشيفت
               </Button>
             )}
             <Button
@@ -474,13 +462,6 @@ export function CashRegisterDashboard() {
         <TransferCashModal
           isOpen={showTransferModal}
           onClose={() => setShowTransferModal(false)}
-        />
-        <ReconcileModal
-          isOpen={showReconcileModal}
-          onClose={() => setShowReconcileModal(false)}
-          branchId={currentBranch?.id ?? 0}
-          shiftId={balance?.activeShiftId ?? 0}
-          expectedAmount={balance?.currentBalance ?? 0}
         />
         {/* Help Section */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">

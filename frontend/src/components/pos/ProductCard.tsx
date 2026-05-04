@@ -57,7 +57,8 @@ export const ProductCard = ({
   // Get quantity in cart for this product
   const cartItems = items.filter((item) => item.product.id === product.id);
   const quantityInCart = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  const displayPrice = cartItems[0]?.product.price ?? product.price;
+  // Use suggested price (from batch if available, otherwise base price)
+  const displayPrice = cartItems[0]?.product.suggestedPrice ?? product.suggestedPrice;
 
   // Calculate available stock (stock - what's in cart)
   const totalStock = getProductCurrentStock(product, stockByProductId);

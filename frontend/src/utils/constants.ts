@@ -19,9 +19,8 @@ export const ORDER_TYPES = {
 // طرق الدفع
 export const PAYMENT_METHODS = {
   Cash: { label: "نقدي", icon: "💵" },
-  Card: { label: "فيزا", icon: "💳" },
-  Fawry: { label: "فودافون كاش", icon: "📱" },
-  BankTransfer: { label: "تحويل بنكي", icon: "🏦" },
+  BankAccount: { label: "حساب بنكي", icon: "🏦" },
+  Wallet: { label: "محفظة", icon: "📱" },
 } as const;
 
 // صلاحيات المستخدمين

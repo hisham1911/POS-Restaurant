@@ -47,6 +47,7 @@ export const CustomItemModal = ({
     id: 0,
     name: formData.name || "منتج مخصص",
     price: formData.unitPrice,
+    suggestedPrice: formData.unitPrice,
     taxRate: previewTaxRate,
     taxInclusive: formData.taxInclusive ?? false,
     categoryId: 0,

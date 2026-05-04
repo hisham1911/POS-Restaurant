@@ -22,9 +22,8 @@ import { Trash2 } from "lucide-react";
 const getPaymentMethodLabel = (method: string) => {
   const labels: Record<string, string> = {
     Cash: "نقدي",
-    Card: "فيزا",
-    Fawry: "فوري",
-    BankTransfer: "تحويل بنكي",
+    BankAccount: "حساب بنكي",
+    Wallet: "محفظة",
   };
 
   return labels[method] || method;

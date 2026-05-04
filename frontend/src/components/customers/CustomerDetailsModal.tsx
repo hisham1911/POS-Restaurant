@@ -497,9 +497,9 @@ export const CustomerDetailsModal = ({
                             <p className="text-gray-500">طريقة الدفع</p>
                             <p className="font-medium">
                               {payment.paymentMethod === "Cash" && "💵 نقدي"}
-                              {payment.paymentMethod === "Card" && "💳 فيزا"}
-                              {payment.paymentMethod === "Fawry" &&
-                                "📱 فودافون كاش"}
+                              {payment.paymentMethod === "BankAccount" && "🏦 بنك"}
+                              {payment.paymentMethod === "Wallet" &&
+                                "📱 محفظة"}
                             </p>
                           </div>
                           <div>

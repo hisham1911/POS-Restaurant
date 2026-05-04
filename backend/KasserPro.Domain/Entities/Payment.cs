@@ -13,9 +13,11 @@ public class Payment : BaseEntity
     public string? Reference { get; set; }
 
     public int OrderId { get; set; }
-    
+    public int? WalletId { get; set; }
+
     // Navigation
     public Tenant Tenant { get; set; } = null!;
     public Branch Branch { get; set; } = null!;
     public Order Order { get; set; } = null!;
+    public Wallet? Wallet { get; set; }
 }

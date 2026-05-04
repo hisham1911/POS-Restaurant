@@ -597,6 +597,7 @@ export const POSPage = () => {
               id: -Date.now(),
               name: item.name,
               price: item.unitPrice,
+              suggestedPrice: item.unitPrice,
               taxRate: item.taxRate ?? taxRate,
               taxInclusive: item.taxInclusive ?? false,
               categoryId: 0,

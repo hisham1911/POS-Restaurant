@@ -529,7 +529,7 @@ public class PurchaseInvoiceIntegrationTests : IClassFixture<CustomWebApplicatio
     }
 
     [Fact]
-    public async Task AddPayment_BankTransfer_DoesNotAffectCashRegister()
+    public async Task AddPayment_BankAccount_DoesNotAffectCashRegister()
     {
         var testData = await SeedPurchaseInvoiceDataAsync(0m);
         using var client = CreateAuthenticatedAdminClient(testData);
@@ -543,18 +543,18 @@ public class PurchaseInvoiceIntegrationTests : IClassFixture<CustomWebApplicatio
             {
                 Amount = invoice.Total,
                 PaymentDate = DateTime.UtcNow,
-                Method = PaymentMethod.BankTransfer,
+                Method = PaymentMethod.BankAccount,
                 ReferenceNumber = "TXN123",
-                Notes = "Bank transfer test"
+                Notes = "Bank account test"
             });
 
         var balanceAfter = await GetCurrentBalanceAsync(client, testData.BranchId);
         balanceAfter.Should().Be(balanceBefore,
-            "Bank transfer should NOT affect cash register balance");
+            "Bank account should NOT affect cash register balance");
     }
 
     [Fact]
-    public async Task AddPayment_Fawry_DoesNotAffectCashRegister()
+    public async Task AddPayment_Wallet_DoesNotAffectCashRegister()
     {
         var testData = await SeedPurchaseInvoiceDataAsync(0m);
         using var client = CreateAuthenticatedAdminClient(testData);
@@ -568,9 +568,9 @@ public class PurchaseInvoiceIntegrationTests : IClassFixture<CustomWebApplicatio
             {
                 Amount = invoice.Total,
                 PaymentDate = DateTime.UtcNow,
-                Method = PaymentMethod.Fawry,
-                ReferenceNumber = "FWR456",
-                Notes = "Fawry payment test"
+                Method = PaymentMethod.Wallet,
+                ReferenceNumber = "WLT456",
+                Notes = "Wallet payment test"
             });
 
         var balanceAfter = await GetCurrentBalanceAsync(client, testData.BranchId);

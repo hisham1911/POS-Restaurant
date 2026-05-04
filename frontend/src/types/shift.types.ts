@@ -10,16 +10,14 @@ export interface Shift {
   isClosed: boolean;
   notes?: string;
   totalCash: number;
-  totalCard: number;
-  totalFawry: number;
-  totalBankTransfer: number;
+  totalBankAccount: number;
+  totalWallet: number;
   totalSales: number;
   totalCollected: number;
   deferredAmount: number;
   collectedCash: number;
-  collectedCard: number;
-  collectedFawry: number;
-  collectedBankTransfer: number;
+  collectedBankAccount: number;
+  collectedWallet: number;
   totalOrders: number;
   userName?: string;
   orders?: ShiftOrder[];
@@ -53,10 +51,8 @@ export interface Shift {
 
   // Detailed sales by payment method
   totalCashSales?: number;
-  totalCardSales?: number;
-  totalFawrySales?: number;
-  totalBankTransferSales?: number;
-  totalVodafoneCashSales?: number;
+  totalBankAccountSales?: number;
+  totalWalletSales?: number;
 
   // Refunds & orders breakdown
   totalRefunds?: number;
@@ -78,9 +74,8 @@ export interface Shift {
   totalDebtPayments?: number;
   debtPaymentsCount?: number;
   totalDebtPaymentsCash?: number;
-  totalDebtPaymentsCard?: number;
-  totalDebtPaymentsFawry?: number;
-  totalDebtPaymentsBankTransfer?: number;
+  totalDebtPaymentsBankAccount?: number;
+  totalDebtPaymentsWallet?: number;
 
   // Concurrency Token (for optimistic locking)
   rowVersion?: string;
@@ -128,4 +123,10 @@ export interface ShiftWarning {
   shouldWarn: boolean;
   isCritical: boolean;
   shiftId?: number;
+}
+
+export interface ShiftProductSummary {
+  productName: string;
+  totalQuantity: number;
+  totalAmount: number;
 }

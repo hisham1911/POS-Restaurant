@@ -89,7 +89,7 @@ export const moduleSections: ModuleSectionConfig[] = [
     id: "finance",
     title: "الخزينة والمصروفات",
     icon: Wallet,
-    paths: ["/cash-register", "/expenses"],
+    paths: ["/wallets", "/cash-register", "/expenses"],
     tone: "secondary",
   },
   {

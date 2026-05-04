@@ -91,11 +91,11 @@ const getActionDescription = (log: AuditLog): string => {
       if (method === "Cash" || method === 0 || method === "0") {
         return "تسجيل دفعة نقدية";
       }
-      if (method === "Card" || method === 1 || method === "1") {
-        return "تسجيل دفعة بالبطاقة";
+      if (method === "BankAccount" || method === 1 || method === "1") {
+        return "تسجيل دفعة بنك";
       }
-      if (method === "Fawry" || method === 2 || method === "2") {
-        return "تسجيل دفعة فوري";
+      if (method === "Wallet" || method === 2 || method === "2") {
+        return "تسجيل دفعة محفظة";
       }
       return "تسجيل دفعة";
     }

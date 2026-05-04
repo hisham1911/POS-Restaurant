@@ -1,3 +1,5 @@
+import type { WalletPaymentBreakdown } from './report.types';
+
 // Employee Report Types
 
 export interface CashierPerformanceDetail {
@@ -17,8 +19,8 @@ export interface CashierPerformanceDetail {
   refundedOrders: number;
   cancellationRate: number;
   cashSales: number;
-  cardSales: number;
-  fawrySales: number;
+  bankAccountSales: number;
+  walletSales: number;
   performanceScore: number;
   performanceRating: string;
 }
@@ -47,12 +49,15 @@ export interface DetailedShift {
   variance: number;
   totalOrders: number;
   totalCash: number;
-  totalCard: number;
-  totalFawry: number;
-  totalBankTransfer: number;
+  totalBankAccount: number;
+  totalWallet: number;
   totalSales: number;
   totalCollected: number;
   deferredAmount: number;
+
+  // Wallet Breakdown
+  walletBreakdown: WalletPaymentBreakdown[];
+
   isForceClosed: boolean;
   forceCloseReason?: string;
   closedByUserName?: string;

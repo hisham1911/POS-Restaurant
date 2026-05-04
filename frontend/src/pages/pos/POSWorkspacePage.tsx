@@ -15,6 +15,7 @@ import { usePOSShortcuts } from "@/hooks/usePOSShortcuts";
 import { useGetShiftWarningsQuery } from "@/api/shiftsApi";
 import { useGetBranchInventoryQuery } from "@/api/inventoryApi";
 import { useGetAvailableBatchesQuery } from "@/api/productBatchApi";
+import { useGetActiveWalletsQuery } from "@/api/walletApi";
 import { usePOSMode } from "@/hooks/usePOSMode";
 import { Customer } from "@/types/customer.types";
 import { PaymentMethod } from "@/types/order.types";
@@ -185,7 +186,7 @@ export const POSWorkspacePage = () => {
   const [showCustomerCreateModal, setShowCustomerCreateModal] = useState(false);
   const [customerPhone, setCustomerPhone] = useState("");
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
-    useState<PaymentMethod>("Cash");
+    useState<string>("Cash");
   const [transactionReference, setTransactionReference] = useState("");
   const [amountPaid, setAmountPaid] = useState<string>("");
   const [allowPartialPayment, setAllowPartialPayment] = useState(false);
@@ -251,6 +252,7 @@ export const POSWorkspacePage = () => {
     [branchInventory],
   );
   const hasInventorySnapshot = Array.isArray(branchInventory);
+  const { data: walletsData } = useGetActiveWalletsQuery();
   const deferredSearchInput = useDeferredValue(searchInput);
 
   const [
@@ -569,7 +571,7 @@ export const POSWorkspacePage = () => {
     }
 
     if (selectedPaymentMethod !== "Cash" && !transactionReference.trim()) {
-      toast.error("رقم المعاملة مطلوب عند الدفع بفودافون كاش أو فيزا");
+      toast.error("رقم المعاملة مطلوب لطرق الدفع غير النقدية");
       return;
     }
 
@@ -590,12 +592,13 @@ export const POSWorkspacePage = () => {
       const completedOrder = await completeOrder(order.id, {
         payments: [
           {
-            method: selectedPaymentMethod,
+            method: (selectedWallet ? selectedWallet.type : selectedPaymentMethod) as PaymentMethod,
             amount: numericAmount,
             reference:
               selectedPaymentMethod !== "Cash"
                 ? transactionReference.trim()
                 : undefined,
+            walletId: selectedWallet?.id,
           },
         ],
       });
@@ -619,6 +622,7 @@ export const POSWorkspacePage = () => {
         clearCart();
         setSelectedCustomer(null);
         setCustomerPhone("");
+        setSelectedPaymentMethod("Cash");
         setTransactionReference("");
         setAmountPaid("");
         setAllowPartialPayment(false);
@@ -761,18 +765,21 @@ export const POSWorkspacePage = () => {
       )
     : null;
 
+  const wallets = walletsData?.data ?? [];
+
   const paymentMethods: Array<{
-    id: PaymentMethod;
+    id: string;
     label: string;
     icon: ReactNode;
+    walletId?: number;
   }> = [
     { id: "Cash", label: "نقدي", icon: <Banknote className="h-5 w-5" /> },
-    { id: "Card", label: "فيزا", icon: <CreditCard className="h-5 w-5" /> },
-    {
-      id: "Fawry",
-      label: "فودافون كاش",
-      icon: <Building2 className="h-5 w-5" />,
-    },
+    ...wallets.map((wallet) => ({
+      id: `wallet-${wallet.id}`,
+      label: wallet.name,
+      icon: <Wallet className="h-5 w-5" />,
+      walletId: wallet.id,
+    })),
   ];
 
   const quickAmounts = [50, 100, 200, 500];
@@ -816,6 +823,10 @@ export const POSWorkspacePage = () => {
     paymentMethods.find((method) => method.id === selectedPaymentMethod)
       ?.label ?? selectedPaymentMethod;
   const requiresTransactionReference = selectedPaymentMethod !== "Cash";
+  const selectedWallet =
+    selectedPaymentMethod.startsWith("wallet-")
+      ? wallets.find((w) => w.id === parseInt(selectedPaymentMethod.replace("wallet-", ""), 10))
+      : null;
   const selectedCategoryName =
     selectedCategory !== null
       ? (categories.find((category) => category.id === selectedCategory)
@@ -1341,7 +1352,7 @@ export const POSWorkspacePage = () => {
                   setTransactionReference(event.target.value)
                 }
                 className="w-full rounded-[1.35rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                placeholder="اكتب رقم العملية من فودافون كاش أو الفيزا"
+                placeholder="اكتب رقم العملية من محفظة أو حساب بنكي"
               />
             </div>
           )}
@@ -1806,7 +1817,7 @@ export const POSWorkspacePage = () => {
 
                   <div className="shrink-0 text-end">
                     <p className="text-sm font-black text-slate-900">
-                      {formatCurrency(product.price)}
+                      {formatCurrency(product.suggestedPrice)}
                     </p>
                     <span
                       className={clsx(
@@ -2390,6 +2401,7 @@ export const POSWorkspacePage = () => {
               id: -Date.now(),
               name: item.name,
               price: item.unitPrice,
+              suggestedPrice: item.unitPrice,
               taxRate: item.taxRate ?? taxRate,
               taxInclusive: item.taxInclusive ?? false,
               categoryId: 0,

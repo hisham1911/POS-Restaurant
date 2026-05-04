@@ -58,6 +58,8 @@ import { ExpenseFormPage } from "./pages/expenses/ExpenseFormPage";
 import { ExpenseDetailsPage } from "./pages/expenses/ExpenseDetailsPage";
 import { CashRegisterDashboard } from "./pages/cash-register/CashRegisterDashboard";
 import { CashRegisterTransactionsPage } from "./pages/cash-register/CashRegisterTransactionsPage";
+import WalletsPage from "./pages/wallets/WalletsPage";
+import WalletDetailsPage from "./pages/wallets/WalletDetailsPage";
 import InventoryPage from "./pages/inventory/InventoryPage";
 import { StockTakingPage } from "./pages/inventory/StockTakingPage";
 import { ProductBatchesPage } from "./pages/inventory/ProductBatchesPage";
@@ -578,6 +580,26 @@ const AppRoutes = () => (
           <NonSystemOwnerRoute>
             <PermissionRoute permission="ExpensesCreate">
               <ExpenseFormPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/wallets"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="WalletView">
+              <WalletsPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/wallets/:id"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="WalletView">
+              <WalletDetailsPage />
             </PermissionRoute>
           </NonSystemOwnerRoute>
         }

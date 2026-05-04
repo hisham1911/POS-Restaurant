@@ -34,6 +34,9 @@ public class ProfitLossReportDto
     public int TotalOrders { get; set; }
     public decimal AverageOrderValue { get; set; }
     public decimal RefundsAmount { get; set; }
+
+    // Wallet Breakdown
+    public List<WalletPaymentBreakdownDto> WalletBreakdown { get; set; } = new();
 }
 
 public class ExpenseCategoryBreakdownDto
@@ -64,8 +67,8 @@ public class ExpensesReportDto
     
     // Breakdown by Payment Method
     public decimal CashExpenses { get; set; }
-    public decimal CardExpenses { get; set; }
-    public decimal OtherExpenses { get; set; }
+    public decimal BankAccountExpenses { get; set; }
+    public decimal WalletExpenses { get; set; }
     
     // Daily Breakdown
     public List<DailyExpenseDto> DailyExpenses { get; set; } = new();

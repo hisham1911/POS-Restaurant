@@ -1,3 +1,5 @@
+import type { WalletPaymentBreakdown } from './report.types';
+
 // Profit & Loss Report Types
 export interface ExpenseCategoryBreakdown {
   categoryId: number;
@@ -37,6 +39,9 @@ export interface ProfitLossReport {
   totalOrders: number;
   averageOrderValue: number;
   refundsAmount: number;
+
+  // Wallet Breakdown
+  walletBreakdown: WalletPaymentBreakdown[];
 }
 
 // Expenses Report Types
@@ -69,8 +74,8 @@ export interface ExpensesReport {
   expensesByCategory: ExpenseCategoryBreakdown[];
   
   cashExpenses: number;
-  cardExpenses: number;
-  otherExpenses: number;
+  bankAccountExpenses: number;
+  walletExpenses: number;
   
   dailyExpenses: DailyExpense[];
   topExpenses: ExpenseDetail[];

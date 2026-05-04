@@ -39,6 +39,11 @@ public class PurchaseInvoice : BaseEntity
     public decimal TaxRate { get; set; }
     
     /// <summary>
+    /// Whether tax is enabled for this invoice
+    /// </summary>
+    public bool IsTaxEnabled { get; set; } = true;
+    
+    /// <summary>
     /// Calculated tax amount (Subtotal * TaxRate / 100)
     /// </summary>
     public decimal TaxAmount { get; set; }

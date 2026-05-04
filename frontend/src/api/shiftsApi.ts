@@ -7,6 +7,7 @@ import {
   ForceCloseShiftRequest,
   HandoverShiftRequest,
   ShiftWarning,
+  ShiftProductSummary,
 } from "../types/shift.types";
 import { ApiResponse } from "../types/api.types";
 
@@ -101,6 +102,12 @@ export const shiftsApi = baseApi.injectEndpoints({
       query: () => "/shifts/warnings",
       providesTags: [{ type: "Shifts", id: "WARNINGS" }],
     }),
+
+    // جلب ملخص المنتجات المباعة في الوردية
+    getShiftProductsSummary: builder.query<ApiResponse<ShiftProductSummary[]>, number>({
+      query: (id) => `/shifts/${id}/products-summary`,
+      providesTags: (_result, _error, id) => [{ type: "Shifts", id: `PRODUCTS_${id}` }],
+    }),
   }),
 });
 
@@ -116,4 +123,5 @@ export const {
   useGetActiveShiftsQuery,
   useGetShiftOrdersQuery,
   useGetShiftWarningsQuery,
+  useGetShiftProductsSummaryQuery,
 } = shiftsApi;

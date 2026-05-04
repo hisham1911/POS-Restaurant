@@ -74,6 +74,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                 Status = pi.Status.ToString(),
                 Subtotal = pi.Subtotal,
                 TaxRate = pi.TaxRate,
+                IsTaxEnabled = pi.IsTaxEnabled,
                 TaxAmount = pi.TaxAmount,
                 Total = pi.Total,
                 AmountPaid = pi.AmountPaid,
@@ -169,14 +170,16 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             .FirstOrDefaultAsync(t => t.Id == tenantId);
 
         var taxRate = tenant?.TaxRate ?? 14m;
+        var isTaxEnabled = request.IsTaxEnabled && (tenant?.IsTaxEnabled ?? true);
         subtotal = Math.Round(subtotal, 2);
-        var taxAmount = Math.Round(subtotal * (taxRate / 100m), 2);
+        var taxAmount = isTaxEnabled ? Math.Round(subtotal * (taxRate / 100m), 2) : 0m;
         var total = Math.Round(subtotal + taxAmount, 2);
 
         return ApiResponse<PurchaseInvoicePreviewDto>.Ok(new PurchaseInvoicePreviewDto
         {
             Subtotal = subtotal,
             TaxRate = taxRate,
+            IsTaxEnabled = isTaxEnabled,
             TaxAmount = taxAmount,
             Total = total
         });
@@ -204,6 +207,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             Status = invoice.Status.ToString(),
             Subtotal = invoice.Subtotal,
             TaxRate = invoice.TaxRate,
+            IsTaxEnabled = invoice.IsTaxEnabled,
             TaxAmount = invoice.TaxAmount,
             Total = invoice.Total,
             AmountPaid = invoice.AmountPaid,
@@ -287,6 +291,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             InvoiceDate = request.InvoiceDate,
             Status = PurchaseInvoiceStatus.Draft,
             TaxRate = taxRate,
+            IsTaxEnabled = request.IsTaxEnabled && (tenant?.IsTaxEnabled ?? true),
             Notes = request.Notes,
             CreatedByUserId = userId,
             CreatedByUserName = user?.Name,
@@ -337,7 +342,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
 
         // Calculate totals
         invoice.Subtotal = subtotal;
-        invoice.TaxAmount = subtotal * (taxRate / 100);
+        invoice.TaxAmount = invoice.IsTaxEnabled ? subtotal * (taxRate / 100) : 0m;
         invoice.Total = invoice.Subtotal + invoice.TaxAmount;
         invoice.AmountDue = invoice.Total;
 
@@ -431,7 +436,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
 
         // Recalculate totals
         invoice.Subtotal = subtotal;
-        invoice.TaxAmount = subtotal * (invoice.TaxRate / 100);
+        invoice.TaxAmount = invoice.IsTaxEnabled ? subtotal * (invoice.TaxRate / 100) : 0m;
         invoice.Total = invoice.Subtotal + invoice.TaxAmount;
         invoice.AmountDue = invoice.Total - invoice.AmountPaid;
 

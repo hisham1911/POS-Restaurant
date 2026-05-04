@@ -292,6 +292,8 @@ export const baseApi = createApi({
     "CashRegister",
     "CashRegisterBalance",
     "CashRegisterTransactions",
+    "Wallets",
+    "WalletTransactions",
     "Backup",
     "Permissions",
     "UserPermissions",

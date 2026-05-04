@@ -38,11 +38,14 @@ export const getProductNetUnitPrice = (
     isTaxEnabled,
   );
 
+  // Use suggestedPrice (batch price if available, otherwise base price)
+  const effectivePrice = product.suggestedPrice;
+
   if (product.taxInclusive && taxRate > 0) {
-    return round4(product.price / (1 + taxRate / 100));
+    return round4(effectivePrice / (1 + taxRate / 100));
   }
 
-  return product.price;
+  return effectivePrice;
 };
 
 export const getCartItemSubtotal = (

@@ -35,6 +35,7 @@ public class ProductService : IProductService
 
         var branchInventoryQuery = _unitOfWork.BranchInventories.Query()
             .Where(bi => bi.TenantId == tenantId && bi.BranchId == branchId);
+        
         var query = _unitOfWork.Products.Query()
             .AsNoTracking()
             .Where(p => p.TenantId == tenantId && !p.IsDeleted);
@@ -68,6 +69,7 @@ public class ProductService : IProductService
             Sku = p.Sku,
             Barcode = p.Barcode,
             Price = p.Price,
+            SuggestedPrice = p.Price, // Will be calculated after query execution
             Cost = p.Cost,
             TaxRate = p.TaxRate,
             TaxInclusive = p.TaxInclusive,
@@ -102,6 +104,40 @@ public class ProductService : IProductService
             .Take(pageSize)
             .ToListAsync();
 
+        // Calculate SuggestedPrice for batch-tracked products
+        var batchTrackedProductIds = pagedItems
+            .Where(p => p.IsBatchTracked)
+            .Select(p => p.Id)
+            .ToList();
+
+        if (batchTrackedProductIds.Any())
+        {
+            // Get next batch price for each batch-tracked product
+            var nextBatchPrices = await _unitOfWork.ProductBatches.Query()
+                .Where(pb => pb.TenantId == tenantId 
+                          && pb.BranchId == branchId 
+                          && batchTrackedProductIds.Contains(pb.ProductId)
+                          && pb.Status == BatchStatus.Active
+                          && pb.Quantity > 0)
+                .GroupBy(pb => pb.ProductId)
+                .Select(g => new
+                {
+                    ProductId = g.Key,
+                    SellingPrice = (decimal?)g.OrderBy(pb => pb.ExpiryDate ?? DateTime.MaxValue)
+                                    .ThenBy(pb => pb.Id)
+                                    .Select(pb => pb.SellingPrice)
+                                    .FirstOrDefault()
+                })
+                .ToListAsync();
+
+            // Update SuggestedPrice for products with batches
+            foreach (var product in pagedItems.Where(p => p.IsBatchTracked))
+            {
+                var batchPrice = nextBatchPrices.FirstOrDefault(bp => bp.ProductId == product.Id);
+                product.SuggestedPrice = batchPrice?.SellingPrice ?? product.Price;
+            }
+        }
+
         var pagedResult = new PagedResult<ProductDto>(pagedItems, totalCount, page, pageSize);
         return ApiResponse<PagedResult<ProductDto>>.Ok(pagedResult);
     }
@@ -128,6 +164,26 @@ public class ProductService : IProductService
             ? branchInventory.Quantity
             : (product.TrackInventory ? 0 : (int?)null);
 
+        // Get suggested price from next available batch
+        decimal suggestedPrice = product.Price;
+        if (product.IsBatchTracked)
+        {
+            var nextBatch = await _unitOfWork.ProductBatches.Query()
+                .Where(pb => pb.TenantId == tenantId 
+                          && pb.BranchId == branchId 
+                          && pb.ProductId == product.Id
+                          && pb.Status == BatchStatus.Active
+                          && pb.Quantity > 0)
+                .OrderBy(pb => pb.ExpiryDate ?? DateTime.MaxValue)
+                .ThenBy(pb => pb.Id)
+                .FirstOrDefaultAsync();
+            
+            if (nextBatch != null)
+            {
+                suggestedPrice = nextBatch.SellingPrice ?? product.Price;
+            }
+        }
+
         return ApiResponse<ProductDto>.Ok(new ProductDto
         {
             Id = product.Id,
@@ -137,6 +193,7 @@ public class ProductService : IProductService
             Sku = product.Sku,
             Barcode = product.Barcode,
             Price = product.Price,
+            SuggestedPrice = suggestedPrice,
             Cost = product.Cost,
             TaxRate = product.TaxRate,
             TaxInclusive = product.TaxInclusive,

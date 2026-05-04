@@ -18,16 +18,14 @@ public class ShiftService : IShiftService
     private readonly record struct ShiftFinancialSnapshot(
         int TotalOrders,
         decimal TotalCash,
-        decimal TotalCard,
-        decimal TotalFawry,
-        decimal TotalBankTransfer,
+        decimal TotalBankAccount,
+        decimal TotalWallet,
         decimal TotalSales,
         decimal TotalCollected,
         decimal DeferredAmount,
         decimal TotalCashSales,
-        decimal TotalCardSales,
-        decimal TotalFawrySales,
-        decimal TotalBankTransferSales,
+        decimal TotalBankAccountSales,
+        decimal TotalWalletSales,
         decimal TotalRefunds,
         int RefundsCount,
         int TotalOrdersCount,
@@ -268,7 +266,7 @@ public class ShiftService : IShiftService
             var financials = CalculateShiftFinancials(shift.Orders);
             shift.TotalOrders = financials.TotalOrders;
             shift.TotalCash = financials.TotalCash;
-            shift.TotalCard = financials.TotalCard;
+            shift.TotalBankAccount = financials.TotalBankAccount;
 
             shift.ClosingBalance = Math.Round(request.ClosingBalance, 2);
             shift.ExpectedBalance = await CalculateExpectedBalanceAsync(shift.BranchId, shift.OpeningBalance, financials.TotalCash);
@@ -382,6 +380,46 @@ public class ShiftService : IShiftService
         return ApiResponse<List<ShiftOrderDto>>.Ok(orders);
     }
 
+    public async Task<ApiResponse<List<ShiftProductSummaryDto>>> GetProductsSummaryAsync(int shiftId)
+    {
+        var tenantId = _currentUser.TenantId;
+        var branchId = _currentUser.BranchId;
+
+        if (tenantId <= 0)
+            return ApiResponse<List<ShiftProductSummaryDto>>.Fail(ErrorCodes.TENANT_NOT_FOUND, "سياق المستأجر غير صالح");
+
+        // التحقق من وجود الوردية
+        var shift = await _unitOfWork.Shifts.Query()
+            .FirstOrDefaultAsync(s => s.Id == shiftId && s.TenantId == tenantId && s.BranchId == branchId);
+
+        if (shift == null)
+            return ApiResponse<List<ShiftProductSummaryDto>>.Fail(ErrorCodes.SHIFT_NOT_FOUND, "الوردية غير موجودة");
+
+        // جلب ملخص المنتجات من الطلبات المكتملة فقط
+        // SQLite cannot Sum(decimal) in SQL → fetch raw rows then aggregate client-side
+        var orderItems = await _unitOfWork.Orders.Query()
+            .Where(order => order.ShiftId == shiftId
+                         && order.TenantId == tenantId
+                         && order.BranchId == branchId
+                         && order.Status == Domain.Enums.OrderStatus.Completed)
+            .SelectMany(order => order.Items)
+            .Select(oi => new { oi.ProductName, oi.Quantity, oi.Total })
+            .ToListAsync();
+
+        var productsSummary = orderItems
+            .GroupBy(oi => oi.ProductName)
+            .Select(g => new ShiftProductSummaryDto
+            {
+                ProductName = g.Key,
+                TotalQuantity = g.Sum(oi => oi.Quantity),
+                TotalAmount = g.Sum(oi => oi.Total)
+            })
+            .OrderByDescending(x => x.TotalQuantity)
+            .ToList();
+
+        return ApiResponse<List<ShiftProductSummaryDto>>.Ok(productsSummary);
+    }
+
     /// <summary>
     /// Shift deletion is NOT supported for audit/financial integrity.
     /// Shifts contain financial records that must be preserved for accounting and legal compliance.
@@ -443,7 +481,7 @@ public class ShiftService : IShiftService
             shift.ExpectedBalance = expectedBalance;
             shift.Difference = shift.ClosingBalance - shift.ExpectedBalance;
             shift.TotalCash = financials.TotalCash;
-            shift.TotalCard = financials.TotalCard;
+            shift.TotalBankAccount = financials.TotalBankAccount;
             shift.TotalOrders = financials.TotalOrders;
             shift.ClosedAt = DateTime.UtcNow;
             shift.IsClosed = true;
@@ -701,8 +739,8 @@ public class ShiftService : IShiftService
     /// FIX C-2/C-3/H-8: Single source of truth for shift financial calculations.
     /// Used by both CloseAsync and ForceCloseAsync to guarantee 100% parity.
     /// Includes Completed, PartiallyRefunded, and Refunded orders.
-    /// TotalCard includes Card payments ONLY (excludes Fawry and BankTransfer).
-    /// TotalFawry and TotalBankTransfer provide granular breakdown.
+    /// TotalBankAccount includes BankAccount payments.
+    /// TotalWallet includes Wallet payments.
     /// </summary>
     private static ShiftFinancialSnapshot CalculateShiftFinancials(
         IEnumerable<Order> orders)
@@ -719,22 +757,19 @@ public class ShiftService : IShiftService
 
         // Sales by payment method use applied amounts only, so cash change never inflates shift totals.
         var totalCashSales = SumAppliedPayments(salesOrders, PaymentMethod.Cash);
-        var totalCardSales = SumAppliedPayments(salesOrders, PaymentMethod.Card);
-        var totalFawrySales = SumAppliedPayments(salesOrders, PaymentMethod.Fawry);
-        var totalBankTransferSales = SumAppliedPayments(salesOrders, PaymentMethod.BankTransfer);
+        var totalBankAccountSales = SumAppliedPayments(salesOrders, PaymentMethod.BankAccount);
+        var totalWalletSales = SumAppliedPayments(salesOrders, PaymentMethod.Wallet);
         // Net after returns
         var totalCash = Math.Round(
             totalCashSales - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)), 2);
-        var totalCard = Math.Round(
-            totalCardSales - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)), 2);
-        var totalFawry = Math.Round(
-            totalFawrySales - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)), 2);
-        var totalBankTransfer = Math.Round(
-            totalBankTransferSales - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)), 2);
+        var totalBankAccount = Math.Round(
+            totalBankAccountSales - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankAccount).Sum(p => p.Amount)), 2);
+        var totalWallet = Math.Round(
+            totalWalletSales - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Wallet).Sum(p => p.Amount)), 2);
         var totalSales = Math.Round(
             salesOrders.Sum(o => o.Total)
             - Math.Abs(returnOrders.Sum(o => o.Total)), 2);
-        var totalCollected = Math.Round(totalCash + totalCard + totalFawry + totalBankTransfer, 2);
+        var totalCollected = Math.Round(totalCash + totalBankAccount + totalWallet, 2);
         var deferredAmount = Math.Max(0, Math.Round(totalSales - totalCollected, 2));
 
         // Refunds
@@ -761,16 +796,14 @@ public class ShiftService : IShiftService
         return new ShiftFinancialSnapshot(
             salesOrders.Count,
             totalCash,
-            totalCard,
-            totalFawry,
-            totalBankTransfer,
+            totalBankAccount,
+            totalWallet,
             totalSales,
             totalCollected,
             deferredAmount,
             totalCashSales,
-            totalCardSales,
-            totalFawrySales,
-            totalBankTransferSales,
+            totalBankAccountSales,
+            totalWalletSales,
             totalRefunds,
             refundsCount,
             totalOrdersCount,
@@ -801,11 +834,10 @@ public class ShiftService : IShiftService
 
         // Use calculated values for open shifts, stored values for closed shifts
         var totalCash = shift.IsClosed ? shift.TotalCash : financials.TotalCash;
-        var totalCard = shift.IsClosed ? shift.TotalCard : financials.TotalCard;
+        var totalBankAccount = shift.IsClosed ? shift.TotalBankAccount : financials.TotalBankAccount;
         var totalOrders = shift.IsClosed ? shift.TotalOrders : financials.TotalOrders;
-        // Fawry/BankTransfer are always computed from orders (not stored separately on entity)
-        var totalFawry = financials.TotalFawry;
-        var totalBankTransfer = financials.TotalBankTransfer;
+        // Wallet is always computed from orders (not stored separately on entity)
+        var totalWallet = financials.TotalWallet;
         var totalSales = financials.TotalSales;
         var totalCollected = financials.TotalCollected;
         var deferredAmount = financials.DeferredAmount;
@@ -820,14 +852,11 @@ public class ShiftService : IShiftService
         var totalDebtPaymentsCash = debtPayments
             .Where(dp => dp.PaymentMethod == Domain.Enums.PaymentMethod.Cash)
             .Sum(dp => dp.Amount);
-        var totalDebtPaymentsCard = debtPayments
-            .Where(dp => dp.PaymentMethod == Domain.Enums.PaymentMethod.Card)
+        var totalDebtPaymentsBankAccount = debtPayments
+            .Where(dp => dp.PaymentMethod == Domain.Enums.PaymentMethod.BankAccount)
             .Sum(dp => dp.Amount);
-        var totalDebtPaymentsFawry = debtPayments
-            .Where(dp => dp.PaymentMethod == Domain.Enums.PaymentMethod.Fawry)
-            .Sum(dp => dp.Amount);
-        var totalDebtPaymentsBankTransfer = debtPayments
-            .Where(dp => dp.PaymentMethod == Domain.Enums.PaymentMethod.BankTransfer)
+        var totalDebtPaymentsWallet = debtPayments
+            .Where(dp => dp.PaymentMethod == Domain.Enums.PaymentMethod.Wallet)
             .Sum(dp => dp.Amount);
 
         // Calculate duration
@@ -855,16 +884,14 @@ public class ShiftService : IShiftService
             IsClosed = shift.IsClosed,
             Notes = shift.Notes,
             TotalCash = totalCash,
-            TotalCard = totalCard,
-            TotalFawry = totalFawry,
-            TotalBankTransfer = totalBankTransfer,
+            TotalBankAccount = totalBankAccount,
+            TotalWallet = totalWallet,
             TotalSales = totalSales,
             TotalCollected = totalCollected,
             DeferredAmount = deferredAmount,
             CollectedCash = totalCash,
-            CollectedCard = totalCard,
-            CollectedFawry = totalFawry,
-            CollectedBankTransfer = totalBankTransfer,
+            CollectedBankAccount = totalBankAccount,
+            CollectedWallet = totalWallet,
             TotalOrders = totalOrders,
             UserName = shift.User?.Name ?? string.Empty,
 
@@ -891,9 +918,8 @@ public class ShiftService : IShiftService
 
             // Detailed sales by payment method
             TotalCashSales = financials.TotalCashSales,
-            TotalCardSales = financials.TotalCardSales,
-            TotalFawrySales = financials.TotalFawrySales,
-            TotalBankTransferSales = financials.TotalBankTransferSales,
+            TotalBankAccountSales = financials.TotalBankAccountSales,
+            TotalWalletSales = financials.TotalWalletSales,
 
             // Refunds
             TotalRefunds = financials.TotalRefunds,
@@ -908,8 +934,6 @@ public class ShiftService : IShiftService
             // Credit
             TotalCreditSales = financials.TotalCreditSales,
             CreditOrdersCount = financials.CreditOrdersCount,
-            TotalVodafoneCashSales = 0m,
-
             // Net cash and expenses
             NetCash = financials.NetCash,
             TotalExpenses = shift.Expenses?.Sum(e => e.Amount) ?? 0m,
@@ -918,9 +942,8 @@ public class ShiftService : IShiftService
             TotalDebtPayments = totalDebtPayments,
             DebtPaymentsCount = debtPaymentsCount,
             TotalDebtPaymentsCash = totalDebtPaymentsCash,
-            TotalDebtPaymentsCard = totalDebtPaymentsCard,
-            TotalDebtPaymentsFawry = totalDebtPaymentsFawry,
-            TotalDebtPaymentsBankTransfer = totalDebtPaymentsBankTransfer,
+            TotalDebtPaymentsBankAccount = totalDebtPaymentsBankAccount,
+            TotalDebtPaymentsWallet = totalDebtPaymentsWallet,
 
             RowVersion = shift.RowVersion,
 

@@ -30,8 +30,8 @@ public class PurchaseInvoicePaymentTests
     }
 
     [Theory]
-    [InlineData(PaymentMethod.BankTransfer)]
-    [InlineData(PaymentMethod.Fawry)]
+    [InlineData(PaymentMethod.BankAccount)]
+    [InlineData(PaymentMethod.Wallet)]
     public void Payment_NonCash_ShouldNotAffectCashRegister(PaymentMethod method)
     {
         var shouldRecordInCashRegister = method == PaymentMethod.Cash;

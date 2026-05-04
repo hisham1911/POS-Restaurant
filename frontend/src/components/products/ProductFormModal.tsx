@@ -8,6 +8,7 @@ import {
   ToggleRight,
   ToggleLeft,
   Eye,
+  AlertTriangle,
 } from "lucide-react";
 import {
   Product,
@@ -18,6 +19,7 @@ import {
 import { useProducts, useCategories } from "@/hooks/useProducts";
 import { useGetBranchesQuery } from "@/api/branchesApi";
 import { useGetBranchInventoryQuery } from "@/api/inventoryApi";
+import { useGetBatchesByProductQuery } from "@/api/productBatchApi";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentBranch } from "@/store/slices/branchSlice";
 import { Button } from "@/components/common/Button";
@@ -119,6 +121,21 @@ export const ProductFormModal = ({
     },
   );
 
+  // جلب الباتشات للمنتج للتحقق من وجودها
+  const { data: productBatchesResponse } = useGetBatchesByProductQuery(
+    {
+      productId: product?.id ?? 0,
+      branchId: currentBranch?.id,
+    },
+    {
+      skip: !product?.id || !currentBranch?.id || !isEditing,
+    },
+  );
+
+  const productBatches = productBatchesResponse?.data ?? [];
+  const hasActiveBatches = productBatches.length > 0;
+  const nextBatch = productBatches.find((b) => b.status === "Active");
+
   const currentBranchQuantity = useMemo(() => {
     if (!product?.id || !branchInventory) {
       return 0;
@@ -136,14 +153,14 @@ export const ProductFormModal = ({
     description: product?.description || "",
     sku: product?.sku || "",
     barcode: product?.barcode || "",
-    price: product?.price || 0,
-    cost: product?.cost || 0,
+    price: product?.suggestedPrice || product?.price || 0, // استخدم suggestedPrice إذا كان موجوداً
+    cost: nextBatch?.costPrice || product?.cost || 0, // استخدم تكلفة الباتش إذا كان موجوداً
     taxRate: product?.taxRate ?? null,
     taxInclusive: product?.taxInclusive ?? true,
     imageUrl: product?.imageUrl || "",
     categoryId: product?.categoryId || categories[0]?.id || 0,
     type: product?.type || ProductType.Physical,
-    isBatchTracked: product?.isBatchTracked ?? true,
+    isBatchTracked: product?.isBatchTracked ?? false,
     branchQuantity: 0,
     lowStockThreshold: product?.lowStockThreshold ?? 5,
     reorderPoint: product?.reorderPoint ?? null,
@@ -483,88 +500,116 @@ export const ProductFormModal = ({
             التسعير والضرائب
           </h3>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="سعر البيع *"
-              type="number"
-              min="0"
-              step="0.01"
-              value={numberToDisplay(formData.price)}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  price: displayToNumber(e.target.value),
-                })
-              }
-              placeholder="0.00"
-              required
-            />
-            <Input
-              label="سعر التكلفة"
-              type="number"
-              min="0"
-              step="0.01"
-              value={numberToDisplay(formData.cost)}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  cost: displayToNumber(e.target.value),
-                })
-              }
-              placeholder="0.00"
-            />
-          </div>
+          {/* تنبيه للمنتجات التي لها باتشات */}
+          {isEditing && hasActiveBatches && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-amber-100">
+                  <AlertTriangle className="h-5 w-5 text-amber-700" />
+                </div>
+                <div className="flex-1 space-y-2">
+                  <h4 className="text-sm font-semibold text-amber-900">
+                    هذا المنتج له دفعات مخزون (Batches)
+                  </h4>
+                  <p className="text-xs leading-relaxed text-amber-800">
+                    السعر المعروض أدناه هو <strong>سعر الباتش الحالي</strong> ({numberToDisplay(product.suggestedPrice)} ج.م).
+                    لتغيير السعر، قم بتعديل سعر الباتش من شاشة إدارة الدفعات.
+                    السعر الأساسي للمنتج هو {numberToDisplay(product.price)} ج.م.
+                  </p>
+                  {nextBatch && (
+                    <div className="mt-2 rounded-lg bg-white p-3 border border-amber-200">
+                      <p className="text-xs font-medium text-gray-700 mb-1">
+                        الدفعة التي ستُستخدم في البيع القادم:
+                      </p>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold text-gray-900">
+                            {nextBatch.batchNumber || "بدون رقم"}
+                          </p>
+                          {nextBatch.expiryDate && (
+                            <p className="text-xs text-gray-500">
+                              ينتهي:{" "}
+                              {new Date(nextBatch.expiryDate).toLocaleDateString(
+                                "ar-EG",
+                              )}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-left">
+                          <p className="text-lg font-bold text-green-600">
+                            {numberToDisplay(nextBatch.sellingPrice)} ج.م
+                          </p>
+                          <p className="text-xs text-gray-500">سعر البيع</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <p className="text-xs text-amber-700 mt-2">
+                    💡 <strong>للتحكم في الأسعار:</strong> قم بتعديل أسعار
+                    الدفعات من{" "}
+                    <a
+                      href={`/product-batches?productId=${product?.id}`}
+                      className="underline hover:text-amber-900 font-medium"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        window.location.href = `/product-batches?productId=${product?.id}`;
+                      }}
+                    >
+                      شاشة إدارة الدفعات
+                    </a>
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Input
-                label="معدل الضريبة (%)"
+                label="سعر البيع *"
                 type="number"
                 min="0"
-                max="100"
                 step="0.01"
-                value={formData.taxRate ?? ""}
+                value={numberToDisplay(formData.price)}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    taxRate: e.target.value ? parseFloat(e.target.value) : null,
+                    price: displayToNumber(e.target.value),
                   })
                 }
-                placeholder="استخدام الافتراضي"
+                placeholder="0.00"
+                required
+                disabled={isEditing && hasActiveBatches}
               />
-              <p className="text-xs text-gray-500 mt-1">
-                اتركه فارغاً لاستخدام معدل الفرع الافتراضي
-              </p>
+              {isEditing && hasActiveBatches && (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  معطّل لأن المنتج له دفعات مخزون
+                </p>
+              )}
             </div>
-
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                السعر شامل الضريبة؟
-              </label>
-              <div className="flex gap-4 mt-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={formData.taxInclusive}
-                    onChange={() =>
-                      setFormData({ ...formData, taxInclusive: true })
-                    }
-                    className="w-4 h-4 text-primary-600"
-                  />
-                  <span className="text-sm">نعم (شامل)</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    checked={!formData.taxInclusive}
-                    onChange={() =>
-                      setFormData({ ...formData, taxInclusive: false })
-                    }
-                    className="w-4 h-4 text-primary-600"
-                  />
-                  <span className="text-sm">لا (غير شامل)</span>
-                </label>
-              </div>
+              <Input
+                label="سعر التكلفة"
+                type="number"
+                min="0"
+                step="0.01"
+                value={numberToDisplay(formData.cost)}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    cost: displayToNumber(e.target.value),
+                  })
+                }
+                placeholder="0.00"
+                disabled={isEditing && hasActiveBatches}
+              />
+              {isEditing && hasActiveBatches && (
+                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  معطّل لأن المنتج له دفعات مخزون
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -575,23 +620,31 @@ export const ProductFormModal = ({
             الأكواد
           </h3>
 
-          <div className="grid grid-cols-2 gap-4">
-            <Input
+          <div className="grid grid-cols-1 gap-4">
+            {/* SKU مخفي حالياً - غير مفيد بدون Product Variants */}
+            {/* <Input
               label="SKU"
               value={formData.sku}
               onChange={(e) =>
                 setFormData({ ...formData, sku: e.target.value })
               }
               placeholder="كود المنتج"
-            />
-            <Input
-              label="الباركود"
-              value={formData.barcode}
-              onChange={(e) =>
-                setFormData({ ...formData, barcode: e.target.value })
-              }
-              placeholder="رقم الباركود"
-            />
+            /> */}
+            <div>
+              <Input
+                label="الباركود"
+                value={formData.barcode}
+                onChange={(e) =>
+                  setFormData({ ...formData, barcode: e.target.value })
+                }
+                placeholder="رقم الباركود (يمكن المسح بجهاز الباركود)"
+                autoComplete="off"
+              />
+              <p className="mt-1.5 text-xs text-gray-500 flex items-center gap-1.5">
+                <Package className="w-3.5 h-3.5" />
+                يمكنك استخدام جهاز الباركود للمسح المباشر في هذا الحقل
+              </p>
+            </div>
           </div>
         </div>
 

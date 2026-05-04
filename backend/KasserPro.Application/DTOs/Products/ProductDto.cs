@@ -11,6 +11,13 @@ public class ProductDto
     public string? Sku { get; set; }
     public string? Barcode { get; set; }
     public decimal Price { get; set; }
+    
+    /// <summary>
+    /// Suggested selling price - uses next batch price if product has active batches, otherwise uses base Price.
+    /// This is the price that will actually be used in POS.
+    /// </summary>
+    public decimal SuggestedPrice { get; set; }
+    
     public decimal? Cost { get; set; }
     public decimal? TaxRate { get; set; }
     public bool TaxInclusive { get; set; }

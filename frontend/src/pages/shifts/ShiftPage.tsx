@@ -68,9 +68,8 @@ export const ShiftPage = () => {
   };
 
   const nonCashCollected = currentShift
-    ? currentShift.collectedCard +
-      currentShift.collectedFawry +
-      currentShift.collectedBankTransfer
+    ? currentShift.collectedBankAccount +
+      currentShift.collectedWallet
     : 0;
 
   if (isLoading) return <Loading />;
@@ -252,20 +251,14 @@ export const ShiftPage = () => {
                     {formatCurrency(nonCashCollected)}
                   </p>
                   <p className="text-xs text-gray-400 mt-1">
-                    بطاقات + فوري + تحويل
+                    بنك + محفظة
                   </p>
                   {nonCashCollected > 0 && (
                     <div className="text-xs text-gray-400 mt-1 space-y-0.5">
-                      <p>بطاقة: {formatCurrency(currentShift.collectedCard)}</p>
-                      {currentShift.collectedFawry > 0 && (
+                      <p>بنك: {formatCurrency(currentShift.collectedBankAccount)}</p>
+                      {currentShift.collectedWallet > 0 && (
                         <p>
-                          فوري: {formatCurrency(currentShift.collectedFawry)}
-                        </p>
-                      )}
-                      {currentShift.collectedBankTransfer > 0 && (
-                        <p>
-                          تحويل بنكي:{" "}
-                          {formatCurrency(currentShift.collectedBankTransfer)}
+                          محفظة: {formatCurrency(currentShift.collectedWallet)}
                         </p>
                       )}
                     </div>
@@ -385,11 +378,8 @@ export const ShiftPage = () => {
               </div>
               <div className="grid grid-cols-2 gap-2 text-xs text-gray-500 ps-3">
                 <span>نقدي: {formatCurrency(currentShift.collectedCash)}</span>
-                <span>فيزا: {formatCurrency(currentShift.collectedCard)}</span>
-                <span>فوري: {formatCurrency(currentShift.collectedFawry)}</span>
-                <span>
-                  تحويل: {formatCurrency(currentShift.collectedBankTransfer)}
-                </span>
+                <span>بنك: {formatCurrency(currentShift.collectedBankAccount)}</span>
+                <span>محفظة: {formatCurrency(currentShift.collectedWallet)}</span>
               </div>
               {currentShift.totalRefunds != null &&
                 currentShift.totalRefunds > 0 && (

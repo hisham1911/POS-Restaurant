@@ -1,3 +1,11 @@
+export interface WalletPaymentBreakdown {
+  walletId: number;
+  walletName: string;
+  walletType: string;
+  total: number;
+  transactionCount: number;
+}
+
 export interface TopProduct {
   productId: number;
   productName: string;
@@ -18,16 +26,14 @@ export interface ShiftSummary {
   closedAt: string;
   totalOrders: number;
   totalCash: number;
-  totalCard: number;
-  totalFawry: number;
-  totalOther: number;
+  totalBankAccount: number;
+  totalWallet: number;
   totalSales: number;
   totalCollected: number;
   deferredAmount: number;
   collectedCash: number;
-  collectedCard: number;
-  collectedFawry: number;
-  collectedOther: number;
+  collectedBankAccount: number;
+  collectedWallet: number;
   isForceClosed: boolean;
   forceCloseReason?: string;
 }
@@ -54,14 +60,17 @@ export interface DailyReport {
   totalRefunds: number;
   // Payment Breakdown
   totalCash: number;
-  totalCard: number;
-  totalFawry: number;
-  totalOther: number;
+  totalBankAccount: number;
+  totalWallet: number;
   totalCollected: number;
   totalDeferred: number;
   // Details
   topProducts: TopProduct[];
   hourlySales: HourlySales[];
+
+  // Wallet Breakdown
+  walletBreakdown: WalletPaymentBreakdown[];
+  totalNonCash: number;
 }
 
 export interface SalesReport {
@@ -73,6 +82,8 @@ export interface SalesReport {
   totalOrders: number;
   averageOrderValue: number;
   dailySales: DailySales[];
+  // Wallet Breakdown
+  walletBreakdown: WalletPaymentBreakdown[];
 }
 
 export interface DailySales {

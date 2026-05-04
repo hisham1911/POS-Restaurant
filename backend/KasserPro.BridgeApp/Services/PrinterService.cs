@@ -607,8 +607,8 @@ public class PrinterService : IPrinterService
         return method.ToLower() switch
         {
             "cash" => "كاش",
-            "card" => "فيزا",
-            "fawry" => "فوري",
+            "bankaccount" => "حساب بنكي",
+            "wallet" => "محفظة",
             _ => method
         };
     }

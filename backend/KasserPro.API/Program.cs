@@ -182,6 +182,7 @@ builder.Services.AddScoped<ISupplierReportService, SupplierReportService>();
 builder.Services.AddScoped<IExpenseService, ExpenseService>();
 builder.Services.AddScoped<IExpenseCategoryService, ExpenseCategoryService>();
 builder.Services.AddScoped<ICashRegisterService, CashRegisterService>();
+builder.Services.AddScoped<IWalletService, WalletService>();
 
 // Device Command Service for SignalR
 builder.Services.AddScoped<IDeviceCommandService, DeviceCommandService>();

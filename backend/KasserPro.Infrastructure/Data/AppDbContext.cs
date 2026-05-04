@@ -63,6 +63,10 @@ public class AppDbContext : DbContext
     public DbSet<StockTaking> StockTakings => Set<StockTaking>();
     public DbSet<StockTakingItem> StockTakingItems => Set<StockTakingItem>();
 
+    // Wallet entities
+    public DbSet<Wallet> Wallets => Set<Wallet>();
+    public DbSet<WalletTransaction> WalletTransactions => Set<WalletTransaction>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -117,6 +121,10 @@ public class AppDbContext : DbContext
         // Stock Taking: Soft delete filters
         modelBuilder.Entity<StockTaking>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<StockTakingItem>().HasQueryFilter(e => !e.IsDeleted);
+
+        // Wallet: Soft delete filters
+        modelBuilder.Entity<Wallet>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<WalletTransaction>().HasQueryFilter(e => !e.IsDeleted);
 
         // Tenant relationships
         modelBuilder.Entity<Branch>()

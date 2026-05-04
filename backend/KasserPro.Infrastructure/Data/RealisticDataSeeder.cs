@@ -333,7 +333,7 @@ public static class RealisticDataSeeder
                 var orderCount = isWeekend ? _random.Next(15, 25) : _random.Next(10, 18);
 
                 decimal totalCash = 0;
-                decimal totalCard = 0;
+                decimal totalBankAccount = 0;
                 int completedCount = 0;
 
                 for (int i = 0; i < orderCount; i++)
@@ -369,7 +369,7 @@ public static class RealisticDataSeeder
                             if (payment.Method == PaymentMethod.Cash)
                                 totalCash += payment.Amount;
                             else
-                                totalCard += payment.Amount;
+                                totalBankAccount += payment.Amount;
                         }
                     }
                 }
@@ -377,7 +377,7 @@ public static class RealisticDataSeeder
                 // Update shift totals
                 shift.TotalOrders = completedCount;
                 shift.TotalCash = totalCash;
-                shift.TotalCard = totalCard;
+                shift.TotalBankAccount = totalBankAccount;
                 shift.ExpectedBalance = shift.OpeningBalance + totalCash;
                 shift.ClosingBalance = shift.ExpectedBalance + _random.Next(-100, 150);
                 shift.Difference = shift.ClosingBalance - shift.ExpectedBalance;
@@ -408,7 +408,7 @@ public static class RealisticDataSeeder
             shiftCount++;
 
             decimal todayTotalCash = 0;
-            decimal todayTotalCard = 0;
+            decimal todayTotalBankAccount = 0;
             var todayCompletedCount = 0;
 
             // Add a small number of completed orders for today.
@@ -439,14 +439,14 @@ public static class RealisticDataSeeder
                         if (payment.Method == PaymentMethod.Cash)
                             todayTotalCash += payment.Amount;
                         else
-                            todayTotalCard += payment.Amount;
+                            todayTotalBankAccount += payment.Amount;
                     }
                 }
             }
 
             todayShift.TotalOrders = todayCompletedCount;
             todayShift.TotalCash = todayTotalCash;
-            todayShift.TotalCard = todayTotalCard;
+            todayShift.TotalBankAccount = todayTotalBankAccount;
             todayShift.ExpectedBalance = todayShift.OpeningBalance + todayTotalCash;
             todayShift.ClosingBalance = todayShift.ExpectedBalance;
             todayShift.Difference = 0;
@@ -824,9 +824,8 @@ public static class RealisticDataSeeder
             var paymentRoll = _random.Next(100);
             PaymentMethod paymentMethod;
             if (paymentRoll < 50) paymentMethod = PaymentMethod.Cash;
-            else if (paymentRoll < 85) paymentMethod = PaymentMethod.Card;
-            else if (paymentRoll < 95) paymentMethod = PaymentMethod.Fawry;
-            else paymentMethod = PaymentMethod.BankTransfer;
+            else if (paymentRoll < 85) paymentMethod = PaymentMethod.BankAccount;
+            else paymentMethod = PaymentMethod.Wallet;
 
             order.Payments.Add(new Payment
             {
@@ -1048,7 +1047,7 @@ public static class RealisticDataSeeder
                 {
                     Amount = invoice.Total,
                     PaymentDate = invoiceDate.AddDays(_random.Next(1, 7)),
-                    Method = _random.Next(2) == 0 ? PaymentMethod.Cash : PaymentMethod.BankTransfer,
+                    Method = _random.Next(2) == 0 ? PaymentMethod.Cash : PaymentMethod.BankAccount,
                     ReferenceNumber = _random.Next(2) == 0 ? $"REF-{_random.Next(10000, 99999)}" : null,
                     Notes = "دفعة كاملة",
                     CreatedByUserId = admin.Id,
@@ -1086,8 +1085,8 @@ public static class RealisticDataSeeder
                         Method = _random.Next(3) switch
                         {
                             0 => PaymentMethod.Cash,
-                            1 => PaymentMethod.BankTransfer,
-                            _ => PaymentMethod.Card
+                            1 => PaymentMethod.BankAccount,
+                            _ => PaymentMethod.Wallet
                         },
                         ReferenceNumber = _random.Next(2) == 0 ? $"REF-{_random.Next(10000, 99999)}" : null,
                         Notes = $"دفعة جزئية {p + 1}",

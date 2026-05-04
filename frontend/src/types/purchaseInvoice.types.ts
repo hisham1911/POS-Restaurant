@@ -9,7 +9,7 @@ export type PurchaseInvoiceStatus =
   | 'Returned' 
   | 'PartiallyReturned';
 
-export type PaymentMethod = 'Cash' | 'Card' | 'Fawry' | 'BankTransfer';
+export type PaymentMethod = 'Cash' | 'BankAccount' | 'Wallet';
 
 export interface PurchaseInvoiceItem {
   id: number;
@@ -47,6 +47,7 @@ export interface PurchaseInvoice {
   status: PurchaseInvoiceStatus;
   subtotal: number;
   taxRate: number;
+  isTaxEnabled: boolean;
   taxAmount: number;
   total: number;
   amountPaid: number;
@@ -63,6 +64,7 @@ export interface PurchaseInvoice {
 export interface PurchaseInvoicePreview {
   subtotal: number;
   taxRate: number;
+  isTaxEnabled: boolean;
   taxAmount: number;
   total: number;
 }
@@ -83,6 +85,7 @@ export interface CreatePurchaseInvoiceRequest {
   invoiceDate: string;
   items: CreatePurchaseInvoiceItemRequest[];
   notes?: string;
+  isTaxEnabled?: boolean;
 }
 
 export interface UpdatePurchaseInvoiceItemRequest {
@@ -102,6 +105,7 @@ export interface UpdatePurchaseInvoiceRequest {
   invoiceDate: string;
   items: UpdatePurchaseInvoiceItemRequest[];
   notes?: string;
+  isTaxEnabled?: boolean;
 }
 
 export interface AddPaymentRequest {

@@ -8,6 +8,7 @@ import {
   AlertCircle,
   BarChart3,
   Info,
+  Wallet,
 } from "lucide-react";
 import { Card } from "@/components/common/Card";
 import { formatCurrency, formatDateOnly } from "@/utils/formatters";
@@ -137,6 +138,30 @@ export const SalesReportPage = () => {
           </div>
         </Card>
       </div>
+
+      {/* Wallet Breakdown */}
+      {report?.walletBreakdown && report.walletBreakdown.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {report.walletBreakdown.map((wallet) => (
+            <Card key={wallet.walletId}>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+                  <Wallet className="w-6 h-6 text-indigo-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">{wallet.walletName}</p>
+                  <p className="text-2xl font-bold text-indigo-600">
+                    {formatCurrency(wallet.total)}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    {wallet.transactionCount} معاملة
+                  </p>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Average Order Value */}
       <Card>

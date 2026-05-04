@@ -17,6 +17,7 @@ public class OrderService : IOrderService
     private readonly IInventoryService _inventoryService;
     private readonly ICustomerService _customerService;
     private readonly ICashRegisterService _cashRegisterService;
+    private readonly IWalletService _walletService;
     private readonly IPermissionService _permissionService;
 
     // Valid state transitions
@@ -30,13 +31,14 @@ public class OrderService : IOrderService
         { OrderStatus.Refunded, Array.Empty<OrderStatus>() }
     };
 
-    public OrderService(IUnitOfWork unitOfWork, ICurrentUserService currentUser, IInventoryService inventoryService, ICustomerService customerService, ICashRegisterService cashRegisterService, IPermissionService permissionService)
+    public OrderService(IUnitOfWork unitOfWork, ICurrentUserService currentUser, IInventoryService inventoryService, ICustomerService customerService, ICashRegisterService cashRegisterService, IWalletService walletService, IPermissionService permissionService)
     {
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
         _inventoryService = inventoryService;
         _customerService = customerService;
         _cashRegisterService = cashRegisterService;
+        _walletService = walletService;
         _permissionService = permissionService;
     }
 
@@ -725,7 +727,8 @@ public class OrderService : IOrderService
                         Math.Round(paymentReq.Amount, 2),
                         Math.Max(0, orderTotal - totalPaid)),
                     Method = paymentMethod,
-                    Reference = paymentReq.Reference
+                    Reference = paymentReq.Reference,
+                    WalletId = paymentReq.WalletId
                 };
                 if (payment.Amount <= 0)
                     continue;
@@ -834,6 +837,25 @@ public class OrderService : IOrderService
                     referenceId: order.Id,
                     shiftId: order.ShiftId ?? currentShift.Id
                 );
+            }
+
+            // INTEGRATION: Record wallet transactions for non-cash wallet payments
+            foreach (var paymentReq in request.Payments.Where(p => p.WalletId.HasValue && p.Amount > 0))
+            {
+                var method = Enum.Parse<PaymentMethod>(paymentReq.Method);
+                if (method != PaymentMethod.Cash)
+                {
+                    await _walletService.RecordOrderPaymentAsync(
+                        walletId: paymentReq.WalletId!.Value,
+                        amount: Math.Min(Math.Round(paymentReq.Amount, 2), orderTotal),
+                        orderId: order.Id,
+                        orderNumber: order.OrderNumber,
+                        referenceNumber: paymentReq.Reference,
+                        userId: _currentUser.UserId,
+                        userName: _currentUser.Email ?? "Unknown",
+                        ct: CancellationToken.None
+                    );
+                }
             }
 
             // Save all changes (customer stats, credit balance, cash register)

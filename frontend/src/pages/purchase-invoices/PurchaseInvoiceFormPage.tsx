@@ -40,6 +40,7 @@ export function PurchaseInvoiceFormPage() {
     new Date().toISOString().split("T")[0],
   );
   const [notes, setNotes] = useState<string>("");
+  const [isTaxEnabled, setIsTaxEnabled] = useState<boolean>(true);
   const [items, setItems] = useState<InvoiceItem[]>([]);
   const [selectedProductId, setSelectedProductId] = useState<number>(0);
   const [quantity, setQuantity] = useState<string>("");
@@ -51,6 +52,9 @@ export function PurchaseInvoiceFormPage() {
   const [productionDate, setProductionDate] = useState<string>("");
   const [showQuickAddProduct, setShowQuickAddProduct] = useState(false);
   const [preview, setPreview] = useState<PurchaseInvoicePreview | null>(null);
+  const [productSearchQuery, setProductSearchQuery] = useState<string>("");
+  const [showProductSuggestions, setShowProductSuggestions] = useState(false);
+  const [filteredProducts, setFilteredProducts] = useState<typeof products>([]);
 
   const { data: suppliersResponse } = useGetSuppliersQuery();
   const { data: productsResponse } = useGetProductsQuery({
@@ -79,6 +83,7 @@ export function PurchaseInvoiceFormPage() {
       setSupplierId(invoice.supplierId);
       setInvoiceDate(invoice.invoiceDate.split("T")[0]);
       setNotes(invoice.notes || "");
+      setIsTaxEnabled(invoice.isTaxEnabled);
       setItems(
         invoice.items.map((item) => ({
           tempId: `item-${item.id}`,
@@ -116,6 +121,7 @@ export function PurchaseInvoiceFormPage() {
         productionDate: item.productionDate,
       })),
       notes,
+      isTaxEnabled,
     };
 
     const timer = setTimeout(() => {
@@ -130,7 +136,7 @@ export function PurchaseInvoiceFormPage() {
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [supplierId, invoiceDate, items, notes, prepareInvoice]);
+  }, [supplierId, invoiceDate, items, notes, isTaxEnabled, prepareInvoice]);
 
   const handleAddItem = () => {
     const numQuantity = Number(quantity) || 0;
@@ -168,6 +174,7 @@ export function PurchaseInvoiceFormPage() {
 
     setItems([...items, newItem]);
     setSelectedProductId(0);
+    setProductSearchQuery("");
     setQuantity("");
     setPurchasePrice("");
     setSellingPrice("");
@@ -183,8 +190,53 @@ export function PurchaseInvoiceFormPage() {
     const product = products.find((p) => p.id === productId);
     if (product) {
       setSellingPrice(String(product.price));
+      setProductSearchQuery(product.name);
     }
     toast.success("تم إضافة المنتج. يمكنك الآن إضافته للفاتورة");
+  };
+
+  const handleProductSearch = (searchValue: string) => {
+    setProductSearchQuery(searchValue);
+    
+    // إذا كان الحقل فارغ، امسح الاختيار
+    if (!searchValue.trim()) {
+      setSelectedProductId(0);
+      setFilteredProducts([]);
+      setShowProductSuggestions(false);
+      return;
+    }
+
+    // البحث يبدأ بعد حرفين على الأقل
+    if (searchValue.trim().length < 2) {
+      setFilteredProducts([]);
+      setShowProductSuggestions(false);
+      return;
+    }
+
+    const searchLower = searchValue.toLowerCase().trim();
+    
+    // البحث بالباركود أو SKU أو الاسم
+    const matches = products.filter(
+      (p) =>
+        (p.barcode && p.barcode.toLowerCase().includes(searchLower)) ||
+        (p.sku && p.sku.toLowerCase().includes(searchLower)) ||
+        p.name.toLowerCase().includes(searchLower)
+    );
+
+    setFilteredProducts(matches.slice(0, 10)); // أول 10 نتائج فقط
+    setShowProductSuggestions(matches.length > 0);
+  };
+
+  const handleSelectProduct = (product: typeof products[0]) => {
+    setSelectedProductId(product.id);
+    setProductSearchQuery(product.name);
+    setSellingPrice(String(product.price));
+    setShowProductSuggestions(false);
+    
+    // الانتقال لحقل الكمية
+    setTimeout(() => {
+      document.querySelector<HTMLInputElement>('input[placeholder="1"]')?.focus();
+    }, 100);
   };
 
   const handleRemoveItem = (tempId: string) => {
@@ -198,6 +250,7 @@ export function PurchaseInvoiceFormPage() {
   };
 
   const calculateTaxAmount = () => {
+    if (!isTaxEnabled) return 0;
     return roundCurrency(calculateSubtotal() * (purchaseTaxRate / 100));
   };
 
@@ -237,6 +290,7 @@ export function PurchaseInvoiceFormPage() {
         productionDate: item.productionDate,
       })),
       notes,
+      isTaxEnabled,
     };
 
     try {
@@ -331,6 +385,20 @@ export function PurchaseInvoiceFormPage() {
                 placeholder="ملاحظات اختيارية"
               />
             </div>
+
+            <div className="flex items-center">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isTaxEnabled}
+                  onChange={(e) => setIsTaxEnabled(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium">
+                  تطبيق الضريبة ({purchaseTaxRate}%)
+                </span>
+              </label>
+            </div>
           </div>
         </Card>
 
@@ -350,28 +418,107 @@ export function PurchaseInvoiceFormPage() {
             <div className="md:col-span-2">
               <label className="block text-sm font-medium mb-1">المنتج</label>
               <div className="relative">
-                <select
-                  value={selectedProductId}
-                  onChange={(e) => {
-                    const productId = Number(e.target.value);
-                    setSelectedProductId(productId);
-                    // Auto-fill selling price from product
-                    const product = products.find((p) => p.id === productId);
-                    if (product) {
-                      setSellingPrice(String(product.price));
+                <input
+                  type="text"
+                  value={productSearchQuery}
+                  onChange={(e) => handleProductSearch(e.target.value)}
+                  onFocus={() => {
+                    if (filteredProducts.length > 0) {
+                      setShowProductSuggestions(true);
                     }
                   }}
-                  className="w-full appearance-none pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
-                >
-                  <option value={0}>اختر المنتج</option>
-                  {products.map((product) => (
-                    <option key={product.id} value={product.id}>
-                      {product.name} {product.sku && `(${product.sku})`}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                  onBlur={() => {
+                    // تأخير الإخفاء للسماح بالنقر على الاقتراحات
+                    setTimeout(() => setShowProductSuggestions(false), 200);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      
+                      // إذا كان في منتج واحد فقط في النتائج، اختره
+                      if (filteredProducts.length === 1) {
+                        handleSelectProduct(filteredProducts[0]);
+                      } 
+                      // إذا كان البحث بالباركود الكامل
+                      else if (productSearchQuery.trim()) {
+                        const exactMatch = products.find(
+                          (p) =>
+                            (p.barcode && p.barcode === productSearchQuery.trim()) ||
+                            (p.sku && p.sku === productSearchQuery.trim())
+                        );
+                        
+                        if (exactMatch) {
+                          handleSelectProduct(exactMatch);
+                        } else if (filteredProducts.length > 0) {
+                          // اختر أول نتيجة
+                          handleSelectProduct(filteredProducts[0]);
+                        } else {
+                          toast.error(`لم يتم العثور على منتج: ${productSearchQuery}`);
+                        }
+                      }
+                    } else if (e.key === "Escape") {
+                      setShowProductSuggestions(false);
+                    } else if (e.key === "ArrowDown" && filteredProducts.length > 0) {
+                      e.preventDefault();
+                      setShowProductSuggestions(true);
+                    }
+                  }}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 hover:border-gray-400 transition-all duration-200 shadow-sm"
+                  placeholder="ابحث بالاسم أو الباركود (حرفين على الأقل)..."
+                  autoComplete="off"
+                />
+                
+                {/* قائمة الاقتراحات */}
+                {showProductSuggestions && filteredProducts.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg max-h-60 overflow-y-auto">
+                    {filteredProducts.map((product) => (
+                      <button
+                        key={product.id}
+                        type="button"
+                        onClick={() => handleSelectProduct(product)}
+                        className="w-full px-4 py-3 text-right hover:bg-blue-50 focus:bg-blue-50 focus:outline-none border-b border-gray-100 last:border-b-0 transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">
+                              {product.name}
+                            </div>
+                            <div className="text-sm text-gray-500 mt-1">
+                              {product.barcode && (
+                                <span className="inline-block bg-gray-100 px-2 py-0.5 rounded text-xs mr-2">
+                                  باركود: {product.barcode}
+                                </span>
+                              )}
+                              {product.sku && (
+                                <span className="inline-block bg-gray-100 px-2 py-0.5 rounded text-xs">
+                                  SKU: {product.sku}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-left mr-4">
+                            <div className="text-sm font-medium text-green-600">
+                              {formatCurrency(product.price)}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                
+                {/* رسالة عدم وجود نتائج */}
+                {productSearchQuery.trim().length >= 2 && 
+                 filteredProducts.length === 0 && 
+                 !showProductSuggestions && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-xl shadow-lg p-4 text-center text-gray-500">
+                    لا توجد نتائج للبحث "{productSearchQuery}"
+                  </div>
+                )}
               </div>
+              <p className="mt-1 text-xs text-gray-500">
+                💡 اكتب حرفين على الأقل للبحث، أو امسح الباركود مباشرة
+              </p>
             </div>
 
             <div>
@@ -572,7 +719,7 @@ export function PurchaseInvoiceFormPage() {
                       الضريبة ({purchaseTaxRate}%):
                     </span>
                     <span className="text-sm font-medium">
-                      {formatCurrency(taxAmount)}
+                      {isTaxEnabled ? formatCurrency(taxAmount) : "معفاة"}
                     </span>
                   </div>
                   <p className="mb-3 text-xs text-gray-500">

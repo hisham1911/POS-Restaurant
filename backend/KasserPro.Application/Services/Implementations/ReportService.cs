@@ -17,9 +17,8 @@ public class ReportService : IReportService
     private readonly ILogger<ReportService> _logger;
     private readonly record struct ShiftSummaryFinancials(
         decimal CollectedCash,
-        decimal CollectedCard,
-        decimal CollectedFawry,
-        decimal CollectedOther,
+        decimal CollectedBankAccount,
+        decimal CollectedWallet,
         decimal TotalSales,
         decimal TotalCollected,
         decimal DeferredAmount);
@@ -72,6 +71,7 @@ public class ReportService : IReportService
                 .ThenInclude(o => o.Items)
             .Include(s => s.Orders)
                 .ThenInclude(o => o.Payments)
+                    .ThenInclude(p => p.Wallet)
             .Where(s => s.TenantId == tenantId
                      && s.BranchId == branchId
                      && s.IsClosed
@@ -105,17 +105,13 @@ public class ReportService : IReportService
         // FIX: Include return order payments in breakdown to account for refunded cash
         var returnPayments = returnOrders.SelectMany(o => o.Payments).ToList();
         var refundedCash = Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount));
-        var refundedCard = Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount));
-        var refundedFawry = Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount));
-        var refundedOther = Math.Abs(returnPayments.Where(p => p.Method != PaymentMethod.Cash
-                                                              && p.Method != PaymentMethod.Card
-                                                              && p.Method != PaymentMethod.Fawry).Sum(p => p.Amount));
+        var refundedBankAccount = Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankAccount).Sum(p => p.Amount));
+        var refundedWallet = Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Wallet).Sum(p => p.Amount));
 
         // FIX H-4: Ensure payment breakdown doesn't go negative (display as 0 minimum)
         var totalCash = Math.Round(Math.Max(0, SumAppliedPayments(completedOrders, PaymentMethod.Cash) - refundedCash), 2);
-        var totalCard = Math.Round(Math.Max(0, SumAppliedPayments(completedOrders, PaymentMethod.Card) - refundedCard), 2);
-        var totalFawry = Math.Round(Math.Max(0, SumAppliedPayments(completedOrders, PaymentMethod.Fawry) - refundedFawry), 2);
-        var totalOther = Math.Round(Math.Max(0, SumAppliedPayments(completedOrders, PaymentMethod.BankTransfer) - refundedOther), 2);
+        var totalBankAccount = Math.Round(Math.Max(0, SumAppliedPayments(completedOrders, PaymentMethod.BankAccount) - refundedBankAccount), 2);
+        var totalWallet = Math.Round(Math.Max(0, SumAppliedPayments(completedOrders, PaymentMethod.Wallet) - refundedWallet), 2);
 
         // Calculate sales totals (INCLUDING refund adjustments)
         var grossSales = completedOrders.Sum(o => o.Subtotal);
@@ -138,8 +134,24 @@ public class ReportService : IReportService
         var actualTotalTax = Math.Round(totalTax - Math.Abs(returnOrders.Sum(o => o.TaxAmount)), 2);
         var actualTotalSales = Math.Round(totalSales - totalRefunds, 2);
         var actualNetSales = Math.Round(netSales - Math.Abs(returnOrders.Sum(o => o.Subtotal - o.DiscountAmount)), 2);
-        var totalCollected = Math.Round(totalCash + totalCard + totalFawry + totalOther, 2);
+        var totalCollected = Math.Round(totalCash + totalBankAccount + totalWallet, 2);
         var totalDeferred = Math.Round(actualTotalSales - totalCollected, 2);
+
+        // Wallet breakdown: use already-loaded completedOrders to guarantee
+        // exact parity with totalWallet (same data source, same filter).
+        var walletBreakdown = completedOrders
+            .SelectMany(o => o.Payments ?? Enumerable.Empty<Payment>())
+            .Where(p => p.Method == PaymentMethod.Wallet && p.WalletId.HasValue)
+            .GroupBy(p => new { p.WalletId, Name = p.Wallet?.Name ?? "غير معروف", Type = p.Wallet?.Type ?? "غير معروف" })
+            .Select(g => new WalletPaymentBreakdownDto
+            {
+                WalletId = g.Key.WalletId!.Value,
+                WalletName = g.Key.Name,
+                WalletType = g.Key.Type,
+                Total = Math.Round(g.Sum(p => p.Amount), 2),
+                TransactionCount = g.Count()
+            })
+            .ToList();
 
         // Top products - Calculate NET quantities (sales - returns)
         var allSalesItems = completedOrders.SelectMany(o => o.Items).ToList();
@@ -183,7 +195,6 @@ public class ReportService : IReportService
             })
             .Where(p => p.QuantitySold > 0) // Only show products with net positive sales
             .OrderByDescending(p => p.QuantitySold)
-            .Take(10)
             .ToList();
 
         _logger.LogDebug("Top products (after returns): {Count}", topProducts.Count);
@@ -213,16 +224,14 @@ public class ReportService : IReportService
                 ClosedAt = s.ClosedAt!.Value,
                 TotalOrders = s.TotalOrders,
                 TotalCash = financials.CollectedCash,
-                TotalCard = financials.CollectedCard,
-                TotalFawry = financials.CollectedFawry,
-                TotalOther = financials.CollectedOther,
+                TotalBankAccount = financials.CollectedBankAccount,
+                TotalWallet = financials.CollectedWallet,
                 TotalSales = financials.TotalSales,
                 TotalCollected = financials.TotalCollected,
                 DeferredAmount = financials.DeferredAmount,
                 CollectedCash = financials.CollectedCash,
-                CollectedCard = financials.CollectedCard,
-                CollectedFawry = financials.CollectedFawry,
-                CollectedOther = financials.CollectedOther,
+                CollectedBankAccount = financials.CollectedBankAccount,
+                CollectedWallet = financials.CollectedWallet,
                 IsForceClosed = s.IsForceClosed,
                 ForceCloseReason = s.ForceCloseReason
             };
@@ -255,11 +264,13 @@ public class ReportService : IReportService
 
             // Payment Breakdown
             TotalCash = totalCash,
-            TotalCard = totalCard,
-            TotalFawry = totalFawry,
-            TotalOther = totalOther,
+            TotalBankAccount = totalBankAccount,
+            TotalWallet = totalWallet,
             TotalCollected = totalCollected,
             TotalDeferred = totalDeferred,
+
+            // Wallet Breakdown
+            WalletBreakdown = walletBreakdown,
 
             // Details
             TopProducts = topProducts,
@@ -292,26 +303,22 @@ public class ReportService : IReportService
         var collectedCash = Math.Round(
             SumAppliedPayments(salesOrders, PaymentMethod.Cash)
             - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount)), 2);
-        var collectedCard = Math.Round(
-            SumAppliedPayments(salesOrders, PaymentMethod.Card)
-            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount)), 2);
-        var collectedFawry = Math.Round(
-            SumAppliedPayments(salesOrders, PaymentMethod.Fawry)
-            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Fawry).Sum(p => p.Amount)), 2);
-        var collectedOther = Math.Round(
-            SumAppliedPayments(salesOrders, PaymentMethod.BankTransfer)
-            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankTransfer).Sum(p => p.Amount)), 2);
+        var collectedBankAccount = Math.Round(
+            SumAppliedPayments(salesOrders, PaymentMethod.BankAccount)
+            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.BankAccount).Sum(p => p.Amount)), 2);
+        var collectedWallet = Math.Round(
+            SumAppliedPayments(salesOrders, PaymentMethod.Wallet)
+            - Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Wallet).Sum(p => p.Amount)), 2);
         var totalSales = Math.Round(
             salesOrders.Sum(o => o.Total)
             - Math.Abs(returnOrders.Sum(o => o.Total)), 2);
-        var totalCollected = Math.Round(collectedCash + collectedCard + collectedFawry + collectedOther, 2);
+        var totalCollected = Math.Round(collectedCash + collectedBankAccount + collectedWallet, 2);
         var deferredAmount = Math.Max(0, Math.Round(totalSales - totalCollected, 2));
 
         return new ShiftSummaryFinancials(
             collectedCash,
-            collectedCard,
-            collectedFawry,
-            collectedOther,
+            collectedBankAccount,
+            collectedWallet,
             totalSales,
             totalCollected,
             deferredAmount);
@@ -350,6 +357,31 @@ public class ReportService : IReportService
             .Sum(i => (i.UnitCost ?? 0) * Math.Abs(i.Quantity)), 2);
         var netCost = Math.Round(totalCost - returnedCost, 2);
 
+        // Wallet breakdown (client-side aggregation because SQLite cannot Sum(decimal) in SQL)
+        var walletPayments = await _unitOfWork.Payments.Query()
+            .AsNoTracking()
+            .Include(p => p.Wallet)
+            .Where(p => p.Order != null
+                     && p.Order.TenantId == tenantId
+                     && p.Order.BranchId == branchId
+                     && p.Order.CompletedAt >= utcFrom
+                     && p.Order.CompletedAt < utcTo
+                     && p.WalletId.HasValue
+                     && !p.Order.IsDeleted)
+            .ToListAsync();
+
+        var walletBreakdown = walletPayments
+            .GroupBy(p => new { p.WalletId, p.Wallet!.Name, p.Wallet!.Type })
+            .Select(g => new WalletPaymentBreakdownDto
+            {
+                WalletId = g.Key.WalletId!.Value,
+                WalletName = g.Key.Name,
+                WalletType = g.Key.Type,
+                Total = Math.Round(g.Sum(p => p.Amount), 2),
+                TransactionCount = g.Count()
+            })
+            .ToList();
+
         // FIX C-8: Include return orders in daily breakdown so daily sum matches monthly total.
         // Group sales and returns by day, then compute net per day.
         var salesByDay = salesOrders
@@ -384,7 +416,8 @@ public class ReportService : IReportService
             AverageOrderValue = salesOrders.Count > 0
                 ? Math.Round(totalSales / salesOrders.Count, 2)
                 : 0m,
-            DailySales = dailySales
+            DailySales = dailySales,
+            WalletBreakdown = walletBreakdown
         };
 
         return ApiResponse<SalesReportDto>.Ok(report);

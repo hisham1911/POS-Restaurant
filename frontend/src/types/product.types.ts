@@ -12,6 +12,7 @@ export interface Product {
   sku?: string;
   barcode?: string;
   price: number;
+  suggestedPrice: number; // السعر المقترح - من الباتش إذا كان المنتج له باتشات، وإلا السعر الأساسي
   cost?: number;
   taxRate?: number;
   taxInclusive: boolean;

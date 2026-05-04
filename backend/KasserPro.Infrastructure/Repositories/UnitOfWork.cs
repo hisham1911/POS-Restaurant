@@ -59,6 +59,10 @@ public class UnitOfWork : IUnitOfWork
         // Stock Taking repositories
         StockTakings = new GenericRepository<StockTaking>(context);
         StockTakingItems = new GenericRepository<StockTakingItem>(context);
+
+        // Wallet repositories
+        Wallets = new GenericRepository<Wallet>(context);
+        WalletTransactions = new GenericRepository<WalletTransaction>(context);
     }
 
     public IRepository<Tenant> Tenants { get; }
@@ -107,6 +111,10 @@ public class UnitOfWork : IUnitOfWork
     // Stock Taking repository properties
     public IRepository<StockTaking> StockTakings { get; }
     public IRepository<StockTakingItem> StockTakingItems { get; }
+
+    // Wallet repository properties
+    public IRepository<Wallet> Wallets { get; }
+    public IRepository<WalletTransaction> WalletTransactions { get; }
 
     public async Task<int> SaveChangesAsync() => await _context.SaveChangesAsync();
 

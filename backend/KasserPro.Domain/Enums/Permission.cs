@@ -77,4 +77,8 @@ public enum Permission
     // Delivery
     DeliveryView   = 1600,
     DeliveryManage = 1601,
+
+    // Wallet
+    WalletView   = 1700,
+    WalletManage = 1701,
 }

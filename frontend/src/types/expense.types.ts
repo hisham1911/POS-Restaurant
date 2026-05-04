@@ -93,7 +93,7 @@ export interface RejectExpenseRequest {
 }
 
 export interface PayExpenseRequest {
-  paymentMethod: "Cash" | "Card" | "Fawry";
+  paymentMethod: "Cash" | "BankAccount" | "Wallet";
   paymentReferenceNumber?: string;
   notes?: string;
 }

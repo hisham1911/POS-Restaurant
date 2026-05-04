@@ -230,7 +230,7 @@ export default function BranchPricingEditor() {
                   <option value={0}>اختر المنتج</option>
                   {products.map((product) => (
                     <option key={product.id} value={product.id}>
-                      {product.name} - السعر الافتراضي: {product.price} ج.م
+                      {product.name} - السعر: {product.suggestedPrice} ج.م
                     </option>
                   ))}
                 </select>

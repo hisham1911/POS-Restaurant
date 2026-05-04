@@ -9,19 +9,14 @@ public enum PaymentMethod
     /// Cash payment - affects cash register
     /// </summary>
     Cash = 0,
-    
+
     /// <summary>
-    /// Card payment (Credit/Debit) - does not affect cash register
+    /// Bank account payment - does not affect cash register
     /// </summary>
-    Card = 1,
-    
+    BankAccount = 1,
+
     /// <summary>
-    /// Fawry payment - does not affect cash register
+    /// Wallet payment - does not affect cash register
     /// </summary>
-    Fawry = 2,
-    
-    /// <summary>
-    /// Bank transfer - does not affect cash register
-    /// </summary>
-    BankTransfer = 3
+    Wallet = 2
 }

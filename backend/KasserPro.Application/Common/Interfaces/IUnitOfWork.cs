@@ -52,6 +52,10 @@ public interface IUnitOfWork : IDisposable
     public IRepository<StockTaking> StockTakings { get; }
     public IRepository<StockTakingItem> StockTakingItems { get; }
 
+    // Wallet repositories
+    public IRepository<Wallet> Wallets { get; }
+    public IRepository<WalletTransaction> WalletTransactions { get; }
+
     Task<int> SaveChangesAsync();
 
     /// <summary>

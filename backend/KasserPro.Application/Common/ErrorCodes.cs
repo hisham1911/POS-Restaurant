@@ -187,6 +187,15 @@ public static class ErrorCodes
     public const string BATCH_HAS_ORDERS = "BATCH_HAS_ORDERS";
     public const string BATCH_HAS_MOVEMENTS = "BATCH_HAS_MOVEMENTS";
     public const string BATCH_NUMBER_DUPLICATE = "BATCH_NUMBER_DUPLICATE";
+
+    // Wallet Errors (8000-8099)
+    public const string WALLET_NOT_FOUND = "WALLET_NOT_FOUND";
+    public const string WALLET_NAME_REQUIRED = "WALLET_NAME_REQUIRED";
+    public const string WALLET_TYPE_INVALID = "WALLET_TYPE_INVALID";
+    public const string WALLET_HAS_BALANCE = "WALLET_HAS_BALANCE";
+    public const string WALLET_HAS_TRANSACTIONS = "WALLET_HAS_TRANSACTIONS";
+    public const string WALLET_INVALID_AMOUNT = "WALLET_INVALID_AMOUNT";
+    public const string WALLET_INSUFFICIENT_BALANCE = "WALLET_INSUFFICIENT_BALANCE";
 }
 
 /// <summary>
@@ -372,7 +381,16 @@ public static class ErrorMessages
         { ErrorCodes.BATCH_HAS_QUANTITY, "لا يمكن حذف باتش له كمية في المخزون" },
         { ErrorCodes.BATCH_HAS_ORDERS, "لا يمكن حذف باتش مرتبط بطلبات" },
         { ErrorCodes.BATCH_HAS_MOVEMENTS, "لا يمكن حذف باتش له حركات مخزون" },
-        { ErrorCodes.BATCH_NUMBER_DUPLICATE, "رقم الدفعة مستخدم بالفعل لهذا المنتج في هذا الفرع" }
+        { ErrorCodes.BATCH_NUMBER_DUPLICATE, "رقم الدفعة مستخدم بالفعل لهذا المنتج في هذا الفرع" },
+
+        // Wallet
+        { ErrorCodes.WALLET_NOT_FOUND, "المحفظة غير موجودة" },
+        { ErrorCodes.WALLET_NAME_REQUIRED, "اسم المحفظة مطلوب" },
+        { ErrorCodes.WALLET_TYPE_INVALID, "نوع المحفظة غير صالح — القيم المقبولة: Wallet, BankAccount" },
+        { ErrorCodes.WALLET_HAS_BALANCE, "لا يمكن تعطيل أو حذف محفظة بها رصيد" },
+        { ErrorCodes.WALLET_HAS_TRANSACTIONS, "لا يمكن حذف محفظة بها معاملات" },
+        { ErrorCodes.WALLET_INVALID_AMOUNT, "المبلغ غير صحيح" },
+        { ErrorCodes.WALLET_INSUFFICIENT_BALANCE, "رصيد المحفظة غير كافٍ" }
     };
 
     public static string Get(string code) => Messages.TryGetValue(code, out var msg) ? msg : code;

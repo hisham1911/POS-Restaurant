@@ -843,7 +843,7 @@ public class OrderService : IOrderService
             foreach (var paymentReq in request.Payments.Where(p => p.WalletId.HasValue && p.Amount > 0))
             {
                 var method = Enum.Parse<PaymentMethod>(paymentReq.Method);
-                if (method != PaymentMethod.Cash)
+                if (method == PaymentMethod.Wallet)
                 {
                     await _walletService.RecordOrderPaymentAsync(
                         walletId: paymentReq.WalletId!.Value,

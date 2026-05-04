@@ -109,9 +109,13 @@ public class ReportService : IReportService
         var refundedWallet = Math.Abs(returnPayments.Where(p => p.Method == PaymentMethod.Wallet).Sum(p => p.Amount));
 
         // FIX H-4: Ensure payment breakdown doesn't go negative (display as 0 minimum)
+        // FIX: Use raw amounts for consistency with walletBreakdown
         var totalCash = Math.Round(Math.Max(0, SumAppliedPayments(completedOrders, PaymentMethod.Cash) - refundedCash), 2);
         var totalBankAccount = Math.Round(Math.Max(0, SumAppliedPayments(completedOrders, PaymentMethod.BankAccount) - refundedBankAccount), 2);
-        var totalWallet = Math.Round(Math.Max(0, SumAppliedPayments(completedOrders, PaymentMethod.Wallet) - refundedWallet), 2);
+        var totalWallet = Math.Round(Math.Max(0,
+            completedOrders.SelectMany(o => o.Payments ?? Enumerable.Empty<Payment>())
+                .Where(p => p.Method == PaymentMethod.Wallet)
+                .Sum(p => p.Amount) - refundedWallet), 2);
 
         // Calculate sales totals (INCLUDING refund adjustments)
         var grossSales = completedOrders.Sum(o => o.Subtotal);
@@ -140,6 +144,9 @@ public class ReportService : IReportService
         // Wallet breakdown: use already-loaded completedOrders to guarantee
         // exact parity with totalWallet (same data source, same filter).
         var walletBreakdown = completedOrders
+            .Where(o => o.Status == OrderStatus.Completed
+                     || o.Status == OrderStatus.PartiallyRefunded
+                     || o.Status == OrderStatus.Refunded)
             .SelectMany(o => o.Payments ?? Enumerable.Empty<Payment>())
             .Where(p => p.Method == PaymentMethod.Wallet && p.WalletId.HasValue)
             .GroupBy(p => new { p.WalletId, Name = p.Wallet?.Name ?? "غير معروف", Type = p.Wallet?.Type ?? "غير معروف" })

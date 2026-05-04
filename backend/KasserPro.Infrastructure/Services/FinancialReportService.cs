@@ -139,21 +139,11 @@ public class FinancialReportService : IFinancialReportService
                 ? Math.Round((netProfit / actualNetSales) * 100, 2)
                 : 0m;
 
-            // Wallet breakdown (client-side aggregation because SQLite cannot Sum(decimal) in SQL)
-            var walletPayments = await _context.Payments
-                .AsNoTracking()
-                .Include(p => p.Wallet)
-                .Where(p => p.Order != null
-                         && p.Order.TenantId == tenantId
-                         && p.Order.BranchId == branchId
-                         && p.Order.CompletedAt >= utcFrom
-                         && p.Order.CompletedAt < utcTo
-                         && p.WalletId.HasValue
-                         && !p.Order.IsDeleted)
-                .ToListAsync();
-
-            var walletBreakdown = walletPayments
-                .GroupBy(p => new { p.WalletId, p.Wallet!.Name, p.Wallet!.Type })
+            // Wallet breakdown - use already-loaded orders for consistency
+            var walletBreakdown = orders
+                .SelectMany(o => o.Payments ?? new List<Domain.Entities.Payment>())
+                .Where(p => p.Method == PaymentMethod.Wallet && p.WalletId.HasValue)
+                .GroupBy(p => new { p.WalletId, Name = p.Wallet?.Name ?? "غير معروف", Type = p.Wallet?.Type ?? "غير معروف" })
                 .Select(g => new WalletPaymentBreakdownDto
                 {
                     WalletId = g.Key.WalletId!.Value,

@@ -219,31 +219,29 @@ public class EmployeeReportService : IEmployeeReportService
 
             var shiftIds = shifts.Select(s => s.Id).ToList();
 
-            // Wallet breakdown per shift
-            var allWalletPayments = await _context.Payments
-                .AsNoTracking()
-                .Include(p => p.Wallet)
-                .Where(p => p.Order != null
-                         && p.Order.ShiftId.HasValue
-                         && shiftIds.Contains(p.Order.ShiftId.Value)
-                         && p.WalletId.HasValue
-                         && !p.Order.IsDeleted)
-                .ToListAsync();
-
-            var walletBreakdownByShift = allWalletPayments
-                .GroupBy(p => p.Order!.ShiftId!.Value)
-                .ToDictionary(
-                    g => g.Key,
-                    g => g.GroupBy(p => new { p.WalletId, p.Wallet!.Name, p.Wallet.Type })
-                        .Select(wg => new WalletPaymentBreakdownDto
-                        {
-                            WalletId = wg.Key.WalletId!.Value,
-                            WalletName = wg.Key.Name,
-                            WalletType = wg.Key.Type,
-                            Total = wg.Sum(p => p.Amount),
-                            TransactionCount = wg.Count()
-                        })
-                        .ToList());
+            // Wallet breakdown per shift - use already-loaded shifts.Orders for consistency
+            var walletBreakdownByShift = shifts.ToDictionary(
+                s => s.Id,
+                s => (s.Orders ?? new List<Domain.Entities.Order>())
+                    .Where(o => (o.Status == OrderStatus.Completed
+                              || o.Status == OrderStatus.PartiallyRefunded
+                              || o.Status == OrderStatus.Refunded)
+                             && o.OrderType != OrderType.Return
+                             && !o.IsDeleted)
+                    .SelectMany(o => o.Payments ?? new List<Domain.Entities.Payment>())
+                    .Where(p => p.Method == PaymentMethod.Wallet && p.WalletId.HasValue)
+                    .GroupBy(p => new { p.WalletId,
+                                        Name = p.Wallet?.Name ?? "غير معروف",
+                                        Type = p.Wallet?.Type ?? "غير معروف" })
+                    .Select(wg => new WalletPaymentBreakdownDto
+                    {
+                        WalletId         = wg.Key.WalletId!.Value,
+                        WalletName       = wg.Key.Name,
+                        WalletType       = wg.Key.Type,
+                        Total            = Math.Round(wg.Sum(p => p.Amount), 2),
+                        TransactionCount = wg.Count()
+                    })
+                    .ToList());
 
             var detailedShifts = shifts.Select(s =>
             {

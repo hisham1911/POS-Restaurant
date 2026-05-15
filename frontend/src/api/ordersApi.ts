@@ -6,6 +6,8 @@ import {
   OrdersQueryParams,
   PagedOrders,
   AddCustomItemRequest,
+  KitchenTicket,
+  UpdateOrderStatusRequest,
 } from "../types/order.types";
 import { ApiResponse } from "../types/api.types";
 
@@ -29,6 +31,8 @@ interface CustomerOrdersParams {
 interface CompleteOrderApiResponse extends ApiResponse<Order> {
   printAttempted?: boolean;
   printDelivered?: boolean;
+  kitchenPrintAttempted?: boolean;
+  kitchenPrintDelivered?: boolean;
 }
 
 export const ordersApi = baseApi.injectEndpoints({
@@ -109,7 +113,15 @@ export const ordersApi = baseApi.injectEndpoints({
       ApiResponse<Order>,
       {
         orderId: number;
-        item: { productId: number; quantity: number; batchId?: number; notes?: string };
+        item: {
+          productId: number;
+          quantity: number;
+          batchId?: number;
+          notes?: string;
+          discountType?: "percentage" | "fixed";
+          discountValue?: number;
+          discountReason?: string;
+        };
       }
     >({
       query: ({ orderId, item }) => ({
@@ -157,23 +169,32 @@ export const ordersApi = baseApi.injectEndpoints({
     // إكمال الطلب
     completeOrder: builder.mutation<
       CompleteOrderApiResponse,
-      { orderId: number; data: CompleteOrderRequest }
+      { orderId: number; data: CompleteOrderRequest; printKitchenTicket?: boolean }
     >({
-      query: ({ orderId, data }) => ({
+      query: ({ orderId, data, printKitchenTicket = true }) => ({
         url: `/orders/${orderId}/complete`,
         method: "POST",
         body: data,
+        headers: {
+          "X-Print-Kitchen-Ticket": printKitchenTicket ? "1" : "0",
+        },
       }),
       transformResponse: (response: ApiResponse<Order>, meta) => {
         const printAttempted =
           meta?.response?.headers.get("x-print-attempted") === "1";
         const printDelivered =
           meta?.response?.headers.get("x-print-delivered") === "1";
+        const kitchenPrintAttempted =
+          meta?.response?.headers.get("x-kitchen-print-attempted") === "1";
+        const kitchenPrintDelivered =
+          meta?.response?.headers.get("x-kitchen-print-delivered") === "1";
 
         return {
           ...response,
           printAttempted,
           printDelivered,
+          kitchenPrintAttempted,
+          kitchenPrintDelivered,
         };
       },
       invalidatesTags: (_result, _error, { orderId }) => [
@@ -233,7 +254,35 @@ export const ordersApi = baseApi.injectEndpoints({
       }),
     }),
 
+    sendToKitchen: builder.mutation<ApiResponse<KitchenTicket>, number>({
+      query: (orderId) => ({
+        url: `/orders/${orderId}/send-to-kitchen`,
+        method: "POST",
+      }),
+      invalidatesTags: (_result, _error, orderId) => [
+        { type: "Orders", id: orderId },
+        { type: "Orders", id: "LIST" },
+        "RestaurantTables",
+      ],
+    }),
+
     // تحديد طلب التوصيل كـ "تم التسليم"
+    updateOrderStatus: builder.mutation<
+      ApiResponse<Order>,
+      { orderId: number; request: UpdateOrderStatusRequest }
+    >({
+      query: ({ orderId, request }) => ({
+        url: `/orders/${orderId}/status`,
+        method: "PATCH",
+        body: request,
+      }),
+      invalidatesTags: (_result, _error, { orderId }) => [
+        { type: "Orders", id: orderId },
+        { type: "Orders", id: "LIST" },
+        "RestaurantTables",
+      ],
+    }),
+
     markAsDelivered: builder.mutation<ApiResponse<Order>, number>({
       query: (orderId) => ({
         url: `/orders/${orderId}/mark-delivered`,
@@ -260,5 +309,7 @@ export const {
   useCancelOrderMutation,
   useRefundOrderMutation,
   usePrintReceiptMutation,
+  useSendToKitchenMutation,
+  useUpdateOrderStatusMutation,
   useMarkAsDeliveredMutation,
 } = ordersApi;

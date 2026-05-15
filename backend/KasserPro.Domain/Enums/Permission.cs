@@ -81,4 +81,8 @@ public enum Permission
     // Wallet
     WalletView   = 1700,
     WalletManage = 1701,
+
+    // Recipes
+    RecipesView   = 1800,
+    RecipesManage = 1801,
 }

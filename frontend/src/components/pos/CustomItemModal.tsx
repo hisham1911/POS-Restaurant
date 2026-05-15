@@ -7,7 +7,7 @@ import { numberToDisplay, displayToNumber } from "@/hooks/useNumberInput";
 import { useAppSelector } from "@/store/hooks";
 import { selectIsTaxEnabled, selectTaxRate } from "@/store/slices/cartSlice";
 import { AddCustomItemRequest } from "@/types/order.types";
-import { Product, ProductType } from "@/types/product.types";
+import { Product, ProductType, UnitOfMeasure } from "@/types/product.types";
 import {
   getCartItemSubtotal,
   getCartItemTaxAmount,
@@ -32,7 +32,6 @@ export const CustomItemModal = ({
     unitPrice: 0,
     quantity: 1,
     taxRate: currentTaxRate,
-    taxInclusive: false,
     notes: "",
   });
 
@@ -49,10 +48,11 @@ export const CustomItemModal = ({
     price: formData.unitPrice,
     suggestedPrice: formData.unitPrice,
     taxRate: previewTaxRate,
-    taxInclusive: formData.taxInclusive ?? false,
+    taxInclusive: false,
     categoryId: 0,
     isActive: true,
     type: ProductType.Service,
+    unit: UnitOfMeasure.Piece,
     trackInventory: false,
     isBatchTracked: false,
     createdAt: "",
@@ -236,38 +236,6 @@ export const CustomItemModal = ({
 
             <div>
               <label className="mb-2 block text-sm font-medium text-gray-700">
-                السعر شامل الضريبة؟
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-gray-300 px-4 py-3">
-                  <input
-                    type="radio"
-                    name="custom-item-tax-mode"
-                    checked={Boolean(formData.taxInclusive)}
-                    onChange={() =>
-                      setFormData({ ...formData, taxInclusive: true })
-                    }
-                    className="h-4 w-4 text-orange-600"
-                  />
-                  <span className="text-sm text-gray-700">نعم (شامل)</span>
-                </label>
-                <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-gray-300 px-4 py-3">
-                  <input
-                    type="radio"
-                    name="custom-item-tax-mode"
-                    checked={!formData.taxInclusive}
-                    onChange={() =>
-                      setFormData({ ...formData, taxInclusive: false })
-                    }
-                    className="h-4 w-4 text-orange-600"
-                  />
-                  <span className="text-sm text-gray-700">لا (تضاف)</span>
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
                 ملاحظات (اختياري)
               </label>
               <textarea
@@ -305,9 +273,7 @@ export const CustomItemModal = ({
                 </div>
               </div>
               <p className="mt-2 text-xs text-gray-500">
-                {formData.taxInclusive
-                  ? "السعر المُدخل شامل الضريبة وسيتم استخراج صافي السعر تلقائيًا."
-                  : "السعر المُدخل قبل الضريبة وسيتم إضافة الضريبة عليه."}
+                السعر المُدخل قبل الضريبة وسيتم إضافة الضريبة عليه.
               </p>
             </div>
           </form>

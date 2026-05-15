@@ -15,6 +15,9 @@ public interface IOrderService
     Task<ApiResponse<OrderDto>> AddCustomItemAsync(int orderId, AddCustomItemRequest request);
     Task<ApiResponse<OrderDto>> RemoveItemAsync(int orderId, int itemId);
     Task<ApiResponse<OrderDto>> CompleteAsync(int orderId, CompleteOrderRequest request);
+    Task<ApiResponse<KitchenTicketDto>> SendToKitchenAsync(int orderId);
+    Task<ApiResponse<bool>> MarkKitchenTicketPrintedAsync(int orderId, KitchenTicketDto ticket);
+    Task<ApiResponse<OrderDto>> UpdateStatusAsync(int orderId, UpdateOrderStatusRequest request);
     Task<ApiResponse<bool>> CancelAsync(int orderId, string? reason);
     Task<ApiResponse<OrderDto>> RefundAsync(int orderId, int userId, string? reason, List<RefundItemDto>? items = null);
     Task<ApiResponse<OrderDto>> MarkAsDeliveredAsync(int orderId);

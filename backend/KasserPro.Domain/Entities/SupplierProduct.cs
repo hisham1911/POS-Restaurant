@@ -29,7 +29,7 @@ public class SupplierProduct : BaseEntity
     /// <summary>
     /// Total quantity purchased from this supplier (lifetime)
     /// </summary>
-    public int TotalQuantityPurchased { get; set; } = 0;
+    public decimal TotalQuantityPurchased { get; set; } = 0;
     
     /// <summary>
     /// Total amount spent with this supplier (lifetime)

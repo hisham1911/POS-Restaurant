@@ -15,7 +15,7 @@ import { useOrders } from "@/hooks/useOrders";
 import { useCart } from "@/hooks/useCart";
 import { usePermission } from "@/hooks/usePermission";
 import { formatCurrency } from "@/utils/formatters";
-import { PaymentMethod } from "@/types/order.types";
+import { OrderSource, OrderType, PaymentMethod } from "@/types/order.types";
 import { Customer } from "@/types/customer.types";
 import { useGetActiveWalletsQuery } from "@/api/walletApi";
 import { Button } from "@/components/common/Button";
@@ -26,10 +26,17 @@ import { Portal } from "@/components/common/Portal";
 interface PaymentModalProps {
   onClose: () => void;
   selectedCustomer?: Customer | null;
-  orderType: "Standard" | "Delivery";
+  orderType: OrderType;
+  tableId?: number;
   deliveryAddress: string;
   deliveryFee: string;
   deliveryNotes: string;
+  orderSource?: OrderSource;
+  externalOrderNumber?: string;
+  orderNotes?: string;
+  draftOrderId?: number | null;
+  draftOrderTotal?: number;
+  onDraftOrderChange?: (draft: { id: number; total: number } | null) => void;
   onOrderComplete?: () => void;
 }
 
@@ -37,13 +44,26 @@ export const PaymentModal = ({
   onClose,
   selectedCustomer,
   orderType,
+  tableId,
   deliveryAddress,
   deliveryFee,
   deliveryNotes,
+  orderSource = "POS",
+  externalOrderNumber,
+  orderNotes,
+  draftOrderId,
+  draftOrderTotal = 0,
+  onDraftOrderChange,
   onOrderComplete,
 }: PaymentModalProps) => {
-  const { createOrder, completeOrder, cancelOrder, isCreating, isCompleting } = useOrders();
-  const { clearCart, total: cartTotal } = useCart();
+  const {
+    createOrder,
+    completeOrder,
+    addCartItemsToOrder,
+    isCreating,
+    isCompleting,
+  } = useOrders();
+  const { clearCart, total: cartTotal, items } = useCart();
   const { data: walletsData } = useGetActiveWalletsQuery();
   const wallets = walletsData?.data ?? [];
 
@@ -67,14 +87,17 @@ export const PaymentModal = ({
   const [transactionReference, setTransactionReference] = useState("");
   const [showError, setShowError] = useState(false);
   const [allowPartialPayment, setAllowPartialPayment] = useState(false);
+  const [printKitchenTicket, setPrintKitchenTicket] = useState(true);
   const [isOrderCompleted, setIsOrderCompleted] = useState(false);
   const { hasPermission } = usePermission();
   const canSellOnCredit = hasPermission("PosCreditSale");
   const isDeliveryOrder = orderType === "Delivery";
   const parsedDeliveryFee =
-    isDeliveryOrder ? Number.parseFloat(deliveryFee || "0") || 0 : 0;
+    isDeliveryOrder && !draftOrderId
+      ? Number.parseFloat(deliveryFee || "0") || 0
+      : 0;
 
-  const total = cartTotal + parsedDeliveryFee;
+  const total = cartTotal + parsedDeliveryFee + draftOrderTotal;
 
   useEffect(() => {
     // ❌ Don't reset amountPaid if order is already completed
@@ -193,17 +216,56 @@ export const PaymentModal = ({
       return;
     }
 
+    if (!draftOrderId && orderType === "DineIn" && !tableId) {
+      toast.error("اختر طاولة قبل إتمام طلب الصالة");
+      return;
+    }
+
+    if (!draftOrderId && isDeliveryOrder && !deliveryAddress.trim()) {
+      toast.error("عنوان الدليفري مطلوب قبل الدفع");
+      return;
+    }
+
     try {
-      // 1. إنشاء الطلب أولاً (مع العميل إن وجد)
-      const order = await createOrder(
-        selectedCustomer?.id,
-        isDeliveryOrder ? "Delivery" : "DineIn",
-        isDeliveryOrder ? deliveryAddress || undefined : undefined,
-        isDeliveryOrder ? parsedDeliveryFee : 0,
-        isDeliveryOrder ? deliveryNotes || undefined : undefined,
-      );
-      if (!order) {
-        // فشل إنشاء الطلب - لا نغلق النافذة، السلة محفوظة
+      let orderId = draftOrderId ?? null;
+
+      if (!orderId) {
+        const order = await createOrder(
+          selectedCustomer?.id,
+          orderType,
+          isDeliveryOrder ? deliveryAddress || undefined : undefined,
+          isDeliveryOrder ? parsedDeliveryFee : 0,
+          isDeliveryOrder ? deliveryNotes || undefined : undefined,
+          {
+            tableId: orderType === "DineIn" ? tableId : undefined,
+            orderSource: isDeliveryOrder ? orderSource : "POS",
+            externalOrderNumber:
+              isDeliveryOrder &&
+              orderSource !== "POS" &&
+              externalOrderNumber?.trim()
+                ? externalOrderNumber.trim()
+                : undefined,
+            notes: orderNotes?.trim() || undefined,
+          },
+        );
+
+        if (!order) {
+          return;
+        }
+
+        orderId = order.id;
+        onDraftOrderChange?.({ id: order.id, total: order.total });
+      } else if (items.length > 0) {
+        const order = await addCartItemsToOrder(orderId);
+
+        if (!order) {
+          return;
+        }
+
+        onDraftOrderChange?.({ id: order.id, total: order.total });
+      }
+
+      if (!orderId) {
         return;
       }
 
@@ -212,7 +274,7 @@ export const PaymentModal = ({
         ? wallets.find((w) => w.id === parseInt(selectedMethod.replace("wallet-", ""), 10))
         : null;
 
-      const completedOrder = await completeOrder(order.id, {
+      const completedOrder = await completeOrder(orderId, {
         payments: [
           {
             method: (selectedWallet ? selectedWallet.type : selectedMethod) as PaymentMethod,
@@ -223,11 +285,12 @@ export const PaymentModal = ({
             walletId: selectedWallet?.id,
           },
         ],
+      }, {
+        printKitchenTicket,
       });
 
       if (!completedOrder) {
         // ✅ فشل إكمال الطلب - نلغي المسودة تلقائيًا
-        await cancelOrder(order.id, "فشل إكمال الدفع", { silent: true });
         // لا نغلق النافذة، السلة محفوظة
         return;
       }
@@ -265,6 +328,7 @@ export const PaymentModal = ({
         // Then clear cart and call callbacks
         clearCart();
         setTransactionReference("");
+        onDraftOrderChange?.(null);
         onOrderComplete?.();
       }, 0);
     } catch {
@@ -617,6 +681,23 @@ export const PaymentModal = ({
             )}
 
             {/* Complete Button */}
+            <label className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+              <input
+                type="checkbox"
+                checked={printKitchenTicket}
+                onChange={(event) => setPrintKitchenTicket(event.target.checked)}
+                className="h-5 w-5 rounded border-amber-300 text-amber-600 focus:ring-amber-500"
+              />
+              <span className="flex-1">
+                <span className="block font-bold text-gray-900">
+                  طباعة فاتورة المطبخ مع فاتورة البيع
+                </span>
+                <span className="mt-1 block text-sm text-gray-600">
+                  عند الدفع سيتم طباعة فاتورة مطبخ بدون أسعار ثم فاتورة العميل.
+                </span>
+              </span>
+            </label>
+
             <Button
               variant="success"
               size="xl"

@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   ClipboardList,
   Eye,
-  XCircle,
   Search,
   Calendar,
   Undo2,
@@ -10,10 +10,9 @@ import {
   ChevronRight,
   X,
   ChevronDown,
-  CheckCircle,
 } from "lucide-react";
 import { useOrders } from "@/hooks/useOrders";
-import { Button, ConfirmDialog } from "@/components/common";
+import { Button } from "@/components/common";
 import { Input } from "@/components/common/Input";
 import { Card } from "@/components/common/Card";
 import { Loading } from "@/components/common/Loading";
@@ -21,23 +20,28 @@ import { formatCurrency, formatDateTime } from "@/utils/formatters";
 import { ORDER_STATUS, PAYMENT_METHODS, ORDER_TYPES } from "@/utils/constants";
 import type { Order, OrdersQueryParams } from "@/types/order.types";
 import { OrderDetailsModal } from "@/components/orders/OrderDetailsModal";
-import { useGetOrdersQuery, useMarkAsDeliveredMutation } from "@/api/ordersApi";
+import { useGetOrderQuery, useGetOrdersQuery } from "@/api/ordersApi";
 import clsx from "clsx";
-import { toast } from "react-hot-toast";
+
+interface OrdersLocationState {
+  openOrderId?: number;
+}
 
 export const OrdersPage = () => {
-  const { todayOrders, isLoadingOrders, cancelOrder } = useOrders();
+  const { todayOrders, isLoadingOrders } = useOrders();
+  const location = useLocation();
+  const locationState = location.state as OrdersLocationState | null;
+  const openOrderId =
+    typeof locationState?.openOrderId === "number"
+      ? locationState.openOrderId
+      : undefined;
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [cancellingOrderId, setCancellingOrderId] = useState<number | null>(null);
-  const [markingDeliveredOrderId, setMarkingDeliveredOrderId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"today" | "all" | "date">("today");
   const [selectedDate, setSelectedDate] = useState<string>("");
   const [orderTypeFilter, setOrderTypeFilter] = useState<"all" | "delivery">(
     "all",
   );
-
-  const [markAsDelivered] = useMarkAsDeliveredMutation();
 
   const [filters, setFilters] = useState<OrdersQueryParams>({
     page: 1,
@@ -48,6 +52,15 @@ export const OrdersPage = () => {
     useGetOrdersQuery(viewMode === "today" ? undefined : filters, {
       skip: viewMode === "today",
     });
+  const { data: openedOrderResponse } = useGetOrderQuery(openOrderId ?? 0, {
+    skip: openOrderId === undefined,
+  });
+
+  useEffect(() => {
+    if (openedOrderResponse?.data) {
+      setSelectedOrder(openedOrderResponse.data);
+    }
+  }, [openedOrderResponse?.data]);
 
   const displayOrders =
     viewMode === "today" ? todayOrders : ordersResponse?.data?.items || [];
@@ -117,6 +130,9 @@ export const OrdersPage = () => {
     const colors: Record<string, string> = {
       Completed: "bg-success-50 text-success-500",
       Pending: "bg-warning-50 text-warning-500",
+      Preparing: "bg-blue-50 text-blue-600",
+      Prepared: "bg-emerald-50 text-emerald-600",
+      Delivered: "bg-success-50 text-success-600",
       Cancelled: "bg-danger-50 text-danger-500",
       Refunded: "bg-gray-100 text-gray-500",
       PartiallyRefunded: "bg-amber-50 text-amber-600",
@@ -126,38 +142,6 @@ export const OrdersPage = () => {
   };
 
   const isReturnOrder = (order: Order) => order.orderType === "Return";
-
-  const handleCancelClick = (orderId: number) => {
-    setCancellingOrderId(orderId);
-  };
-
-  const handleConfirmCancel = async () => {
-    if (cancellingOrderId === null) return;
-    await cancelOrder(cancellingOrderId, "إلغاء من المستخدم");
-    setCancellingOrderId(null);
-  };
-
-  const handleMarkDeliveredClick = (orderId: number) => {
-    setMarkingDeliveredOrderId(orderId);
-  };
-
-  const handleConfirmMarkDelivered = async () => {
-    if (markingDeliveredOrderId === null) return;
-    
-    try {
-      const result = await markAsDelivered(markingDeliveredOrderId).unwrap();
-      if (result.success) {
-        toast.success("تم تحديد الطلب كـ تم التسليم بنجاح");
-      } else {
-        toast.error(result.message || "حدث خطأ أثناء تحديث حالة الطلب");
-      }
-    } catch (error: any) {
-      const errorMessage = error?.data?.message || "حدث خطأ أثناء تحديث حالة الطلب";
-      toast.error(errorMessage);
-    } finally {
-      setMarkingDeliveredOrderId(null);
-    }
-  };
 
   const handleFilterChange = <K extends keyof OrdersQueryParams>(
     key: K,
@@ -562,24 +546,6 @@ export const OrdersPage = () => {
                           >
                             <Eye className="w-4 h-4 text-gray-500" />
                           </button>
-                          {order.status === "Pending" && order.orderType === "Delivery" && (
-                            <button
-                              onClick={() => handleMarkDeliveredClick(order.id)}
-                              className="p-2 hover:bg-success-50 rounded-lg transition-colors"
-                              title="تحديد كـ تم التسليم"
-                            >
-                              <CheckCircle className="w-4 h-4 text-success-500" />
-                            </button>
-                          )}
-                          {(order.status === "Pending" || order.status === "Draft") && (
-                            <button
-                              onClick={() => handleCancelClick(order.id)}
-                              className="p-2 hover:bg-danger-50 rounded-lg transition-colors"
-                              title={order.status === "Draft" ? "حذف المسودة" : "إلغاء الطلب"}
-                            >
-                              <XCircle className="w-4 h-4 text-danger-500" />
-                            </button>
-                          )}
                         </div>
                       </td>
                     </tr>
@@ -630,6 +596,7 @@ export const OrdersPage = () => {
           <OrderDetailsModal
             order={selectedOrder}
             onClose={() => setSelectedOrder(null)}
+            onStatusUpdated={setSelectedOrder}
           />
         )}
 
@@ -678,25 +645,6 @@ export const OrdersPage = () => {
         </div>
       </div>
 
-      <ConfirmDialog
-        open={cancellingOrderId !== null}
-        onOpenChange={(open) => !open && setCancellingOrderId(null)}
-        onConfirm={handleConfirmCancel}
-        title="إلغاء الطلب"
-        description="هل أنت متأكد من إلغاء هذا الطلب؟"
-        confirmText="إلغاء"
-        cancelText="تراجع"
-      />
-
-      <ConfirmDialog
-        open={markingDeliveredOrderId !== null}
-        onOpenChange={(open) => !open && setMarkingDeliveredOrderId(null)}
-        onConfirm={handleConfirmMarkDelivered}
-        title="تأكيد التسليم"
-        description="هل تم تسليم هذا الطلب للعميل بالفعل؟ سيتم تحديث حالة الطلب إلى 'مكتمل'."
-        confirmText="نعم، تم التسليم"
-        cancelText="تراجع"
-      />
     </div>
   );
 };

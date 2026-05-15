@@ -43,12 +43,12 @@ public class ProductBatch : BaseEntity
     /// <summary>
     /// Quantity remaining in this batch
     /// </summary>
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
 
     /// <summary>
     /// Initial quantity when batch was received
     /// </summary>
-    public int InitialQuantity { get; set; }
+    public decimal InitialQuantity { get; set; }
 
     /// <summary>
     /// Cost price per unit at time of purchase

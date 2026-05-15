@@ -215,7 +215,7 @@ public class TenantService : ITenantService
                 Code = "MAIN",
                 IsActive = true,
                 DefaultTaxRate = 14,
-                DefaultTaxInclusive = true,
+                DefaultTaxInclusive = false,
                 CurrencyCode = "EGP",
                 IsWarehouse = false
             };

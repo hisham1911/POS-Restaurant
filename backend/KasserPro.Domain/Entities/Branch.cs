@@ -10,7 +10,7 @@ public class Branch : BaseEntity
     public string? Address { get; set; }
     public string? Phone { get; set; }
     public decimal DefaultTaxRate { get; set; } = 14; // Egypt VAT 14%
-    public bool DefaultTaxInclusive { get; set; } = true;
+    public bool DefaultTaxInclusive { get; set; } = false;
     public string CurrencyCode { get; set; } = "EGP";
     public bool IsActive { get; set; } = true;
     

@@ -381,6 +381,109 @@ export const printOrderReceiptFallback = (
   return openPrintWindow(html);
 };
 
+const getKitchenTitle = (order: Order): string => {
+  if (order.orderType === "DineIn") {
+    return order.tableNumberSnapshot
+      ? `طاولة ${order.tableNumberSnapshot}`
+      : "طاولة";
+  }
+
+  if (order.orderType === "Delivery") {
+    return order.customerName ? `دليفري - ${order.customerName}` : "دليفري";
+  }
+
+  return "تيك أواي";
+};
+
+export const printKitchenTicketFallback = (
+  order: Order,
+  tenant?: Tenant | null,
+): boolean => {
+  const settings = normalizeReceiptSettings(tenant);
+  const safeLogoUrl = resolveLogoUrl(settings.logoUrl);
+  const receiptDate = order.completedAt || order.createdAt;
+  const formattedReceiptDate = formatReceiptDate(
+    receiptDate,
+    settings.timezone,
+  );
+  const title = getKitchenTitle(order);
+
+  const itemsRows = order.items
+    .map((item) => {
+      const isAddOn = Boolean(item.parentOrderItemId) || item.isCustomItem;
+      return `
+        <div class="kitchen-item ${isAddOn ? "addon" : ""}">
+          <div class="line-item total">
+            <span>${escapeHtml(isAddOn ? `+ ${item.productName}` : item.productName)}</span>
+            <span>× ${Math.abs(item.quantity)}</span>
+          </div>
+          ${
+            item.notes
+              ? `<div class="note">${escapeHtml(item.notes)}</div>`
+              : ""
+          }
+        </div>`;
+    })
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8" />
+  <title>فاتورة مطبخ ${escapeHtml(order.orderNumber)}</title>
+  <style>
+    ${buildBaseReceiptStyles(settings)}
+    .kitchen-title {
+      border: 2px solid #111;
+      border-radius: 6px;
+      padding: 8px;
+      margin: 10px 0;
+      text-align: center;
+      font-size: ${Math.max(settings.receiptHeaderFontSize + 2, 14)}px;
+      font-weight: 800;
+    }
+    .kitchen-item {
+      padding: 6px 0;
+      border-bottom: 1px dashed #999;
+    }
+    .kitchen-item.addon {
+      padding-inline-start: 12px;
+      font-size: ${Math.max(settings.receiptBodyFontSize - 1, 8)}px;
+    }
+    .note {
+      margin-top: 3px;
+      font-weight: 700;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    ${
+      settings.receiptShowLogo && safeLogoUrl
+        ? `<img class="logo" src="${escapeHtml(safeLogoUrl)}" alt="Logo" onerror="this.style.display='none'" />`
+        : ""
+    }
+    <h2 class="title">${escapeHtml(order.branchName || settings.name || "KasserPro Store")}</h2>
+    <div class="kitchen-title">${escapeHtml(title)}</div>
+    <div class="line-item"><span>أمر مطبخ</span><span>${escapeHtml(order.orderNumber)}</span></div>
+    <p class="center">${formattedReceiptDate}</p>
+  </div>
+
+  <div class="line"></div>
+  ${itemsRows}
+  ${
+    order.notes
+      ? `<div class="line"></div><div class="note">ملاحظات الطلب: ${escapeHtml(order.notes)}</div>`
+      : ""
+  }
+  <script>window.onload = function () { window.print(); };</script>
+</body>
+</html>`;
+
+  return openPrintWindow(html);
+};
+
 interface DebtReceiptOptions {
   customerName?: string;
   branchName?: string;

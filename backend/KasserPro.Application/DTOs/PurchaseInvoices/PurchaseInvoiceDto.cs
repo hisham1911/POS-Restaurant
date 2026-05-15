@@ -45,7 +45,7 @@ public class PurchaseInvoiceItemDto
     public int ProductId { get; set; }
     public string ProductName { get; set; } = string.Empty;
     public string? ProductSku { get; set; }
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     public decimal PurchasePrice { get; set; }
     public decimal SellingPrice { get; set; }
     public decimal Total { get; set; }

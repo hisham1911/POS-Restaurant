@@ -329,6 +329,77 @@ public class PurchaseInvoiceIntegrationTests : IClassFixture<CustomWebApplicatio
         updatedProduct.AverageCost.Should().Be(10.0025m);
     }
 
+    [Fact]
+    public async Task ConfirmPurchaseInvoice_ShouldUpdateAffectedRecipeTotalCost()
+    {
+        var testData = await SeedPurchaseInvoiceDataAsync(0m);
+        int recipeId;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var rawMaterial = await db.Products.SingleAsync(p => p.Id == testData.ProductId);
+            rawMaterial.Type = ProductType.RawMaterial;
+            rawMaterial.Cost = 5m;
+            rawMaterial.AverageCost = null;
+            rawMaterial.Unit = UnitOfMeasure.Piece;
+
+            var manufacturedProduct = new Product
+            {
+                TenantId = testData.TenantId,
+                CategoryId = rawMaterial.CategoryId,
+                Name = "Recipe Product " + Guid.NewGuid().ToString()[..8],
+                NameEn = "Recipe Product",
+                Sku = "RCP-" + Guid.NewGuid().ToString()[..8],
+                Price = 100m,
+                Cost = 0m,
+                TaxInclusive = false,
+                IsActive = true,
+                Type = ProductType.Manufactured,
+                Unit = UnitOfMeasure.Piece,
+                TrackInventory = false
+            };
+            db.Products.Add(manufacturedProduct);
+            await db.SaveChangesAsync();
+
+            var recipe = new Recipe
+            {
+                TenantId = testData.TenantId,
+                ProductId = manufacturedProduct.Id,
+                YieldQuantity = 1,
+                TotalCost = 10m,
+                IsActive = true,
+                AutoDeductIngredients = true,
+                Ingredients =
+                [
+                    new RecipeIngredient
+                    {
+                        RawMaterialProductId = rawMaterial.Id,
+                        Quantity = 2m,
+                        Unit = UnitOfMeasure.Piece,
+                        Cost = 10m
+                    }
+                ]
+            };
+            db.Recipes.Add(recipe);
+            await db.SaveChangesAsync();
+            recipeId = recipe.Id;
+        }
+
+        using var client = CreateAuthenticatedAdminClient(testData);
+        var invoice = await CreateInvoiceAsync(client, testData.SupplierId, testData.ProductId, 20m);
+        await ConfirmInvoiceAsync(client, invoice.Id);
+
+        using var verificationScope = _factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var updatedRecipe = await verificationDb.Recipes
+            .Include(r => r.Ingredients)
+            .SingleAsync(r => r.Id == recipeId);
+
+        updatedRecipe.Ingredients.Single().Cost.Should().Be(40m);
+        updatedRecipe.TotalCost.Should().Be(40m);
+    }
+
     private HttpClient CreateAuthenticatedAdminClient(
         (int TenantId, int BranchId, int AdminUserId, int SupplierId, int ProductId) testData)
     {

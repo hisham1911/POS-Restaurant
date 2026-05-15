@@ -124,6 +124,50 @@ public class SimplePrinterService : IPrinterService
         // Format date
         string formattedDate = receipt.Date.ToString("dd/MM/yyyy hh:mm tt", new System.Globalization.CultureInfo("ar-EG"));
 
+        if (receipt.IsKitchenTicket)
+        {
+            var kitchenRows = new System.Text.StringBuilder();
+            foreach (var item in receipt.Items)
+            {
+                var name = item.IsAddOn ? $"&nbsp;&nbsp;+ {item.Name.TrimStart('+', ' ')}" : item.Name;
+                kitchenRows.Append($"<div class='item'><span>{name} × {item.Quantity:F0}</span><span></span></div>");
+                if (!string.IsNullOrWhiteSpace(item.Notes))
+                    kitchenRows.Append($"<div style='font-size:{Math.Max(rs.BodyFontSize - 1, 7)}px;margin:2px 0 6px'>ملاحظة: {item.Notes}</div>");
+            }
+
+            var orderNotesHtml = !string.IsNullOrWhiteSpace(receipt.OrderNotes)
+                ? $"<div class='line'></div><strong>ملاحظات الطلب</strong><p>{receipt.OrderNotes}</p>"
+                : "";
+
+            return $@"
+<!DOCTYPE html>
+<html dir='rtl'>
+<head>
+    <meta charset='UTF-8'>
+    <title>{receipt.KitchenTitle ?? "طلب مطبخ"}</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; padding: 20px; font-size: {rs.BodyFontSize}px; max-width: {paperMaxWidth}; margin: 0 auto; }}
+        .header {{ text-align: center; margin-bottom: 16px; }}
+        .line {{ border-top: 1px dashed #000; margin: 10px 0; }}
+        .item {{ display: flex; justify-content: space-between; margin: 6px 0; font-weight: bold; }}
+    </style>
+</head>
+<body>
+    <div class='header'>
+        <h2>{receipt.BranchName}</h2>
+        <h3>{receipt.KitchenTitle ?? "طلب مطبخ"}</h3>
+        <p>{(receipt.IsAdditionTicket ? "إضافات فقط" : "طلب كامل")}</p>
+        <p>{formattedDate}</p>
+    </div>
+    <div class='line'></div>
+    {kitchenRows}
+    {orderNotesHtml}
+    <div class='line'></div>
+    <p style='text-align:center;font-weight:bold'>بدون أسعار</p>
+</body>
+</html>";
+        }
+
         // Generate item rows
         // Item rendering conventions:
         //   Quantity == -1               -> section header (bold centered divider)

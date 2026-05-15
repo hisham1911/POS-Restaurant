@@ -112,7 +112,7 @@ const baseQueryWithReauth = retry(
         args !== null &&
         "method" in args &&
         typeof (args as Record<string, unknown>).method === "string" &&
-        ["POST", "PUT", "DELETE"].includes(
+        ["POST", "PUT", "PATCH", "DELETE"].includes(
           ((args as Record<string, unknown>).method as string).toUpperCase(),
         );
 
@@ -299,6 +299,9 @@ export const baseApi = createApi({
     "UserPermissions",
     "SystemUsers",
     "PrinterStatus",
+    "Recipes",
+    "RestaurantTables",
+    "SavedOrderNotes",
   ],
   // Enable automatic refetching on focus and reconnect
   refetchOnFocus: true,

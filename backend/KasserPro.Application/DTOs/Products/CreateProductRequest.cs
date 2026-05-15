@@ -16,7 +16,8 @@ public class CreateProductRequest
     
     // Tax settings
     public decimal? TaxRate { get; set; } // null = use branch default
-    public bool TaxInclusive { get; set; } = true;
+    // Legacy compatibility field. Inclusive pricing is disabled and this value is ignored.
+    public bool TaxInclusive { get; set; } = false;
     
     /// <summary>
     /// Product type determines inventory behavior:
@@ -24,18 +25,19 @@ public class CreateProductRequest
     /// - Service: Inventory tracking disabled automatically
     /// </summary>
     public ProductType Type { get; set; } = ProductType.Physical;
-    
+    public UnitOfMeasure Unit { get; set; } = UnitOfMeasure.Piece;
+
     // Inventory fields (only used for Physical products)
     /// <summary>
     /// Initial stock quantity for the current branch (stored in BranchInventories)
     /// </summary>
-    public int InitialBranchStock { get; set; } = 0;
+    public decimal InitialBranchStock { get; set; } = 0;
     public int LowStockThreshold { get; set; } = 5;
     public int? ReorderPoint { get; set; }
-    
+
     // Branch-specific initial stock (optional)
     // Key: BranchId, Value: Initial Quantity
-    public Dictionary<int, int>? BranchStockQuantities { get; set; }
+    public Dictionary<int, decimal>? BranchStockQuantities { get; set; }
     
     /// <summary>
     /// Whether this product tracks batches (FEFO, expiry, cost-per-batch).

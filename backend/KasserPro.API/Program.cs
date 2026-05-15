@@ -169,6 +169,10 @@ builder.Services.AddScoped<ISupplierService, SupplierService>();
 builder.Services.AddScoped<IPurchaseInvoiceService, PurchaseInvoiceService>();
 builder.Services.AddScoped<IProductBatchService, ProductBatchService>();
 builder.Services.AddScoped<IDeliveryService, DeliveryService>();
+builder.Services.AddScoped<IRestaurantTableRepository, RestaurantTableRepository>();
+builder.Services.AddScoped<ISavedOrderNoteRepository, SavedOrderNoteRepository>();
+builder.Services.AddScoped<IRestaurantTableService, RestaurantTableService>();
+builder.Services.AddScoped<ISavedOrderNoteService, SavedOrderNoteService>();
 builder.Services.AddScoped<IStockTakingService, StockTakingService>();
 
 // Report Services
@@ -186,6 +190,9 @@ builder.Services.AddScoped<IWalletService, WalletService>();
 
 // Device Command Service for SignalR
 builder.Services.AddScoped<IDeviceCommandService, DeviceCommandService>();
+
+// Recipe System (Restaurant)
+builder.Services.AddScoped<IRecipeService, RecipeService>();
 
 // P2: Backup and Restore services
 builder.Services.AddScoped<IBackupService, BackupService>();

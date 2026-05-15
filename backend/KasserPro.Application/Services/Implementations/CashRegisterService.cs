@@ -48,7 +48,9 @@ public class CashRegisterService : ICashRegisterService
 
             // Get active shift
             var activeShift = await _unitOfWork.Shifts.Query()
-                .FirstOrDefaultAsync(s => s.BranchId == branchId && !s.IsClosed);
+                .FirstOrDefaultAsync(s => s.TenantId == _currentUserService.TenantId
+                                       && s.BranchId == branchId
+                                       && !s.IsClosed);
 
             var balance = new CashRegisterBalanceDto
             {
@@ -141,6 +143,11 @@ public class CashRegisterService : ICashRegisterService
 
     public async Task<ApiResponse<CashRegisterTransactionDto>> CreateTransactionAsync(CreateCashRegisterTransactionRequest request)
     {
+        if (request.Amount <= 0)
+            return ApiResponse<CashRegisterTransactionDto>.Fail(
+                ErrorCodes.CASH_REGISTER_INVALID_AMOUNT,
+                ErrorMessages.Get(ErrorCodes.CASH_REGISTER_INVALID_AMOUNT));
+
         var activeShift = await _unitOfWork.Shifts.Query()
             .FirstOrDefaultAsync(s => s.TenantId == _currentUserService.TenantId
                                    && s.BranchId == _currentUserService.BranchId
@@ -233,6 +240,11 @@ public class CashRegisterService : ICashRegisterService
 
     public async Task<ApiResponse<bool>> ReconcileAsync(int shiftId, ReconcileCashRegisterRequest request)
     {
+        if (request.ActualBalance < 0)
+            return ApiResponse<bool>.Fail(
+                ErrorCodes.CASH_REGISTER_INVALID_AMOUNT,
+                ErrorMessages.Get(ErrorCodes.CASH_REGISTER_INVALID_AMOUNT));
+
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
@@ -310,6 +322,11 @@ public class CashRegisterService : ICashRegisterService
 
     public async Task<ApiResponse<bool>> TransferCashAsync(TransferCashRequest request)
     {
+        if (request.Amount <= 0)
+            return ApiResponse<bool>.Fail(
+                ErrorCodes.CASH_REGISTER_INVALID_AMOUNT,
+                ErrorMessages.Get(ErrorCodes.CASH_REGISTER_INVALID_AMOUNT));
+
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
@@ -339,10 +356,14 @@ public class CashRegisterService : ICashRegisterService
 
             // Get active shifts
             var sourceShift = await _unitOfWork.Shifts.Query()
-                .FirstOrDefaultAsync(s => s.BranchId == request.SourceBranchId && !s.IsClosed);
+                .FirstOrDefaultAsync(s => s.TenantId == _currentUserService.TenantId
+                                       && s.BranchId == request.SourceBranchId
+                                       && !s.IsClosed);
 
             var targetShift = await _unitOfWork.Shifts.Query()
-                .FirstOrDefaultAsync(s => s.BranchId == request.TargetBranchId && !s.IsClosed);
+                .FirstOrDefaultAsync(s => s.TenantId == _currentUserService.TenantId
+                                       && s.BranchId == request.TargetBranchId
+                                       && !s.IsClosed);
 
             // Create withdrawal transaction (source)
             var withdrawalNumber = await GenerateTransactionNumberAsync();

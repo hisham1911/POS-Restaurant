@@ -56,9 +56,17 @@ public class UnitOfWork : IUnitOfWork
         // Delivery repository
         DeliveryPersons = new GenericRepository<DeliveryPerson>(context);
 
+        // Restaurant floor repositories
+        RestaurantTables = new GenericRepository<RestaurantTable>(context);
+        SavedOrderNotes = new GenericRepository<SavedOrderNote>(context);
+
         // Stock Taking repositories
         StockTakings = new GenericRepository<StockTaking>(context);
         StockTakingItems = new GenericRepository<StockTakingItem>(context);
+
+        // Recipe repositories
+        Recipes = new GenericRepository<Recipe>(context);
+        RecipeIngredients = new GenericRepository<RecipeIngredient>(context);
 
         // Wallet repositories
         Wallets = new GenericRepository<Wallet>(context);
@@ -108,9 +116,17 @@ public class UnitOfWork : IUnitOfWork
     // Delivery repository property
     public IRepository<DeliveryPerson> DeliveryPersons { get; }
 
+    // Restaurant floor repository properties
+    public IRepository<RestaurantTable> RestaurantTables { get; }
+    public IRepository<SavedOrderNote> SavedOrderNotes { get; }
+
     // Stock Taking repository properties
     public IRepository<StockTaking> StockTakings { get; }
     public IRepository<StockTakingItem> StockTakingItems { get; }
+
+    // Recipe repository properties
+    public IRepository<Recipe> Recipes { get; }
+    public IRepository<RecipeIngredient> RecipeIngredients { get; }
 
     // Wallet repository properties
     public IRepository<Wallet> Wallets { get; }

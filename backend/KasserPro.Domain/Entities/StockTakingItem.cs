@@ -15,19 +15,19 @@ public class StockTakingItem : BaseEntity
     /// System quantity at the time of counting.
     /// NOTE: Phase 2 — change to decimal when fractional quantities are supported.
     /// </summary>
-    public int SystemQuantity { get; set; }
+    public decimal SystemQuantity { get; set; }
 
     /// <summary>
     /// Actual quantity counted physically.
     /// NOTE: Phase 2 — change to decimal when fractional quantities are supported.
     /// </summary>
-    public int ActualQuantity { get; set; }
+    public decimal ActualQuantity { get; set; }
 
     /// <summary>
     /// Difference = ActualQuantity - SystemQuantity.
     /// NOTE: Phase 2 — recalculate as decimal when fractional quantities are supported.
     /// </summary>
-    public int Difference => ActualQuantity - SystemQuantity;
+    public decimal Difference => ActualQuantity - SystemQuantity;
 
     /// <summary>
     /// Reason for the difference (optional)

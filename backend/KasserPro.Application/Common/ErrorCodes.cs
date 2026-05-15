@@ -59,6 +59,12 @@ public static class ErrorCodes
     public const string ORDER_ITEM_NOT_FOUND = "ORDER_ITEM_NOT_FOUND";
     public const string ORDER_CANNOT_MODIFY = "ORDER_CANNOT_MODIFY";
     public const string ORDER_INVALID_QUANTITY = "ORDER_INVALID_QUANTITY";
+    public const string TABLE_NOT_FOUND = "TABLE_NOT_FOUND";
+    public const string TABLE_NOT_AVAILABLE = "TABLE_NOT_AVAILABLE";
+    public const string TABLE_REQUIRED_FOR_DINEIN = "TABLE_REQUIRED_FOR_DINEIN";
+    public const string TABLE_NOT_ALLOWED = "TABLE_NOT_ALLOWED";
+    public const string NOTHING_TO_PRINT = "NOTHING_TO_PRINT";
+    public const string EXTERNAL_ORDER_NUMBER_EXISTS = "EXTERNAL_ORDER_NUMBER_EXISTS";
 
     // Delivery Errors (1690-1699)
     public const string DELIVERY_PERSON_INACTIVE = "DELIVERY_PERSON_INACTIVE";
@@ -260,6 +266,12 @@ public static class ErrorMessages
         { ErrorCodes.ORDER_ITEM_NOT_FOUND, "عنصر الطلب غير موجود" },
         { ErrorCodes.ORDER_CANNOT_MODIFY, "لا يمكن تعديل الطلب" },
         { ErrorCodes.ORDER_INVALID_QUANTITY, "الكمية يجب أن تكون أكبر من صفر" },
+        { ErrorCodes.TABLE_NOT_FOUND, "الطاولة غير موجودة" },
+        { ErrorCodes.TABLE_NOT_AVAILABLE, "الطاولة مشغولة بطلب آخر" },
+        { ErrorCodes.TABLE_REQUIRED_FOR_DINEIN, "يجب اختيار طاولة لطلبات الصالة" },
+        { ErrorCodes.TABLE_NOT_ALLOWED, "لا يمكن ربط طاولة بطلبات التيك أواي أو الدليفري" },
+        { ErrorCodes.NOTHING_TO_PRINT, "لا توجد إضافات جديدة للطباعة في المطبخ" },
+        { ErrorCodes.EXTERNAL_ORDER_NUMBER_EXISTS, "رقم طلب المنصة مستخدم بالفعل" },
 
         // Delivery
         { ErrorCodes.DELIVERY_PERSON_INACTIVE, "لا يمكن تعيين مندوب غير نشط" },

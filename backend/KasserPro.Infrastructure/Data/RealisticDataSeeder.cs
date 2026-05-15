@@ -560,7 +560,7 @@ public static class RealisticDataSeeder
                     continue;
                 }
 
-                var refundQty = fullRefund ? maxQty : _random.Next(1, maxQty + 1);
+                var refundQty = fullRefund ? maxQty : (decimal)_random.Next(1, (int)maxQty + 1);
                 var returnQty = -refundQty;
                 var netPrice = originalItem.UnitPrice * refundQty;
                 var itemTax = netPrice * (14m / 100m);

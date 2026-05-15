@@ -26,7 +26,7 @@ public class BranchInventory : BaseEntity
     /// <summary>
     /// Current quantity available in this branch
     /// </summary>
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     
     /// <summary>
     /// Reorder level - when quantity falls below this, alert is triggered

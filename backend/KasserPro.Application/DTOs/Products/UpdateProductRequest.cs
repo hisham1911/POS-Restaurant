@@ -17,7 +17,8 @@ public class UpdateProductRequest
     
     // Tax settings
     public decimal? TaxRate { get; set; }
-    public bool TaxInclusive { get; set; } = true;
+    // Legacy compatibility field. Inclusive pricing is disabled and this value is ignored.
+    public bool TaxInclusive { get; set; } = false;
     
     /// <summary>
     /// Product type determines inventory behavior:
@@ -25,12 +26,13 @@ public class UpdateProductRequest
     /// - Service: Inventory tracking disabled automatically
     /// </summary>
     public ProductType Type { get; set; } = ProductType.Physical;
-    
+    public UnitOfMeasure Unit { get; set; } = UnitOfMeasure.Piece;
+
     // Inventory fields (only used for Physical products)
     /// <summary>
     /// Stock quantity for the current branch (updates BranchInventories table)
     /// </summary>
-    public int CurrentBranchStock { get; set; } = 0;
+    public decimal CurrentBranchStock { get; set; } = 0;
     public int LowStockThreshold { get; set; } = 5;
     public int? ReorderPoint { get; set; }
     

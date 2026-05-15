@@ -116,6 +116,22 @@ export const ProfitLossReportPage = () => {
         </div>
       </Card>
 
+      {report?.hasMissingCostData && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="mt-0.5 h-5 w-5 text-amber-600" />
+            <div>
+              <p className="text-sm font-semibold text-amber-900">
+                هامش الربح يحتاج مراجعة التكلفة
+              </p>
+              <p className="mt-1 text-sm text-amber-800">
+                يوجد {report.missingCostItemCount} بند مبيعات بدون تكلفة محفوظة. أضف تكلفة للمنتجات الجاهزة أو وصفة للمنتجات المصنعة حتى تظهر الأرباح بدقة.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Revenue Section */}
       <div>
         <h2 className="text-lg font-bold text-gray-800 mb-4">الإيرادات</h2>
@@ -129,6 +145,9 @@ export const ProfitLossReportPage = () => {
                 <p className="text-xs text-gray-500">إجمالي المبيعات</p>
                 <p className="text-lg font-bold text-gray-800">
                   {formatCurrency(report?.grossSales || 0)}
+                </p>
+                <p className="text-[11px] text-gray-400">
+                  قبل الخصومات والضريبة والخدمة والتوصيل
                 </p>
               </div>
             </div>
@@ -157,6 +176,9 @@ export const ProfitLossReportPage = () => {
                 <p className="text-xs text-gray-500">صافي المبيعات</p>
                 <p className="text-lg font-bold text-green-600">
                   {formatCurrency(report?.netSales || 0)}
+                </p>
+                <p className="text-[11px] text-gray-400">
+                  بعد الخصومات والمرتجعات وقبل الضريبة والخدمة
                 </p>
               </div>
             </div>
@@ -219,6 +241,11 @@ export const ProfitLossReportPage = () => {
                 ({formatCurrency(report?.totalCost || 0)})
               </span>
             </div>
+            {report?.hasMissingCostData && (
+              <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                لا تعتمد على هامش الربح قبل استكمال تكاليف المنتجات الناقصة.
+              </p>
+            )}
             <div className="border-t pt-3 flex justify-between items-center">
               <span className="font-bold text-gray-800">إجمالي الربح</span>
               <span className="font-bold text-primary-600 text-xl">

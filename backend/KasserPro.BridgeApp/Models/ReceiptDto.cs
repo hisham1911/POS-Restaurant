@@ -37,6 +37,14 @@ public class ReceiptDto
     public bool IsRefund { get; set; } = false;
     [JsonPropertyName("refundReason")]
     public string? RefundReason { get; set; }
+    [JsonPropertyName("isKitchenTicket")]
+    public bool IsKitchenTicket { get; set; } = false;
+    [JsonPropertyName("kitchenTitle")]
+    public string? KitchenTitle { get; set; }
+    [JsonPropertyName("orderNotes")]
+    public string? OrderNotes { get; set; }
+    [JsonPropertyName("isAdditionTicket")]
+    public bool IsAdditionTicket { get; set; } = false;
 }
 
 /// <summary>
@@ -47,9 +55,13 @@ public class ReceiptItemDto
     [JsonPropertyName("name")]
     public string Name { get; set; } = string.Empty;
     [JsonPropertyName("quantity")]
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     [JsonPropertyName("unitPrice")]
     public decimal UnitPrice { get; set; }
     [JsonPropertyName("totalPrice")]
     public decimal TotalPrice { get; set; }
+    [JsonPropertyName("notes")]
+    public string? Notes { get; set; }
+    [JsonPropertyName("isAddOn")]
+    public bool IsAddOn { get; set; }
 }

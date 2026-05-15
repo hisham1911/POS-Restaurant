@@ -15,7 +15,7 @@ public class Product : BaseEntity
     public decimal Price { get; set; }
     public decimal? Cost { get; set; }
     public decimal? TaxRate { get; set; } // null = use branch default
-    public bool TaxInclusive { get; set; } = true; // Egypt VAT is inclusive
+    public bool TaxInclusive { get; set; } = false; // Prices are always before tax
     public string? ImageUrl { get; set; }
     public bool IsActive { get; set; } = true;
     
@@ -25,10 +25,16 @@ public class Product : BaseEntity
     /// - Service: TrackInventory = false (automatic)
     /// </summary>
     public ProductType Type { get; set; } = ProductType.Physical;
-    
+
+    /// <summary>
+    /// Unit of measure for this product (Piece, Kilogram, Liter, etc.)
+    /// </summary>
+    public UnitOfMeasure Unit { get; set; } = UnitOfMeasure.Piece;
+
     /// <summary>
     /// Automatically set based on Type. Not user-controlled.
-    /// Physical products always track inventory, Service products never do.
+    /// Physical and RawMaterial products always track inventory, Service products never do.
+    /// Manufactured products track inventory via recipe ingredient deduction.
     /// </summary>
     public bool TrackInventory { get; set; } = true;
     

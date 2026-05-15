@@ -98,6 +98,9 @@ public class FinancialReportService : IFinancialReportService
                 .SelectMany(o => o.Items)
                 .Sum(i => (i.UnitCost ?? 0) * Math.Abs(i.Quantity)), 2);
             var netCost = Math.Round(totalCost - returnedCost, 2);
+            var missingCostItemCount = orders
+                .SelectMany(o => o.Items)
+                .Count(i => i.ProductId.HasValue && !i.IsCustomItem && (!i.UnitCost.HasValue || i.UnitCost <= 0));
 
             var grossProfit = Math.Round(actualNetSales - netCost, 2);
             var grossProfitMargin = actualNetSales > 0
@@ -172,6 +175,7 @@ public class FinancialReportService : IFinancialReportService
                 TotalCost = netCost,
                 GrossProfit = grossProfit,
                 GrossProfitMargin = grossProfitMargin,
+                MissingCostItemCount = missingCostItemCount,
 
                 // Expenses
                 TotalExpenses = totalExpenses,

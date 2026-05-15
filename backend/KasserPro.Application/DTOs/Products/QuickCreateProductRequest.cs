@@ -13,8 +13,9 @@ public class QuickCreateProductRequest
     /// Product type - defaults to Service for quick POS items
     /// </summary>
     public ProductType Type { get; set; } = ProductType.Service;
+    public UnitOfMeasure Unit { get; set; } = UnitOfMeasure.Piece;
 
-    public int InitialStock { get; set; } = 0;
+    public decimal InitialStock { get; set; } = 0;
     public string? Sku { get; set; }
     public string? Barcode { get; set; }
 }

@@ -43,7 +43,7 @@ public class InventoryTransfer : BaseEntity
     /// <summary>
     /// Quantity to transfer
     /// </summary>
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     
     /// <summary>
     /// Current status of the transfer

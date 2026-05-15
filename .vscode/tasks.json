@@ -522,6 +522,18 @@
 			"command": "dotnet test backend/KasserPro.Tests/",
 			"isBackground": false,
 			"group": "build"
+		},
+		{
+			"label": "reinit-clean-history-now",
+			"type": "shell",
+			"command": "git checkout --orphan clean-main; git add .; git commit -m \"Initial clean import\"; git branch -M main",
+			"isBackground": false
+		},
+		{
+			"label": "reindex-and-commit-clean",
+			"type": "shell",
+			"command": "git rm -r --cached .; git add .; git commit -m initial-clean; git branch -M main",
+			"isBackground": false
 		}
 	]
 }

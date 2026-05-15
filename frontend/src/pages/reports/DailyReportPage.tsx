@@ -222,7 +222,9 @@ const generateDailyReportReceiptHtml = (
   <!-- ملخص المبيعات -->
   <div class="section-title">💰 المبيعات</div>
   <div class="row"><span>إجمالي المبيعات</span><span class="value">${fmt(report.totalSales)} ج.م</span></div>
+  <div class="row"><span style="font-size:8px;color:#555">يشمل الضريبة والخدمة والتوصيل</span><span></span></div>
   <div class="row"><span>صافي المبيعات</span><span class="value">${fmt(report.netSales)} ج.م</span></div>
+  <div class="row"><span style="font-size:8px;color:#555">بعد الخصم وقبل الضريبة والخدمة</span><span></span></div>
   ${report.totalDiscount > 0 ? `<div class="row"><span>الخصومات</span><span class="value">-${fmt(report.totalDiscount)} ج.م</span></div>` : ""}
   ${report.totalTax > 0 ? `<div class="row"><span>الضرائب</span><span class="value">${fmt(report.totalTax)} ج.م</span></div>` : ""}
   ${report.totalRefunds > 0 ? `<div class="row"><span>المرتجعات</span><span class="value" style="color:red">-${fmt(report.totalRefunds)} ج.م</span></div>` : ""}
@@ -608,8 +610,14 @@ export const DailyReportPage = () => {
               <p className="text-2xl font-bold text-gray-800">
                 {formatCurrency(report?.totalSales || 0)}
               </p>
+              <p className="text-[11px] text-gray-400">
+                شامل الضريبة والخدمة والتوصيل
+              </p>
               <p className="text-xs text-gray-400">
                 صافي: {formatCurrency(report?.netSales || 0)}
+              </p>
+              <p className="text-[11px] text-gray-400">
+                بعد الخصم وقبل الضريبة والخدمة
               </p>
             </div>
           </div>

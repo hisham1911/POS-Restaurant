@@ -23,7 +23,7 @@ public class StockTakingDto
     public string? CompletedByUserName { get; set; }
     public string? Notes { get; set; }
     public int ItemCount { get; set; }
-    public int TotalDifference { get; set; }
+    public decimal TotalDifference { get; set; }
     public List<StockTakingItemDto> Items { get; set; } = new();
 }
 
@@ -36,9 +36,9 @@ public class StockTakingItemDto
     public int ProductId { get; set; }
     public string ProductName { get; set; } = string.Empty;
     public string? ProductSku { get; set; }
-    public int SystemQuantity { get; set; }
-    public int ActualQuantity { get; set; }
-    public int Difference { get; set; }
+    public decimal SystemQuantity { get; set; }
+    public decimal ActualQuantity { get; set; }
+    public decimal Difference { get; set; }
     public string? Reason { get; set; }
     public int? BatchId { get; set; }
     public string? BatchNumber { get; set; }
@@ -60,7 +60,7 @@ public class CreateStockTakingRequest
 public class UpsertStockTakingItemRequest
 {
     public int ProductId { get; set; }
-    public int ActualQuantity { get; set; }
+    public decimal ActualQuantity { get; set; }
     public string? Reason { get; set; }
     public int? BatchId { get; set; }
 }

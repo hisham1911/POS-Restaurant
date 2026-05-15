@@ -342,8 +342,8 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
 
         // Calculate totals
         invoice.Subtotal = subtotal;
-        invoice.TaxAmount = invoice.IsTaxEnabled ? subtotal * (taxRate / 100) : 0m;
-        invoice.Total = invoice.Subtotal + invoice.TaxAmount;
+        invoice.TaxAmount = invoice.IsTaxEnabled ? Math.Round(subtotal * (taxRate / 100), 2) : 0m;
+        invoice.Total = Math.Round(invoice.Subtotal + invoice.TaxAmount, 2);
         invoice.AmountDue = invoice.Total;
 
         await _unitOfWork.PurchaseInvoices.AddAsync(invoice);
@@ -436,9 +436,9 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
 
         // Recalculate totals
         invoice.Subtotal = subtotal;
-        invoice.TaxAmount = invoice.IsTaxEnabled ? subtotal * (invoice.TaxRate / 100) : 0m;
-        invoice.Total = invoice.Subtotal + invoice.TaxAmount;
-        invoice.AmountDue = invoice.Total - invoice.AmountPaid;
+        invoice.TaxAmount = invoice.IsTaxEnabled ? Math.Round(subtotal * (invoice.TaxRate / 100), 2) : 0m;
+        invoice.Total = Math.Round(invoice.Subtotal + invoice.TaxAmount, 2);
+        invoice.AmountDue = Math.Round(invoice.Total - invoice.AmountPaid, 2);
 
         _unitOfWork.PurchaseInvoices.Update(invoice);
         await _unitOfWork.SaveChangesAsync();
@@ -539,7 +539,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                                                 && bi.BranchId == invoice.BranchId
                                                 && bi.TenantId == tenantId);
 
-                    int balanceBefore;
+                    decimal balanceBefore;
 
                     if (shouldCreateBatch)
                     {
@@ -658,6 +658,7 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
                         var totalOldValue = oldStock * oldAvgCost;
                         var totalNewValue = item.Quantity * item.PurchasePrice;
                         product.AverageCost = Math.Round((totalOldValue + totalNewValue) / newStock, 4);
+                        await UpdateAffectedRecipeCostsAsync(product, tenantId);
                     }
 
                     product.UpdatedAt = DateTime.UtcNow;
@@ -1049,11 +1050,66 @@ public class PurchaseInvoiceService : IPurchaseInvoiceService
             || item.ProductionDate.HasValue;
     }
 
+    private async Task UpdateAffectedRecipeCostsAsync(Product rawMaterial, int tenantId)
+    {
+        var averageCost = rawMaterial.AverageCost ?? rawMaterial.Cost ?? 0m;
+        var affectedIngredients = await _unitOfWork.RecipeIngredients.Query()
+            .Where(ri => ri.RawMaterialProductId == rawMaterial.Id
+                      && !ri.IsDeleted
+                      && ri.Recipe.TenantId == tenantId
+                      && !ri.Recipe.IsDeleted)
+            .Include(ri => ri.Recipe)
+            .ThenInclude(r => r.Ingredients)
+            .ThenInclude(i => i.RawMaterial)
+            .ToListAsync();
+
+        foreach (var ingredient in affectedIngredients)
+        {
+            var quantityInProductUnit = NormalizeToProductUnit(
+                ingredient.Quantity,
+                ingredient.Unit,
+                rawMaterial.Unit);
+
+            ingredient.Cost = Math.Round(quantityInProductUnit * averageCost, 4);
+            ingredient.Recipe.TotalCost = Math.Round(
+                ingredient.Recipe.Ingredients
+                    .Where(i => !i.IsDeleted)
+                    .Sum(i => i.Cost),
+                4);
+        }
+    }
+
+    private static decimal NormalizeToProductUnit(decimal quantity, UnitOfMeasure fromUnit, UnitOfMeasure productUnit)
+    {
+        if (fromUnit == productUnit)
+            return quantity;
+
+        if (IsWeight(fromUnit) && IsWeight(productUnit))
+        {
+            var grams = fromUnit == UnitOfMeasure.Kilogram ? quantity * 1000m : quantity;
+            return productUnit == UnitOfMeasure.Kilogram ? grams / 1000m : grams;
+        }
+
+        if (IsVolume(fromUnit) && IsVolume(productUnit))
+        {
+            var milliliters = fromUnit == UnitOfMeasure.Liter ? quantity * 1000m : quantity;
+            return productUnit == UnitOfMeasure.Liter ? milliliters / 1000m : milliliters;
+        }
+
+        return quantity;
+    }
+
+    private static bool IsWeight(UnitOfMeasure unit)
+        => unit is UnitOfMeasure.Kilogram or UnitOfMeasure.Gram;
+
+    private static bool IsVolume(UnitOfMeasure unit)
+        => unit is UnitOfMeasure.Liter or UnitOfMeasure.Milliliter;
+
     private async Task EnsureExistingStockHasOpeningBatchAsync(
         Product product,
         int branchId,
         int tenantId,
-        int existingBranchStock,
+        decimal existingBranchStock,
         DateTime now,
         DateTime purchaseDate)
     {

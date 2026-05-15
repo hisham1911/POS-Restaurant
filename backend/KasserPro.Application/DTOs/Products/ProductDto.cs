@@ -28,7 +28,8 @@ public class ProductDto
     /// Product type (Physical or Service)
     /// </summary>
     public ProductType Type { get; set; }
-    
+    public UnitOfMeasure Unit { get; set; }
+
     /// <summary>
     /// Automatically determined by Type
     /// </summary>
@@ -44,7 +45,7 @@ public class ProductDto
     /// Transitional field only until BranchInventory endpoints fully replace it in clients.
     /// </summary>
     // TODO: Remove in next sprint - use GET /api/inventory/branch endpoint instead
-    public int? CurrentBranchStock { get; set; }
+    public decimal? CurrentBranchStock { get; set; }
     
     public int CategoryId { get; set; }
     public string? CategoryName { get; set; }

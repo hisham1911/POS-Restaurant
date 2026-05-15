@@ -18,7 +18,7 @@ public class PurchaseInvoiceItem : BaseEntity
     public string? ProductSku { get; set; }
     public string? ProductBarcode { get; set; }
     
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     
     /// <summary>
     /// Purchase price per unit (cost price, not selling price)

@@ -154,8 +154,8 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<int>("ProductId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("Quantity")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
 
                     b.Property<int>("ReorderLevel")
                         .HasColumnType("INTEGER");
@@ -922,8 +922,8 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Quantity")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Reason")
                         .IsRequired()
@@ -1083,8 +1083,17 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<decimal?>("DiscountValue")
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("ExternalOrderNumber")
+                        .HasColumnType("TEXT");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
+
+                    b.Property<int>("KitchenPrintCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("LastKitchenPrintedAt")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Notes")
                         .HasColumnType("TEXT");
@@ -1093,6 +1102,9 @@ namespace KasserPro.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("OrderSource")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("OrderType")
                         .HasColumnType("INTEGER");
@@ -1136,6 +1148,12 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
+                    b.Property<int?>("TableId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("TableNumberSnapshot")
+                        .HasColumnType("TEXT");
+
                     b.Property<decimal>("TaxAmount")
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
@@ -1172,10 +1190,22 @@ namespace KasserPro.Infrastructure.Migrations
 
                     b.HasIndex("OriginalOrderId");
 
+                    b.HasIndex("TableId");
+
                     b.HasIndex("UserId");
 
                     b.HasIndex("ShiftId", "CreatedAt")
                         .HasFilter("IsDeleted = 0");
+
+                    b.HasIndex("TenantId", "BranchId", "TableId")
+                        .IsUnique()
+                        .HasFilter("TableId IS NOT NULL AND OrderType = 0 AND Status IN (0,1,6,7,8) AND IsDeleted = 0");
+
+                    b.HasIndex("TenantId", "BranchId", "OrderSource", "CreatedAt");
+
+                    b.HasIndex("TenantId", "BranchId", "OrderSource", "ExternalOrderNumber")
+                        .IsUnique()
+                        .HasFilter("ExternalOrderNumber IS NOT NULL AND Status <> 3");
 
                     b.HasIndex("TenantId", "BranchId", "Status", "CompletedAt")
                         .HasDatabaseName("IX_Orders_Tenant_Branch_Status_CompletedAt")
@@ -1229,6 +1259,12 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
 
+                    b.Property<decimal>("KitchenPrintedQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("LastKitchenPrintedAt")
+                        .HasColumnType("TEXT");
+
                     b.Property<string>("Notes")
                         .HasColumnType("TEXT");
 
@@ -1237,6 +1273,9 @@ namespace KasserPro.Infrastructure.Migrations
 
                     b.Property<decimal>("OriginalPrice")
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("ParentOrderItemId")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ProductBarcode")
                         .HasColumnType("TEXT");
@@ -1254,11 +1293,11 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<string>("ProductSku")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Quantity")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
 
-                    b.Property<int>("RefundedQuantity")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("RefundedQuantity")
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal>("Subtotal")
                         .HasColumnType("TEXT");
@@ -1289,6 +1328,8 @@ namespace KasserPro.Infrastructure.Migrations
                     b.HasIndex("BatchId");
 
                     b.HasIndex("OrderId");
+
+                    b.HasIndex("ParentOrderItemId");
 
                     b.HasIndex("ProductId");
 
@@ -1428,6 +1469,9 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<int>("Type")
                         .HasColumnType("INTEGER");
 
+                    b.Property<int>("Unit")
+                        .HasColumnType("INTEGER");
+
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("TEXT");
 
@@ -1465,8 +1509,8 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<DateTime?>("ExpiryDate")
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("InitialQuantity")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("InitialQuantity")
+                        .HasColumnType("TEXT");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("INTEGER");
@@ -1487,8 +1531,8 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<int?>("PurchaseInvoiceId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("Quantity")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal?>("SellingPrice")
                         .HasColumnType("TEXT");
@@ -1702,8 +1746,8 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("Quantity")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
 
                     b.Property<decimal>("SellingPrice")
                         .HasColumnType("TEXT");
@@ -1777,6 +1821,100 @@ namespace KasserPro.Infrastructure.Migrations
                     b.ToTable("PurchaseInvoicePayments");
                 });
 
+            modelBuilder.Entity("KasserPro.Domain.Entities.Recipe", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("AutoDeductIngredients")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("CookingTimeMinutes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Instructions")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int?>("PreparationTimeMinutes")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("ProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("TotalCost")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("YieldQuantity")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProductId");
+
+                    b.HasIndex("TenantId", "ProductId")
+                        .IsUnique();
+
+                    b.ToTable("Recipes");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.RecipeIngredient", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<decimal>("Cost")
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("RawMaterialProductId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("RecipeId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Unit")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("RawMaterialProductId");
+
+                    b.HasIndex("RecipeId");
+
+                    b.ToTable("RecipeIngredients");
+                });
+
             modelBuilder.Entity("KasserPro.Domain.Entities.RefundLog", b =>
                 {
                     b.Property<int>("Id")
@@ -1827,6 +1965,95 @@ namespace KasserPro.Infrastructure.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("RefundLogs");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.RestaurantTable", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Number")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("TEXT");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("TenantId", "BranchId", "Number")
+                        .IsUnique()
+                        .HasFilter("IsDeleted = 0");
+
+                    b.HasIndex("TenantId", "BranchId", "Status", "IsActive");
+
+                    b.ToTable("RestaurantTables");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.SavedOrderNote", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("BranchId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TenantId")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("BranchId");
+
+                    b.HasIndex("TenantId", "BranchId", "IsActive", "SortOrder");
+
+                    b.ToTable("SavedOrderNotes");
                 });
 
             modelBuilder.Entity("KasserPro.Domain.Entities.Shift", b =>
@@ -1982,11 +2209,11 @@ namespace KasserPro.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("BalanceAfter")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("BalanceAfter")
+                        .HasColumnType("TEXT");
 
-                    b.Property<int>("BalanceBefore")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("BalanceBefore")
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("BatchId")
                         .HasColumnType("INTEGER");
@@ -2003,8 +2230,8 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<int>("ProductId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("Quantity")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("Quantity")
+                        .HasColumnType("TEXT");
 
                     b.Property<string>("Reason")
                         .HasMaxLength(500)
@@ -2119,8 +2346,8 @@ namespace KasserPro.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("ActualQuantity")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("ActualQuantity")
+                        .HasColumnType("TEXT");
 
                     b.Property<int?>("BatchId")
                         .HasColumnType("INTEGER");
@@ -2141,8 +2368,8 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Property<int>("StockTakingId")
                         .HasColumnType("INTEGER");
 
-                    b.Property<int>("SystemQuantity")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("SystemQuantity")
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("TEXT");
@@ -2267,8 +2494,8 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
-                    b.Property<int>("TotalQuantityPurchased")
-                        .HasColumnType("INTEGER");
+                    b.Property<decimal>("TotalQuantityPurchased")
+                        .HasColumnType("TEXT");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("TEXT");
@@ -3062,6 +3289,11 @@ namespace KasserPro.Infrastructure.Migrations
                         .HasForeignKey("ShiftId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("KasserPro.Domain.Entities.RestaurantTable", "Table")
+                        .WithMany("Orders")
+                        .HasForeignKey("TableId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("KasserPro.Domain.Entities.Tenant", "Tenant")
                         .WithMany()
                         .HasForeignKey("TenantId")
@@ -3084,6 +3316,8 @@ namespace KasserPro.Infrastructure.Migrations
 
                     b.Navigation("Shift");
 
+                    b.Navigation("Table");
+
                     b.Navigation("Tenant");
 
                     b.Navigation("User");
@@ -3102,6 +3336,11 @@ namespace KasserPro.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("KasserPro.Domain.Entities.OrderItem", "ParentOrderItem")
+                        .WithMany("AddOns")
+                        .HasForeignKey("ParentOrderItemId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("KasserPro.Domain.Entities.Product", "Product")
                         .WithMany("OrderItems")
                         .HasForeignKey("ProductId");
@@ -3109,6 +3348,8 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Navigation("Batch");
 
                     b.Navigation("Order");
+
+                    b.Navigation("ParentOrderItem");
 
                     b.Navigation("Product");
                 });
@@ -3286,6 +3527,44 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Navigation("PurchaseInvoice");
                 });
 
+            modelBuilder.Entity("KasserPro.Domain.Entities.Recipe", b =>
+                {
+                    b.HasOne("KasserPro.Domain.Entities.Product", "Product")
+                        .WithMany()
+                        .HasForeignKey("ProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KasserPro.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Product");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.RecipeIngredient", b =>
+                {
+                    b.HasOne("KasserPro.Domain.Entities.Product", "RawMaterial")
+                        .WithMany()
+                        .HasForeignKey("RawMaterialProductId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KasserPro.Domain.Entities.Recipe", "Recipe")
+                        .WithMany("Ingredients")
+                        .HasForeignKey("RecipeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("RawMaterial");
+
+                    b.Navigation("Recipe");
+                });
+
             modelBuilder.Entity("KasserPro.Domain.Entities.RefundLog", b =>
                 {
                     b.HasOne("KasserPro.Domain.Entities.Branch", "Branch")
@@ -3319,6 +3598,44 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Navigation("Tenant");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.RestaurantTable", b =>
+                {
+                    b.HasOne("KasserPro.Domain.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KasserPro.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("Tenant");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.SavedOrderNote", b =>
+                {
+                    b.HasOne("KasserPro.Domain.Entities.Branch", "Branch")
+                        .WithMany()
+                        .HasForeignKey("BranchId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("KasserPro.Domain.Entities.Tenant", "Tenant")
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Branch");
+
+                    b.Navigation("Tenant");
                 });
 
             modelBuilder.Entity("KasserPro.Domain.Entities.Shift", b =>
@@ -3638,6 +3955,11 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Navigation("RefundLog");
                 });
 
+            modelBuilder.Entity("KasserPro.Domain.Entities.OrderItem", b =>
+                {
+                    b.Navigation("AddOns");
+                });
+
             modelBuilder.Entity("KasserPro.Domain.Entities.Product", b =>
                 {
                     b.Navigation("Batches");
@@ -3667,6 +3989,16 @@ namespace KasserPro.Infrastructure.Migrations
                     b.Navigation("Items");
 
                     b.Navigation("Payments");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.Recipe", b =>
+                {
+                    b.Navigation("Ingredients");
+                });
+
+            modelBuilder.Entity("KasserPro.Domain.Entities.RestaurantTable", b =>
+                {
+                    b.Navigation("Orders");
                 });
 
             modelBuilder.Entity("KasserPro.Domain.Entities.Shift", b =>

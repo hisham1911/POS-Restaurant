@@ -4,22 +4,26 @@ import {
   Image as ImageIcon,
   Package,
   Wrench,
+  ChefHat,
   ChevronDown,
   ToggleRight,
   ToggleLeft,
   Eye,
   AlertTriangle,
+  Scale,
 } from "lucide-react";
 import {
   Product,
   CreateProductRequest,
   UpdateProductRequest,
   ProductType,
+  UnitOfMeasure,
 } from "@/types/product.types";
 import { useProducts, useCategories } from "@/hooks/useProducts";
 import { useGetBranchesQuery } from "@/api/branchesApi";
 import { useGetBranchInventoryQuery } from "@/api/inventoryApi";
 import { useGetBatchesByProductQuery } from "@/api/productBatchApi";
+import { useGetRecipeByProductIdQuery } from "@/api/recipesApi";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentBranch } from "@/store/slices/branchSlice";
 import { Button } from "@/components/common/Button";
@@ -104,6 +108,15 @@ const isImageSource = (value?: string): boolean => {
   return /^(https?:\/\/|\/|data:image\/|blob:)/i.test(normalized);
 };
 
+const RAW_MATERIAL_UNITS = [
+  { value: UnitOfMeasure.Kilogram, label: "كيلوجرام" },
+  { value: UnitOfMeasure.Gram, label: "جرام" },
+  { value: UnitOfMeasure.Liter, label: "لتر" },
+  { value: UnitOfMeasure.Milliliter, label: "ملليلتر" },
+  { value: UnitOfMeasure.Piece, label: "قطعة" },
+  { value: UnitOfMeasure.Portion, label: "حصة" },
+] as const;
+
 export const ProductFormModal = ({
   product,
   onClose,
@@ -135,6 +148,27 @@ export const ProductFormModal = ({
   const productBatches = productBatchesResponse?.data ?? [];
   const hasActiveBatches = productBatches.length > 0;
   const nextBatch = productBatches.find((b) => b.status === "Active");
+  const { data: recipeResponse } = useGetRecipeByProductIdQuery(
+    product?.id ?? 0,
+    {
+      skip: !product?.id || !isEditing,
+    },
+  );
+  const productRecipe = recipeResponse?.data ?? null;
+  const hasRecipeCostSource =
+    !!productRecipe && productRecipe.yieldQuantity > 0;
+  const recipeUnitCost = hasRecipeCostSource
+    ? productRecipe.totalCost / productRecipe.yieldQuantity
+    : 0;
+  const recipeUnitCostDisplay = hasRecipeCostSource
+    ? recipeUnitCost.toFixed(2)
+    : "لا توجد وصفة نشطة";
+  const hasRecipeWithZeroCost =
+    hasRecipeCostSource &&
+    recipeUnitCost === 0 &&
+    (productRecipe?.ingredients.length ?? 0) > 0;
+  const isCostInputDisabled =
+    isEditing && (hasActiveBatches || hasRecipeCostSource);
 
   const currentBranchQuantity = useMemo(() => {
     if (!product?.id || !branchInventory) {
@@ -156,22 +190,53 @@ export const ProductFormModal = ({
     price: product?.suggestedPrice || product?.price || 0, // استخدم suggestedPrice إذا كان موجوداً
     cost: nextBatch?.costPrice || product?.cost || 0, // استخدم تكلفة الباتش إذا كان موجوداً
     taxRate: product?.taxRate ?? null,
-    taxInclusive: product?.taxInclusive ?? true,
+    taxInclusive: product?.taxInclusive ?? false,
     imageUrl: product?.imageUrl || "",
     categoryId: product?.categoryId || categories[0]?.id || 0,
     type: product?.type || ProductType.Physical,
+    unit: product?.unit || UnitOfMeasure.Piece,
     isBatchTracked: product?.isBatchTracked ?? false,
     branchQuantity: 0,
     lowStockThreshold: product?.lowStockThreshold ?? 5,
     reorderPoint: product?.reorderPoint ?? null,
     isActive: product?.isActive ?? true,
   });
-
   const [showIconPicker, setShowIconPicker] = useState(false);
   const [branchStocks, setBranchStocks] = useState<
     Record<number, number | string>
   >({});
   const [useBranchSpecificStock, setUseBranchSpecificStock] = useState(false);
+  const isRawMaterial = formData.type === ProductType.RawMaterial;
+  const managesDirectStock =
+    formData.type === ProductType.Physical ||
+    formData.type === ProductType.RawMaterial;
+
+  useEffect(() => {
+    if (isRawMaterial && !RAW_MATERIAL_UNITS.some((unit) => unit.value === formData.unit)) {
+      setFormData((prev) => ({ ...prev, unit: UnitOfMeasure.Kilogram }));
+      return;
+    }
+
+    if (!managesDirectStock && (formData.isBatchTracked || formData.branchQuantity !== 0)) {
+      setFormData((prev) => ({
+        ...prev,
+        isBatchTracked: false,
+        branchQuantity: 0,
+      }));
+    }
+
+    if (isRawMaterial && formData.price !== 0) {
+      setFormData((prev) => ({ ...prev, price: 0 }));
+    }
+  }, [
+    formData.branchQuantity,
+    formData.isBatchTracked,
+    formData.price,
+    formData.type,
+    formData.unit,
+    isRawMaterial,
+    managesDirectStock,
+  ]);
 
   // Initialize branch stocks with default quantity
   useEffect(() => {
@@ -195,14 +260,15 @@ export const ProductFormModal = ({
         description: formData.description,
         sku: formData.sku,
         barcode: formData.barcode,
-        price: formData.price,
+        price: isRawMaterial ? 0 : formData.price,
         cost: formData.cost,
         taxRate: formData.taxRate ?? undefined,
-        taxInclusive: formData.taxInclusive,
+        taxInclusive: false,
         imageUrl: formData.imageUrl,
         categoryId: formData.categoryId,
         type: formData.type,
-        isBatchTracked: formData.isBatchTracked,
+        unit: isRawMaterial ? formData.unit : UnitOfMeasure.Piece,
+        isBatchTracked: managesDirectStock ? formData.isBatchTracked : false,
         lowStockThreshold: formData.lowStockThreshold,
         reorderPoint: formData.reorderPoint ?? undefined,
         isActive: formData.isActive,
@@ -217,18 +283,19 @@ export const ProductFormModal = ({
         description: formData.description,
         sku: formData.sku,
         barcode: formData.barcode,
-        price: formData.price,
+        price: isRawMaterial ? 0 : formData.price,
         cost: formData.cost,
         taxRate: formData.taxRate ?? undefined,
-        taxInclusive: formData.taxInclusive,
+        taxInclusive: false,
         imageUrl: formData.imageUrl,
         categoryId: formData.categoryId,
         type: formData.type,
-        isBatchTracked: formData.isBatchTracked,
-        initialBranchStock: formData.branchQuantity,
+        unit: isRawMaterial ? formData.unit : UnitOfMeasure.Piece,
+        isBatchTracked: managesDirectStock ? formData.isBatchTracked : false,
+        initialBranchStock: managesDirectStock ? formData.branchQuantity : 0,
         lowStockThreshold: formData.lowStockThreshold,
         reorderPoint: formData.reorderPoint ?? undefined,
-        branchStockQuantities: useBranchSpecificStock
+        branchStockQuantities: managesDirectStock && useBranchSpecificStock
           ? Object.fromEntries(
               Object.entries(branchStocks).map(([key, value]) => [
                 key,
@@ -322,53 +389,118 @@ export const ProductFormModal = ({
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               نوع المنتج *
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <button
                 type="button"
                 onClick={() =>
-                  setFormData({ ...formData, type: ProductType.Physical })
+                  setFormData((prev) => ({
+                    ...prev,
+                    type: ProductType.Physical,
+                  }))
                 }
                 className={clsx(
-                  "flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all",
+                  "flex items-center gap-2 rounded-lg border-2 px-4 py-3 transition-all",
                   formData.type === ProductType.Physical
                     ? "border-primary-500 bg-primary-50 text-primary-700"
-                    : "border-gray-200 hover:border-gray-300 text-gray-700",
+                    : "border-gray-200 text-gray-700 hover:border-gray-300",
                 )}
               >
-                <Package className="w-5 h-5" />
+                <Package className="h-5 w-5" />
                 <div className="text-right">
                   <div className="font-medium">منتج مادي</div>
-                  <div className="text-xs opacity-75">يتم تتبع المخزون</div>
+                  <div className="text-xs opacity-75">يباع ويُخصم من مخزونه</div>
                 </div>
               </button>
 
               <button
                 type="button"
                 onClick={() =>
-                  setFormData({ ...formData, type: ProductType.Service })
+                  setFormData((prev) => ({
+                    ...prev,
+                    type: ProductType.Manufactured,
+                    isBatchTracked: false,
+                    branchQuantity: 0,
+                  }))
                 }
                 className={clsx(
-                  "flex items-center gap-2 px-4 py-3 rounded-lg border-2 transition-all",
-                  formData.type === ProductType.Service
+                  "flex items-center gap-2 rounded-lg border-2 px-4 py-3 transition-all",
+                  formData.type === ProductType.Manufactured
                     ? "border-secondary-500 bg-secondary-50 text-secondary-700"
-                    : "border-gray-200 hover:border-gray-300 text-gray-700",
+                    : "border-gray-200 text-gray-700 hover:border-gray-300",
                 )}
               >
-                <Wrench className="w-5 h-5" />
+                <ChefHat className="h-5 w-5" />
+                <div className="text-right">
+                  <div className="font-medium">منتج مصنّع</div>
+                  <div className="text-xs opacity-75">يباع من الوصفة وليس من مخزون مباشر</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    type: ProductType.RawMaterial,
+                    unit: RAW_MATERIAL_UNITS.some(
+                      (unit) => unit.value === prev.unit,
+                    )
+                      ? prev.unit
+                      : UnitOfMeasure.Kilogram,
+                    price: 0,
+                  }))
+                }
+                className={clsx(
+                  "flex items-center gap-2 rounded-lg border-2 px-4 py-3 transition-all",
+                  formData.type === ProductType.RawMaterial
+                    ? "border-amber-500 bg-amber-50 text-amber-700"
+                    : "border-gray-200 text-gray-700 hover:border-gray-300",
+                )}
+              >
+                <Scale className="h-5 w-5" />
+                <div className="text-right">
+                  <div className="font-medium">مادة خام</div>
+                  <div className="text-xs opacity-75">مخزون داخلي للوصفات فقط</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    type: ProductType.Service,
+                    isBatchTracked: false,
+                    branchQuantity: 0,
+                  }))
+                }
+                className={clsx(
+                  "flex items-center gap-2 rounded-lg border-2 px-4 py-3 transition-all",
+                  formData.type === ProductType.Service
+                    ? "border-gray-500 bg-gray-50 text-gray-700"
+                    : "border-gray-200 text-gray-700 hover:border-gray-300",
+                )}
+              >
+                <Wrench className="h-5 w-5" />
                 <div className="text-right">
                   <div className="font-medium">خدمة</div>
-                  <div className="text-xs opacity-75">بدون مخزون</div>
+                  <div className="text-xs opacity-75">تباع بدون مخزون</div>
                 </div>
               </button>
             </div>
-            <p className="text-xs text-gray-500 mt-2">
-              {formData.type === ProductType.Physical
-                ? "المنتجات المادية يتم تتبع مخزونها تلقائياً"
-                : "الخدمات لا تحتاج لتتبع مخزون"}
+            <p className="mt-2 text-xs text-gray-500">
+              {formData.type === ProductType.Physical &&
+                "المنتجات المادية تُراجع على المخزون وتُخصم عند البيع."}
+              {formData.type === ProductType.Manufactured &&
+                "هذا المنتج له وصفة - مخزونه يُحسب من المكونات."}
+              {formData.type === ProductType.RawMaterial &&
+                "المادة الخام لا تظهر في الكاشير وتُستخدم داخل الوصفات فقط."}
+              {formData.type === ProductType.Service &&
+                "الخدمات تباع بدون تتبع مخزون."}
             </p>
           </div>
 
-          {formData.type === ProductType.Physical && (
+          {managesDirectStock && (
             <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
               <div>
                 <p className="font-medium text-sm">تتبع دفعات المخزون</p>
@@ -563,34 +695,37 @@ export const ProductFormModal = ({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {!isRawMaterial && (
+              <div>
+                <Input
+                  label="سعر البيع *"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={numberToDisplay(formData.price)}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      price: displayToNumber(e.target.value),
+                    })
+                  }
+                  placeholder="0.00"
+                  required
+                  disabled={isEditing && hasActiveBatches}
+                />
+                {isEditing && hasActiveBatches && (
+                  <p className="mt-1 flex items-center gap-1 text-xs text-amber-600">
+                    <AlertTriangle className="h-3 w-3" />
+                    معطّل لأن المنتج له دفعات مخزون
+                  </p>
+                )}
+              </div>
+            )}
+
             <div>
               <Input
-                label="سعر البيع *"
-                type="number"
-                min="0"
-                step="0.01"
-                value={numberToDisplay(formData.price)}
-                onChange={(e) =>
-                  setFormData({
-                    ...formData,
-                    price: displayToNumber(e.target.value),
-                  })
-                }
-                placeholder="0.00"
-                required
-                disabled={isEditing && hasActiveBatches}
-              />
-              {isEditing && hasActiveBatches && (
-                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3" />
-                  معطّل لأن المنتج له دفعات مخزون
-                </p>
-              )}
-            </div>
-            <div>
-              <Input
-                label="سعر التكلفة"
+                label="سعر التكلفة اليدوي"
                 type="number"
                 min="0"
                 step="0.01"
@@ -602,15 +737,66 @@ export const ProductFormModal = ({
                   })
                 }
                 placeholder="0.00"
-                disabled={isEditing && hasActiveBatches}
+                disabled={isCostInputDisabled}
               />
-              {isEditing && hasActiveBatches && (
-                <p className="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3" />
+              <div className="mt-3">
+                <Input
+                  label="التكلفة المحسوبة من الوصفة"
+                  type="text"
+                  value={recipeUnitCostDisplay}
+                  readOnly
+                  disabled
+                />
+              </div>
+              {hasRecipeWithZeroCost && (
+                <p className="mt-1 text-xs leading-relaxed text-amber-600">
+                  الوصفة موجودة، لكن تكلفة مكوناتها صفر. حدّث تكلفة المواد
+                  الخام من المنتج أو من فاتورة شراء حتى تظهر تكلفة الوصفة.
+                </p>
+              )}
+              <p className="mt-2 text-xs leading-relaxed text-gray-500">
+                المستخدم حالياً:{" "}
+                <strong className={hasRecipeCostSource ? "text-blue-700" : "text-green-700"}>
+                  {hasRecipeCostSource ? "التكلفة المحسوبة من الوصفة" : "سعر التكلفة اليدوي"}
+                </strong>
+                . لاستخدام الوصفة أضف أو فعّل وصفة للمنتج. لاستخدام اليدوي
+                عطّل أو احذف الوصفة.
+              </p>
+              {isEditing && hasActiveBatches && !hasRecipeCostSource && (
+                <p className="mt-1 flex items-center gap-1 text-xs text-amber-600">
+                  <AlertTriangle className="h-3 w-3" />
                   معطّل لأن المنتج له دفعات مخزون
                 </p>
               )}
             </div>
+
+            {isRawMaterial && (
+              <div className="md:col-span-2">
+                <label className="mb-1.5 block text-sm font-medium text-gray-700">
+                  وحدة القياس *
+                </label>
+                <div className="relative">
+                  <select
+                    value={formData.unit}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        unit: Number(e.target.value) as UnitOfMeasure,
+                      }))
+                    }
+                    className="w-full appearance-none rounded-xl border border-gray-300 bg-white px-4 py-2.5 pl-10 pr-4 text-gray-700 shadow-sm transition-all duration-200 hover:border-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    {RAW_MATERIAL_UNITS.map((unit) => (
+                      <option key={unit.value} value={unit.value}>
+                        {unit.label}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
@@ -648,8 +834,8 @@ export const ProductFormModal = ({
           </div>
         </div>
 
-        {/* Inventory - Only for Physical Products */}
-        {formData.type === ProductType.Physical && (
+        {/* Inventory - Only for stocked products */}
+        {managesDirectStock && (
           <div className="space-y-4">
             <h3 className="text-sm font-semibold text-gray-700 border-b pb-2 flex items-center gap-2">
               <Package className="w-4 h-4" />

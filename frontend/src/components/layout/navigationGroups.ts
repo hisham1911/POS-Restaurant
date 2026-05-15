@@ -63,6 +63,7 @@ export const moduleSections: ModuleSectionConfig[] = [
     icon: ShoppingCart,
     paths: [
       "/pos",
+      "/tables",
       "/orders",
       "/delivery/operations",
       "/delivery-persons",
@@ -75,7 +76,7 @@ export const moduleSections: ModuleSectionConfig[] = [
     id: "products",
     title: "الأصناف والمخزون",
     icon: Package,
-    paths: ["/products", "/categories", "/inventory", "/stock-taking", "/product-batches"],
+    paths: ["/products", "/recipes", "/categories", "/inventory", "/stock-taking", "/product-batches"],
     tone: "emerald",
   },
   {
@@ -96,7 +97,15 @@ export const moduleSections: ModuleSectionConfig[] = [
     id: "admin",
     title: "الإدارة والتحكم",
     icon: Shield,
-    paths: ["/branches", "/users", "/settings", "/backup", "/audit"],
+    paths: [
+      "/branches",
+      "/users",
+      "/settings",
+      "/settings/tables",
+      "/settings/saved-order-notes",
+      "/backup",
+      "/audit",
+    ],
     tone: "primary",
   },
   {

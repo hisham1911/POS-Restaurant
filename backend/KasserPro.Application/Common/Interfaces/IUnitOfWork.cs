@@ -48,9 +48,17 @@ public interface IUnitOfWork : IDisposable
     // Delivery repository
     public IRepository<DeliveryPerson> DeliveryPersons { get; }
 
+    // Restaurant floor repositories
+    public IRepository<RestaurantTable> RestaurantTables { get; }
+    public IRepository<SavedOrderNote> SavedOrderNotes { get; }
+
     // Stock Taking repositories
     public IRepository<StockTaking> StockTakings { get; }
     public IRepository<StockTakingItem> StockTakingItems { get; }
+
+    // Recipe repositories
+    public IRepository<Recipe> Recipes { get; }
+    public IRepository<RecipeIngredient> RecipeIngredients { get; }
 
     // Wallet repositories
     public IRepository<Wallet> Wallets { get; }

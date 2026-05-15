@@ -199,6 +199,79 @@ public class FinancialReportIntegrationTests : IClassFixture<CustomWebApplicatio
     }
 
     [Fact]
+    public async Task ProfitLossReport_ShouldFlagSoldItemsWithMissingCost()
+    {
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var (tenant, branch, user) = await SeedTenantBranchAndUserAsync(db, "profit-loss-missing-cost");
+        var product = new Product
+        {
+            TenantId = tenant.Id,
+            Category = new Category
+            {
+                TenantId = tenant.Id,
+                Name = "Profit Missing Cost Category",
+                IsActive = true
+            },
+            Name = "Profit Missing Cost Product",
+            Sku = "PMC-" + Guid.NewGuid().ToString("N")[..6],
+            Price = 100m,
+            Cost = null,
+            AverageCost = null,
+            TaxRate = 0m,
+            TaxInclusive = false,
+            IsActive = true,
+            TrackInventory = true,
+            Type = ProductType.Physical
+        };
+
+        var order = new Order
+        {
+            TenantId = tenant.Id,
+            BranchId = branch.Id,
+            UserId = user.Id,
+            OrderNumber = "PL-MC-" + Guid.NewGuid().ToString("N")[..6],
+            Status = OrderStatus.Completed,
+            OrderType = OrderType.DineIn,
+            Subtotal = 100m,
+            TaxRate = 0m,
+            TaxAmount = 0m,
+            Total = 100m,
+            AmountPaid = 100m,
+            CompletedAt = FixedUtcNoon.AddHours(2)
+        };
+        order.Items.Add(new OrderItem
+        {
+            Product = product,
+            ProductName = product.Name,
+            UnitPrice = 100m,
+            OriginalPrice = 100m,
+            Quantity = 1,
+            UnitCost = null,
+            Subtotal = 100m,
+            TaxRate = 0m,
+            TaxAmount = 0m,
+            Total = 100m
+        });
+
+        db.Orders.Add(order);
+        await db.SaveChangesAsync();
+
+        var service = new FinancialReportService(
+            db,
+            new TestCurrentUserService { TenantId = tenant.Id, BranchId = branch.Id, UserId = user.Id },
+            NullLogger<FinancialReportService>.Instance);
+
+        var result = await service.GetProfitLossReportAsync(FixedCairoDate, FixedCairoDate);
+
+        result.Success.Should().BeTrue(because: result.Message);
+        result.Data.Should().NotBeNull();
+        result.Data!.MissingCostItemCount.Should().Be(1);
+        result.Data.HasMissingCostData.Should().BeTrue();
+    }
+
+    [Fact]
     public async Task DailyReport_ShouldCalculateDeferredAgainstTaxInclusiveRevenue()
     {
         using var scope = _factory.Services.CreateScope();

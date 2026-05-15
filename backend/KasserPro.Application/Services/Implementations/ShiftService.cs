@@ -2,6 +2,7 @@ namespace KasserPro.Application.Services.Implementations;
 
 using Microsoft.EntityFrameworkCore;
 using KasserPro.Application.Common;
+using KasserPro.Application.Common.Helpers;
 using KasserPro.Application.Common.Interfaces;
 using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Shifts;
@@ -142,6 +143,9 @@ public class ShiftService : IShiftService
         if (branchId <= 0)
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.BRANCH_NOT_FOUND, "معرف الفرع غير صالح");
 
+        if (request.OpeningBalance < 0)
+            return ApiResponse<ShiftDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
+
         // Verify user exists
         var user = await _unitOfWork.Users.GetByIdAsync(userId);
         if (user == null)
@@ -228,6 +232,9 @@ public class ShiftService : IShiftService
         // SECURITY: Validate tenant context
         if (tenantId <= 0)
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.TENANT_NOT_FOUND, "سياق المستأجر غير صالح");
+
+        if (request.ClosingBalance < 0)
+            return ApiResponse<ShiftDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
 
         // Use transaction for atomicity
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
@@ -447,6 +454,9 @@ public class ShiftService : IShiftService
         // Validate request
         if (string.IsNullOrWhiteSpace(request.Reason))
             return ApiResponse<ShiftDto>.Fail(ErrorCodes.SHIFT_FORCE_CLOSE_REASON_REQUIRED, "سبب الإغلاق مطلوب");
+
+        if (request.ActualBalance.HasValue && request.ActualBalance.Value < 0)
+            return ApiResponse<ShiftDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
 
         // Get shift with user info
         var shift = await QueryShiftDetails()
@@ -773,7 +783,7 @@ public class ShiftService : IShiftService
         var deferredAmount = Math.Max(0, Math.Round(totalSales - totalCollected, 2));
 
         // Refunds
-        var totalRefunds = Math.Round(returnPayments.Sum(p => p.Amount), 2);
+        var totalRefunds = Math.Round(Math.Abs(returnPayments.Sum(p => p.Amount)), 2);
         var refundsCount = returnOrders.Count;
 
         // Order counts
@@ -819,12 +829,11 @@ public class ShiftService : IShiftService
     private async Task<decimal> CalculateExpectedBalanceAsync(int branchId, decimal openingBalance, decimal totalCash)
     {
         var cashRegisterBalanceResponse = await _cashRegisterService.GetCurrentBalanceAsync(branchId);
-        if (cashRegisterBalanceResponse.Success && cashRegisterBalanceResponse.Data is not null)
-        {
-            return Math.Round(cashRegisterBalanceResponse.Data.CurrentBalance, 2);
-        }
+        var currentBalance = cashRegisterBalanceResponse.Success && cashRegisterBalanceResponse.Data is not null
+            ? cashRegisterBalanceResponse.Data.CurrentBalance
+            : (decimal?)null;
 
-        return Math.Round(openingBalance + totalCash, 2);
+        return ShiftCalculationHelper.ResolveExpectedBalance(openingBalance, totalCash, currentBalance);
     }
 
     private async Task<ShiftDto> MapToDtoAsync(Shift shift)

@@ -145,6 +145,16 @@ public class PrinterService : IPrinterService
                 // Dashed line pen
                 var dashPen = new Pen(System.Drawing.Color.Black, 0.8f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash };
 
+                void DisposeResources()
+                {
+                    font.Dispose();
+                    fontBold.Dispose();
+                    fontHeader.Dispose();
+                    fontTotal.Dispose();
+                    fontSmall.Dispose();
+                    dashPen.Dispose();
+                }
+
                 // Helper: draw text centered
                 void DrawCenter(string text, Font f)
                 {
@@ -230,6 +240,35 @@ public class PrinterService : IPrinterService
                 }
 
                 DrawDash();
+
+                if (receipt.IsKitchenTicket)
+                {
+                    DrawCenter(receipt.KitchenTitle ?? "طلب مطبخ", fontHeader);
+                    DrawCenter(receipt.IsAdditionTicket ? "إضافات فقط" : "طلب كامل", fontBold);
+                    DrawRow("رقم الطلب", receipt.ReceiptNumber.Replace("KITCHEN-", ""), font);
+                    DrawRow("الكاشير", receipt.CashierName, font);
+                    DrawDash();
+
+                    foreach (var item in receipt.Items)
+                    {
+                        var name = item.IsAddOn ? $"   {item.Name}" : item.Name;
+                        DrawRow($"{name} × {item.Quantity:F0}", "", item.IsAddOn ? font : fontBold);
+                        if (!string.IsNullOrWhiteSpace(item.Notes))
+                            DrawRow($"ملاحظة: {item.Notes}", "", fontSmall);
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(receipt.OrderNotes))
+                    {
+                        DrawDash();
+                        DrawRow("ملاحظات الطلب", "", fontBold);
+                        DrawRow(receipt.OrderNotes, "", fontSmall);
+                    }
+
+                    DrawDash();
+                    DrawCenter("بدون أسعار", fontBold);
+                    DisposeResources();
+                    return;
+                }
 
                 // ========== 3. CASHIER, CUSTOMER & PAYMENT ==========
                 if (!string.IsNullOrEmpty(receipt.PaymentMethod) || !string.IsNullOrEmpty(receipt.CashierName))

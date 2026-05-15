@@ -13,12 +13,30 @@ public class ProductService : IProductService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUser;
+    private static readonly HashSet<UnitOfMeasure> AllowedRawMaterialUnits = new()
+    {
+        UnitOfMeasure.Kilogram,
+        UnitOfMeasure.Gram,
+        UnitOfMeasure.Liter,
+        UnitOfMeasure.Milliliter,
+        UnitOfMeasure.Piece,
+        UnitOfMeasure.Portion
+    };
 
     public ProductService(IUnitOfWork unitOfWork, ICurrentUserService currentUser)
     {
         _unitOfWork = unitOfWork;
         _currentUser = currentUser;
     }
+
+    private static bool TracksInventory(ProductType productType)
+        => productType is ProductType.Physical or ProductType.RawMaterial;
+
+    private static bool SupportsBatchTracking(ProductType productType)
+        => TracksInventory(productType);
+
+    private static bool IsRawMaterial(ProductType productType)
+        => productType == ProductType.RawMaterial;
 
     public async Task<ApiResponse<PagedResult<ProductDto>>> GetAllAsync(
         int? categoryId = null,
@@ -76,12 +94,13 @@ public class ProductService : IProductService
             ImageUrl = p.ImageUrl,
             IsActive = p.IsActive,
             Type = p.Type,
+            Unit = p.Unit,
             TrackInventory = p.TrackInventory,
             IsBatchTracked = p.IsBatchTracked,
             CurrentBranchStock = p.TrackInventory
                 ? branchInventoryQuery
                     .Where(bi => bi.ProductId == p.Id)
-                    .Select(bi => (int?)bi.Quantity)
+                    .Select(bi => (decimal?)bi.Quantity)
                     .FirstOrDefault() ?? 0
                 : null,
             CategoryId = p.CategoryId,
@@ -162,7 +181,7 @@ public class ProductService : IProductService
 
         var branchQuantity = product.TrackInventory && branchInventory != null
             ? branchInventory.Quantity
-            : (product.TrackInventory ? 0 : (int?)null);
+            : (product.TrackInventory ? 0m : (decimal?)null);
 
         // Get suggested price from next available batch
         decimal suggestedPrice = product.Price;
@@ -200,6 +219,7 @@ public class ProductService : IProductService
             ImageUrl = product.ImageUrl,
             IsActive = product.IsActive,
             Type = product.Type,
+            Unit = product.Unit,
             TrackInventory = product.TrackInventory,
             IsBatchTracked = product.IsBatchTracked,
             CurrentBranchStock = branchQuantity,
@@ -217,9 +237,32 @@ public class ProductService : IProductService
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
+            if (IsRawMaterial(request.Type) && !AllowedRawMaterialUnits.Contains(request.Unit))
+            {
+                return ApiResponse<ProductDto>.Fail(
+                    ErrorCodes.VALIDATION_ERROR,
+                    "وحدة المادة الخام يجب أن تكون: كيلو أو جرام أو لتر أو ملليلتر أو قطعة أو حصة");
+            }
+
+            var tracksInventory = TracksInventory(request.Type);
+            var isBatchTracked = SupportsBatchTracking(request.Type) && request.IsBatchTracked;
+            var normalizedPrice = IsRawMaterial(request.Type) ? 0m : request.Price;
+
             // Validation: Price must be non-negative
-            if (request.Price < 0)
+            if (normalizedPrice < 0)
                 return ApiResponse<ProductDto>.Fail(ErrorCodes.PRODUCT_INVALID_PRICE, ErrorMessages.Get(ErrorCodes.PRODUCT_INVALID_PRICE));
+
+            if (request.Cost.HasValue && request.Cost.Value < 0)
+                return ApiResponse<ProductDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
+
+            if (request.TaxRate.HasValue && (request.TaxRate.Value < 0 || request.TaxRate.Value > 100))
+                return ApiResponse<ProductDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
+
+            if (request.InitialBranchStock < 0
+                || request.LowStockThreshold < 0
+                || (request.ReorderPoint.HasValue && request.ReorderPoint.Value < 0)
+                || (request.BranchStockQuantities?.Values.Any(q => q < 0) ?? false))
+                return ApiResponse<ProductDto>.Fail(ErrorCodes.INVENTORY_INVALID_QUANTITY, ErrorMessages.Get(ErrorCodes.INVENTORY_INVALID_QUANTITY));
 
             // Validation: Category must exist
             var category = await _unitOfWork.Categories.GetByIdAsync(request.CategoryId);
@@ -260,18 +303,18 @@ public class ProductService : IProductService
             Description = request.Description,
             Sku = request.Sku,
             Barcode = request.Barcode,
-            Price = request.Price,
+            Price = normalizedPrice,
             Cost = request.Cost,
             ImageUrl = request.ImageUrl,
             CategoryId = request.CategoryId,
             // Tax settings
             TaxRate = request.TaxRate,
-            TaxInclusive = request.TaxInclusive,
+            TaxInclusive = false,
             // Product Type determines inventory behavior
             Type = request.Type,
-            // TrackInventory is automatically set based on Type
-            TrackInventory = request.Type == Domain.Enums.ProductType.Physical,
-            IsBatchTracked = request.IsBatchTracked,
+            Unit = request.Unit,
+            TrackInventory = tracksInventory,
+            IsBatchTracked = isBatchTracked,
             LowStockThreshold = request.LowStockThreshold,
             ReorderPoint = request.ReorderPoint,
             LastStockUpdate = DateTime.UtcNow
@@ -291,7 +334,7 @@ public class ProductService : IProductService
             {
                 // If branch-specific quantities provided, use them
                 // Otherwise: current branch gets the requested quantity, other branches get 0
-                int quantity;
+                decimal quantity;
                 if (request.BranchStockQuantities?.ContainsKey(branch.Id) == true)
                 {
                     quantity = request.BranchStockQuantities[branch.Id];
@@ -351,6 +394,7 @@ public class ProductService : IProductService
                 TaxInclusive = product.TaxInclusive,
                 IsActive = product.IsActive,
                 Type = product.Type,
+                Unit = product.Unit,
                 TrackInventory = product.TrackInventory,
                 IsBatchTracked = product.IsBatchTracked,
                 CurrentBranchStock = request.InitialBranchStock, // Return requested quantity for consistency
@@ -369,6 +413,17 @@ public class ProductService : IProductService
         // Validation: Price must be non-negative
         if (request.Price < 0)
             return ApiResponse<ProductDto>.Fail(ErrorCodes.PRODUCT_INVALID_PRICE, ErrorMessages.Get(ErrorCodes.PRODUCT_INVALID_PRICE));
+
+        if (request.Cost.HasValue && request.Cost.Value < 0)
+            return ApiResponse<ProductDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
+
+        if (request.TaxRate.HasValue && (request.TaxRate.Value < 0 || request.TaxRate.Value > 100))
+            return ApiResponse<ProductDto>.Fail(ErrorCodes.VALIDATION_ERROR, ErrorMessages.Get(ErrorCodes.VALIDATION_ERROR));
+
+        if (request.CurrentBranchStock < 0
+            || request.LowStockThreshold < 0
+            || (request.ReorderPoint.HasValue && request.ReorderPoint.Value < 0))
+            return ApiResponse<ProductDto>.Fail(ErrorCodes.INVENTORY_INVALID_QUANTITY, ErrorMessages.Get(ErrorCodes.INVENTORY_INVALID_QUANTITY));
 
         await using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
@@ -433,9 +488,18 @@ public class ProductService : IProductService
             }
 
             var wasBatchTracked = product.IsBatchTracked;
-            var willTrackInventory = request.Type == Domain.Enums.ProductType.Physical;
+            var willTrackInventory = TracksInventory(request.Type);
+            var nextBatchTracked = SupportsBatchTracking(request.Type) && request.IsBatchTracked;
+            var normalizedPrice = IsRawMaterial(request.Type) ? 0m : request.Price;
 
-            if (wasBatchTracked && !request.IsBatchTracked)
+            if (IsRawMaterial(request.Type) && !AllowedRawMaterialUnits.Contains(request.Unit))
+            {
+                return ApiResponse<ProductDto>.Fail(
+                    ErrorCodes.VALIDATION_ERROR,
+                    "وحدة المادة الخام يجب أن تكون: كيلو أو جرام أو لتر أو ملليلتر أو قطعة أو حصة");
+            }
+
+            if (wasBatchTracked && !nextBatchTracked)
             {
                 var hasActiveBatches = await _unitOfWork.ProductBatches.Query()
                     .AnyAsync(b => b.ProductId == product.Id
@@ -456,27 +520,27 @@ public class ProductService : IProductService
             product.Description = request.Description;
             product.Sku = request.Sku;
             product.Barcode = request.Barcode;
-            product.Price = request.Price;
+            product.Price = normalizedPrice;
             product.Cost = request.Cost;
             product.ImageUrl = request.ImageUrl;
             product.IsActive = request.IsActive;
             product.CategoryId = request.CategoryId;
             // Tax settings
             product.TaxRate = request.TaxRate;
-            product.TaxInclusive = request.TaxInclusive;
+            product.TaxInclusive = false;
             // Product Type determines inventory behavior
             product.Type = request.Type;
-            // TrackInventory is automatically set based on Type
+            product.Unit = request.Unit;
             product.TrackInventory = willTrackInventory;
             product.LowStockThreshold = request.LowStockThreshold;
             product.ReorderPoint = request.ReorderPoint;
-            product.IsBatchTracked = request.IsBatchTracked;
+            product.IsBatchTracked = nextBatchTracked;
             product.LastStockUpdate = DateTime.UtcNow;
 
             _unitOfWork.Products.Update(product);
 
             // Convert existing branch inventory into opening batches when enabling batch tracking.
-            if (!wasBatchTracked && request.IsBatchTracked && willTrackInventory)
+            if (!wasBatchTracked && nextBatchTracked && willTrackInventory)
             {
                 var now = DateTime.UtcNow;
                 var branchInventories = await _unitOfWork.BranchInventories.Query()
@@ -529,7 +593,7 @@ public class ProductService : IProductService
 
             var branchQuantity = product.TrackInventory && branchInventory != null
                 ? branchInventory.Quantity
-                : (product.TrackInventory ? 0 : (int?)null);
+                : (product.TrackInventory ? 0m : (decimal?)null);
 
             return ApiResponse<ProductDto>.Ok(new ProductDto
             {
@@ -542,6 +606,7 @@ public class ProductService : IProductService
                 TaxInclusive = product.TaxInclusive,
                 IsActive = product.IsActive,
                 Type = product.Type,
+                Unit = product.Unit,
                 TrackInventory = product.TrackInventory,
                 IsBatchTracked = product.IsBatchTracked,
                 CurrentBranchStock = branchQuantity,
@@ -725,14 +790,14 @@ public class ProductService : IProductService
                 Name = request.Name,
                 Sku = request.Sku,
                 Barcode = request.Barcode,
-                Price = request.Price,
+                Price = IsRawMaterial(request.Type) ? 0m : request.Price,
                 ImageUrl = request.ImageUrl,
                 CategoryId = request.CategoryId,
                 // Quick create defaults
                 IsActive = true,
                 Type = request.Type,
-                // TrackInventory is automatically set based on Type
-                TrackInventory = request.Type == Domain.Enums.ProductType.Physical,
+                Unit = request.Unit,
+                TrackInventory = TracksInventory(request.Type),
                 LowStockThreshold = 5,
                 TaxInclusive = false, // Default to tax exclusive
                 LastStockUpdate = DateTime.UtcNow
@@ -779,6 +844,7 @@ public class ProductService : IProductService
                 Price = product.Price,
                 ImageUrl = product.ImageUrl,
                 Type = product.Type,
+                Unit = product.Unit,
                 TrackInventory = product.TrackInventory,
                 IsBatchTracked = product.IsBatchTracked,
                 IsActive = product.IsActive,

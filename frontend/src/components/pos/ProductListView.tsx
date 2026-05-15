@@ -1,4 +1,4 @@
-import { Product } from "@/types/product.types";
+import { Product, ProductType } from "@/types/product.types";
 import { Category } from "@/types/category.types";
 import { useCart } from "@/hooks/useCart";
 import { formatCurrency } from "@/utils/formatters";
@@ -45,15 +45,17 @@ export const ProductListView = ({
     const availableStock = hasInventorySnapshot
       ? getProductAvailableStock(product, quantityInCart, stockByProductId)
       : Number.POSITIVE_INFINITY;
+    const requiresDirectStock =
+      product.type !== ProductType.Manufactured && product.trackInventory;
     const canAddMore = product.isBatchTracked
       ? !hasInventorySnapshot || availableStock > 0
       : allowNegativeStock ||
-        !product.trackInventory ||
+        !requiresDirectStock ||
         !hasInventorySnapshot ||
         availableStock > 0;
     const isOutOfStock =
       !allowNegativeStock &&
-      product.trackInventory &&
+      requiresDirectStock &&
       hasInventorySnapshot &&
       totalStock <= 0;
 
@@ -127,19 +129,22 @@ export const ProductListView = ({
                       stockByProductId,
                     )
                   : Number.POSITIVE_INFINITY;
+                const requiresDirectStock =
+                  product.type !== ProductType.Manufactured &&
+                  product.trackInventory;
                 const canAddMore = product.isBatchTracked
                   ? !hasInventorySnapshot || availableStock > 0
                   : allowNegativeStock ||
-                    !product.trackInventory ||
+                    !requiresDirectStock ||
                     !hasInventorySnapshot ||
                     availableStock > 0;
                 const isOutOfStock =
                   !allowNegativeStock &&
-                  product.trackInventory &&
+                  requiresDirectStock &&
                   hasInventorySnapshot &&
                   totalStock <= 0;
                 const isLowStock =
-                  product.trackInventory &&
+                  requiresDirectStock &&
                   hasInventorySnapshot &&
                   totalStock > 0 &&
                   totalStock <= (product.lowStockThreshold ?? 10);
@@ -178,7 +183,7 @@ export const ProductListView = ({
                       </div>
 
                       {/* Stock Status */}
-                      {product.trackInventory && (
+                      {requiresDirectStock && (
                         <div className="flex items-center gap-1.5 text-xs">
                           {isInventoryLoading && !hasInventorySnapshot ? (
                             <>

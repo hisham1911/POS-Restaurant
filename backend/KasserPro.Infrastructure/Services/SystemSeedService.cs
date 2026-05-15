@@ -34,7 +34,7 @@ public class SystemSeedService : ISystemSeedService
             return;
         }
 
-        var systemOwnerPassword = SeedSystemOwnerPasswordResolver.Resolve(out var passwordFromEnvironment);
+        var systemOwnerPassword = SeedSystemOwnerPasswordResolver.ResolveWithSource(out var passwordSource);
 
         var systemOwner = new User
         {
@@ -51,10 +51,8 @@ public class SystemSeedService : ISystemSeedService
         await _context.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
-            passwordFromEnvironment
-                ? "System Owner created (password source: env {PasswordEnvVar})"
-                : "System Owner created (password source: generated for current process)",
-            SeedSystemOwnerPasswordResolver.EnvironmentVariableName);
+            "System Owner created (password source: {PasswordSource})",
+            FormatPasswordSource(passwordSource));
     }
 
     public async Task<ApiResponse<SystemSeedRunResultDto>> RunFullSeedPipelineAsync(CancellationToken cancellationToken = default)
@@ -224,5 +222,14 @@ public class SystemSeedService : ISystemSeedService
         }
 
         return false;
+    }
+
+    private static string FormatPasswordSource(SeedSystemOwnerPasswordSource source)
+    {
+        return source switch
+        {
+            SeedSystemOwnerPasswordSource.Environment => $"env {SeedSystemOwnerPasswordResolver.EnvironmentVariableName}",
+            _ => "fixed default"
+        };
     }
 }

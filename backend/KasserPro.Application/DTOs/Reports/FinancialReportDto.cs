@@ -21,6 +21,8 @@ public class ProfitLossReportDto
     public decimal TotalCost { get; set; }
     public decimal GrossProfit { get; set; }
     public decimal GrossProfitMargin { get; set; } // Percentage
+    public int MissingCostItemCount { get; set; }
+    public bool HasMissingCostData => MissingCostItemCount > 0;
     
     // Operating Expenses
     public decimal TotalExpenses { get; set; }

@@ -20,4 +20,25 @@ public static class ShiftCalculationHelper
             openingBalance + cashSales - cashRefunds - cashExpenses + cashIn - cashOut,
             2);
     }
+
+    /// <summary>
+    /// Resolve expected balance from the cash register when available; otherwise
+    /// fall back to the shared opening/cash movement formula.
+    /// </summary>
+    public static decimal ResolveExpectedBalance(
+        decimal openingBalance,
+        decimal netCash,
+        decimal? currentCashRegisterBalance)
+    {
+        if (currentCashRegisterBalance.HasValue)
+            return Math.Round(currentCashRegisterBalance.Value, 2);
+
+        return CalculateExpectedBalance(
+            openingBalance,
+            netCash,
+            cashRefunds: 0m,
+            cashExpenses: 0m,
+            cashIn: 0m,
+            cashOut: 0m);
+    }
 }

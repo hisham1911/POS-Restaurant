@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 public static class SeedInventorySynchronizer
 {
     private sealed record ProductSeedInfo(int ProductId, int ReorderLevel);
-    private sealed record QuantityAggregate(int BranchId, int ProductId, int Quantity);
+    private sealed record QuantityAggregate(int BranchId, int ProductId, decimal Quantity);
 
     public static async Task SynchronizeAsync(AppDbContext context)
     {
@@ -61,7 +61,7 @@ public static class SeedInventorySynchronizer
 
             var productIds = products.Select(p => p.ProductId).ToList();
 
-            var purchaseIncoming = await context.PurchaseInvoiceItems
+            var purchaseRows = await context.PurchaseInvoiceItems
                 .AsNoTracking()
                 .Where(i => productIds.Contains(i.ProductId)
                     && i.PurchaseInvoice.TenantId == tenantId
@@ -69,11 +69,15 @@ public static class SeedInventorySynchronizer
                     && (i.PurchaseInvoice.Status == PurchaseInvoiceStatus.Confirmed
                         || i.PurchaseInvoice.Status == PurchaseInvoiceStatus.Paid
                         || i.PurchaseInvoice.Status == PurchaseInvoiceStatus.PartiallyPaid))
-                .GroupBy(i => new { i.PurchaseInvoice.BranchId, i.ProductId })
-                .Select(g => new QuantityAggregate(g.Key.BranchId, g.Key.ProductId, g.Sum(x => x.Quantity)))
+                .Select(i => new { i.PurchaseInvoice.BranchId, i.ProductId, i.Quantity })
                 .ToListAsync();
 
-            var netOrderConsumption = await context.OrderItems
+            var purchaseIncoming = purchaseRows
+                .GroupBy(i => new { i.BranchId, i.ProductId })
+                .Select(g => new QuantityAggregate(g.Key.BranchId, g.Key.ProductId, g.Sum(x => x.Quantity)))
+                .ToList();
+
+            var orderRows = await context.OrderItems
                 .AsNoTracking()
                 .Where(i => i.ProductId.HasValue
                     && productIds.Contains(i.ProductId.Value)
@@ -82,30 +86,47 @@ public static class SeedInventorySynchronizer
                     && (i.Order.Status == OrderStatus.Completed
                         || i.Order.Status == OrderStatus.Refunded
                         || i.Order.Status == OrderStatus.PartiallyRefunded))
-                .GroupBy(i => new { i.Order.BranchId, ProductId = i.ProductId!.Value })
-                .Select(g => new QuantityAggregate(g.Key.BranchId, g.Key.ProductId, g.Sum(x => x.Quantity)))
+                .Select(i => new
+                {
+                    i.Order.BranchId,
+                    ProductId = i.ProductId!.Value,
+                    Quantity = i.Order.OrderType == OrderType.Return ? -i.Quantity : i.Quantity
+                })
                 .ToListAsync();
 
-            var transferOutgoing = await context.Set<InventoryTransfer>()
+            var netOrderConsumption = orderRows
+                .GroupBy(i => new { i.BranchId, i.ProductId })
+                .Select(g => new QuantityAggregate(g.Key.BranchId, g.Key.ProductId, g.Sum(x => x.Quantity)))
+                .ToList();
+
+            var transferOutgoingRows = await context.Set<InventoryTransfer>()
                 .AsNoTracking()
                 .Where(t => t.TenantId == tenantId
                     && productIds.Contains(t.ProductId)
                     && branchIds.Contains(t.FromBranchId)
                     && (t.Status == InventoryTransferStatus.Approved
                         || t.Status == InventoryTransferStatus.Completed))
-                .GroupBy(t => new { BranchId = t.FromBranchId, t.ProductId })
-                .Select(g => new QuantityAggregate(g.Key.BranchId, g.Key.ProductId, g.Sum(x => x.Quantity)))
+                .Select(t => new { BranchId = t.FromBranchId, t.ProductId, t.Quantity })
                 .ToListAsync();
 
-            var transferIncoming = await context.Set<InventoryTransfer>()
+            var transferOutgoing = transferOutgoingRows
+                .GroupBy(t => new { t.BranchId, t.ProductId })
+                .Select(g => new QuantityAggregate(g.Key.BranchId, g.Key.ProductId, g.Sum(x => x.Quantity)))
+                .ToList();
+
+            var transferIncomingRows = await context.Set<InventoryTransfer>()
                 .AsNoTracking()
                 .Where(t => t.TenantId == tenantId
                     && productIds.Contains(t.ProductId)
                     && branchIds.Contains(t.ToBranchId)
                     && t.Status == InventoryTransferStatus.Completed)
-                .GroupBy(t => new { BranchId = t.ToBranchId, t.ProductId })
-                .Select(g => new QuantityAggregate(g.Key.BranchId, g.Key.ProductId, g.Sum(x => x.Quantity)))
+                .Select(t => new { BranchId = t.ToBranchId, t.ProductId, t.Quantity })
                 .ToListAsync();
+
+            var transferIncoming = transferIncomingRows
+                .GroupBy(t => new { t.BranchId, t.ProductId })
+                .Select(g => new QuantityAggregate(g.Key.BranchId, g.Key.ProductId, g.Sum(x => x.Quantity)))
+                .ToList();
 
             var existingInventories = await context.BranchInventories
                 .Where(i => i.TenantId == tenantId

@@ -16,13 +16,16 @@ import { useGetShiftWarningsQuery } from "@/api/shiftsApi";
 import { useGetBranchInventoryQuery } from "@/api/inventoryApi";
 import { useGetAvailableBatchesQuery } from "@/api/productBatchApi";
 import { useGetActiveWalletsQuery } from "@/api/walletApi";
+import { useGetRestaurantTablesQuery } from "@/api/restaurantTablesApi";
+import { useGetSavedOrderNotesQuery } from "@/api/savedOrderNotesApi";
 import { usePOSMode } from "@/hooks/usePOSMode";
 import { Customer } from "@/types/customer.types";
-import { PaymentMethod } from "@/types/order.types";
-import { Product, ProductType } from "@/types/product.types";
+import { OrderSource, OrderType, PaymentMethod } from "@/types/order.types";
+import type { RestaurantTable } from "@/types/restaurant.types";
+import { Product, ProductType, UnitOfMeasure } from "@/types/product.types";
 import { ProductBatch } from "@/types/productBatch.types";
 import { toast } from "sonner";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import {
   ScanBarcode,
   PackageCheck,
@@ -46,6 +49,8 @@ import {
   Store,
   Clock3,
   Wallet,
+  Armchair,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 import clsx from "clsx";
@@ -61,6 +66,8 @@ import { CustomerQuickCreateModal } from "@/components/pos/CustomerQuickCreateMo
 import { ProductQuickCreateModal } from "@/components/pos/ProductQuickCreateModal";
 import { CustomItemModal } from "@/components/pos/CustomItemModal";
 import { BatchSelectionModal } from "@/components/pos/BatchSelectionModal";
+import { TableSelectionModal } from "@/components/pos/TableSelectionModal";
+import { SavedNotesModal } from "@/components/pos/SavedNotesModal";
 import { LowStockAlert } from "@/components/pos/LowStockAlert";
 import { ShiftWarningBanner } from "@/components/shifts";
 import { BatchExpiryAlertBanner } from "@/components/inventory";
@@ -94,6 +101,10 @@ interface WorkspaceTabButtonProps {
   disabled?: boolean;
   indicator?: ReactNode;
   onClick: () => void;
+}
+
+interface POSWorkspaceLocationState {
+  selectedTable?: RestaurantTable;
 }
 
 const SurfaceCard = ({ children, className }: SurfaceCardProps) => (
@@ -163,15 +174,17 @@ const WorkspaceTabButton = ({
 
 const formatShiftDuration = (hours: number, minutes: number) => {
   if (hours > 0) {
-    return `${hours}س ${minutes}د`;
+    return `${hours}Ø³ ${minutes}Ø¯`;
   }
 
-  return `${minutes}د`;
+  return `${minutes}Ø¯`;
 };
 
 export const POSWorkspacePage = () => {
+  const navigate = useNavigate();
   const { mode } = usePOSMode();
   const shouldRedirectToCashier = mode === "cashier";
+  const location = useLocation();
 
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [showAvailableOnly, setShowAvailableOnly] = useState(false);
@@ -190,6 +203,7 @@ export const POSWorkspacePage = () => {
   const [transactionReference, setTransactionReference] = useState("");
   const [amountPaid, setAmountPaid] = useState<string>("");
   const [allowPartialPayment, setAllowPartialPayment] = useState(false);
+  const [printKitchenTicket, setPrintKitchenTicket] = useState(true);
   const [showPaymentError, setShowPaymentError] = useState(false);
   const [showDiscountInput, setShowDiscountInput] = useState(false);
   const [discountInputValue, setDiscountInputValue] = useState("");
@@ -197,10 +211,18 @@ export const POSWorkspacePage = () => {
   const [discountInputType, setDiscountInputType] = useState<
     "Percentage" | "Fixed"
   >("Percentage");
-  const [orderType, setOrderType] = useState<"Standard" | "Delivery">("Standard");
+  const [orderType, setOrderType] = useState<OrderType>("DineIn");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [deliveryFee, setDeliveryFee] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(
+    null,
+  );
+  const [showTableModal, setShowTableModal] = useState(false);
+  const [showSavedNotesModal, setShowSavedNotesModal] = useState(false);
+  const [orderNotes, setOrderNotes] = useState("");
+  const [orderSource, setOrderSource] = useState<OrderSource>("POS");
+  const [externalOrderNumber, setExternalOrderNumber] = useState("");
 
   // Batch selection state
   const [showBatchModal, setShowBatchModal] = useState(false);
@@ -236,7 +258,12 @@ export const POSWorkspacePage = () => {
     isLoading: isLoadingShift,
     currentShift,
   } = useShift();
-  const { createOrder, completeOrder, cancelOrder, isCreating, isCompleting } = useOrders();
+  const {
+    createOrder,
+    completeOrder,
+    isCreating,
+    isCompleting,
+  } = useOrders();
   const currentBranch = useAppSelector(selectCurrentBranch);
   const allowNegativeStock = useAppSelector(selectAllowNegativeStock);
   const { hasPermission } = usePermission();
@@ -253,6 +280,18 @@ export const POSWorkspacePage = () => {
   );
   const hasInventorySnapshot = Array.isArray(branchInventory);
   const { data: walletsData } = useGetActiveWalletsQuery();
+  const { data: tablesData } = useGetRestaurantTablesQuery(
+    currentBranch?.id ?? 0,
+    {
+      skip: !currentBranch?.id,
+    },
+  );
+  const { data: savedNotesData } = useGetSavedOrderNotesQuery(
+    currentBranch?.id ?? 0,
+    {
+      skip: !currentBranch?.id,
+    },
+  );
   const deferredSearchInput = useDeferredValue(searchInput);
 
   const [
@@ -265,8 +304,12 @@ export const POSWorkspacePage = () => {
   });
 
   const shiftWarning = warningsData?.data;
+  const restaurantTables = tablesData?.data ?? [];
+  const savedOrderNotes = savedNotesData?.data ?? [];
   const deliveryFeeAmount =
-    orderType === "Delivery" ? parseFloat(deliveryFee || "0") || 0 : 0;
+    orderType === "Delivery"
+      ? parseFloat(deliveryFee || "0") || 0
+      : 0;
   const checkoutTotal = total + deliveryFeeAmount;
   const paymentTotal = checkoutTotal;
   const displayWorkspaceTotal =
@@ -277,12 +320,12 @@ export const POSWorkspacePage = () => {
   }, [shiftWarning?.message]);
 
   const openPaymentWorkspace = useCallback(() => {
-    if (items.length === 0) {
+    if (paymentTotal <= 0) {
       return;
     }
 
     setActiveTab("payment");
-  }, [items.length]);
+  }, [paymentTotal]);
 
   usePOSShortcuts({
     onCheckout: openPaymentWorkspace,
@@ -305,6 +348,25 @@ export const POSWorkspacePage = () => {
     }
   }, [activeTab, selectedCustomer]);
 
+  useEffect(() => {
+    const state = location.state as POSWorkspaceLocationState | null;
+
+    if (!state?.selectedTable) return;
+
+    setOrderType("DineIn");
+    setSelectedTable(state.selectedTable);
+  }, [location.state]);
+
+  useEffect(() => {
+    if (
+      orderType === "Delivery" &&
+      selectedCustomer?.address &&
+      !deliveryAddress.trim()
+    ) {
+      setDeliveryAddress(selectedCustomer.address);
+    }
+  }, [deliveryAddress, orderType, selectedCustomer?.address]);
+
   const handleAddProductToCart = useCallback(
     (product: Product, options?: { showToast?: boolean }) => {
       const quantityInCart = items
@@ -314,25 +376,27 @@ export const POSWorkspacePage = () => {
       const availableStock = hasInventorySnapshot
         ? getProductAvailableStock(product, quantityInCart, stockByProductId)
         : Number.POSITIVE_INFINITY;
+      const requiresDirectStock =
+        product.type !== ProductType.Manufactured && product.trackInventory;
       const canAddMore = product.isBatchTracked
         ? !hasInventorySnapshot || availableStock > 0
         : allowNegativeStock ||
-          !product.trackInventory ||
+          !requiresDirectStock ||
           !hasInventorySnapshot ||
           availableStock > 0;
       const isOutOfStock =
         !allowNegativeStock &&
-        product.trackInventory &&
+        requiresDirectStock &&
         hasInventorySnapshot &&
         totalStock <= 0;
 
       if (!product.isActive) {
-        toast.error(`المنتج غير متاح الآن: ${product.name}`);
+        toast.error(`Ø§Ù„Ù…Ù†ØªØ¬ ØºÙŠØ± Ù…ØªØ§Ø­ Ø§Ù„Ø¢Ù†: ${product.name}`);
         return false;
       }
 
       if (isOutOfStock || !canAddMore) {
-        toast.error(`لا يمكن إضافة ${product.name} لعدم توفر مخزون كافٍ`);
+        toast.error(`Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø¥Ø¶Ø§ÙØ© ${product.name} Ù„Ø¹Ø¯Ù… ØªÙˆÙØ± Ù…Ø®Ø²ÙˆÙ† ÙƒØ§ÙÙ`);
         return false;
       }
 
@@ -353,7 +417,7 @@ export const POSWorkspacePage = () => {
       addItem(productForCart, 1);
 
       if (options?.showToast) {
-        toast.success(`تمت الإضافة: ${product.name}`);
+        toast.success(`ØªÙ…Øª Ø§Ù„Ø¥Ø¶Ø§ÙØ©: ${product.name}`);
       }
 
       return true;
@@ -390,7 +454,7 @@ export const POSWorkspacePage = () => {
           searchInputRef.current?.focus();
         }
       } else {
-        toast.error(`لم يتم العثور على منتج: ${trimmedValue}`);
+        toast.error(`Ù„Ù… ÙŠØªÙ… Ø§Ù„Ø¹Ø«ÙˆØ± Ø¹Ù„Ù‰ Ù…Ù†ØªØ¬: ${trimmedValue}`);
       }
     },
     [handleAddProductToCart, products],
@@ -428,7 +492,7 @@ export const POSWorkspacePage = () => {
   const handleSelectCustomer = (customer: Customer) => {
     setSelectedCustomer(customer);
     setCustomerPhone("");
-    toast.success(`تم اختيار العميل: ${customer.name || customer.phone}`);
+    toast.success(`ØªÙ… Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„Ø¹Ù…ÙŠÙ„: ${customer.name || customer.phone}`);
   };
 
   const handleClearCustomer = () => {
@@ -447,7 +511,7 @@ export const POSWorkspacePage = () => {
 
   const handleApplyDiscount = () => {
     if (!canManageDiscounts) {
-      toast.error("ليس لديك صلاحية تطبيق أو تعديل الخصومات");
+      toast.error("Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ© ØªØ·Ø¨ÙŠÙ‚ Ø£Ùˆ ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„Ø®ØµÙˆÙ…Ø§Øª");
       return;
     }
 
@@ -458,23 +522,23 @@ export const POSWorkspacePage = () => {
 
     if (discountInputType === "Percentage") {
       if (parsedValue > 100) {
-        toast.error("النسبة يجب أن تكون بين 0 و 100");
+        toast.error("Ø§Ù„Ù†Ø³Ø¨Ø© ÙŠØ¬Ø¨ Ø£Ù† ØªÙƒÙˆÙ† Ø¨ÙŠÙ† 0 Ùˆ 100");
         return;
       }
 
       applyDiscount("Percentage", parsedValue);
-      toast.success(`تم تطبيق خصم ${parsedValue}%`);
+      toast.success(`ØªÙ… ØªØ·Ø¨ÙŠÙ‚ Ø®ØµÙ… ${parsedValue}%`);
       resetDiscountEditor();
       return;
     }
 
     applyDiscount("Fixed", parsedValue);
-    toast.success(`تم تطبيق خصم ${formatCurrency(parsedValue)}`);
+    toast.success(`ØªÙ… ØªØ·Ø¨ÙŠÙ‚ Ø®ØµÙ… ${formatCurrency(parsedValue)}`);
     resetDiscountEditor();
   };
 
   const handleWorkspaceTabChange = (tab: WorkspaceTab) => {
-    if ((tab === "payment" || tab === "summary") && items.length === 0) {
+    if ((tab === "payment" || tab === "summary") && paymentTotal <= 0) {
       return;
     }
 
@@ -500,7 +564,7 @@ export const POSWorkspacePage = () => {
   };
 
   const handleOpenWorkspaceSheet = (tab: WorkspaceTab = "cart") => {
-    if ((tab === "payment" || tab === "summary") && items.length === 0) {
+    if ((tab === "payment" || tab === "summary") && paymentTotal <= 0) {
       return;
     }
 
@@ -509,15 +573,93 @@ export const POSWorkspacePage = () => {
 
   const handleOpenQuickCreate = () => {
     if (!canQuickCreateProduct) {
-      toast.error("ليس لديك صلاحية إضافة منتج سريع");
+      toast.error("Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ© Ø¥Ø¶Ø§ÙØ© Ù…Ù†ØªØ¬ Ø³Ø±ÙŠØ¹");
       return;
     }
 
     setShowQuickCreate(true);
   };
 
+  const handleOrderTypeChange = (nextOrderType: OrderType) => {
+    if (nextOrderType === "Return") return;
+
+    setOrderType(nextOrderType);
+
+    if (nextOrderType !== "DineIn") {
+      setSelectedTable(null);
+      setShowTableModal(false);
+    }
+
+    if (nextOrderType !== "Delivery") {
+      setOrderSource("POS");
+      setExternalOrderNumber("");
+    }
+  };
+
+  const appendOrderNote = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+
+    setOrderNotes((current) =>
+      current.trim() ? `${current.trim()}\n${trimmed}` : trimmed,
+    );
+  };
+
+  const resetOrderWorkspace = () => {
+    clearCart();
+    setSelectedCustomer(null);
+    setCustomerPhone("");
+    setSelectedPaymentMethod("Cash");
+    setTransactionReference("");
+    setAmountPaid("");
+    setAllowPartialPayment(false);
+    setOrderType("DineIn");
+    setDeliveryAddress("");
+    setDeliveryFee("");
+    setDeliveryNotes("");
+    setSelectedTable(null);
+    setOrderNotes("");
+    setOrderSource("POS");
+    setExternalOrderNumber("");
+  };
+
+  const validateOrderContext = () => {
+    if (orderType === "DineIn" && !selectedTable) {
+      setShowTableModal(true);
+      toast.error("Ø§Ø®ØªØ± Ø·Ø§ÙˆÙ„Ø© Ù‚Ø¨Ù„ Ø¥Ù†Ø´Ø§Ø¡ Ø·Ù„Ø¨ Ø§Ù„ØµØ§Ù„Ø©");
+      return false;
+    }
+
+    if (
+      orderType === "Delivery" &&
+      !deliveryAddress.trim()
+    ) {
+      toast.error("Ø¹Ù†ÙˆØ§Ù† Ø§Ù„ØªÙˆØµÙŠÙ„ Ù…Ø·Ù„ÙˆØ¨ Ù‚Ø¨Ù„ Ø¥Ù†Ø´Ø§Ø¡ Ø·Ù„Ø¨ Ø¯Ù„ÙŠÙØ±ÙŠ");
+      setActiveTab("summary");
+      return false;
+    }
+
+    return true;
+  };
+
+  const createOrderOptions = () => ({
+    tableId: orderType === "DineIn" ? selectedTable?.id : undefined,
+    orderSource: orderType === "Delivery" ? orderSource : "POS",
+    externalOrderNumber:
+      orderType === "Delivery" &&
+      orderSource !== "POS" &&
+      externalOrderNumber.trim()
+        ? externalOrderNumber.trim()
+        : undefined,
+    notes: orderNotes.trim() || undefined,
+  });
+
   const handleCompletePayment = async () => {
-    if (paymentTotal <= 0) {
+    if (items.length === 0) {
+      return;
+    }
+
+    if (!validateOrderContext()) {
       return;
     }
 
@@ -525,19 +667,19 @@ export const POSWorkspacePage = () => {
     const amountDue = paymentTotal - numericAmount;
 
     if (numericAmount < paymentTotal && !canSellOnCredit) {
-      toast.error("ليس لديك صلاحية البيع الآجل أو الدفع الجزئي");
+      toast.error("Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ© Ø§Ù„Ø¨ÙŠØ¹ Ø§Ù„Ø¢Ø¬Ù„ Ø£Ùˆ Ø§Ù„Ø¯ÙØ¹ Ø§Ù„Ø¬Ø²Ø¦ÙŠ");
       return;
     }
 
     if (numericAmount < paymentTotal && !allowPartialPayment) {
       setShowPaymentError(true);
       setTimeout(() => setShowPaymentError(false), 500);
-      toast.error("المبلغ المدفوع أقل من الإجمالي");
+      toast.error("Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯ÙÙˆØ¹ Ø£Ù‚Ù„ Ù…Ù† Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ");
       return;
     }
 
     if (numericAmount < paymentTotal && !selectedCustomer) {
-      toast.error("البيع الآجل يتطلب ربط عميل بالطلب");
+      toast.error("Ø§Ù„Ø¨ÙŠØ¹ Ø§Ù„Ø¢Ø¬Ù„ ÙŠØªØ·Ù„Ø¨ Ø±Ø¨Ø· Ø¹Ù…ÙŠÙ„ Ø¨Ø§Ù„Ø·Ù„Ø¨");
       return;
     }
 
@@ -546,7 +688,7 @@ export const POSWorkspacePage = () => {
       selectedCustomer &&
       !selectedCustomer.isActive
     ) {
-      toast.error("العميل غير نشط - لا يمكن البيع الآجل");
+      toast.error("Ø§Ù„Ø¹Ù…ÙŠÙ„ ØºÙŠØ± Ù†Ø´Ø· - Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ù„Ø¨ÙŠØ¹ Ø§Ù„Ø¢Ø¬Ù„");
       return;
     }
 
@@ -557,13 +699,13 @@ export const POSWorkspacePage = () => {
 
       if (numericAmount < paymentTotal && creditLimitExceeded) {
         toast.error(
-          `تجاوز حد الائتمان. المتاح بعد رصيد العميل عبر كل الفروع: ${formatCurrency(availableCredit)} ج.م، المطلوب آجلاً: ${formatCurrency(amountDue)} ج.م`,
+          `ØªØ¬Ø§ÙˆØ² Ø­Ø¯ Ø§Ù„Ø§Ø¦ØªÙ…Ø§Ù†. Ø§Ù„Ù…ØªØ§Ø­ Ø¨Ø¹Ø¯ Ø±ØµÙŠØ¯ Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø¹Ø¨Ø± ÙƒÙ„ Ø§Ù„ÙØ±ÙˆØ¹: ${formatCurrency(availableCredit)} Ø¬.Ù…ØŒ Ø§Ù„Ù…Ø·Ù„ÙˆØ¨ Ø¢Ø¬Ù„Ø§Ù‹: ${formatCurrency(amountDue)} Ø¬.Ù…`,
           { duration: 5000 },
         );
         return;
 
         toast.error(
-          `تجاوز حد الائتمان. المتاح: ${formatCurrency(availableCredit)} ج.م، المطلوب: ${formatCurrency(amountDue)} ج.م`,
+          `ØªØ¬Ø§ÙˆØ² Ø­Ø¯ Ø§Ù„Ø§Ø¦ØªÙ…Ø§Ù†. Ø§Ù„Ù…ØªØ§Ø­: ${formatCurrency(availableCredit)} Ø¬.Ù…ØŒ Ø§Ù„Ù…Ø·Ù„ÙˆØ¨: ${formatCurrency(amountDue)} Ø¬.Ù…`,
           { duration: 5000 },
         );
         return;
@@ -571,7 +713,7 @@ export const POSWorkspacePage = () => {
     }
 
     if (selectedPaymentMethod !== "Cash" && !transactionReference.trim()) {
-      toast.error("رقم المعاملة مطلوب لطرق الدفع غير النقدية");
+      toast.error("Ø±Ù‚Ù… Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø© Ù…Ø·Ù„ÙˆØ¨ Ù„Ø·Ø±Ù‚ Ø§Ù„Ø¯ÙØ¹ ØºÙŠØ± Ø§Ù„Ù†Ù‚Ø¯ÙŠØ©");
       return;
     }
 
@@ -579,17 +721,20 @@ export const POSWorkspacePage = () => {
       const wasDeliveryOrder = orderType === "Delivery";
       const order = await createOrder(
         selectedCustomer?.id,
-        orderType === "Standard" ? "DineIn" : "Delivery",
+        orderType,
         orderType === "Delivery" ? deliveryAddress || undefined : undefined,
         orderType === "Delivery" ? deliveryFeeAmount : 0,
         orderType === "Delivery" ? deliveryNotes || undefined : undefined,
+        createOrderOptions(),
       );
 
       if (!order) {
         return;
       }
 
-      const completedOrder = await completeOrder(order.id, {
+      const orderId = order.id;
+
+      const completedOrder = await completeOrder(orderId, {
         payments: [
           {
             method: (selectedWallet ? selectedWallet.type : selectedPaymentMethod) as PaymentMethod,
@@ -601,62 +746,54 @@ export const POSWorkspacePage = () => {
             walletId: selectedWallet?.id,
           },
         ],
+      }, {
+        printKitchenTicket,
       });
 
       if (!completedOrder) {
-        // ✅ فشل إكمال الطلب - نلغي المسودة تلقائيًا
-        await cancelOrder(order.id, "فشل إكمال الدفع", { silent: true });
+        // âœ… ÙØ´Ù„ Ø¥ÙƒÙ…Ø§Ù„ Ø§Ù„Ø·Ù„Ø¨ - Ù†Ù„ØºÙŠ Ø§Ù„Ù…Ø³ÙˆØ¯Ø© ØªÙ„Ù‚Ø§Ø¦ÙŠÙ‹Ø§
         return;
       }
 
       const changeAmount = completedOrder.changeAmount ?? 0;
       const completedAmountDue = completedOrder.amountDue ?? 0;
-      const amountDue = completedAmountDue;
 
-      // ✅ CRITICAL: Change tab FIRST to hide payment UI immediately
+      // âœ… CRITICAL: Change tab FIRST to hide payment UI immediately
       setActiveTab("cart");
 
-      // ✅ Then clear cart and reset state in next tick
+      // âœ… Then clear cart and reset state in next tick
       // This ensures tab change renders before cleanup
       setTimeout(() => {
-        clearCart();
-        setSelectedCustomer(null);
-        setCustomerPhone("");
-        setSelectedPaymentMethod("Cash");
-        setTransactionReference("");
-        setAmountPaid("");
-        setAllowPartialPayment(false);
-        setOrderType("Standard");
-        setDeliveryAddress("");
-        setDeliveryFee("");
-        setDeliveryNotes("");
+        resetOrderWorkspace();
 
         // Show success toasts after UI is cleared
         if (changeAmount > 0) {
           toast.success(
-            `تم إتمام الدفع! الباقي: ${formatCurrency(changeAmount)}`,
+            `ØªÙ… Ø¥ØªÙ…Ø§Ù… Ø§Ù„Ø¯ÙØ¹! Ø§Ù„Ø¨Ø§Ù‚ÙŠ: ${formatCurrency(changeAmount)}`,
           );
-        } else if (amountDue > 0) {
+        } else if (completedAmountDue > 0) {
           toast.success(
-            `تم إتمام البيع الآجل! المبلغ المستحق: ${formatCurrency(amountDue)}`,
+            `ØªÙ… Ø¥ØªÙ…Ø§Ù… Ø§Ù„Ø¨ÙŠØ¹ Ø§Ù„Ø¢Ø¬Ù„! Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø³ØªØ­Ù‚: ${formatCurrency(completedAmountDue)}`,
           );
         } else {
-          toast.success("تم إتمام الدفع بنجاح!");
+          toast.success("ØªÙ… Ø¥ØªÙ…Ø§Ù… Ø§Ù„Ø¯ÙØ¹ Ø¨Ù†Ø¬Ø§Ø­!");
         }
 
         if (wasDeliveryOrder) {
           toast.info(
-            "تم إنشاء طلب التوصيل — يمكن تعيين المندوب من شاشة إدارة التوصيل",
+            "ØªÙ… Ø¥Ù†Ø´Ø§Ø¡ Ø·Ù„Ø¨ Ø§Ù„ØªÙˆØµÙŠÙ„ â€” ÙŠÙ…ÙƒÙ† ØªØ¹ÙŠÙŠÙ† Ø§Ù„Ù…Ù†Ø¯ÙˆØ¨ Ù…Ù† Ø´Ø§Ø´Ø© Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„ØªÙˆØµÙŠÙ„",
           );
         }
       }, 0);
     } catch {
-      toast.error("حدث خطأ غير متوقع");
+      toast.error("Ø­Ø¯Ø« Ø®Ø·Ø£ ØºÙŠØ± Ù…ØªÙˆÙ‚Ø¹");
     }
   };
 
   const filteredProducts = useMemo(() => {
-    let nextProducts = products;
+    let nextProducts = products.filter(
+      (product) => product.type !== ProductType.RawMaterial,
+    );
 
     if (deferredSearchInput.trim()) {
       const searchLower = deferredSearchInput.toLowerCase().trim();
@@ -677,7 +814,9 @@ export const POSWorkspacePage = () => {
 
     if (showAvailableOnly) {
       nextProducts = nextProducts.filter((product) => {
-        if (!product.trackInventory) return true;
+        if (product.type === ProductType.Manufactured || !product.trackInventory) {
+          return true;
+        }
         if (!hasInventorySnapshot) return true;
         return getProductCurrentStock(product, stockByProductId) > 0;
       });
@@ -721,17 +860,17 @@ export const POSWorkspacePage = () => {
             <AlertCircle className="h-8 w-8 text-warning-600" />
           </div>
           <h2 className="mb-2 text-2xl font-black text-slate-900">
-            لا توجد وردية مفتوحة
+            Ù„Ø§ ØªÙˆØ¬Ø¯ ÙˆØ±Ø¯ÙŠØ© Ù…ÙØªÙˆØ­Ø©
           </h2>
           <p className="mb-6 text-sm leading-7 text-slate-600">
-            يجب فتح وردية قبل البدء في البيع. انتقل إلى صفحة الورديات لفتح وردية
-            جديدة ثم عد مباشرة إلى مساحة العمل.
+            ÙŠØ¬Ø¨ ÙØªØ­ ÙˆØ±Ø¯ÙŠØ© Ù‚Ø¨Ù„ Ø§Ù„Ø¨Ø¯Ø¡ ÙÙŠ Ø§Ù„Ø¨ÙŠØ¹. Ø§Ù†ØªÙ‚Ù„ Ø¥Ù„Ù‰ ØµÙØ­Ø© Ø§Ù„ÙˆØ±Ø¯ÙŠØ§Øª Ù„ÙØªØ­ ÙˆØ±Ø¯ÙŠØ©
+            Ø¬Ø¯ÙŠØ¯Ø© Ø«Ù… Ø¹Ø¯ Ù…Ø¨Ø§Ø´Ø±Ø© Ø¥Ù„Ù‰ Ù…Ø³Ø§Ø­Ø© Ø§Ù„Ø¹Ù…Ù„.
           </p>
           <Link
             to="/shift"
             className="inline-flex min-h-[48px] items-center justify-center rounded-2xl bg-primary-600 px-6 py-3 font-semibold text-white transition-colors hover:bg-primary-700"
           >
-            الذهاب إلى الورديات
+            Ø§Ù„Ø°Ù‡Ø§Ø¨ Ø¥Ù„Ù‰ Ø§Ù„ÙˆØ±Ø¯ÙŠØ§Øª
           </Link>
         </div>
       </div>
@@ -773,7 +912,7 @@ export const POSWorkspacePage = () => {
     icon: ReactNode;
     walletId?: number;
   }> = [
-    { id: "Cash", label: "نقدي", icon: <Banknote className="h-5 w-5" /> },
+    { id: "Cash", label: "Ù†Ù‚Ø¯ÙŠ", icon: <Banknote className="h-5 w-5" /> },
     ...wallets.map((wallet) => ({
       id: `wallet-${wallet.id}`,
       label: wallet.name,
@@ -793,13 +932,13 @@ export const POSWorkspacePage = () => {
   }> = [
     {
       id: "cart",
-      label: "السلة",
+      label: "Ø§Ù„Ø³Ù„Ø©",
       icon: ShoppingCart,
       indicator: itemsCount > 0 ? itemsCount : undefined,
     },
     {
       id: "customer",
-      label: "العميل",
+      label: "Ø§Ù„Ø¹Ù…ÙŠÙ„",
       icon: User,
       indicator: selectedCustomer ? (
         <span className="h-2 w-2 rounded-full bg-success-500" />
@@ -807,15 +946,15 @@ export const POSWorkspacePage = () => {
     },
     {
       id: "payment",
-      label: "الدفع",
+      label: "Ø§Ù„Ø¯ÙØ¹",
       icon: CreditCard,
-      disabled: items.length === 0,
+      disabled: paymentTotal <= 0,
     },
     {
       id: "summary",
-      label: "الملخص",
+      label: "Ø§Ù„Ù…Ù„Ø®Øµ",
       icon: Receipt,
-      disabled: items.length === 0,
+      disabled: paymentTotal <= 0,
     },
   ];
 
@@ -840,16 +979,18 @@ export const POSWorkspacePage = () => {
           <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-slate-100">
             <ShoppingCart className="h-10 w-10 text-slate-400" />
           </div>
-          <h3 className="text-lg font-black text-slate-900">السلة فارغة</h3>
+          <h3 className="text-lg font-black text-slate-900">
+            Ø§Ù„Ø³Ù„Ø© ÙØ§Ø±ØºØ©
+          </h3>
           <p className="mt-2 max-w-xs text-sm leading-7 text-slate-500">
-            ابحث عن منتج أو امسح الباركود ثم أضفه، وستظهر العناصر هنا مباشرة.
+            Ø§Ø¨Ø­Ø« Ø¹Ù† Ù…Ù†ØªØ¬ Ø£Ùˆ Ø§Ù…Ø³Ø­ Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯ Ø«Ù… Ø£Ø¶ÙÙ‡ØŒ ÙˆØ³ØªØ¸Ù‡Ø± Ø§Ù„Ø¹Ù†Ø§ØµØ± Ù‡Ù†Ø§ Ù…Ø¨Ø§Ø´Ø±Ø©.
           </p>
           <button
             type="button"
             onClick={() => searchInputRef.current?.focus()}
             className="mt-4 inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
           >
-            الرجوع للبحث
+            Ø§Ù„Ø±Ø¬ÙˆØ¹ Ù„Ù„Ø¨Ø­Ø«
           </button>
         </div>
       );
@@ -860,10 +1001,10 @@ export const POSWorkspacePage = () => {
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="text-lg font-black text-slate-900">
-              السلة ({itemsCount})
+              Ø§Ù„Ø³Ù„Ø© ({itemsCount})
             </h3>
             <p className="mt-1 text-sm text-slate-500">
-              راجع الكميات والإجمالي قبل الدفع.
+              Ø±Ø§Ø¬Ø¹ Ø§Ù„ÙƒÙ…ÙŠØ§Øª ÙˆØ§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ù‚Ø¨Ù„ Ø§Ù„Ø¯ÙØ¹.
             </p>
           </div>
           <button
@@ -872,7 +1013,7 @@ export const POSWorkspacePage = () => {
             className="inline-flex min-h-[40px] items-center gap-2 rounded-2xl border border-danger-200 bg-danger-50 px-3 py-2 text-sm font-semibold text-danger-600 transition-colors hover:bg-danger-100"
           >
             <Trash2 className="h-4 w-4" />
-            إفراغ
+            Ø¥ÙØ±Ø§Øº
           </button>
         </div>
 
@@ -885,18 +1026,18 @@ export const POSWorkspacePage = () => {
         {(canManageDiscounts || discountAmount > 0) && (
           <SurfaceCard>
           <div className="mb-3 flex items-center justify-between">
-            <h4 className="text-sm font-bold text-slate-900">الخصم</h4>
+            <h4 className="text-sm font-bold text-slate-900">Ø§Ù„Ø®ØµÙ…</h4>
             {canManageDiscounts && discountAmount > 0 && (
               <button
                 type="button"
                 onClick={() => {
                   removeDiscount();
-                  toast.success("تم إلغاء الخصم");
+                  toast.success("ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø§Ù„Ø®ØµÙ…");
                 }}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-danger-500 hover:text-danger-600"
               >
                 <XIcon className="h-4 w-4" />
-                إزالة
+                Ø¥Ø²Ø§Ù„Ø©
               </button>
             )}
           </div>
@@ -915,7 +1056,7 @@ export const POSWorkspacePage = () => {
                         : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50",
                     )}
                   >
-                    نسبة %
+                    Ù†Ø³Ø¨Ø© %
                   </button>
                   <button
                     type="button"
@@ -927,7 +1068,7 @@ export const POSWorkspacePage = () => {
                         : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50",
                     )}
                   >
-                    مبلغ ثابت
+                    Ù…Ø¨Ù„Øº Ø«Ø§Ø¨Øª
                   </button>
                 </div>
 
@@ -950,14 +1091,14 @@ export const POSWorkspacePage = () => {
                     onClick={handleApplyDiscount}
                     className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-2xl bg-primary-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-700"
                   >
-                    تطبيق
+                    ØªØ·Ø¨ÙŠÙ‚
                   </button>
                   <button
                     type="button"
                     onClick={resetDiscountEditor}
                     className="inline-flex min-h-[44px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                   >
-                    إلغاء
+                    Ø¥Ù„ØºØ§Ø¡
                   </button>
                 </div>
               </div>
@@ -968,7 +1109,7 @@ export const POSWorkspacePage = () => {
                 className="flex min-h-[52px] w-full items-center justify-center gap-2 rounded-[1.35rem] border border-dashed border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-600 transition-colors hover:border-primary-400 hover:bg-primary-50 hover:text-primary-700"
               >
                 <Tag className="h-4 w-4" />
-                إضافة خصم على الطلب
+                Ø¥Ø¶Ø§ÙØ© Ø®ØµÙ… Ø¹Ù„Ù‰ Ø§Ù„Ø·Ù„Ø¨
               </button>
             )
           ) : (
@@ -978,10 +1119,10 @@ export const POSWorkspacePage = () => {
                   <p className="text-sm font-bold text-success-700">
                     {discountType === "Percentage"
                       ? `خصم ${discountValue}%`
-                      : "خصم ثابت"}
+                      : "Ø®ØµÙ… Ø«Ø§Ø¨Øª"}
                   </p>
                   <p className="mt-1 text-xs text-success-600">
-                    مطبق على إجمالي الطلب الحالي
+                    Ù…Ø·Ø¨Ù‚ Ø¹Ù„Ù‰ Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø·Ù„Ø¨ Ø§Ù„Ø­Ø§Ù„ÙŠ
                   </p>
                 </div>
                 <span className="text-lg font-black text-success-600">
@@ -996,7 +1137,7 @@ export const POSWorkspacePage = () => {
         <SurfaceCard className="space-y-3">
           {discountAmount > 0 && (
             <SummaryLine
-              label="خصم الطلب"
+              label="Ø®ØµÙ… Ø§Ù„Ø·Ù„Ø¨"
               value={`- ${formatCurrency(discountAmount)}`}
               valueClassName="text-success-600"
               icon={<Tag className="h-4 w-4 text-success-500" />}
@@ -1004,90 +1145,157 @@ export const POSWorkspacePage = () => {
           )}
           {isTaxEnabled && (
             <SummaryLine
-              label={`الضريبة (${taxRate}%)`}
+              label={`Ø§Ù„Ø¶Ø±ÙŠØ¨Ø© (${taxRate}%)`}
               value={formatCurrency(taxAmount)}
             />
           )}
           {serviceChargeAmount > 0 && (
             <SummaryLine
-              label={`رسوم الخدمة (${serviceChargeRate}%)`}
+              label={`Ø±Ø³ÙˆÙ… Ø§Ù„Ø®Ø¯Ù…Ø© (${serviceChargeRate}%)`}
               value={formatCurrency(serviceChargeAmount)}
             />
           )}
           {orderType === "Delivery" && (
             <SummaryLine
-              label="رسوم التوصيل"
+              label="Ø±Ø³ÙˆÙ… Ø§Ù„ØªÙˆØµÙŠÙ„"
               value={formatCurrency(deliveryFeeAmount)}
               icon={<Store className="h-4 w-4 text-primary-500" />}
             />
           )}
           <div className="border-t border-slate-200 pt-3">
             <SummaryLine
-              label="الإجمالي الحالي"
+              label="Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø­Ø§Ù„ÙŠ"
               value={formatCurrency(checkoutTotal)}
               valueClassName="text-primary-600 text-base font-black"
               icon={<Wallet className="h-4 w-4 text-primary-500" />}
             />
             <p className="mt-2 text-xs text-slate-400">
-              * الإجمالي تقديري، ويتم تأكيده نهائيًا عند إنشاء الطلب.
+              * Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ ØªÙ‚Ø¯ÙŠØ±ÙŠØŒ ÙˆÙŠØªÙ… ØªØ£ÙƒÙŠØ¯Ù‡ Ù†Ù‡Ø§Ø¦ÙŠÙ‹Ø§ Ø¹Ù†Ø¯ Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„Ø·Ù„Ø¨.
             </p>
           </div>
         </SurfaceCard>
 
         {/* Order Type Selector */}
         <SurfaceCard className="space-y-3">
-          <h4 className="text-sm font-bold text-slate-900">نوع الطلب</h4>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="text-sm font-bold text-slate-900">Ù†ÙˆØ¹ Ø§Ù„Ø·Ù„Ø¨</h4>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
             {[
-              { id: "DineIn", label: "صالة" },
-              { id: "Takeaway", label: "تيك أواي" },
-              { id: "Delivery", label: "توصيل" },
-            ]
-              .filter((t) => t.id !== "Takeaway")
-              .map((t) => (
+              { id: "DineIn" as const, label: "ØµØ§Ù„Ø©" },
+              { id: "Takeaway" as const, label: "ØªÙŠÙƒ Ø£ÙˆØ§ÙŠ" },
+              { id: "Delivery" as const, label: "Ø¯Ù„ÙŠÙØ±ÙŠ" },
+            ].map((t) => (
               <button
                 key={t.id}
                 type="button"
-                onClick={() =>
-                  setOrderType(t.id === "Delivery" ? "Delivery" : "Standard")
-                }
+                onClick={() => handleOrderTypeChange(t.id)}
                 className={clsx(
                   "min-h-[44px] rounded-2xl px-3 py-2 text-sm font-semibold transition-all",
-                  orderType ===
-                    (t.id === "Delivery" ? "Delivery" : "Standard")
+                  orderType === t.id
                     ? "bg-primary-600 text-white shadow-sm"
                     : "bg-white text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50",
                 )}
               >
-                {t.id === "Delivery" ? "توصيل" : "طلب عادي"}
+                {t.label}
               </button>
             ))}
           </div>
+
+          {orderType === "DineIn" && (
+            <button
+              type="button"
+              onClick={() => setShowTableModal(true)}
+              className={clsx(
+                "flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-start transition",
+                selectedTable
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                  : "border-dashed border-primary-200 bg-primary-50 text-primary-800",
+              )}
+            >
+              <span className="flex items-center gap-2 text-sm font-bold">
+                <Armchair className="h-4 w-4" />
+                {selectedTable
+                  ? `طاولة ${selectedTable.number}`
+                  : "Ø§Ø®ØªØ± Ø·Ø§ÙˆÙ„Ø© Ù„Ù„Ø·Ù„Ø¨"}
+              </span>
+              <span className="text-xs font-semibold">ØªØºÙŠÙŠØ±</span>
+            </button>
+          )}
+
           {orderType === "Delivery" && (
             <div className="space-y-3">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <select
+                  value={orderSource}
+                  onChange={(event) =>
+                    setOrderSource(event.target.value as OrderSource)
+                  }
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                >
+                  <option value="POS">POS</option>
+                  <option value="Talabat">Ø·Ù„Ø¨Ø§Øª</option>
+                  <option value="Marsool">Ù…Ø±Ø³ÙˆÙ„</option>
+                  <option value="Jahez">Ø¬Ø§Ù‡Ø²</option>
+                  <option value="Other">Ø£Ø®Ø±Ù‰</option>
+                </select>
+                <input
+                  type="text"
+                  value={externalOrderNumber}
+                  onChange={(e) => setExternalOrderNumber(e.target.value)}
+                  placeholder="Ø±Ù‚Ù… Ø§Ù„Ø·Ù„Ø¨ Ø§Ù„Ø®Ø§Ø±Ø¬ÙŠ (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)"
+                  disabled={orderSource === "POS"}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-slate-50"
+                />
+              </div>
               <input
                 type="text"
                 value={deliveryAddress}
                 onChange={(e) => setDeliveryAddress(e.target.value)}
-                placeholder="عنوان التوصيل"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                placeholder="Ø¹Ù†ÙˆØ§Ù† Ø§Ù„Ø¯Ù„ÙŠÙØ±ÙŠ"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-slate-50"
               />
               <input
                 type="number"
+                min="0"
                 value={deliveryFee}
                 onChange={(e) => setDeliveryFee(e.target.value)}
-                placeholder="رسوم التوصيل"
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                placeholder="Ø±Ø³ÙˆÙ… Ø§Ù„Ø¯Ù„ÙŠÙØ±ÙŠ"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-slate-50"
               />
               <textarea
-                placeholder="ملاحظات التوصيل (اختياري)"
+                placeholder="Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø§Ù„Ø¯Ù„ÙŠÙØ±ÙŠ (Ø§Ø®ØªÙŠØ§Ø±ÙŠ)"
                 value={deliveryNotes}
                 onChange={(e) => setDeliveryNotes(e.target.value)}
                 rows={2}
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100 disabled:bg-slate-50"
               />
             </div>
           )}
+
+          <div className="space-y-2 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-sm font-bold text-slate-700">
+                <MessageSquare className="h-4 w-4 text-amber-500" />
+                Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø§Ù„Ø·Ù„Ø¨
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowSavedNotesModal(true)}
+                className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-primary-700 ring-1 ring-primary-100 transition hover:bg-primary-50"
+              >
+                Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø³Ø±ÙŠØ¹Ø©
+              </button>
+            </div>
+            <textarea
+              value={orderNotes}
+              onChange={(event) => setOrderNotes(event.target.value)}
+              rows={2}
+              placeholder="Ù…Ø«Ø§Ù„: Ø¨Ø¯ÙˆÙ† Ø¨ØµÙ„ØŒ Ø­Ø§Ø±ØŒ Ø¨Ø¯ÙˆÙ† Ù…Ù„Ø­"
+              className="w-full resize-none rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
+            />
+          </div>
         </SurfaceCard>
       </div>
     );
@@ -1099,10 +1307,10 @@ export const POSWorkspacePage = () => {
         <div className="space-y-4">
           <div>
             <h3 className="text-lg font-black text-slate-900">
-              العميل المرتبط
+              Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø§Ù„Ù…Ø±ØªØ¨Ø·
             </h3>
             <p className="mt-1 text-sm text-slate-500">
-              البيانات هنا تؤثر على البيع الآجل والائتمان.
+              Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ù‡Ù†Ø§ ØªØ¤Ø«Ø± Ø¹Ù„Ù‰ Ø§Ù„Ø¨ÙŠØ¹ Ø§Ù„Ø¢Ø¬Ù„ ÙˆØ§Ù„Ø§Ø¦ØªÙ…Ø§Ù†.
             </p>
           </div>
 
@@ -1114,7 +1322,7 @@ export const POSWorkspacePage = () => {
                 </div>
                 <div>
                   <p className="text-lg font-black text-slate-900">
-                    {selectedCustomer.name || "عميل"}
+                    {selectedCustomer.name || "Ø¹Ù…ÙŠÙ„"}
                   </p>
                   <p className="mt-1 flex items-center gap-1 text-sm text-slate-600">
                     <Phone className="h-3.5 w-3.5" />
@@ -1127,7 +1335,7 @@ export const POSWorkspacePage = () => {
                 type="button"
                 onClick={handleClearCustomer}
                 className="inline-flex h-10 w-10 items-center justify-center rounded-2xl text-slate-400 transition-colors hover:bg-danger-50 hover:text-danger-500"
-                aria-label="إزالة العميل"
+                aria-label="Ø¥Ø²Ø§Ù„Ø© Ø§Ù„Ø¹Ù…ÙŠÙ„"
               >
                 <XIcon className="h-5 w-5" />
               </button>
@@ -1137,7 +1345,7 @@ export const POSWorkspacePage = () => {
               {(selectedCustomer.loyaltyPoints ?? 0) > 0 && (
                 <SurfaceCard className="border-amber-200 bg-amber-50 p-3">
                   <SummaryLine
-                    label="نقاط الولاء"
+                    label="Ù†Ù‚Ø§Ø· Ø§Ù„ÙˆÙ„Ø§Ø¡"
                     value={selectedCustomer.loyaltyPoints.toString()}
                     valueClassName="text-amber-600"
                     icon={
@@ -1150,7 +1358,7 @@ export const POSWorkspacePage = () => {
               {selectedCustomer.totalDue > 0 && (
                 <SurfaceCard className="border-orange-200 bg-orange-50 p-3">
                   <SummaryLine
-                    label="رصيد مستحق"
+                    label="Ø±ØµÙŠØ¯ Ù…Ø³ØªØ­Ù‚"
                     value={formatCurrency(selectedCustomer.totalDue)}
                     valueClassName="text-orange-600"
                     icon={<AlertCircle className="h-4 w-4 text-orange-500" />}
@@ -1161,7 +1369,7 @@ export const POSWorkspacePage = () => {
               {selectedCustomer.creditLimit > 0 && (
                 <SurfaceCard className="border-blue-200 bg-blue-50 p-3">
                   <SummaryLine
-                    label="حد الائتمان"
+                    label="Ø­Ø¯ Ø§Ù„Ø§Ø¦ØªÙ…Ø§Ù†"
                     value={formatCurrency(selectedCustomer.creditLimit)}
                     valueClassName="text-blue-600"
                     icon={<Wallet className="h-4 w-4 text-blue-500" />}
@@ -1172,7 +1380,7 @@ export const POSWorkspacePage = () => {
               {!selectedCustomer.isActive && (
                 <SurfaceCard className="border-danger-200 bg-danger-50 p-3">
                   <p className="text-sm font-semibold text-danger-600">
-                    هذا العميل غير نشط ولا يمكن استخدامه في البيع الآجل.
+                    Ù‡Ø°Ø§ Ø§Ù„Ø¹Ù…ÙŠÙ„ ØºÙŠØ± Ù†Ø´Ø· ÙˆÙ„Ø§ ÙŠÙ…ÙƒÙ† Ø§Ø³ØªØ®Ø¯Ø§Ù…Ù‡ ÙÙŠ Ø§Ù„Ø¨ÙŠØ¹ Ø§Ù„Ø¢Ø¬Ù„.
                   </p>
                 </SurfaceCard>
               )}
@@ -1185,9 +1393,9 @@ export const POSWorkspacePage = () => {
     return (
       <div className="space-y-4">
         <div>
-          <h3 className="text-lg font-black text-slate-900">ربط عميل</h3>
+          <h3 className="text-lg font-black text-slate-900">Ø±Ø¨Ø· Ø¹Ù…ÙŠÙ„</h3>
           <p className="mt-1 text-sm text-slate-500">
-            ابحث برقم الهاتف أو اتركه للبيع النقدي.
+            Ø§Ø¨Ø­Ø« Ø¨Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ Ø£Ùˆ Ø§ØªØ±ÙƒÙ‡ Ù„Ù„Ø¨ÙŠØ¹ Ø§Ù„Ù†Ù‚Ø¯ÙŠ.
           </p>
         </div>
 
@@ -1199,7 +1407,7 @@ export const POSWorkspacePage = () => {
             onChange={(event) =>
               setCustomerPhone(event.target.value.replace(/[^0-9]/g, ""))
             }
-            placeholder="ابحث برقم الهاتف..."
+            placeholder="Ø§Ø¨Ø­Ø« Ø¨Ø±Ù‚Ù… Ø§Ù„Ù‡Ø§ØªÙ..."
             className="w-full rounded-[1.4rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-100"
             dir="ltr"
           />
@@ -1224,14 +1432,14 @@ export const POSWorkspacePage = () => {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="truncate font-bold text-slate-900">
-                    {searchResult.data.name || "عميل"}
+                    {searchResult.data.name || "Ø¹Ù…ÙŠÙ„"}
                   </p>
                   <p className="mt-1 text-sm text-slate-600">
                     {searchResult.data.phone}
                   </p>
                 </div>
                 <span className="text-xs font-semibold text-success-600">
-                  اضغط للاختيار
+                  Ø§Ø¶ØºØ· Ù„Ù„Ø§Ø®ØªÙŠØ§Ø±
                 </span>
               </div>
             </button>
@@ -1241,23 +1449,23 @@ export const POSWorkspacePage = () => {
           !isSearchingCustomer &&
           !searchResult?.data && (
             <SurfaceCard className="space-y-3">
-              <p className="text-sm text-slate-500">لم يتم العثور على عميل</p>
+              <p className="text-sm text-slate-500">Ù„Ù… ÙŠØªÙ… Ø§Ù„Ø¹Ø«ÙˆØ± Ø¹Ù„Ù‰ Ø¹Ù…ÙŠÙ„</p>
               <button
                 type="button"
                 onClick={() => setShowCustomerCreateModal(true)}
                 className="inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-2xl bg-primary-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-primary-700"
               >
                 <Plus className="h-4 w-4" />
-                إضافة عميل جديد
+                Ø¥Ø¶Ø§ÙØ© Ø¹Ù…ÙŠÙ„ Ø¬Ø¯ÙŠØ¯
               </button>
             </SurfaceCard>
           )}
 
         <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-white px-4 py-8 text-center">
           <User className="mx-auto mb-3 h-12 w-12 text-slate-300" />
-          <p className="text-sm font-semibold text-slate-700">عميل نقدي</p>
+          <p className="text-sm font-semibold text-slate-700">Ø¹Ù…ÙŠÙ„ Ù†Ù‚Ø¯ÙŠ</p>
           <p className="mt-1 text-sm leading-7 text-slate-500">
-            إذا لم يتم اختيار عميل، فسيتم إنشاء الطلب كبيع نقدي بدون حساب آجل.
+            Ø¥Ø°Ø§ Ù„Ù… ÙŠØªÙ… Ø§Ø®ØªÙŠØ§Ø± Ø¹Ù…ÙŠÙ„ØŒ ÙØ³ÙŠØªÙ… Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„Ø·Ù„Ø¨ ÙƒØ¨ÙŠØ¹ Ù†Ù‚Ø¯ÙŠ Ø¨Ø¯ÙˆÙ† Ø­Ø³Ø§Ø¨ Ø¢Ø¬Ù„.
           </p>
         </div>
       </div>
@@ -1267,9 +1475,9 @@ export const POSWorkspacePage = () => {
     return (
       <div className="space-y-4">
         <div>
-          <h3 className="text-lg font-black text-slate-900">الدفع</h3>
+          <h3 className="text-lg font-black text-slate-900">Ø§Ù„Ø¯ÙØ¹</h3>
           <p className="mt-1 text-sm text-slate-500">
-            اختر الطريقة، أدخل المبلغ، ثم أنهِ الفاتورة من الزر السفلي.
+            Ø§Ø®ØªØ± Ø§Ù„Ø·Ø±ÙŠÙ‚Ø©ØŒ Ø£Ø¯Ø®Ù„ Ø§Ù„Ù…Ø¨Ù„ØºØŒ Ø«Ù… Ø£Ù†Ù‡Ù Ø§Ù„ÙØ§ØªÙˆØ±Ø© Ù…Ù† Ø§Ù„Ø²Ø± Ø§Ù„Ø³ÙÙ„ÙŠ.
           </p>
         </div>
 
@@ -1277,7 +1485,7 @@ export const POSWorkspacePage = () => {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                المبلغ المطلوب
+                Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø·Ù„ÙˆØ¨
               </p>
               <p className="mt-1 text-2xl font-black text-primary-700">
                 {formatCurrency(paymentTotal)}
@@ -1289,27 +1497,27 @@ export const POSWorkspacePage = () => {
               onClick={() => setAmountPaid(paymentTotal.toFixed(2))}
               className="inline-flex min-h-[38px] items-center justify-center rounded-full bg-primary-50 px-3 py-2 text-xs font-semibold text-primary-700 transition-colors hover:bg-primary-100"
             >
-              دفع كامل
+              Ø¯ÙØ¹ ÙƒØ§Ù…Ù„
             </button>
           </div>
 
           {orderType === "Delivery" && (
             <div className="rounded-[1.15rem] border border-primary-100 bg-primary-50 px-3 py-3 text-sm">
               <div className="flex items-center justify-between gap-3 text-primary-800">
-                <span className="font-semibold">رسوم التوصيل</span>
+                <span className="font-semibold">Ø±Ø³ÙˆÙ… Ø§Ù„ØªÙˆØµÙŠÙ„</span>
                 <span className="font-black">
                   {formatCurrency(deliveryFeeAmount)}
                 </span>
               </div>
               <div className="mt-2 flex items-start justify-between gap-3 border-t border-primary-100 pt-2 text-primary-800">
-                <span className="shrink-0 font-semibold">العنوان</span>
+                <span className="shrink-0 font-semibold">Ø§Ù„Ø¹Ù†ÙˆØ§Ù†</span>
                 <span className="text-end font-medium">
-                  {deliveryAddress || "لم يتم إدخال عنوان"}
+                  {deliveryAddress || "Ù„Ù… ÙŠØªÙ… Ø¥Ø¯Ø®Ø§Ù„ Ø¹Ù†ÙˆØ§Ù†"}
                 </span>
               </div>
               {deliveryNotes && (
                 <div className="mt-2 flex items-start justify-between gap-3 border-t border-primary-100 pt-2 text-primary-800">
-                  <span className="shrink-0 font-semibold">ملاحظات</span>
+                  <span className="shrink-0 font-semibold">Ù…Ù„Ø§Ø­Ø¸Ø§Øª</span>
                   <span className="text-end font-medium">{deliveryNotes}</span>
                 </div>
               )}
@@ -1343,7 +1551,7 @@ export const POSWorkspacePage = () => {
           {requiresTransactionReference && (
             <div className="space-y-2">
               <label className="block text-sm font-bold text-slate-900">
-                رقم المعاملة <span className="text-danger-500">*</span>
+                Ø±Ù‚Ù… Ø§Ù„Ù…Ø¹Ø§Ù…Ù„Ø© <span className="text-danger-500">*</span>
               </label>
               <input
                 type="text"
@@ -1352,14 +1560,14 @@ export const POSWorkspacePage = () => {
                   setTransactionReference(event.target.value)
                 }
                 className="w-full rounded-[1.35rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
-                placeholder="اكتب رقم العملية من محفظة أو حساب بنكي"
+                placeholder="Ø§ÙƒØªØ¨ Ø±Ù‚Ù… Ø§Ù„Ø¹Ù…Ù„ÙŠØ© Ù…Ù† Ù…Ø­ÙØ¸Ø© Ø£Ùˆ Ø­Ø³Ø§Ø¨ Ø¨Ù†ÙƒÙŠ"
               />
             </div>
           )}
 
           <div className="space-y-3">
             <label className="block text-sm font-bold text-slate-900">
-              المبلغ المدفوع
+              Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯ÙÙˆØ¹
             </label>
             <input
               type="number"
@@ -1393,7 +1601,7 @@ export const POSWorkspacePage = () => {
                 onClick={() => setAmountPaid("")}
                 className="inline-flex min-h-[40px] shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-500 transition-colors hover:bg-slate-50"
               >
-                مسح
+                Ù…Ø³Ø­
               </button>
             </div>
           </div>
@@ -1402,7 +1610,7 @@ export const POSWorkspacePage = () => {
         {change > 0 && (
           <SurfaceCard className="border-success-200 bg-success-50">
             <SummaryLine
-              label="الباقي"
+              label="Ø§Ù„Ø¨Ø§Ù‚ÙŠ"
               value={formatCurrency(change)}
               valueClassName="text-success-600 text-base font-black"
               icon={<Banknote className="h-4 w-4 text-success-500" />}
@@ -1419,7 +1627,7 @@ export const POSWorkspacePage = () => {
             )}
           >
             <SummaryLine
-              label="المبلغ المستحق"
+              label="Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø³ØªØ­Ù‚"
               value={formatCurrency(amountDue)}
               valueClassName={clsx(
                 "text-base font-black",
@@ -1429,12 +1637,12 @@ export const POSWorkspacePage = () => {
             />
             {creditLimitExceeded && (
               <p className="mt-2 text-xs font-semibold text-danger-600">
-                تجاوز حد الائتمان. المتاح: {formatCurrency(availableCredit)}
+                ØªØ¬Ø§ÙˆØ² Ø­Ø¯ Ø§Ù„Ø§Ø¦ØªÙ…Ø§Ù†. Ø§Ù„Ù…ØªØ§Ø­: {formatCurrency(availableCredit)}
               </p>
             )}
             {selectedCustomer && !selectedCustomer.isActive && (
               <p className="mt-2 text-xs font-semibold text-danger-600">
-                العميل غير نشط
+                Ø§Ù„Ø¹Ù…ÙŠÙ„ ØºÙŠØ± Ù†Ø´Ø·
               </p>
             )}
           </SurfaceCard>
@@ -1461,15 +1669,32 @@ export const POSWorkspacePage = () => {
               />
               <label htmlFor="partialPayment" className="flex-1 cursor-pointer">
                 <p className="text-sm font-bold text-slate-900">
-                  السماح بالدفع الجزئي
+                  Ø§Ù„Ø³Ù…Ø§Ø­ Ø¨Ø§Ù„Ø¯ÙØ¹ Ø§Ù„Ø¬Ø²Ø¦ÙŠ
                 </p>
                 <p className="mt-1 text-xs leading-6 text-slate-600">
-                  يخصم المدفوع الآن ويُسجل الباقي على العميل ضمن الائتمان
-                  المتاح.
+                  ÙŠØ®ØµÙ… Ø§Ù„Ù…Ø¯ÙÙˆØ¹ Ø§Ù„Ø¢Ù† ÙˆÙŠÙØ³Ø¬Ù„ Ø§Ù„Ø¨Ø§Ù‚ÙŠ Ø¹Ù„Ù‰ Ø§Ù„Ø¹Ù…ÙŠÙ„ Ø¶Ù…Ù† Ø§Ù„Ø§Ø¦ØªÙ…Ø§Ù†
+                  Ø§Ù„Ù…ØªØ§Ø­.
                 </p>
               </label>
             </div>
           )}
+
+        <label className="flex items-start gap-3 rounded-[1.35rem] border border-amber-200 bg-amber-50 p-4">
+          <input
+            type="checkbox"
+            checked={printKitchenTicket}
+            onChange={(event) => setPrintKitchenTicket(event.target.checked)}
+            className="mt-1 h-5 w-5 rounded text-amber-600 focus:ring-2 focus:ring-amber-500"
+          />
+          <span className="flex-1">
+            <span className="block text-sm font-bold text-slate-900">
+              طباعة فاتورة المطبخ مع فاتورة البيع
+            </span>
+            <span className="mt-1 block text-xs leading-6 text-slate-600">
+              سيتم طباعة أمر مطبخ بدون أسعار ثم فاتورة العميل كفاتورتين منفصلتين.
+            </span>
+          </span>
+        </label>
       </div>
     );
   };
@@ -1479,16 +1704,16 @@ export const POSWorkspacePage = () => {
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-            ملخص الفاتورة
+            Ù…Ù„Ø®Øµ Ø§Ù„ÙØ§ØªÙˆØ±Ø©
           </p>
           <p className="mt-1 text-base font-black text-slate-900">
-            {itemsCount} عنصر
+            {itemsCount} Ø¹Ù†ØµØ±
           </p>
         </div>
 
         <div className="text-end">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-            الإجمالي
+            Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ
           </p>
           <p className="mt-1 text-lg font-black text-primary-700">
             {formatCurrency(displayWorkspaceTotal)}
@@ -1507,18 +1732,43 @@ export const POSWorkspacePage = () => {
         ) : (
           <div className="flex items-center gap-2">
             <User className="h-4 w-4 text-slate-400" />
-            <span>عميل نقدي</span>
+            <span>Ø¹Ù…ÙŠÙ„ Ù†Ù‚Ø¯ÙŠ</span>
           </div>
         )}
       </div>
 
-      <SummaryLine label="المجموع الفرعي" value={formatCurrency(subtotal)} />
+      {orderType === "DineIn" && (
+        <div className="rounded-[1.15rem] bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800">
+          <div className="flex items-center justify-between gap-3">
+            <span className="flex items-center gap-2 font-semibold">
+              <Armchair className="h-4 w-4" />
+              Ø§Ù„ØµØ§Ù„Ø©
+            </span>
+            <span className="font-black">
+              {selectedTable ? `طاولة ${selectedTable.number}` : "لم يتم اختيار طاولة"}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {orderType !== "Delivery" && (
+        <div className="rounded-[1.15rem] bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
+          <div className="flex items-center justify-between gap-3">
+            <span className="font-semibold">Ù†ÙˆØ¹ Ø§Ù„Ø·Ù„Ø¨</span>
+            <span className="font-black">
+              {orderType === "Takeaway" ? "تيك أواي" : "صالة"}
+            </span>
+          </div>
+        </div>
+      )}
+
+      <SummaryLine label="Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ Ø§Ù„ÙØ±Ø¹ÙŠ" value={formatCurrency(subtotal)} />
       {discountAmount > 0 && (
         <SummaryLine
           label={
             discountType === "Percentage" && discountValue
               ? `الخصم (${discountValue}%)`
-              : "الخصم"
+              : "Ø§Ù„Ø®ØµÙ…"
           }
           value={`- ${formatCurrency(discountAmount)}`}
           valueClassName="text-success-600"
@@ -1527,54 +1777,73 @@ export const POSWorkspacePage = () => {
       )}
       {isTaxEnabled && (
         <SummaryLine
-          label={`الضريبة (${taxRate}%)`}
+          label={`Ø§Ù„Ø¶Ø±ÙŠØ¨Ø© (${taxRate}%)`}
           value={formatCurrency(taxAmount)}
         />
       )}
       {serviceChargeAmount > 0 && (
         <SummaryLine
-          label={`رسوم الخدمة (${serviceChargeRate}%)`}
+          label={`Ø±Ø³ÙˆÙ… Ø§Ù„Ø®Ø¯Ù…Ø© (${serviceChargeRate}%)`}
           value={formatCurrency(serviceChargeAmount)}
         />
       )}
       {orderType === "Delivery" && (
         <>
           <SummaryLine
-            label="رسوم التوصيل"
+            label="Ø±Ø³ÙˆÙ… Ø§Ù„ØªÙˆØµÙŠÙ„"
             value={formatCurrency(deliveryFeeAmount)}
             icon={<Store className="h-4 w-4 text-primary-500" />}
           />
           <div className="rounded-[1.15rem] bg-primary-50 px-3 py-2.5 text-sm text-primary-800">
             <div className="flex items-start justify-between gap-3">
-              <span className="shrink-0 font-semibold">عنوان التوصيل</span>
+              <span className="shrink-0 font-semibold">Ø¹Ù†ÙˆØ§Ù† Ø§Ù„ØªÙˆØµÙŠÙ„</span>
               <span className="text-end font-medium">
-                {deliveryAddress || "لم يتم إدخال عنوان"}
+                {deliveryAddress || "Ù„Ù… ÙŠØªÙ… Ø¥Ø¯Ø®Ø§Ù„ Ø¹Ù†ÙˆØ§Ù†"}
               </span>
             </div>
             {deliveryNotes && (
               <div className="mt-2 flex items-start justify-between gap-3 border-t border-primary-100 pt-2">
-                <span className="shrink-0 font-semibold">ملاحظات</span>
+                <span className="shrink-0 font-semibold">Ù…Ù„Ø§Ø­Ø¸Ø§Øª</span>
                 <span className="text-end font-medium">{deliveryNotes}</span>
               </div>
             )}
+            <div className="mt-2 flex items-start justify-between gap-3 border-t border-primary-100 pt-2">
+              <span className="shrink-0 font-semibold">Ù…ØµØ¯Ø± Ø§Ù„Ø·Ù„Ø¨</span>
+              <span className="text-end font-medium">
+                {orderSource}
+                {externalOrderNumber.trim()
+                  ? ` - ${externalOrderNumber.trim()}`
+                  : ""}
+              </span>
+            </div>
           </div>
         </>
       )}
+      {orderNotes.trim() && (
+        <div className="rounded-[1.15rem] bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+          <div className="flex items-start justify-between gap-3">
+            <span className="shrink-0 font-semibold">Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø§Ù„Ø·Ù„Ø¨</span>
+            <span className="whitespace-pre-line text-end font-medium">
+              {orderNotes.trim()}
+            </span>
+          </div>
+        </div>
+      )}
       <SummaryLine
-        label="طريقة الدفع"
+        label="Ø·Ø±ÙŠÙ‚Ø© Ø§Ù„Ø¯ÙØ¹"
         value={selectedPaymentMethodLabel}
         icon={<CreditCard className="h-4 w-4 text-primary-500" />}
       />
 
       <div className="border-t border-slate-200 pt-3">
         <SummaryLine
-          label="الصافي النهائي"
+          label="Ø§Ù„ØµØ§ÙÙŠ Ø§Ù„Ù†Ù‡Ø§Ø¦ÙŠ"
           value={formatCurrency(checkoutTotal)}
           valueClassName="text-primary-600 text-base font-black"
           icon={<Wallet className="h-4 w-4 text-primary-500" />}
         />
         <p className="mt-2 text-xs text-slate-400">
-          * الإجمالي تقديري، ويتم تأكيده نهائيًا عند إنشاء الطلب.
+          * Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ ØªÙ‚Ø¯ÙŠØ±ÙŠØŒ ÙˆÙŠØªÙ… ØªØ£ÙƒÙŠØ¯Ù‡ Ù†Ù‡Ø§Ø¦ÙŠÙ‹Ø§ Ø¹Ù†Ø¯ Ø¥Ù†Ø´Ø§Ø¡ Ø§Ù„Ø·Ù„Ø¨.
         </p>
       </div>
     </SurfaceCard>
@@ -1604,25 +1873,25 @@ export const POSWorkspacePage = () => {
       <div className="mb-3 flex items-center justify-between gap-3 rounded-[1.25rem] bg-gray-50 px-4 py-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-            الإجمالي
+            Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ
           </p>
           <p className="mt-1 text-lg font-black text-primary-700">
             {formatCurrency(displayWorkspaceTotal)}
           </p>
         </div>
         <div className="text-end text-xs text-slate-500">
-          <p>{itemsCount} عنصر</p>
+          <p>{itemsCount} Ø¹Ù†ØµØ±</p>
           {selectedCustomer ? (
             <p className="mt-1 truncate font-semibold text-slate-700">
               {selectedCustomer.name || selectedCustomer.phone}
             </p>
           ) : (
-            <p className="mt-1 font-semibold text-slate-700">عميل نقدي</p>
+            <p className="mt-1 font-semibold text-slate-700">Ø¹Ù…ÙŠÙ„ Ù†Ù‚Ø¯ÙŠ</p>
           )}
         </div>
       </div>
 
-      {activeTab === "payment" && items.length > 0 ? (
+      {activeTab === "payment" && paymentTotal > 0 ? (
         <Button
           variant="success"
           size="xl"
@@ -1642,22 +1911,24 @@ export const POSWorkspacePage = () => {
           {isCreating
               ? "جاري إنشاء الطلب..."
               : isCompleting
-                ? "جاري الدفع..."
+                ? "Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø¯ÙØ¹..."
                 : numericAmount < paymentTotal && allowPartialPayment
                   ? `إتمام البيع الآجل (مستحق: ${formatCurrency(amountDue)})`
-                  : "إتمام الدفع"}
+                  : "Ø¥ØªÙ…Ø§Ù… Ø§Ù„Ø¯ÙØ¹"}
         </Button>
       ) : (
-        <Button
-          variant="success"
-          size="xl"
-          className="w-full rounded-[1.5rem]"
-          onClick={openPaymentWorkspace}
-          disabled={items.length === 0}
-          rightIcon={<CreditCard className="h-5 w-5" />}
-        >
-          الدفع {formatCurrency(checkoutTotal)}
-        </Button>
+        <div className="grid gap-2">
+          <Button
+            variant="success"
+            size="xl"
+            className="rounded-[1.5rem]"
+            onClick={openPaymentWorkspace}
+            disabled={paymentTotal <= 0}
+            rightIcon={<CreditCard className="h-5 w-5" />}
+          >
+            Ø§Ù„Ø¯ÙØ¹ {formatCurrency(checkoutTotal)}
+          </Button>
+        </div>
       )}
     </div>
   );
@@ -1673,11 +1944,11 @@ export const POSWorkspacePage = () => {
               <div>
                 <p className="text-sm font-bold text-slate-900">
                   {selectedCategoryName
-                    ? `فئة ${selectedCategoryName}`
-                    : "الكتالوج"}
+                    ? `ÙØ¦Ø© ${selectedCategoryName}`
+                    : "Ø§Ù„ÙƒØªØ§Ù„ÙˆØ¬"}
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  {filteredProducts.length} منتج متاح للعرض
+                  {filteredProducts.length} Ù…Ù†ØªØ¬ Ù…ØªØ§Ø­ Ù„Ù„Ø¹Ø±Ø¶
                 </p>
               </div>
 
@@ -1686,7 +1957,7 @@ export const POSWorkspacePage = () => {
                 onClick={handleResetDiscovery}
                 className="inline-flex min-h-[34px] items-center justify-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
               >
-                إغلاق الكتالوج
+                Ø¥ØºÙ„Ø§Ù‚ Ø§Ù„ÙƒØªØ§Ù„ÙˆØ¬
               </button>
             </div>
           </div>
@@ -1714,9 +1985,9 @@ export const POSWorkspacePage = () => {
         <div className="rounded-[1.25rem] border border-primary-100 bg-primary-50 px-4 py-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-bold text-slate-900">نتائج البحث</p>
+              <p className="text-sm font-bold text-slate-900">Ù†ØªØ§Ø¦Ø¬ Ø§Ù„Ø¨Ø­Ø«</p>
               <p className="mt-1 text-xs text-slate-500">
-                {filteredProducts.length} نتيجة لعبارة "
+                {filteredProducts.length} Ù†ØªÙŠØ¬Ø© Ù„Ø¹Ø¨Ø§Ø±Ø© "
                 {deferredSearchInput.trim()}"
               </p>
             </div>
@@ -1726,7 +1997,7 @@ export const POSWorkspacePage = () => {
               onClick={() => setSearchInput("")}
               className="inline-flex min-h-[34px] items-center justify-center rounded-full border border-primary-200 bg-white px-3 py-1.5 text-xs font-semibold text-primary-700 transition-colors hover:bg-primary-100"
             >
-              مسح البحث
+              Ù…Ø³Ø­ Ø§Ù„Ø¨Ø­Ø«
             </button>
           </div>
         </div>
@@ -1749,21 +2020,24 @@ export const POSWorkspacePage = () => {
                     stockByProductId,
                   )
                 : Number.POSITIVE_INFINITY;
+              const requiresDirectStock =
+                product.type !== ProductType.Manufactured &&
+                product.trackInventory;
               const canAddMore = product.isBatchTracked
                 ? !hasInventorySnapshot || availableStock > 0
                 : allowNegativeStock ||
-                  !product.trackInventory ||
+                  !requiresDirectStock ||
                   !hasInventorySnapshot ||
                   availableStock > 0;
               const isOutOfStock =
                 !allowNegativeStock &&
-                product.trackInventory &&
+                requiresDirectStock &&
                 hasInventorySnapshot &&
                 totalStock <= 0;
               const categoryName =
                 categories.find(
                   (category) => category.id === product.categoryId,
-                )?.name ?? "غير مصنف";
+                )?.name ?? "ØºÙŠØ± Ù…ØµÙ†Ù";
 
               return (
                 <button
@@ -1801,7 +2075,7 @@ export const POSWorkspacePage = () => {
                     <p className="mt-1 text-xs text-slate-500">
                       {categoryName}
                     </p>
-                    {product.trackInventory && hasInventorySnapshot && (
+                    {requiresDirectStock && hasInventorySnapshot && (
                       <p
                         className={clsx(
                           "mt-1 text-[11px] font-semibold",
@@ -1809,8 +2083,8 @@ export const POSWorkspacePage = () => {
                         )}
                       >
                         {isOutOfStock
-                          ? "نفد المخزون"
-                          : `المتاح ${availableStock}`}
+                          ? "Ù†ÙØ¯ Ø§Ù„Ù…Ø®Ø²ÙˆÙ†"
+                          : `Ø§Ù„Ù…ØªØ§Ø­ ${availableStock}`}
                       </p>
                     )}
                   </div>
@@ -1829,7 +2103,7 @@ export const POSWorkspacePage = () => {
                     >
                       {!product.isActive || isOutOfStock || !canAddMore
                         ? "غير متاح"
-                        : "إضافة"}
+                        : "Ø¥Ø¶Ø§ÙØ©"}
                     </span>
                   </div>
                 </button>
@@ -1838,19 +2112,19 @@ export const POSWorkspacePage = () => {
 
             {filteredProducts.length > visibleSearchResults.length && (
               <div className="rounded-[1.15rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
-                تم عرض أول 12 منتج فقط. افتح الكتالوج إذا كنت تريد استعراض
-                المزيد.
+                ØªÙ… Ø¹Ø±Ø¶ Ø£ÙˆÙ„ 12 Ù…Ù†ØªØ¬ ÙÙ‚Ø·. Ø§ÙØªØ­ Ø§Ù„ÙƒØªØ§Ù„ÙˆØ¬ Ø¥Ø°Ø§ ÙƒÙ†Øª ØªØ±ÙŠØ¯ Ø§Ø³ØªØ¹Ø±Ø§Ø¶
+                Ø§Ù„Ù…Ø²ÙŠØ¯.
               </div>
             )}
           </div>
         ) : (
           <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
             <p className="text-sm font-semibold text-slate-700">
-              لا توجد منتجات مطابقة.
+              Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ù†ØªØ¬Ø§Øª Ù…Ø·Ø§Ø¨Ù‚Ø©.
             </p>
             <p className="mt-1 text-xs leading-6 text-slate-500">
-              جرّب اسمًا مختلفًا أو افتح الكتالوج، ويمكنك إنشاء منتج جديد إذا
-              كانت لديك الصلاحية.
+              Ø¬Ø±Ù‘Ø¨ Ø§Ø³Ù…Ù‹Ø§ Ù…Ø®ØªÙ„ÙÙ‹Ø§ Ø£Ùˆ Ø§ÙØªØ­ Ø§Ù„ÙƒØªØ§Ù„ÙˆØ¬ØŒ ÙˆÙŠÙ…ÙƒÙ†Ùƒ Ø¥Ù†Ø´Ø§Ø¡ Ù…Ù†ØªØ¬ Ø¬Ø¯ÙŠØ¯ Ø¥Ø°Ø§
+              ÙƒØ§Ù†Øª Ù„Ø¯ÙŠÙƒ Ø§Ù„ØµÙ„Ø§Ø­ÙŠØ©.
             </p>
             {canQuickCreateProduct && (
               <button
@@ -1858,7 +2132,7 @@ export const POSWorkspacePage = () => {
                 onClick={handleOpenQuickCreate}
                 className="mt-4 inline-flex min-h-[40px] items-center justify-center rounded-full bg-primary-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-primary-700"
               >
-                إضافة منتج جديد
+                Ø¥Ø¶Ø§ÙØ© Ù…Ù†ØªØ¬ Ø¬Ø¯ÙŠØ¯
               </button>
             )}
           </div>
@@ -1882,17 +2156,17 @@ export const POSWorkspacePage = () => {
           className="rounded-[1.35rem] border border-gray-200 bg-white px-4 py-3 text-start shadow-sm transition-colors hover:border-primary-200 hover:bg-primary-50"
         >
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-            العميل
+            Ø§Ù„Ø¹Ù…ÙŠÙ„
           </p>
           <p className="mt-1 text-sm font-bold text-slate-900">
             {selectedCustomer
               ? selectedCustomer.name || selectedCustomer.phone
-              : "إضافة عميل للفاتورة"}
+              : "Ø¥Ø¶Ø§ÙØ© Ø¹Ù…ÙŠÙ„ Ù„Ù„ÙØ§ØªÙˆØ±Ø©"}
           </p>
           <p className="mt-1 text-xs text-slate-500">
             {selectedCustomer
               ? "تغيير أو مراجعة بيانات العميل"
-              : "اتركها نقدي أو اربط عميلًا للبيع الآجل"}
+              : "Ø§ØªØ±ÙƒÙ‡Ø§ Ù†Ù‚Ø¯ÙŠ Ø£Ùˆ Ø§Ø±Ø¨Ø· Ø¹Ù…ÙŠÙ„Ù‹Ø§ Ù„Ù„Ø¨ÙŠØ¹ Ø§Ù„Ø¢Ø¬Ù„"}
           </p>
         </button>
 
@@ -1902,13 +2176,13 @@ export const POSWorkspacePage = () => {
           className="rounded-[1.35rem] border border-primary-200 bg-primary-50 px-4 py-3 text-start shadow-sm transition-colors hover:bg-primary-100"
         >
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary-500">
-            الدفع
+            Ø§Ù„Ø¯ÙØ¹
           </p>
           <p className="mt-1 text-sm font-bold text-slate-900">
             {selectedPaymentMethodLabel}
           </p>
           <p className="mt-1 text-xs text-slate-500">
-            افتح الدفع لاختيار الطريقة والمبلغ المدفوع.
+            Ø§ÙØªØ­ Ø§Ù„Ø¯ÙØ¹ Ù„Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„Ø·Ø±ÙŠÙ‚Ø© ÙˆØ§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø¯ÙÙˆØ¹.
           </p>
         </button>
       </div>
@@ -1969,7 +2243,7 @@ export const POSWorkspacePage = () => {
               <div className="flex min-w-0 items-center gap-1.5">
                 <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-700">
                   <Store className="h-3.5 w-3.5 text-primary-500" />
-                  {currentBranch?.name || "الفرع الحالي"}
+                  {currentBranch?.name || "Ø§Ù„ÙØ±Ø¹ Ø§Ù„Ø­Ø§Ù„ÙŠ"}
                 </span>
                 {shiftDuration && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-1 text-[11px] font-semibold text-gray-700">
@@ -1990,7 +2264,7 @@ export const POSWorkspacePage = () => {
                   <Wallet className="h-3 w-3" />
                   {itemsCount > 0
                     ? formatCurrency(displayWorkspaceTotal)
-                    : "جاهز للبيع"}
+                    : "Ø¬Ø§Ù‡Ø² Ù„Ù„Ø¨ÙŠØ¹"}
                 </span>
               </div>
             </div>
@@ -2004,7 +2278,7 @@ export const POSWorkspacePage = () => {
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
                   onKeyDown={handleSearchKeyDown}
-                  placeholder="ابحث بالاسم أو الباركود أو SKU"
+                  placeholder="Ø§Ø¨Ø­Ø« Ø¨Ø§Ù„Ø§Ø³Ù… Ø£Ùˆ Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯ Ø£Ùˆ SKU"
                   className="w-full rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-3 pe-11 ps-4 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:bg-white focus:ring-2 focus:ring-primary-100"
                   autoComplete="off"
                 />
@@ -2024,7 +2298,7 @@ export const POSWorkspacePage = () => {
                 )}
               >
                 <Package className="h-4 w-4" />
-                {showCatalog ? "إخفاء الكتالوج" : "الكتالوج"}
+                {showCatalog ? "Ø¥Ø®ÙØ§Ø¡ Ø§Ù„ÙƒØªØ§Ù„ÙˆØ¬" : "Ø§Ù„ÙƒØªØ§Ù„ÙˆØ¬"}
               </button>
             </div>
 
@@ -2041,7 +2315,7 @@ export const POSWorkspacePage = () => {
                   )}
                 >
                   <PackageCheck className="h-3.5 w-3.5" />
-                  المتاح فقط
+                  Ø§Ù„Ù…ØªØ§Ø­ ÙÙ‚Ø·
                 </button>
 
                 {showProductResults && (
@@ -2051,7 +2325,7 @@ export const POSWorkspacePage = () => {
                     className="inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
                   >
                     <XIcon className="h-3.5 w-3.5" />
-                    مسح النتائج
+                    Ù…Ø³Ø­ Ø§Ù„Ù†ØªØ§Ø¦Ø¬
                   </button>
                 )}
 
@@ -2062,7 +2336,7 @@ export const POSWorkspacePage = () => {
                     className="inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
                   >
                     <PlusCircle className="h-3.5 w-3.5" />
-                    منتج جديد
+                    Ù…Ù†ØªØ¬ Ø¬Ø¯ÙŠØ¯
                   </button>
                 )}
 
@@ -2071,10 +2345,10 @@ export const POSWorkspacePage = () => {
                     type="button"
                     onClick={() => setShowCustomItem(true)}
                     className="inline-flex min-h-[36px] shrink-0 items-center gap-1.5 rounded-full border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 transition-colors hover:bg-gray-50"
-                    title="إضافة منتج مخصص"
+                    title="Ø¥Ø¶Ø§ÙØ© Ù…Ù†ØªØ¬ Ù…Ø®ØµØµ"
                   >
                     <FileText className="h-3.5 w-3.5" />
-                    منتج مخصص
+                    Ù…Ù†ØªØ¬ Ù…Ø®ØµØµ
                   </button>
                 )}
               </div>
@@ -2129,7 +2403,7 @@ export const POSWorkspacePage = () => {
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700">
                         <Store className="h-3.5 w-3.5 text-primary-500" />
-                        {currentBranch?.name || "الفرع الحالي"}
+                        {currentBranch?.name || "Ø§Ù„ÙØ±Ø¹ Ø§Ù„Ø­Ø§Ù„ÙŠ"}
                       </span>
                       {shiftDuration && (
                         <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700">
@@ -2139,7 +2413,7 @@ export const POSWorkspacePage = () => {
                       )}
                       {shiftOpenedAt && (
                         <span className="inline-flex items-center gap-1 rounded-lg bg-gray-100 px-3 py-1.5 text-xs font-semibold text-gray-700">
-                          فتحت {shiftOpenedAt}
+                          ÙØªØ­Øª {shiftOpenedAt}
                         </span>
                       )}
                     </div>
@@ -2165,7 +2439,7 @@ export const POSWorkspacePage = () => {
                         value={searchInput}
                         onChange={(event) => setSearchInput(event.target.value)}
                         onKeyDown={handleSearchKeyDown}
-                        placeholder="بحث بالاسم أو الباركود أو SKU... واضغط Enter للإضافة"
+                        placeholder="Ø¨Ø­Ø« Ø¨Ø§Ù„Ø§Ø³Ù… Ø£Ùˆ Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯ Ø£Ùˆ SKU... ÙˆØ§Ø¶ØºØ· Enter Ù„Ù„Ø¥Ø¶Ø§ÙØ©"
                         className="w-full rounded-[1.45rem] border border-slate-200 bg-white px-4 py-3.5 pe-12 text-sm font-medium text-slate-900 outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
                         autoComplete="off"
                       />
@@ -2177,7 +2451,7 @@ export const POSWorkspacePage = () => {
                       className="inline-flex min-h-[50px] items-center justify-center gap-2 rounded-xl bg-primary-600 px-4 py-3 text-sm font-semibold text-white transition-all hover:bg-primary-700"
                     >
                       <Package className="h-4.5 w-4.5" />
-                      عرض الكتالوج
+                      Ø¹Ø±Ø¶ Ø§Ù„ÙƒØªØ§Ù„ÙˆØ¬
                     </button>
                   </div>
 
@@ -2193,7 +2467,7 @@ export const POSWorkspacePage = () => {
                       )}
                     >
                       <PackageCheck className="h-4 w-4" />
-                      المتاح فقط
+                      Ø§Ù„Ù…ØªØ§Ø­ ÙÙ‚Ø·
                     </button>
 
                     <button
@@ -2208,7 +2482,7 @@ export const POSWorkspacePage = () => {
                       )}
                     >
                       <PlusCircle className="h-4 w-4" />
-                      منتج جديد
+                      Ù…Ù†ØªØ¬ Ø¬Ø¯ÙŠØ¯
                     </button>
 
                     <button
@@ -2222,11 +2496,11 @@ export const POSWorkspacePage = () => {
                           : "cursor-not-allowed bg-gray-100 text-gray-400",
                       )}
                       title={
-                        itemsCount > 0 ? "إضافة منتج مخصص" : "ابدأ طلب أولاً"
+                        itemsCount > 0 ? "Ø¥Ø¶Ø§ÙØ© Ù…Ù†ØªØ¬ Ù…Ø®ØµØµ" : "Ø§Ø¨Ø¯Ø£ Ø·Ù„Ø¨ Ø£ÙˆÙ„Ø§Ù‹"
                       }
                     >
                       <FileText className="h-4 w-4" />
-                      منتج مخصص
+                      Ù…Ù†ØªØ¬ Ù…Ø®ØµØµ
                     </button>
                   </div>
 
@@ -2245,10 +2519,10 @@ export const POSWorkspacePage = () => {
                   <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3">
                     <div>
                       <p className="text-sm font-semibold text-slate-900">
-                        نتائج البحث
+                        Ù†ØªØ§Ø¦Ø¬ Ø§Ù„Ø¨Ø­Ø«
                       </p>
                       <p className="mt-1 text-xs text-slate-500">
-                        {filteredProducts.length} نتيجة لعبارة "
+                        {filteredProducts.length} Ù†ØªÙŠØ¬Ø© Ù„Ø¹Ø¨Ø§Ø±Ø© "
                         {deferredSearchInput.trim()}"
                       </p>
                     </div>
@@ -2257,7 +2531,7 @@ export const POSWorkspacePage = () => {
                       onClick={() => setSearchInput("")}
                       className="inline-flex min-h-[40px] items-center justify-center rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
                     >
-                      مسح
+                      Ù…Ø³Ø­
                     </button>
                   </div>
                 )}
@@ -2279,16 +2553,16 @@ export const POSWorkspacePage = () => {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">
-                      الطلب الحالي
+                      Ø§Ù„Ø·Ù„Ø¨ Ø§Ù„Ø­Ø§Ù„ÙŠ
                     </p>
                     <h2 className="mt-1 text-lg font-black text-gray-900">
-                      السلة والدفع
+                      Ø§Ù„Ø³Ù„Ø© ÙˆØ§Ù„Ø¯ÙØ¹
                     </h2>
                   </div>
 
                   <div className="rounded-xl bg-white px-3 py-2 text-end ring-1 ring-gray-200">
                     <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">
-                      الإجمالي
+                      Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ
                     </p>
                     <p className="mt-1 text-lg font-black text-primary-700">
                       {formatCurrency(displayWorkspaceTotal)}
@@ -2319,21 +2593,21 @@ export const POSWorkspacePage = () => {
                 <div className="mb-3 flex items-center justify-between gap-3 rounded-xl bg-gray-50 px-4 py-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-                      الإجمالي
+                      Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ
                     </p>
                     <p className="mt-1 text-lg font-black text-primary-700">
                       {formatCurrency(displayWorkspaceTotal)}
                     </p>
                   </div>
                   <div className="text-end text-xs text-slate-500">
-                    <p>{itemsCount} عنصر</p>
+                    <p>{itemsCount} Ø¹Ù†ØµØ±</p>
                     {selectedCustomer ? (
                       <p className="mt-1 truncate font-semibold text-slate-700">
                         {selectedCustomer.name || selectedCustomer.phone}
                       </p>
                     ) : (
                       <p className="mt-1 font-semibold text-slate-700">
-                        عميل نقدي
+                        Ø¹Ù…ÙŠÙ„ Ù†Ù‚Ø¯ÙŠ
                       </p>
                     )}
                   </div>
@@ -2360,10 +2634,10 @@ export const POSWorkspacePage = () => {
                     {isCreating
                         ? "جاري إنشاء الطلب..."
                         : isCompleting
-                          ? "جاري الدفع..."
+                          ? "Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø¯ÙØ¹..."
                           : numericAmount < paymentTotal && allowPartialPayment
                             ? `إتمام البيع الآجل (مستحق: ${formatCurrency(amountDue)})`
-                            : "إتمام الدفع"}
+                            : "Ø¥ØªÙ…Ø§Ù… Ø§Ù„Ø¯ÙØ¹"}
                   </Button>
                 ) : (
                   <Button
@@ -2374,7 +2648,7 @@ export const POSWorkspacePage = () => {
                     disabled={items.length === 0}
                     rightIcon={<CreditCard className="h-5 w-5" />}
                   >
-                    الدفع {formatCurrency(checkoutTotal)}
+                    Ø§Ù„Ø¯ÙØ¹ {formatCurrency(checkoutTotal)}
                   </Button>
                 )}
               </div>
@@ -2387,7 +2661,7 @@ export const POSWorkspacePage = () => {
         <ProductQuickCreateModal
           onClose={() => setShowQuickCreate(false)}
           onSuccess={() => {
-            toast.success("تم إضافة المنتج بنجاح");
+            toast.success("ØªÙ… Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ù…Ù†ØªØ¬ Ø¨Ù†Ø¬Ø§Ø­");
             setShowQuickCreate(false);
           }}
         />
@@ -2403,17 +2677,18 @@ export const POSWorkspacePage = () => {
               price: item.unitPrice,
               suggestedPrice: item.unitPrice,
               taxRate: item.taxRate ?? taxRate,
-              taxInclusive: item.taxInclusive ?? false,
+              taxInclusive: false,
               categoryId: 0,
               isActive: true,
               type: ProductType.Service,
+              unit: UnitOfMeasure.Piece,
               trackInventory: false,
               isBatchTracked: false,
               createdAt: new Date().toISOString(),
             };
 
             addItem(customProduct, item.quantity ?? 1);
-            toast.success(`تم إضافة: ${item.name}`);
+            toast.success(`ØªÙ… Ø¥Ø¶Ø§ÙØ©: ${item.name}`);
           }}
         />
       )}
@@ -2443,7 +2718,7 @@ export const POSWorkspacePage = () => {
               batchQuantity: batch.quantity,
             });
 
-            toast.success(`تمت الإضافة: ${selectedProductForBatch.name} من ${batch.batchNumber || "بدون رقم دفعة"}`);
+            toast.success(`ØªÙ…Øª Ø§Ù„Ø¥Ø¶Ø§ÙØ©: ${selectedProductForBatch.name} Ù…Ù† ${batch.batchNumber || "Ø¨Ø¯ÙˆÙ† Ø±Ù‚Ù… Ø¯ÙØ¹Ø©"}`);
             setShowBatchModal(false);
             setSelectedProductForBatch(null);
           }}
@@ -2458,6 +2733,26 @@ export const POSWorkspacePage = () => {
             handleSelectCustomer(customer);
             setShowCustomerCreateModal(false);
           }}
+        />
+      )}
+
+      {showTableModal && (
+        <TableSelectionModal
+          tables={restaurantTables}
+          selectedTableId={selectedTable?.id}
+          onSelect={(table) => {
+            setSelectedTable(table);
+            setShowTableModal(false);
+          }}
+          onClose={() => setShowTableModal(false)}
+        />
+      )}
+
+      {showSavedNotesModal && (
+        <SavedNotesModal
+          notes={savedOrderNotes}
+          onApply={appendOrderNote}
+          onClose={() => setShowSavedNotesModal(false)}
         />
       )}
     </div>
@@ -2498,7 +2793,7 @@ const BatchSelectionModalWithData = ({
 
   useEffect(() => {
     if (isLoading || !isSuccess || batches.length > 0) return;
-    toast.error(`لا توجد دفعات متاحة للبيع للمنتج: ${product.name}`);
+    toast.error(`Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¯ÙØ¹Ø§Øª Ù…ØªØ§Ø­Ø© Ù„Ù„Ø¨ÙŠØ¹ Ù„Ù„Ù…Ù†ØªØ¬: ${product.name}`);
     onClose();
   }, [batches.length, isLoading, isSuccess, onClose, product.name]);
 

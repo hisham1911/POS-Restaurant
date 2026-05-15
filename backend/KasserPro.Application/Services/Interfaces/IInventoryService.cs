@@ -34,16 +34,16 @@ public interface IInventoryService
 
     // Helper Methods
     Task<decimal> GetEffectivePriceAsync(int productId, int branchId);
-    Task<int> GetAvailableQuantityAsync(int productId, int branchId);
+    Task<decimal> GetAvailableQuantityAsync(int productId, int branchId);
 
     // Legacy compatibility methods for OrderService
-    Task BatchDecrementStockAsync(List<(int OrderItemId, int ProductId, int Quantity, int? BatchId)> items, int orderId);
-    Task<int> GetCurrentStockAsync(int productId);
-    Task<int> IncrementStockAsync(int productId, int quantity, int referenceId, int? batchId = null);
+    Task BatchDecrementStockAsync(List<(int OrderItemId, int ProductId, decimal Quantity, int? BatchId)> items, int orderId);
+    Task<decimal> GetCurrentStockAsync(int productId);
+    Task<decimal> IncrementStockAsync(int productId, decimal quantity, int referenceId, int? batchId = null);
 
     /// <summary>
     /// FIX H-2: Get restorable quantity for a product on a given order.
     /// Returns actualDecremented - alreadyRestored to prevent stock inflation from clamping.
     /// </summary>
-    Task<int> GetRestorableQuantityAsync(int productId, int orderId);
+    Task<decimal> GetRestorableQuantityAsync(int productId, int orderId);
 }

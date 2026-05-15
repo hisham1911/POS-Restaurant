@@ -42,13 +42,16 @@ public class OrderItem : BaseEntity
     public decimal? UnitCost { get; set; }
     public decimal OriginalPrice { get; set; } // Price before any discount
 
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
+    public int? ParentOrderItemId { get; set; }
+    public decimal KitchenPrintedQuantity { get; set; } = 0;
+    public DateTime? LastKitchenPrintedAt { get; set; }
 
     /// <summary>
     /// Tracks how many units of this item have been refunded across partial refunds.
     /// Prevents the same item from being refunded more times than originally ordered.
     /// </summary>
-    public int RefundedQuantity { get; set; } = 0;
+    public decimal RefundedQuantity { get; set; } = 0;
 
     // Discount Snapshot
     public string? DiscountType { get; set; } // "percentage" or "fixed"
@@ -73,6 +76,8 @@ public class OrderItem : BaseEntity
 
     public int OrderId { get; set; }
     public Order Order { get; set; } = null!;
+    public OrderItem? ParentOrderItem { get; set; }
+    public List<OrderItem> AddOns { get; set; } = [];
 
     /// <summary>
     /// Navigation to Product - nullable for custom items

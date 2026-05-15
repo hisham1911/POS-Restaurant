@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.SignalR;
+using System.Collections.Concurrent;
 
 namespace KasserPro.API.Hubs;
 
@@ -11,6 +12,7 @@ public class DeviceHub : Hub
     private static readonly object _connectionLock = new();
     private static readonly Dictionary<string, string> _deviceConnections = new();
     private static readonly Dictionary<string, DeviceConnectionInfo> _connectionInfoByConnectionId = new();
+    private static readonly ConcurrentDictionary<string, TaskCompletionSource<bool>> _printCompletionWaiters = new();
 
     private sealed record DeviceConnectionInfo(
         string DeviceId,
@@ -155,8 +157,39 @@ public class DeviceHub : Hub
             eventDto.ErrorMessage ?? "None"
         );
 
+        if (!string.IsNullOrWhiteSpace(eventDto.CommandId)
+            && _printCompletionWaiters.TryRemove(eventDto.CommandId, out var waiter))
+        {
+            waiter.TrySetResult(eventDto.Success);
+        }
+
         // P0-5: Notify the caller that print is complete (no need to broadcast status)
         await Clients.Caller.SendAsync("PrintCompleted", eventDto);
+    }
+
+    public static async Task<bool> WaitForPrintCompletionAsync(
+        string commandId,
+        TimeSpan timeout,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(commandId))
+            return false;
+
+        var waiter = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _printCompletionWaiters[commandId] = waiter;
+
+        try
+        {
+            return await waiter.Task.WaitAsync(timeout, cancellationToken);
+        }
+        catch (TimeoutException)
+        {
+            return false;
+        }
+        finally
+        {
+            _printCompletionWaiters.TryRemove(commandId, out _);
+        }
     }
 
     /// <summary>

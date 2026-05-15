@@ -22,7 +22,7 @@ public class StockMovement : BaseEntity
     /// <summary>
     /// Quantity changed. Positive = stock increase, Negative = stock decrease
     /// </summary>
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     
     /// <summary>
     /// Reference to the source entity (OrderId, RefundLogId, etc.)
@@ -38,12 +38,12 @@ public class StockMovement : BaseEntity
     /// <summary>
     /// Stock quantity before this movement
     /// </summary>
-    public int BalanceBefore { get; set; }
+    public decimal BalanceBefore { get; set; }
     
     /// <summary>
     /// Stock quantity after this movement
     /// </summary>
-    public int BalanceAfter { get; set; }
+    public decimal BalanceAfter { get; set; }
     
     /// <summary>
     /// Reason for the movement (required for adjustments)

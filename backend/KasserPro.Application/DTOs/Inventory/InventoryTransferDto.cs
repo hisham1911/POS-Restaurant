@@ -11,7 +11,7 @@ public class InventoryTransferDto
     public int ProductId { get; set; }
     public string ProductName { get; set; } = string.Empty;
     public string? ProductSku { get; set; }
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     public string Status { get; set; } = string.Empty;
     public string Reason { get; set; } = string.Empty;
     public string? Notes { get; set; }
@@ -35,7 +35,7 @@ public class CreateTransferRequest
     public int FromBranchId { get; set; }
     public int ToBranchId { get; set; }
     public int ProductId { get; set; }
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     public string Reason { get; set; } = string.Empty;
     public string? Notes { get; set; }
 }

@@ -8,7 +8,8 @@ public class AddCustomItemRequest
     public string Name { get; set; } = string.Empty;
     public decimal UnitPrice { get; set; }
     public int Quantity { get; set; } = 1;
+    public int? ParentOrderItemId { get; set; }
     public decimal? TaxRate { get; set; } // null = use tenant default
-    public bool? TaxInclusive { get; set; } // null = preserve legacy tax-exclusive behavior
+    public bool? TaxInclusive { get; set; } // Ignored - custom items are always tax exclusive
     public string? Notes { get; set; }
 }

@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
+using KasserPro.Application.Common.Helpers;
 using Microsoft.EntityFrameworkCore;
 using KasserPro.Infrastructure.Data;
 using KasserPro.Domain.Entities;
@@ -130,9 +131,20 @@ public class AutoCloseShiftBackgroundService : BackgroundService
                 var totalCash = SumAppliedPayments(completedOrders, PaymentMethod.Cash);
                 var totalBankAccount = SumAppliedPayments(completedOrders, PaymentMethod.BankAccount);
 
+                var currentBalance = await context.CashRegisterTransactions
+                    .Where(t => t.TenantId == shift.TenantId && t.BranchId == shift.BranchId)
+                    .OrderByDescending(t => t.CreatedAt)
+                    .Select(t => (decimal?)t.BalanceAfter)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                var expectedBalance = ShiftCalculationHelper.ResolveExpectedBalance(
+                    shift.OpeningBalance,
+                    totalCash,
+                    currentBalance);
+
                 // Set closing values
-                shift.ClosingBalance = shift.OpeningBalance + totalCash;
-                shift.ExpectedBalance = shift.OpeningBalance + totalCash;
+                shift.ClosingBalance = expectedBalance;
+                shift.ExpectedBalance = expectedBalance;
                 shift.Difference = 0; // No difference since we're using expected balance
                 shift.TotalCash = totalCash;
                 shift.TotalBankAccount = totalBankAccount;

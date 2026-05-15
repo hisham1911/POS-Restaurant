@@ -51,7 +51,7 @@ public class InventoryService : IInventoryService
                 .ToList();
 
             var batchAvailableByProductId = productIds.Count == 0
-                ? new Dictionary<int, int>()
+                ? new Dictionary<int, decimal>()
                 : await _context.ProductBatches
                     .Where(pb => pb.TenantId == tenantId
                               && pb.BranchId == branchId
@@ -281,9 +281,11 @@ public class InventoryService : IInventoryService
 
     public async Task<decimal> GetEffectivePriceAsync(int productId, int branchId)
     {
+        var tenantId = _currentUserService.TenantId;
         var branchPrice = await _context.BranchProductPrices
             .Where(bp => bp.ProductId == productId &&
                         bp.BranchId == branchId &&
+                        bp.TenantId == tenantId &&
                         bp.IsActive &&
                         bp.EffectiveFrom <= DateTime.UtcNow &&
                         (bp.EffectiveTo == null || bp.EffectiveTo > DateTime.UtcNow))
@@ -293,40 +295,54 @@ public class InventoryService : IInventoryService
         if (branchPrice != null)
             return branchPrice.Price;
 
-        var product = await _context.Products.FindAsync(productId);
+        var product = await _context.Products
+            .FirstOrDefaultAsync(p => p.Id == productId && p.TenantId == tenantId && !p.IsDeleted);
         return product?.Price ?? 0;
     }
 
-    public async Task<int> GetAvailableQuantityAsync(int productId, int branchId)
+    public async Task<decimal> GetAvailableQuantityAsync(int productId, int branchId)
     {
+        var tenantId = _currentUserService.TenantId;
         var inventory = await _context.BranchInventories
-            .FirstOrDefaultAsync(i => i.ProductId == productId && i.BranchId == branchId);
+            .FirstOrDefaultAsync(i => i.TenantId == tenantId && i.ProductId == productId && i.BranchId == branchId);
 
         return inventory?.Quantity ?? 0;
     }
 
     // Legacy compatibility methods for OrderService
-    public async Task BatchDecrementStockAsync(List<(int OrderItemId, int ProductId, int Quantity, int? BatchId)> items, int orderId)
+    public async Task BatchDecrementStockAsync(List<(int OrderItemId, int ProductId, decimal Quantity, int? BatchId)> items, int orderId)
     {
+        var ownsTransaction = _context.Database.CurrentTransaction == null;
+        await using var transaction = ownsTransaction
+            ? await _context.Database.BeginTransactionAsync()
+            : null;
+
         var branchId = _currentUserService.BranchId;
         var tenantId = _currentUserService.TenantId;
-        var tenant = await _context.Tenants.FindAsync(tenantId);
-        var allowExpired = tenant?.AllowExpiredSales ?? false;
 
-        foreach (var (orderItemId, productId, quantity, requestedBatchId) in items)
+        try
         {
-            var product = await _context.Products.FindAsync(productId);
-            if (product == null || !product.TrackInventory)
-            {
-                _logger.LogInformation("Skipping stock decrement for Product={ProductId}", productId);
-                continue;
-            }
+            var tenant = await _context.Tenants.FindAsync(tenantId);
+            var allowExpired = tenant?.AllowExpiredSales ?? false;
 
-            var inventory = await _context.BranchInventories
-                .FirstOrDefaultAsync(i => i.ProductId == productId && i.BranchId == branchId);
-
-            if (inventory != null)
+            foreach (var (orderItemId, productId, quantity, requestedBatchId) in items)
             {
+                var product = await _context.Products
+                    .FirstOrDefaultAsync(p => p.Id == productId && p.TenantId == tenantId && !p.IsDeleted);
+                if (product == null || !product.TrackInventory)
+                {
+                    _logger.LogInformation("Skipping stock decrement for Product={ProductId}", productId);
+                    continue;
+                }
+
+                var inventory = await _context.BranchInventories
+                    .FirstOrDefaultAsync(i => i.TenantId == tenantId && i.ProductId == productId && i.BranchId == branchId);
+
+                if (inventory == null)
+                {
+                    continue;
+                }
+
                 var balanceBefore = inventory.Quantity;
                 if (balanceBefore < quantity)
                 {
@@ -338,36 +354,34 @@ public class InventoryService : IInventoryService
                 inventory.Quantity -= quantity;
                 inventory.LastUpdatedAt = DateTime.UtcNow;
 
-                // FIFO: deduct from the selected batch when provided, otherwise from the oldest available batch.
+                // FEFO: deduct the nearest expiry batch first, then purchase age.
                 var remaining = quantity;
-                var batchQuery = _context.ProductBatches
+                IQueryable<ProductBatch> batchQuery = _context.ProductBatches
                     .Where(pb => pb.TenantId == tenantId && pb.BranchId == branchId
                                  && pb.ProductId == productId && !pb.IsDeleted
                                  && pb.Status != BatchStatus.Depleted
                                  && pb.Status != BatchStatus.OnHold
-                                 && pb.Quantity > 0)
-                    .OrderBy(pb => pb.PurchaseDate)
-                    .ThenBy(pb => pb.CreatedAt)
-                    .ThenBy(pb => pb.Id);
+                                 && pb.Quantity > 0);
 
                 if (!allowExpired)
                 {
                     var today = DateTime.UtcNow.Date;
-                    batchQuery = batchQuery.Where(pb => !pb.ExpiryDate.HasValue || pb.ExpiryDate.Value.Date >= today)
-                                           .OrderBy(pb => pb.PurchaseDate)
-                                           .ThenBy(pb => pb.CreatedAt)
-                                           .ThenBy(pb => pb.Id);
+                    batchQuery = batchQuery.Where(pb => !pb.ExpiryDate.HasValue || pb.ExpiryDate.Value.Date >= today);
                 }
 
                 if (requestedBatchId.HasValue)
-                    batchQuery = batchQuery.Where(pb => pb.Id == requestedBatchId.Value)
-                                           .OrderBy(pb => pb.PurchaseDate)
-                                           .ThenBy(pb => pb.CreatedAt)
-                                           .ThenBy(pb => pb.Id);
+                    batchQuery = batchQuery.Where(pb => pb.Id == requestedBatchId.Value);
 
-                var batches = await batchQuery.ToListAsync();
+                var batches = await batchQuery
+                    .OrderBy(pb => pb.ExpiryDate ?? DateTime.MaxValue)
+                    .ThenBy(pb => pb.PurchaseDate)
+                    .ThenBy(pb => pb.CreatedAt)
+                    .ThenBy(pb => pb.Id)
+                    .ToListAsync();
                 var availableInSelectedBatches = batches.Sum(batch => batch.Quantity);
-                if (product.IsBatchTracked && availableInSelectedBatches < quantity)
+                if (product.IsBatchTracked
+                    && (requestedBatchId.HasValue || batches.Count > 0)
+                    && availableInSelectedBatches < quantity)
                 {
                     throw new InvalidOperationException(
                         $"Insufficient batch stock for product {productId}. Available={availableInSelectedBatches}, Requested={quantity}");
@@ -395,7 +409,6 @@ public class InventoryService : IInventoryService
                         primaryBatch = batch;
                 }
 
-                // Record stock movement
                 var movement = new StockMovement
                 {
                     TenantId = tenantId,
@@ -413,7 +426,6 @@ public class InventoryService : IInventoryService
                 };
                 _context.StockMovements.Add(movement);
 
-                // Update OrderItem with batch info
                 if (primaryBatch != null && orderItemId > 0)
                 {
                     var orderItem = await _context.OrderItems.FindAsync(orderItemId);
@@ -426,24 +438,39 @@ public class InventoryService : IInventoryService
                     }
                 }
             }
-        }
 
-        await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync();
+
+            if (ownsTransaction && transaction != null)
+            {
+                await transaction.CommitAsync();
+            }
+        }
+        catch
+        {
+            if (ownsTransaction && transaction != null)
+            {
+                await transaction.RollbackAsync();
+            }
+
+            throw;
+        }
     }
 
-    public async Task<int> GetCurrentStockAsync(int productId)
+    public async Task<decimal> GetCurrentStockAsync(int productId)
     {
         var branchId = _currentUserService.BranchId;
         return await GetAvailableQuantityAsync(productId, branchId);
     }
 
-    public async Task<int> IncrementStockAsync(int productId, int quantity, int referenceId, int? batchId = null)
+    public async Task<decimal> IncrementStockAsync(int productId, decimal quantity, int referenceId, int? batchId = null)
     {
         var branchId = _currentUserService.BranchId;
         var tenantId = _currentUserService.TenantId;
 
         // GUARD: Check if product tracks inventory
-        var product = await _context.Products.FindAsync(productId);
+        var product = await _context.Products
+            .FirstOrDefaultAsync(p => p.Id == productId && p.TenantId == tenantId && !p.IsDeleted);
         if (product == null || !product.TrackInventory)
         {
             _logger.LogInformation(
@@ -453,7 +480,7 @@ public class InventoryService : IInventoryService
         }
 
         var inventory = await _context.BranchInventories
-            .FirstOrDefaultAsync(i => i.ProductId == productId && i.BranchId == branchId);
+            .FirstOrDefaultAsync(i => i.TenantId == tenantId && i.ProductId == productId && i.BranchId == branchId);
 
         if (inventory == null)
         {
@@ -520,7 +547,7 @@ public class InventoryService : IInventoryService
         return inventory.Quantity;
     }
 
-    public async Task<int> GetRestorableQuantityAsync(int productId, int orderId)
+    public async Task<decimal> GetRestorableQuantityAsync(int productId, int orderId)
     {
         var tenantId = _currentUserService.TenantId;
         var branchId = _currentUserService.BranchId;
@@ -533,7 +560,7 @@ public class InventoryService : IInventoryService
                         m.ReferenceType == "Order" &&
                         m.ReferenceId == orderId &&
                         m.Quantity < 0)
-            .SumAsync(m => (int?)(-m.Quantity)) ?? 0;
+            .SumAsync(m => (decimal?)(-m.Quantity)) ?? 0;
 
         // Already restored quantity from refund movements for this order/product.
         var alreadyRestored = await _context.StockMovements
@@ -543,7 +570,7 @@ public class InventoryService : IInventoryService
                         m.ReferenceType == "OrderRefund" &&
                         m.ReferenceId == orderId &&
                         m.Quantity > 0)
-            .SumAsync(m => (int?)m.Quantity) ?? 0;
+            .SumAsync(m => (decimal?)m.Quantity) ?? 0;
 
         var restorable = actualDecremented - alreadyRestored;
         return restorable > 0 ? restorable : 0;
@@ -554,6 +581,9 @@ public class InventoryService : IInventoryService
         await using var transaction = await _context.Database.BeginTransactionAsync();
         try
         {
+            if (request.Quantity <= 0)
+                return ApiResponse<InventoryTransferDto>.Fail(ErrorCodes.INVENTORY_INVALID_QUANTITY, ErrorMessages.Get(ErrorCodes.INVENTORY_INVALID_QUANTITY));
+
             // Validate branches
             var fromBranch = await _context.Branches
                 .FirstOrDefaultAsync(b => b.Id == request.FromBranchId && b.TenantId == _currentUserService.TenantId);
@@ -646,6 +676,9 @@ public class InventoryService : IInventoryService
 
             if (transfer == null)
                 return ApiResponse<InventoryTransferDto>.Fail(ErrorCodes.INVENTORY_TRANSFER_NOT_FOUND, "عملية النقل غير موجودة");
+
+            if (transfer.Quantity <= 0)
+                return ApiResponse<InventoryTransferDto>.Fail(ErrorCodes.INVENTORY_INVALID_QUANTITY, ErrorMessages.Get(ErrorCodes.INVENTORY_INVALID_QUANTITY));
 
             if (transfer.Status != InventoryTransferStatus.Pending)
                 return ApiResponse<InventoryTransferDto>.Fail(ErrorCodes.INVENTORY_TRANSFER_ALREADY_APPROVED, "عملية النقل تمت الموافقة عليها بالفعل");
@@ -1114,7 +1147,7 @@ public class InventoryService : IInventoryService
         }
     }
 
-    private async Task<bool> HasEnoughBatchStockAsync(int productId, int branchId, int quantity)
+    private async Task<bool> HasEnoughBatchStockAsync(int productId, int branchId, decimal quantity)
     {
         var availableQuantity = await _context.ProductBatches
             .Where(pb => pb.TenantId == _currentUserService.TenantId
@@ -1123,12 +1156,12 @@ public class InventoryService : IInventoryService
                       && !pb.IsDeleted
                       && pb.Status == BatchStatus.Active
                       && pb.Quantity > 0)
-            .SumAsync(pb => (int?)pb.Quantity) ?? 0;
+            .SumAsync(pb => (decimal?)pb.Quantity) ?? 0;
 
         return availableQuantity >= quantity;
     }
 
-    private async Task<List<StockMovement>> DeductTransferBatchesAsync(InventoryTransfer transfer, int balanceBefore, DateTime now)
+    private async Task<List<StockMovement>> DeductTransferBatchesAsync(InventoryTransfer transfer, decimal balanceBefore, DateTime now)
     {
         var sourceBatches = await _context.ProductBatches
             .Where(pb => pb.TenantId == _currentUserService.TenantId
@@ -1137,7 +1170,8 @@ public class InventoryService : IInventoryService
                       && !pb.IsDeleted
                       && pb.Status == BatchStatus.Active
                       && pb.Quantity > 0)
-            .OrderBy(pb => pb.PurchaseDate)
+            .OrderBy(pb => pb.ExpiryDate ?? DateTime.MaxValue)
+            .ThenBy(pb => pb.PurchaseDate)
             .ThenBy(pb => pb.CreatedAt)
             .ThenBy(pb => pb.Id)
             .ToListAsync();
@@ -1187,7 +1221,7 @@ public class InventoryService : IInventoryService
         return movements;
     }
 
-    private async Task<List<StockMovement>> ReceiveTransferBatchesAsync(InventoryTransfer transfer, int balanceBefore, DateTime now)
+    private async Task<List<StockMovement>> ReceiveTransferBatchesAsync(InventoryTransfer transfer, decimal balanceBefore, DateTime now)
     {
         var sourceMovements = await _context.StockMovements
             .Where(m => m.TenantId == _currentUserService.TenantId
@@ -1252,7 +1286,7 @@ public class InventoryService : IInventoryService
     private async Task<ProductBatch> GetOrCreateDestinationBatchAsync(
         InventoryTransfer transfer,
         ProductBatch sourceBatch,
-        int quantity,
+        decimal quantity,
         DateTime now)
     {
         ProductBatch? destinationBatch = null;

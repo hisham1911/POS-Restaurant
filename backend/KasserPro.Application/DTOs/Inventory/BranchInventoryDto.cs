@@ -9,8 +9,8 @@ public class BranchInventoryDto
     public string ProductName { get; set; } = string.Empty;
     public string? ProductSku { get; set; }
     public string? ProductBarcode { get; set; }
-    public int Quantity { get; set; }
-    public int? BatchAvailableQuantity { get; set; }
+    public decimal Quantity { get; set; }
+    public decimal? BatchAvailableQuantity { get; set; }
     public int ReorderLevel { get; set; }
     public bool IsLowStock { get; set; }
     public DateTime LastUpdatedAt { get; set; }
@@ -26,6 +26,6 @@ public class BranchInventorySummaryDto
     public int ProductId { get; set; }
     public string ProductName { get; set; } = string.Empty;
     public string? ProductSku { get; set; }
-    public int TotalQuantity { get; set; }
+    public decimal TotalQuantity { get; set; }
     public List<BranchInventoryDto> BranchInventories { get; set; } = new();
 }

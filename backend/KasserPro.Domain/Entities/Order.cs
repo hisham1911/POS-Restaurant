@@ -24,6 +24,12 @@ public class Order : BaseEntity
     public string OrderNumber { get; set; } = string.Empty;
     public OrderStatus Status { get; set; } = OrderStatus.Draft;
     public OrderType OrderType { get; set; } = OrderType.DineIn;
+    public int? TableId { get; set; }
+    public string? TableNumberSnapshot { get; set; }
+    public OrderSource OrderSource { get; set; } = OrderSource.POS;
+    public string? ExternalOrderNumber { get; set; }
+    public int KitchenPrintCount { get; set; } = 0;
+    public DateTime? LastKitchenPrintedAt { get; set; }
 
     // Currency Snapshot
     public string CurrencyCode { get; set; } = "EGP";
@@ -93,6 +99,7 @@ public class Order : BaseEntity
     public User User { get; set; } = null!;
     public Shift? Shift { get; set; }
     public Customer? Customer { get; set; }
+    public RestaurantTable? Table { get; set; }
     public Order? OriginalOrder { get; set; }
     public RefundLog? RefundLog { get; set; }
     public ICollection<OrderItem> Items { get; set; } = new List<OrderItem>();

@@ -80,14 +80,14 @@ public class EmployeeReportIntegrationTests : IClassFixture<CustomWebApplication
         var cashSale = CreateShiftOrder(tenant.Id, branch.Id, user.Id, shift, "SHIFT-CASH", 300m, 300m, 0m, OrderType.DineIn);
         cashSale.Payments.Add(new Payment { TenantId = tenant.Id, BranchId = branch.Id, Method = PaymentMethod.Cash, Amount = 300m });
 
-        var cardSale = CreateShiftOrder(tenant.Id, branch.Id, user.Id, shift, "SHIFT-CARD", 200m, 200m, 0m, OrderType.DineIn);
-        cardSale.Payments.Add(new Payment { TenantId = tenant.Id, BranchId = branch.Id, Method = PaymentMethod.Card, Amount = 200m });
+        var bankSale = CreateShiftOrder(tenant.Id, branch.Id, user.Id, shift, "SHIFT-BANK", 200m, 200m, 0m, OrderType.DineIn);
+        bankSale.Payments.Add(new Payment { TenantId = tenant.Id, BranchId = branch.Id, Method = PaymentMethod.BankAccount, Amount = 200m });
 
         var creditSale = CreateShiftOrder(tenant.Id, branch.Id, user.Id, shift, "SHIFT-CREDIT", 400m, 0m, 400m, OrderType.DineIn);
         var returnOrder = CreateShiftOrder(tenant.Id, branch.Id, user.Id, shift, "SHIFT-RETURN", 100m, 0m, 0m, OrderType.Return);
 
         shift.Orders.Add(cashSale);
-        shift.Orders.Add(cardSale);
+        shift.Orders.Add(bankSale);
         shift.Orders.Add(creditSale);
         shift.Orders.Add(returnOrder);
 

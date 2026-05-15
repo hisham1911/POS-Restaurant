@@ -6,8 +6,8 @@ public class ProductBatchDto
     public string? BatchNumber { get; set; }
     public int ProductId { get; set; }
     public string ProductName { get; set; } = string.Empty;
-    public int Quantity { get; set; }
-    public int InitialQuantity { get; set; }
+    public decimal Quantity { get; set; }
+    public decimal InitialQuantity { get; set; }
     public DateTime? ExpiryDate { get; set; }
     public DateTime PurchaseDate { get; set; }
     public DateTime? ProductionDate { get; set; }
@@ -27,7 +27,7 @@ public class ProductBatchListDto
     public int Id { get; set; }
     public string? BatchNumber { get; set; }
     public string ProductName { get; set; } = string.Empty;
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     public DateTime? ExpiryDate { get; set; }
     public string Status { get; set; } = string.Empty;
 }
@@ -36,7 +36,7 @@ public class CreateProductBatchDto
 {
     public int ProductId { get; set; }
     public string? BatchNumber { get; set; }
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     public DateTime? ExpiryDate { get; set; }
     public DateTime? ProductionDate { get; set; }
     public decimal? CostPrice { get; set; }
@@ -65,7 +65,7 @@ public class BatchExpiryAlertDto
     public string? BatchNumber { get; set; }
     public int ProductId { get; set; }
     public string ProductName { get; set; } = string.Empty;
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     public DateTime? ExpiryDate { get; set; }
     public int? DaysUntilExpiry { get; set; }
     public string AlertLevel { get; set; } = string.Empty;

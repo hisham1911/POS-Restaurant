@@ -10,9 +10,9 @@ public class ProductMovementReportDto
     public int BranchId { get; set; }
     public string? BranchName { get; set; }
     
-    public int TotalProducts { get; set; }
-    public int ProductsSold { get; set; }
-    public int ProductsNotSold { get; set; }
+    public decimal TotalProducts { get; set; }
+    public decimal ProductsSold { get; set; }
+    public decimal ProductsNotSold { get; set; }
     public decimal TotalRevenue { get; set; }
     
     public List<ProductMovementDetailDto> ProductMovements { get; set; } = new();
@@ -26,18 +26,18 @@ public class ProductMovementDetailDto
     public string? CategoryName { get; set; }
     
     // Sales
-    public int QuantitySold { get; set; }
+    public decimal QuantitySold { get; set; }
     public decimal TotalRevenue { get; set; }
     public decimal TotalCost { get; set; }
     public decimal GrossProfit { get; set; }
     public decimal ProfitMargin { get; set; }
     
     // Inventory
-    public int OpeningStock { get; set; }
-    public int PurchasedQuantity { get; set; }
-    public int TransferredIn { get; set; }
-    public int TransferredOut { get; set; }
-    public int ClosingStock { get; set; }
+    public decimal OpeningStock { get; set; }
+    public decimal PurchasedQuantity { get; set; }
+    public decimal TransferredIn { get; set; }
+    public decimal TransferredOut { get; set; }
+    public decimal ClosingStock { get; set; }
     
     // Performance
     public decimal TurnoverRate { get; set; }
@@ -68,7 +68,7 @@ public class ProfitableProductDetailDto
     public int ProductId { get; set; }
     public string ProductName { get; set; } = string.Empty;
     public string? CategoryName { get; set; }
-    public int QuantitySold { get; set; }
+    public decimal QuantitySold { get; set; }
     public decimal Revenue { get; set; }
     public decimal Cost { get; set; }
     public decimal Profit { get; set; }
@@ -89,7 +89,7 @@ public class SlowMovingProductsReportDto
     
     public int TotalSlowMovingProducts { get; set; }
     public decimal TotalValueAtRisk { get; set; }
-    public int TotalQuantityAtRisk { get; set; }
+    public decimal TotalQuantityAtRisk { get; set; }
     
     public List<SlowMovingProductDetailDto> SlowMovingProducts { get; set; } = new();
 }
@@ -99,8 +99,8 @@ public class SlowMovingProductDetailDto
     public int ProductId { get; set; }
     public string ProductName { get; set; } = string.Empty;
     public string? CategoryName { get; set; }
-    public int CurrentStock { get; set; }
-    public int QuantitySold { get; set; }
+    public decimal CurrentStock { get; set; }
+    public decimal QuantitySold { get; set; }
     public decimal AverageDailySales { get; set; }
     public int DaysOfStock { get; set; }
     public DateTime? LastSoldDate { get; set; }
@@ -162,7 +162,7 @@ public class CogsProductBreakdownDto
     public int ProductId { get; set; }
     public string ProductName { get; set; } = string.Empty;
     public string? CategoryName { get; set; }
-    public int QuantitySold { get; set; }
+    public decimal QuantitySold { get; set; }
     public decimal Revenue { get; set; }
     public decimal UnitCost { get; set; }
     public decimal Cost { get; set; }

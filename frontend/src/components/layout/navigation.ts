@@ -17,6 +17,9 @@ import {
   BarChart3,
   HardDrive,
   Settings,
+  ChefHat,
+  Armchair,
+  MessageSquare,
   type LucideIcon,
 } from "lucide-react";
 
@@ -152,6 +155,17 @@ export const navigationItems: NavigationItem[] = [
     permission: "OrdersView",
   },
   {
+    path: "/tables",
+    label: "الطاولات",
+    description:
+      "عرض طاولات الصالة وبدء طلب صالة جديد أو فتح الطلب المفتوح للطاولة المشغولة.",
+    spotlight: "الصالة",
+    icon: Armchair,
+    sectionId: "operations",
+    audience: "non-system-owner",
+    permission: "PosSell",
+  },
+  {
     path: "/delivery/operations",
     label: "إدارة التوصيل",
     description:
@@ -216,6 +230,17 @@ export const navigationItems: NavigationItem[] = [
     audience: "non-system-owner",
     permission: "ProductsView",
     featured: true,
+  },
+  {
+    path: "/recipes",
+    label: "الوصفات",
+    description:
+      "إنشاء وتعديل وصفات المنتجات المصنعة وإدارة مكوناتها.",
+    spotlight: "الإنتاج",
+    icon: ChefHat,
+    sectionId: "catalog",
+    audience: "non-system-owner",
+    permission: "RecipesView",
   },
   {
     path: "/categories",
@@ -381,6 +406,28 @@ export const navigationItems: NavigationItem[] = [
       "اضبط إعدادات النظام العامة والصلاحيات والسياسات بما يناسب تشغيلك.",
     spotlight: "تخصيص المنظومة",
     icon: Settings,
+    sectionId: "admin",
+    audience: "non-system-owner",
+    permission: "SettingsManage",
+  },
+  {
+    path: "/settings/tables",
+    label: "إعدادات الطاولات",
+    description:
+      "إضافة وتعديل طاولات الصالة وترتيب ظهورها للكاشير داخل الفرع الحالي.",
+    spotlight: "إعدادات الصالة",
+    icon: Armchair,
+    sectionId: "admin",
+    audience: "non-system-owner",
+    permission: "SettingsManage",
+  },
+  {
+    path: "/settings/saved-order-notes",
+    label: "ملاحظات الطلبات",
+    description:
+      "إدارة الملاحظات السريعة التي تظهر في تذكرة المطبخ وفاتورة العميل.",
+    spotlight: "ملاحظات سريعة",
+    icon: MessageSquare,
     sectionId: "admin",
     audience: "non-system-owner",
     permission: "SettingsManage",

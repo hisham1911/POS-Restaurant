@@ -59,9 +59,17 @@ public class AppDbContext : DbContext
     // Delivery
     public DbSet<DeliveryPerson> DeliveryPersons => Set<DeliveryPerson>();
 
+    // Restaurant floor
+    public DbSet<RestaurantTable> RestaurantTables => Set<RestaurantTable>();
+    public DbSet<SavedOrderNote> SavedOrderNotes => Set<SavedOrderNote>();
+
     // Stock Taking (Inventory Count)
     public DbSet<StockTaking> StockTakings => Set<StockTaking>();
     public DbSet<StockTakingItem> StockTakingItems => Set<StockTakingItem>();
+
+    // Recipe System (Restaurant)
+    public DbSet<Recipe> Recipes => Set<Recipe>();
+    public DbSet<RecipeIngredient> RecipeIngredients => Set<RecipeIngredient>();
 
     // Wallet entities
     public DbSet<Wallet> Wallets => Set<Wallet>();
@@ -118,9 +126,17 @@ public class AppDbContext : DbContext
         // Delivery: Soft delete filter
         modelBuilder.Entity<DeliveryPerson>().HasQueryFilter(e => !e.IsDeleted);
 
+        // Restaurant floor: Soft delete filters
+        modelBuilder.Entity<RestaurantTable>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<SavedOrderNote>().HasQueryFilter(e => !e.IsDeleted);
+
         // Stock Taking: Soft delete filters
         modelBuilder.Entity<StockTaking>().HasQueryFilter(e => !e.IsDeleted);
         modelBuilder.Entity<StockTakingItem>().HasQueryFilter(e => !e.IsDeleted);
+
+        // Recipe System: Soft delete filters
+        modelBuilder.Entity<Recipe>().HasQueryFilter(e => !e.IsDeleted);
+        modelBuilder.Entity<RecipeIngredient>().HasQueryFilter(e => !e.IsDeleted);
 
         // Wallet: Soft delete filters
         modelBuilder.Entity<Wallet>().HasQueryFilter(e => !e.IsDeleted);
@@ -186,6 +202,35 @@ public class AppDbContext : DbContext
             .IsRequired(false)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // Order -> RestaurantTable relationship
+        modelBuilder.Entity<Order>()
+            .HasOne(o => o.Table)
+            .WithMany(t => t.Orders)
+            .HasForeignKey(o => o.TableId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        modelBuilder.Entity<Order>()
+            .HasIndex(o => new { o.TenantId, o.BranchId, o.TableId })
+            .IsUnique()
+            .HasFilter("TableId IS NOT NULL AND OrderType = 0 AND Status IN (0,1,6,7,8) AND IsDeleted = 0");
+
+        modelBuilder.Entity<Order>()
+            .HasIndex(o => new { o.TenantId, o.BranchId, o.OrderSource, o.CreatedAt });
+
+        modelBuilder.Entity<Order>()
+            .HasIndex(o => new { o.TenantId, o.BranchId, o.OrderSource, o.ExternalOrderNumber })
+            .IsUnique()
+            .HasFilter("ExternalOrderNumber IS NOT NULL AND Status <> 3");
+
+        // OrderItem -> ParentOrderItem relationship (custom add-ons)
+        modelBuilder.Entity<OrderItem>()
+            .HasOne(oi => oi.ParentOrderItem)
+            .WithMany(oi => oi.AddOns)
+            .HasForeignKey(oi => oi.ParentOrderItemId)
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // DeliveryPerson relationships
         modelBuilder.Entity<DeliveryPerson>()
             .HasOne(dp => dp.Tenant)
@@ -205,6 +250,80 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<DeliveryPerson>()
             .HasIndex(dp => new { dp.TenantId, dp.Phone })
+            .IsUnique();
+
+        // RestaurantTable relationships and indexes
+        modelBuilder.Entity<RestaurantTable>()
+            .HasOne(t => t.Tenant)
+            .WithMany()
+            .HasForeignKey(t => t.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<RestaurantTable>()
+            .HasOne(t => t.Branch)
+            .WithMany()
+            .HasForeignKey(t => t.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<RestaurantTable>()
+            .Property(t => t.Number)
+            .HasMaxLength(50);
+
+        modelBuilder.Entity<RestaurantTable>()
+            .HasIndex(t => new { t.TenantId, t.BranchId, t.Number })
+            .IsUnique()
+            .HasFilter("IsDeleted = 0");
+
+        modelBuilder.Entity<RestaurantTable>()
+            .HasIndex(t => new { t.TenantId, t.BranchId, t.Status, t.IsActive });
+
+        // SavedOrderNote relationships and indexes
+        modelBuilder.Entity<SavedOrderNote>()
+            .HasOne(n => n.Tenant)
+            .WithMany()
+            .HasForeignKey(n => n.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<SavedOrderNote>()
+            .HasOne(n => n.Branch)
+            .WithMany()
+            .HasForeignKey(n => n.BranchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<SavedOrderNote>()
+            .Property(n => n.Text)
+            .HasMaxLength(300);
+
+        modelBuilder.Entity<SavedOrderNote>()
+            .HasIndex(n => new { n.TenantId, n.BranchId, n.IsActive, n.SortOrder });
+
+        // Recipe System relationships
+        modelBuilder.Entity<Recipe>()
+            .HasOne(r => r.Tenant)
+            .WithMany()
+            .HasForeignKey(r => r.TenantId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Recipe>()
+            .HasOne(r => r.Product)
+            .WithMany()
+            .HasForeignKey(r => r.ProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<RecipeIngredient>()
+            .HasOne(ri => ri.Recipe)
+            .WithMany(r => r.Ingredients)
+            .HasForeignKey(ri => ri.RecipeId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<RecipeIngredient>()
+            .HasOne(ri => ri.RawMaterial)
+            .WithMany()
+            .HasForeignKey(ri => ri.RawMaterialProductId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Recipe>()
+            .HasIndex(r => new { r.TenantId, r.ProductId })
             .IsUnique();
 
         // Shift configuration is in ShiftConfiguration.cs

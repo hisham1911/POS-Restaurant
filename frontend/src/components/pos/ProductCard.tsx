@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Product } from "@/types/product.types";
+import { Product, ProductType } from "@/types/product.types";
 import { Category } from "@/types/category.types";
 import { useCart } from "@/hooks/useCart";
 import { formatCurrency } from "@/utils/formatters";
@@ -65,12 +65,14 @@ export const ProductCard = ({
   const availableStock = hasInventorySnapshot
     ? getProductAvailableStock(product, quantityInCart, stockByProductId)
     : Number.POSITIVE_INFINITY;
+  const requiresDirectStock =
+    product.type !== ProductType.Manufactured && product.trackInventory;
 
   // If allowNegativeStock is enabled, always allow adding
   const canAddMore = product.isBatchTracked
     ? !hasInventorySnapshot || availableStock > 0
     : allowNegativeStock ||
-      !product.trackInventory ||
+      !requiresDirectStock ||
       !hasInventorySnapshot ||
       availableStock > 0;
 
@@ -101,7 +103,7 @@ export const ProductCard = ({
 
   // Stock badge logic - shows available stock (accounting for cart)
   const getStockBadge = () => {
-    if (!product.trackInventory) return null;
+    if (!requiresDirectStock) return null;
 
     if (isInventoryLoading && !hasInventorySnapshot) {
       return (
@@ -155,7 +157,7 @@ export const ProductCard = ({
   // Determine if product is out of stock (only if allowNegativeStock is disabled)
   const isOutOfStock =
     !allowNegativeStock &&
-    product.trackInventory &&
+    requiresDirectStock &&
     hasInventorySnapshot &&
     totalStock <= 0;
   const isDisabled = !product.isActive || isOutOfStock;

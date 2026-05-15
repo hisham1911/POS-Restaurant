@@ -5,6 +5,9 @@ using KasserPro.Domain.Enums;
 public class CreateOrderRequest
 {
     public OrderType OrderType { get; set; } = OrderType.DineIn;
+    public int? TableId { get; set; }
+    public OrderSource OrderSource { get; set; } = OrderSource.POS;
+    public string? ExternalOrderNumber { get; set; }
     public string? CustomerName { get; set; }
     public string? CustomerPhone { get; set; }
     public int? CustomerId { get; set; }

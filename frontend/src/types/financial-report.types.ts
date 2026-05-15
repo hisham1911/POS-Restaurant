@@ -26,6 +26,8 @@ export interface ProfitLossReport {
   totalCost: number;
   grossProfit: number;
   grossProfitMargin: number;
+  missingCostItemCount: number;
+  hasMissingCostData: boolean;
   
   // Operating Expenses
   totalExpenses: number;

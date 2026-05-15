@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.SignalR;
 using KasserPro.Application.Common;
 using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Orders;
+using KasserPro.Application.DTOs.Tenants;
 using KasserPro.Application.Services.Interfaces;
 using KasserPro.API.Hubs;
 using KasserPro.Domain.Enums;
@@ -117,6 +118,125 @@ public class OrdersController : ControllerBase
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
+    [HttpPost("{id}/send-to-kitchen")]
+    [HasPermission(Permission.PosSell)]
+    public async Task<IActionResult> SendToKitchen(int id)
+    {
+        var result = await _orderService.SendToKitchenAsync(id);
+        if (!result.Success || result.Data == null)
+            return BadRequest(result);
+
+        try
+        {
+            var tenantResult = await _tenantService.GetCurrentTenantAsync();
+            var tenant = tenantResult.Data;
+            var ticket = result.Data;
+            var commandId = Guid.NewGuid().ToString();
+            var printCompletionTask = DeviceHub.WaitForPrintCompletionAsync(
+                commandId,
+                TimeSpan.FromSeconds(15),
+                HttpContext.RequestAborted);
+
+            var printCommand = new
+            {
+                CommandId = commandId,
+                Receipt = new
+                {
+                    ReceiptNumber = $"KITCHEN-{ticket.OrderNumber}-{ticket.KitchenPrintCount}",
+                    BranchName = tenant?.Name ?? "KasserPro Store",
+                    Date = ConvertToLocalTime(ticket.PrintedAt, tenant?.Timezone),
+                    Items = ticket.Items.Select(item => new
+                    {
+                        Name = item.Name,
+                        Quantity = item.Quantity,
+                        UnitPrice = 0m,
+                        TotalPrice = 0m,
+                        Notes = item.Notes,
+                        IsAddOn = item.IsAddOn
+                    }).ToList(),
+                    NetTotal = 0m,
+                    TaxAmount = 0m,
+                    TotalAmount = 0m,
+                    AmountPaid = 0m,
+                    ChangeAmount = 0m,
+                    AmountDue = 0m,
+                    PaymentMethod = "",
+                    CashierName = User.FindFirst("name")?.Value ?? "Cashier",
+                    CustomerName = "",
+                    IsRefund = false,
+                    RefundReason = (string?)null,
+                    IsKitchenTicket = true,
+                    KitchenTitle = ticket.Header,
+                    OrderNotes = ticket.Notes,
+                    IsAdditionTicket = ticket.TicketType == "Additions"
+                },
+                Settings = tenant != null ? new
+                {
+                    PaperSize = tenant.ReceiptPaperSize,
+                    CustomWidth = tenant.ReceiptCustomWidth,
+                    HeaderFontSize = tenant.ReceiptHeaderFontSize,
+                    BodyFontSize = tenant.ReceiptBodyFontSize,
+                    TotalFontSize = tenant.ReceiptTotalFontSize,
+                    ShowBranchName = tenant.ReceiptShowBranchName,
+                    ShowCashier = tenant.ReceiptShowCashier,
+                    ShowThankYou = false,
+                    ShowCustomerName = false,
+                    ShowLogo = tenant.ReceiptShowLogo,
+                    FooterMessage = tenant.ReceiptFooterMessage,
+                    PhoneNumber = tenant.ReceiptPhoneNumber,
+                    LogoUrl = tenant.LogoUrl,
+                    TaxRate = tenant.TaxRate,
+                    IsTaxEnabled = tenant.IsTaxEnabled
+                } : (object?)null
+            };
+
+            var branchId = User.FindFirst("branchId")?.Value ?? "default";
+            var branchGroup = $"branch-{branchId}";
+            var printSent = await SendPrintCommandByRoutingAsync(
+                printCommand,
+                branchGroup,
+                tenant?.PrintRoutingMode ?? "BranchWithFallback",
+                Request.Headers["X-Target-Device-Id"].ToString(),
+                isAutomatic: false);
+
+            if (!printSent)
+            {
+                _logger.LogWarning("Kitchen ticket for order {OrderId} was not marked printed because no printer device received it", id);
+                return StatusCode(503, ApiResponse<object>.Fail(
+                    ErrorCodes.INTERNAL_ERROR,
+                    "تعذر إرسال تذكرة المطبخ للطابعة. تأكد من اتصال برنامج الطابعة ثم حاول مرة أخرى."));
+            }
+
+            var printCompleted = await printCompletionTask;
+            if (!printCompleted)
+            {
+                _logger.LogWarning("Kitchen ticket print command {CommandId} for order {OrderId} was delivered but not confirmed by the printer bridge", commandId, id);
+                return StatusCode(503, ApiResponse<object>.Fail(
+                    ErrorCodes.INTERNAL_ERROR,
+                    "تم إرسال تذكرة المطبخ للبرنامج لكن لم يتم تأكيد الطباعة. راجع الطابعة أو برنامج Bridge ثم حاول مرة أخرى."));
+            }
+
+            var markPrintedResult = await _orderService.MarkKitchenTicketPrintedAsync(id, ticket);
+            if (!markPrintedResult.Success)
+            {
+                _logger.LogWarning(
+                    "Kitchen ticket for order {OrderId} was delivered to printer but failed to mark as printed: {ErrorCode}",
+                    id,
+                    markPrintedResult.ErrorCode);
+                return BadRequest(markPrintedResult);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send kitchen ticket print command for order {OrderId}", id);
+            return StatusCode(500, ApiResponse<object>.Fail(
+                ErrorCodes.INTERNAL_ERROR,
+                "حدث خطأ أثناء إرسال تذكرة المطبخ للطابعة."));
+        }
+
+        return Ok(result);
+    }
+
     [HttpPost("{id}/complete")]
     [HasPermission(Permission.OrdersCreate)]
     public async Task<IActionResult> Complete(int id, [FromBody] CompleteOrderRequest request)
@@ -124,10 +244,13 @@ public class OrdersController : ControllerBase
         var result = await _orderService.CompleteAsync(id, request);
         var printAttempted = false;
         var printDelivered = false;
+        var kitchenPrintAttempted = false;
+        var kitchenPrintDelivered = false;
         var clientPrintPreference = Request.Headers["X-Print-Preference"].ToString();
         var targetDeviceId = Request.Headers["X-Target-Device-Id"].ToString();
         var browserOnlyPrintRequested =
             string.Equals(clientPrintPreference, "BrowserOnly", StringComparison.OrdinalIgnoreCase);
+        var kitchenPrintRequested = IsKitchenPrintRequested();
 
         if (result.Success && result.Data != null)
         {
@@ -153,74 +276,30 @@ public class OrdersController : ControllerBase
                 }
                 else
                 {
-                    printAttempted = true;
-
-                    var printCommand = new
-                    {
-                        CommandId = Guid.NewGuid().ToString(),
-                        Receipt = new
-                        {
-                            ReceiptNumber = order.OrderNumber,
-                            BranchName = order.BranchName ?? "KasserPro Store",
-                            Date = ConvertToLocalTime(order.CompletedAt ?? DateTime.UtcNow, tenant?.Timezone),
-                            Items = order.Items.Select(item => new
-                            {
-                                Name = item.ProductName,
-                                Quantity = item.Quantity,
-                                UnitPrice = item.UnitPrice,
-                                TotalPrice = item.Total,
-                                DiscountType = item.DiscountType,
-                                DiscountValue = item.DiscountValue,
-                                DiscountAmount = item.DiscountAmount,
-                                DiscountReason = item.DiscountReason
-                            }).ToList(),
-                            ItemDiscountsTotal = order.Items.Sum(i => i.DiscountAmount),
-                            DiscountType = order.DiscountType,
-                            DiscountValue = order.DiscountValue,
-                            DiscountAmount = order.DiscountAmount,
-                            NetTotal = order.Subtotal,
-                            TaxAmount = order.TaxAmount,
-                            TotalAmount = order.Total,
-                            AmountPaid = order.AmountPaid,
-                            ChangeAmount = order.ChangeAmount,
-                            AmountDue = order.AmountDue,
-                            PaymentMethod = order.Payments.FirstOrDefault()?.Method ?? "Cash",
-                            CashierName = order.UserName ?? userName,
-                            CustomerName = order.CustomerName ?? "",
-                            IsRefund = false,
-                            RefundReason = (string?)null,
-                            OrderType = order.OrderType,
-                            DeliveryAddress = order.DeliveryAddress,
-                            DeliveryFee = order.DeliveryFee,
-                            DeliveryNotes = order.DeliveryNotes,
-                            DeliveryStatus = order.DeliveryStatus
-                        },
-                        Settings = tenant != null ? new
-                        {
-                            PaperSize = tenant.ReceiptPaperSize,
-                            CustomWidth = tenant.ReceiptCustomWidth,
-                            HeaderFontSize = tenant.ReceiptHeaderFontSize,
-                            BodyFontSize = tenant.ReceiptBodyFontSize,
-                            TotalFontSize = tenant.ReceiptTotalFontSize,
-                            ShowBranchName = tenant.ReceiptShowBranchName,
-                            ShowCashier = tenant.ReceiptShowCashier,
-                            ShowThankYou = tenant.ReceiptShowThankYou,
-                            ShowCustomerName = tenant.ReceiptShowCustomerName,
-                            ShowLogo = tenant.ReceiptShowLogo,
-                            FooterMessage = tenant.ReceiptFooterMessage,
-                            PhoneNumber = tenant.ReceiptPhoneNumber,
-                            LogoUrl = tenant.LogoUrl,
-                            TaxRate = tenant.TaxRate,
-                            IsTaxEnabled = tenant.IsTaxEnabled
-                        } : (object?)null
-                    };
-
-                    // Send receipt to branch group AND default group to ensure delivery
                     var branchId = User.FindFirst("branchId")?.Value ?? "default";
                     var branchGroup = $"branch-{branchId}";
 
+                    if (kitchenPrintRequested)
+                    {
+                        kitchenPrintAttempted = true;
+                        kitchenPrintDelivered = await SendPrintCommandByRoutingAsync(
+                            BuildKitchenReceiptPrintCommand(order, tenant, userName),
+                            branchGroup,
+                            printRoutingMode,
+                            targetDeviceId,
+                            isAutomatic: true);
+
+                        if (!kitchenPrintDelivered)
+                        {
+                            _logger.LogWarning(
+                                "Kitchen receipt auto print could not be delivered for order {OrderId}; no connected printer device",
+                                order.Id);
+                        }
+                    }
+
+                    printAttempted = true;
                     printDelivered = await SendPrintCommandByRoutingAsync(
-                        printCommand,
+                        BuildSalesReceiptPrintCommand(order, tenant, userName),
                         branchGroup,
                         printRoutingMode,
                         targetDeviceId,
@@ -252,10 +331,20 @@ public class OrdersController : ControllerBase
         {
             Response.Headers["X-Print-Attempted"] = printAttempted ? "1" : "0";
             Response.Headers["X-Print-Delivered"] = printDelivered ? "1" : "0";
+            Response.Headers["X-Kitchen-Print-Attempted"] = kitchenPrintAttempted ? "1" : "0";
+            Response.Headers["X-Kitchen-Print-Delivered"] = kitchenPrintDelivered ? "1" : "0";
             return Ok(result);
         }
 
         return BadRequest(result);
+    }
+
+    [HttpPatch("{id}/status")]
+    [HasPermission(Permission.OrdersCreate)]
+    public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateOrderStatusRequest request)
+    {
+        var result = await _orderService.UpdateStatusAsync(id, request);
+        return result.Success ? Ok(result) : BadRequest(result);
     }
 
     [HttpPost("{id}/cancel")]
@@ -455,6 +544,147 @@ public class OrdersController : ControllerBase
         }
     }
 
+    private bool IsKitchenPrintRequested()
+    {
+        var value = Request.Headers["X-Print-Kitchen-Ticket"].ToString();
+        return string.IsNullOrWhiteSpace(value)
+            || string.Equals(value, "1", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "true", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private PrintCommandDto BuildKitchenReceiptPrintCommand(OrderDto order, TenantDto? tenant, string userName)
+    {
+        return new PrintCommandDto
+        {
+            CommandId = Guid.NewGuid().ToString(),
+            Receipt = new ReceiptDto
+            {
+                ReceiptNumber = $"KITCHEN-{order.OrderNumber}",
+                BranchName = order.BranchName ?? tenant?.Name ?? "KasserPro Store",
+                Date = ConvertToLocalTime(order.CompletedAt ?? DateTime.UtcNow, tenant?.Timezone),
+                Items = order.Items.Select(item => new ReceiptItemDto
+                {
+                    Name = item.ParentOrderItemId.HasValue ? $"+ {item.ProductName}" : item.ProductName,
+                    Quantity = item.Quantity,
+                    UnitPrice = 0m,
+                    TotalPrice = 0m,
+                    Notes = item.Notes,
+                    IsAddOn = item.ParentOrderItemId.HasValue || item.IsCustomItem
+                }).ToList(),
+                NetTotal = 0m,
+                TaxAmount = 0m,
+                TotalAmount = 0m,
+                AmountPaid = 0m,
+                ChangeAmount = 0m,
+                AmountDue = 0m,
+                PaymentMethod = string.Empty,
+                CashierName = order.UserName ?? userName,
+                CustomerName = string.Empty,
+                IsRefund = false,
+                RefundReason = null,
+                OrderType = order.OrderType,
+                IsKitchenTicket = true,
+                KitchenTitle = GetKitchenTitle(order),
+                OrderNotes = order.Notes,
+                IsAdditionTicket = false
+            },
+            Settings = BuildReceiptSettings(tenant, showThankYou: false, showCustomerName: false)
+        };
+    }
+
+    private PrintCommandDto BuildSalesReceiptPrintCommand(OrderDto order, TenantDto? tenant, string userName)
+    {
+        return new PrintCommandDto
+        {
+            CommandId = Guid.NewGuid().ToString(),
+            Receipt = new ReceiptDto
+            {
+                ReceiptNumber = order.OrderNumber,
+                BranchName = order.BranchName ?? tenant?.Name ?? "KasserPro Store",
+                Date = ConvertToLocalTime(order.CompletedAt ?? DateTime.UtcNow, tenant?.Timezone),
+                Items = order.Items.Select(item => new ReceiptItemDto
+                {
+                    Name = item.ProductName,
+                    Quantity = item.Quantity,
+                    UnitPrice = item.UnitPrice,
+                    TotalPrice = item.Total,
+                    DiscountType = item.DiscountType,
+                    DiscountValue = item.DiscountValue,
+                    DiscountAmount = item.DiscountAmount,
+                    DiscountReason = item.DiscountReason,
+                    Notes = item.Notes,
+                    IsAddOn = item.ParentOrderItemId.HasValue || item.IsCustomItem
+                }).ToList(),
+                ItemDiscountsTotal = order.Items.Sum(i => i.DiscountAmount),
+                DiscountType = order.DiscountType,
+                DiscountValue = order.DiscountValue,
+                DiscountAmount = order.DiscountAmount,
+                NetTotal = order.Subtotal,
+                TaxAmount = order.TaxAmount,
+                TotalAmount = order.Total,
+                AmountPaid = order.AmountPaid,
+                ChangeAmount = order.ChangeAmount,
+                AmountDue = order.AmountDue,
+                PaymentMethod = order.Payments.FirstOrDefault()?.Method ?? "Cash",
+                CashierName = order.UserName ?? userName,
+                CustomerName = order.CustomerName ?? string.Empty,
+                IsRefund = false,
+                RefundReason = null,
+                OrderType = order.OrderType,
+                DeliveryAddress = order.DeliveryAddress,
+                DeliveryFee = order.DeliveryFee,
+                DeliveryNotes = order.DeliveryNotes,
+                DeliveryStatus = order.DeliveryStatus,
+                OrderNotes = order.Notes
+            },
+            Settings = BuildReceiptSettings(tenant, tenant?.ReceiptShowThankYou ?? true, tenant?.ReceiptShowCustomerName ?? true)
+        };
+    }
+
+    private static ReceiptPrintSettings BuildReceiptSettings(
+        TenantDto? tenant,
+        bool showThankYou,
+        bool showCustomerName)
+    {
+        return new ReceiptPrintSettings
+        {
+            PaperSize = tenant?.ReceiptPaperSize ?? "80mm",
+            CustomWidth = tenant?.ReceiptCustomWidth,
+            HeaderFontSize = tenant?.ReceiptHeaderFontSize ?? 12,
+            BodyFontSize = tenant?.ReceiptBodyFontSize ?? 9,
+            TotalFontSize = tenant?.ReceiptTotalFontSize ?? 11,
+            ShowBranchName = tenant?.ReceiptShowBranchName ?? true,
+            ShowCashier = tenant?.ReceiptShowCashier ?? true,
+            ShowThankYou = showThankYou,
+            ShowCustomerName = showCustomerName,
+            ShowLogo = tenant?.ReceiptShowLogo ?? true,
+            FooterMessage = tenant?.ReceiptFooterMessage,
+            PhoneNumber = tenant?.ReceiptPhoneNumber,
+            LogoUrl = tenant?.LogoUrl,
+            TaxRate = tenant?.TaxRate ?? 14m,
+            IsTaxEnabled = tenant?.IsTaxEnabled ?? true
+        };
+    }
+
+    private static string GetKitchenTitle(OrderDto order)
+    {
+        if (string.Equals(order.OrderType, "DineIn", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.IsNullOrWhiteSpace(order.TableNumberSnapshot)
+                ? "طاولة"
+                : $"طاولة {order.TableNumberSnapshot}";
+        }
+
+        if (string.Equals(order.OrderType, "Delivery", StringComparison.OrdinalIgnoreCase))
+        {
+            return string.IsNullOrWhiteSpace(order.CustomerName)
+                ? "دليفري"
+                : $"دليفري - {order.CustomerName}";
+        }
+
+        return "تيك أواي";
+    }
+
     private async Task<bool> SendPrintCommandByRoutingAsync(
         object printCommand,
         string branchGroup,
@@ -489,15 +719,21 @@ public class OrdersController : ControllerBase
                     "Target printer device {DeviceId} is not connected in branch scope {BranchGroup}",
                     normalizedTargetDeviceId,
                     branchGroup);
-                return false;
-            }
 
-            await _hubContext.Clients.Client(targetConnectionId).SendAsync("PrintReceipt", printCommand);
-            _logger.LogInformation(
-                "Print command routed to target device {DeviceId} using connection {ConnectionId}",
-                normalizedTargetDeviceId,
-                targetConnectionId);
-            return true;
+                if (isAutomatic || string.Equals(mode, "BranchOnly", StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+            else
+            {
+                await _hubContext.Clients.Client(targetConnectionId).SendAsync("PrintReceipt", printCommand);
+                _logger.LogInformation(
+                    "Print command routed to target device {DeviceId} using connection {ConnectionId}",
+                    normalizedTargetDeviceId,
+                    targetConnectionId);
+                return true;
+            }
         }
 
         if (string.Equals(mode, "BranchOnly", StringComparison.Ordinal))

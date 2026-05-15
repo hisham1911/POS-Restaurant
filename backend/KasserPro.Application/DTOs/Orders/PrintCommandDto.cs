@@ -41,6 +41,10 @@ public class ReceiptDto
     public string BranchName { get; set; } = string.Empty;
     public DateTime Date { get; set; }
     public List<ReceiptItemDto> Items { get; set; } = new();
+    public decimal ItemDiscountsTotal { get; set; }
+    public string? DiscountType { get; set; }
+    public decimal? DiscountValue { get; set; }
+    public decimal DiscountAmount { get; set; }
     public decimal NetTotal { get; set; }
     public decimal TaxAmount { get; set; }
     public decimal TotalAmount { get; set; }
@@ -57,6 +61,10 @@ public class ReceiptDto
     public decimal DeliveryFee { get; set; }
     public string? DeliveryNotes { get; set; }
     public string? DeliveryStatus { get; set; }
+    public bool IsKitchenTicket { get; set; } = false;
+    public string? KitchenTitle { get; set; }
+    public string? OrderNotes { get; set; }
+    public bool IsAdditionTicket { get; set; } = false;
 }
 
 /// <summary>
@@ -65,7 +73,13 @@ public class ReceiptDto
 public class ReceiptItemDto
 {
     public string Name { get; set; } = string.Empty;
-    public int Quantity { get; set; }
+    public decimal Quantity { get; set; }
     public decimal UnitPrice { get; set; }
     public decimal TotalPrice { get; set; }
+    public string? DiscountType { get; set; }
+    public decimal? DiscountValue { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public string? DiscountReason { get; set; }
+    public string? Notes { get; set; }
+    public bool IsAddOn { get; set; }
 }

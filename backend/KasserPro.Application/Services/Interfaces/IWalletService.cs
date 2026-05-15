@@ -16,4 +16,5 @@ public interface IWalletService
     Task<ApiResponse<PagedWalletTransactions>> GetTransactionsAsync(int walletId, WalletTransactionFilters filters, CancellationToken ct);
 
     Task RecordOrderPaymentAsync(int walletId, decimal amount, int orderId, string orderNumber, string? referenceNumber, int userId, string userName, CancellationToken ct);
+    Task<ApiResponse<bool>> RecordOrderRefundAsync(int walletId, decimal amount, int returnOrderId, string originalOrderNumber, string? referenceNumber, int userId, string userName, CancellationToken ct);
 }

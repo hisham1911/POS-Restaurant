@@ -6,6 +6,12 @@ public class OrderDto
     public string OrderNumber { get; set; } = string.Empty;
     public string Status { get; set; } = string.Empty;
     public string OrderType { get; set; } = string.Empty;
+    public int? TableId { get; set; }
+    public string? TableNumberSnapshot { get; set; }
+    public string OrderSource { get; set; } = "POS";
+    public string? ExternalOrderNumber { get; set; }
+    public int KitchenPrintCount { get; set; }
+    public DateTime? LastKitchenPrintedAt { get; set; }
 
     // Branch Snapshot
     public int BranchId { get; set; }
@@ -96,8 +102,11 @@ public class OrderItemDto
     // Price Snapshot
     public decimal UnitPrice { get; set; }
     public decimal OriginalPrice { get; set; }
-    public int Quantity { get; set; }
-    public int RefundedQuantity { get; set; }
+    public decimal Quantity { get; set; }
+    public int? ParentOrderItemId { get; set; }
+    public decimal KitchenPrintedQuantity { get; set; }
+    public DateTime? LastKitchenPrintedAt { get; set; }
+    public decimal RefundedQuantity { get; set; }
 
     // Discount
     public string? DiscountType { get; set; }

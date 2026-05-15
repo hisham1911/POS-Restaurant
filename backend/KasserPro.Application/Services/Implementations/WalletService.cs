@@ -232,8 +232,15 @@ public class WalletService : IWalletService
 
     public async Task RecordOrderPaymentAsync(int walletId, decimal amount, int orderId, string orderNumber, string? referenceNumber, int userId, string userName, CancellationToken ct)
     {
+        if (amount <= 0)
+            return;
+
         var wallet = await _unitOfWork.Wallets.Query()
-            .FirstOrDefaultAsync(w => w.Id == walletId && !w.IsDeleted, ct);
+            .FirstOrDefaultAsync(w => w.Id == walletId
+                                   && w.TenantId == _currentUser.TenantId
+                                   && w.BranchId == _currentUser.BranchId
+                                   && w.IsActive
+                                   && !w.IsDeleted, ct);
         if (wallet == null) return;
 
         var balanceBefore = wallet.CurrentBalance;
@@ -250,6 +257,41 @@ public class WalletService : IWalletService
             Description = $"دفع طلب رقم {orderNumber}",
             UserId = userId, UserName = userName, CreatedAt = DateTime.UtcNow
         });
+    }
+
+    public async Task<ApiResponse<bool>> RecordOrderRefundAsync(int walletId, decimal amount, int returnOrderId, string originalOrderNumber, string? referenceNumber, int userId, string userName, CancellationToken ct)
+    {
+        if (amount <= 0)
+            return ApiResponse<bool>.Fail(ErrorCodes.WALLET_INVALID_AMOUNT, ErrorMessages.Get(ErrorCodes.WALLET_INVALID_AMOUNT));
+
+        var wallet = await _unitOfWork.Wallets.Query()
+            .FirstOrDefaultAsync(w => w.Id == walletId
+                                   && w.TenantId == _currentUser.TenantId
+                                   && w.BranchId == _currentUser.BranchId
+                                   && w.IsActive
+                                   && !w.IsDeleted, ct);
+        if (wallet == null)
+            return ApiResponse<bool>.Fail(ErrorCodes.WALLET_NOT_FOUND, ErrorMessages.Get(ErrorCodes.WALLET_NOT_FOUND));
+
+        if (wallet.CurrentBalance < amount)
+            return ApiResponse<bool>.Fail(ErrorCodes.WALLET_INSUFFICIENT_BALANCE, ErrorMessages.Get(ErrorCodes.WALLET_INSUFFICIENT_BALANCE));
+
+        var balanceBefore = wallet.CurrentBalance;
+        wallet.CurrentBalance = Math.Round(wallet.CurrentBalance - amount, 2);
+        wallet.UpdatedAt = DateTime.UtcNow;
+        _unitOfWork.Wallets.Update(wallet);
+
+        await _unitOfWork.WalletTransactions.AddAsync(new WalletTransaction
+        {
+            WalletId = walletId, TenantId = wallet.TenantId, BranchId = wallet.BranchId,
+            Type = "OrderRefund", Amount = amount, BalanceBefore = balanceBefore,
+            BalanceAfter = wallet.CurrentBalance, ReferenceType = "OrderRefund",
+            ReferenceId = returnOrderId, ReferenceNumber = referenceNumber,
+            Description = $"Ø§Ø³ØªØ±Ø¬Ø§Ø¹ Ø·Ù„Ø¨ Ø±Ù‚Ù… {originalOrderNumber}",
+            UserId = userId, UserName = userName, CreatedAt = DateTime.UtcNow
+        });
+
+        return ApiResponse<bool>.Ok(true);
     }
 
     private static WalletDto MapToDto(Wallet w) => new()

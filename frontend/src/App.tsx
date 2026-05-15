@@ -18,7 +18,9 @@ import LoginPage from "./pages/auth/LoginPage";
 import HomePage from "./pages/home/HomePage";
 import POSPage from "./pages/pos/POSPage";
 import POSWorkspacePage from "./pages/pos/POSWorkspacePage";
+import TablesGridPage from "./pages/tables/TablesGridPage";
 import ProductsPage from "./pages/products/ProductsPage";
+import RecipesPage from "./pages/recipes/RecipesPage";
 import CategoriesPage from "./pages/categories/CategoriesPage";
 import OrdersPage from "./pages/orders/OrdersPage";
 import ShiftPage from "./pages/shifts/ShiftPage";
@@ -48,6 +50,8 @@ import SupplierDebtsReportPage from "./pages/reports/SupplierDebtsReportPage";
 import SupplierPerformanceReportPage from "./pages/reports/SupplierPerformanceReportPage";
 import AuditLogPage from "./pages/audit/AuditLogPage";
 import SettingsPage from "./pages/settings/SettingsPage";
+import TablesManagementPage from "./pages/settings/TablesManagementPage";
+import SavedOrderNotesPage from "./pages/settings/SavedOrderNotesPage";
 import UserManagementPage from "./pages/users/UserManagementPage";
 import UserDetailPage from "./pages/users/UserDetailPage";
 import { PurchaseInvoicesPage } from "./pages/purchase-invoices/PurchaseInvoicesPage";
@@ -175,6 +179,16 @@ const AppRoutes = () => (
         }
       />
       <Route
+        path="/tables"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="PosSell">
+              <TablesGridPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
         path="/orders"
         element={
           <NonSystemOwnerRoute>
@@ -220,6 +234,16 @@ const AppRoutes = () => (
           <NonSystemOwnerRoute>
             <PermissionRoute permission="ProductsView">
               <ProductsPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/recipes"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="RecipesView">
+              <RecipesPage />
             </PermissionRoute>
           </NonSystemOwnerRoute>
         }
@@ -510,6 +534,26 @@ const AppRoutes = () => (
           <NonSystemOwnerRoute>
             <PermissionRoute permission="SettingsManage">
               <SettingsPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/settings/tables"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="SettingsManage">
+              <TablesManagementPage />
+            </PermissionRoute>
+          </NonSystemOwnerRoute>
+        }
+      />
+      <Route
+        path="/settings/saved-order-notes"
+        element={
+          <NonSystemOwnerRoute>
+            <PermissionRoute permission="SettingsManage">
+              <SavedOrderNotesPage />
             </PermissionRoute>
           </NonSystemOwnerRoute>
         }

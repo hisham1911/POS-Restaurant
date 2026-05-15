@@ -491,7 +491,7 @@ public class AdversarialFinancialTests
         };
         // Production now creates these Payment records on the return order
         returnOrder.Payments.Add(new Payment { Method = PaymentMethod.Cash, Amount = -60m });
-        returnOrder.Payments.Add(new Payment { Method = PaymentMethod.Card, Amount = -40m });
+        returnOrder.Payments.Add(new Payment { Method = PaymentMethod.BankAccount, Amount = -40m });
 
         var returnPayments = new[] { returnOrder }
             .SelectMany(o => o.Payments)
@@ -499,11 +499,11 @@ public class AdversarialFinancialTests
 
         var refundedCash = Math.Abs(
             returnPayments.Where(p => p.Method == PaymentMethod.Cash).Sum(p => p.Amount));
-        var refundedCard = Math.Abs(
-            returnPayments.Where(p => p.Method == PaymentMethod.Card).Sum(p => p.Amount));
+        var refundedBankAccount = Math.Abs(
+            returnPayments.Where(p => p.Method == PaymentMethod.BankAccount).Sum(p => p.Amount));
 
         refundedCash.Should().Be(60m, "FIXED: Cash refund breakdown is now tracked");
-        refundedCard.Should().Be(40m, "FIXED: Card refund breakdown is now tracked");
+        refundedBankAccount.Should().Be(40m, "FIXED: Bank account refund breakdown is now tracked");
     }
 
     #endregion

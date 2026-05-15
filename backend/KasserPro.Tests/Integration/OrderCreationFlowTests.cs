@@ -461,7 +461,198 @@ public class OrderCreationFlowTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task CreateOrder_WithTaxInclusiveProduct_ShouldPersistNetUnitPriceAndExpectedTotals()
+    public async Task CreateOrder_ForManufacturedProduct_ShouldSnapshotRecipeUnitCost()
+    {
+        var (testUserId, _, branch1Id, _) = await SeedTestDataAsync();
+        int tenantId;
+        int manufacturedProductId;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var branch = await db.Branches.SingleAsync(b => b.Id == branch1Id);
+            tenantId = branch.TenantId;
+            var category = await db.Categories.FirstAsync(c => c.TenantId == tenantId);
+
+            var rawMaterial = new Product
+            {
+                TenantId = tenantId,
+                CategoryId = category.Id,
+                Name = "Recipe Flour",
+                Sku = "RAW-" + Guid.NewGuid().ToString()[..8],
+                Price = 0m,
+                Cost = 12m,
+                Type = ProductType.RawMaterial,
+                Unit = UnitOfMeasure.Kilogram,
+                TrackInventory = true,
+                TaxInclusive = false,
+                IsActive = true
+            };
+
+            var manufacturedProduct = new Product
+            {
+                TenantId = tenantId,
+                CategoryId = category.Id,
+                Name = "Recipe Pizza",
+                Sku = "MFG-" + Guid.NewGuid().ToString()[..8],
+                Price = 50m,
+                Cost = 0m,
+                Type = ProductType.Manufactured,
+                Unit = UnitOfMeasure.Piece,
+                TrackInventory = false,
+                TaxInclusive = false,
+                IsActive = true
+            };
+
+            db.Products.AddRange(rawMaterial, manufacturedProduct);
+            await db.SaveChangesAsync();
+
+            db.Recipes.Add(new Recipe
+            {
+                TenantId = tenantId,
+                ProductId = manufacturedProduct.Id,
+                YieldQuantity = 2m,
+                TotalCost = 18m,
+                IsActive = true,
+                AutoDeductIngredients = false,
+                Ingredients =
+                [
+                    new RecipeIngredient
+                    {
+                        RawMaterialProductId = rawMaterial.Id,
+                        Quantity = 1.5m,
+                        Unit = UnitOfMeasure.Kilogram,
+                        Cost = 18m
+                    }
+                ]
+            });
+            await db.SaveChangesAsync();
+            manufacturedProductId = manufacturedProduct.Id;
+        }
+
+        var token = TestHelpers.GenerateTestToken(
+            userId: testUserId,
+            tenantId: tenantId,
+            branchId: branch1Id,
+            email: "cashier@test.com",
+            name: "Test Cashier",
+            role: "Cashier"
+        );
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.PostAsJsonAsync("/api/orders", new CreateOrderRequest
+        {
+            OrderType = OrderType.DineIn,
+            Items = new List<CreateOrderItemRequest>
+            {
+                new() { ProductId = manufacturedProductId, Quantity = 1 }
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var content = await response.Content.ReadAsStringAsync();
+        var apiResponse = JsonSerializer.Deserialize<ApiResponse<OrderDto>>(content, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        apiResponse.Should().NotBeNull();
+        apiResponse!.Success.Should().BeTrue(because: apiResponse.Message);
+        apiResponse.Data.Should().NotBeNull();
+
+        using var verificationScope = _factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var persistedItem = await verificationDb.OrderItems
+            .SingleAsync(i => i.OrderId == apiResponse.Data!.Id && i.ProductId == manufacturedProductId);
+
+        persistedItem.UnitCost.Should().Be(9m);
+
+        await CleanupOrderAsync(apiResponse.Data!.Id);
+    }
+
+    [Fact]
+    public async Task CreateOrder_ForProductWithoutRecipe_ShouldSnapshotManualUnitCost()
+    {
+        var (testUserId, _, branch1Id, _) = await SeedTestDataAsync();
+        int tenantId;
+        int manufacturedProductId;
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var branch = await db.Branches.SingleAsync(b => b.Id == branch1Id);
+            tenantId = branch.TenantId;
+            var category = await db.Categories.FirstAsync(c => c.TenantId == tenantId);
+
+            var product = new Product
+            {
+                TenantId = tenantId,
+                CategoryId = category.Id,
+                Name = "Manual Cost Pizza",
+                Sku = "MCP-" + Guid.NewGuid().ToString()[..8],
+                Price = 60m,
+                Cost = 22m,
+                AverageCost = null,
+                Type = ProductType.Manufactured,
+                Unit = UnitOfMeasure.Piece,
+                TrackInventory = false,
+                TaxInclusive = false,
+                IsActive = true
+            };
+
+            db.Products.Add(product);
+            await db.SaveChangesAsync();
+            manufacturedProductId = product.Id;
+        }
+
+        var token = TestHelpers.GenerateTestToken(
+            userId: testUserId,
+            tenantId: tenantId,
+            branchId: branch1Id,
+            email: "cashier@test.com",
+            name: "Test Cashier",
+            role: "Cashier"
+        );
+
+        var client = _factory.CreateClient();
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.PostAsJsonAsync("/api/orders", new CreateOrderRequest
+        {
+            OrderType = OrderType.DineIn,
+            Items = new List<CreateOrderItemRequest>
+            {
+                new() { ProductId = manufacturedProductId, Quantity = 1 }
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.Created);
+
+        var content = await response.Content.ReadAsStringAsync();
+        var apiResponse = JsonSerializer.Deserialize<ApiResponse<OrderDto>>(content, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        });
+
+        apiResponse.Should().NotBeNull();
+        apiResponse!.Success.Should().BeTrue(because: apiResponse.Message);
+        apiResponse.Data.Should().NotBeNull();
+
+        using var verificationScope = _factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var persistedItem = await verificationDb.OrderItems
+            .SingleAsync(i => i.OrderId == apiResponse.Data!.Id && i.ProductId == manufacturedProductId);
+
+        persistedItem.UnitCost.Should().Be(22m);
+
+        await CleanupOrderAsync(apiResponse.Data!.Id);
+    }
+
+    [Fact]
+    public async Task CreateOrder_WithTaxInclusiveProduct_ShouldIgnoreInclusiveFlag_AndTreatPriceAsTaxExclusive()
     {
         var (testUserId, testProductId, branch1Id, _) = await SeedTestDataAsync();
         var taxInclusiveProductId = 0;
@@ -528,17 +719,17 @@ public class OrderCreationFlowTests : IClassFixture<CustomWebApplicationFactory>
         apiResponse.Data.Should().NotBeNull();
 
         var createdOrder = apiResponse.Data!;
-        createdOrder.Subtotal.Should().Be(200m);
-        createdOrder.TaxAmount.Should().Be(28m);
-        createdOrder.Total.Should().Be(228m);
+        createdOrder.Subtotal.Should().Be(214m);
+        createdOrder.TaxAmount.Should().Be(29.96m);
+        createdOrder.Total.Should().Be(243.96m);
 
         var taxInclusiveResponseItem = createdOrder.Items.Single(i => i.ProductId == taxInclusiveProductId);
-        taxInclusiveResponseItem.TaxInclusive.Should().BeTrue();
+        taxInclusiveResponseItem.TaxInclusive.Should().BeFalse();
         taxInclusiveResponseItem.OriginalPrice.Should().Be(114m);
-        taxInclusiveResponseItem.UnitPrice.Should().Be(100m);
-        taxInclusiveResponseItem.Subtotal.Should().Be(100m);
-        taxInclusiveResponseItem.TaxAmount.Should().Be(14m);
-        taxInclusiveResponseItem.Total.Should().Be(114m);
+        taxInclusiveResponseItem.UnitPrice.Should().Be(114m);
+        taxInclusiveResponseItem.Subtotal.Should().Be(114m);
+        taxInclusiveResponseItem.TaxAmount.Should().Be(15.96m);
+        taxInclusiveResponseItem.Total.Should().Be(129.96m);
 
         var taxExclusiveResponseItem = createdOrder.Items.Single(i => i.ProductId == testProductId);
         taxExclusiveResponseItem.TaxInclusive.Should().BeFalse();
@@ -554,17 +745,17 @@ public class OrderCreationFlowTests : IClassFixture<CustomWebApplicationFactory>
             .Include(o => o.Items)
             .SingleAsync(o => o.Id == createdOrder.Id);
 
-        persistedOrder.Subtotal.Should().Be(200m);
-        persistedOrder.TaxAmount.Should().Be(28m);
-        persistedOrder.Total.Should().Be(228m);
+        persistedOrder.Subtotal.Should().Be(214m);
+        persistedOrder.TaxAmount.Should().Be(29.96m);
+        persistedOrder.Total.Should().Be(243.96m);
 
         var taxInclusivePersistedItem = persistedOrder.Items.Single(i => i.ProductId == taxInclusiveProductId);
-        taxInclusivePersistedItem.TaxInclusive.Should().BeTrue();
+        taxInclusivePersistedItem.TaxInclusive.Should().BeFalse();
         taxInclusivePersistedItem.OriginalPrice.Should().Be(114m);
-        taxInclusivePersistedItem.UnitPrice.Should().Be(100m);
-        taxInclusivePersistedItem.Subtotal.Should().Be(100m);
-        taxInclusivePersistedItem.TaxAmount.Should().Be(14m);
-        taxInclusivePersistedItem.Total.Should().Be(114m);
+        taxInclusivePersistedItem.UnitPrice.Should().Be(114m);
+        taxInclusivePersistedItem.Subtotal.Should().Be(114m);
+        taxInclusivePersistedItem.TaxAmount.Should().Be(15.96m);
+        taxInclusivePersistedItem.Total.Should().Be(129.96m);
 
         var taxExclusivePersistedItem = persistedOrder.Items.Single(i => i.ProductId == testProductId);
         taxExclusivePersistedItem.TaxInclusive.Should().BeFalse();
@@ -578,7 +769,7 @@ public class OrderCreationFlowTests : IClassFixture<CustomWebApplicationFactory>
     }
 
     [Fact]
-    public async Task AddCustomItem_WithTaxInclusivePrice_ShouldPersistNetUnitPriceAndExpectedTotals()
+    public async Task AddCustomItem_WithTaxInclusivePrice_ShouldIgnoreInclusiveFlag_AndTreatPriceAsTaxExclusive()
     {
         var (testUserId, testProductId, branch1Id, _) = await SeedTestDataAsync();
 
@@ -625,7 +816,6 @@ public class OrderCreationFlowTests : IClassFixture<CustomWebApplicationFactory>
             UnitPrice = 114m,
             Quantity = 1,
             TaxRate = 14m,
-            TaxInclusive = true,
             Notes = "Tax-inclusive regression test"
         };
 
@@ -646,20 +836,20 @@ public class OrderCreationFlowTests : IClassFixture<CustomWebApplicationFactory>
         addCustomApiResponse.Data.Should().NotBeNull();
 
         var updatedOrder = addCustomApiResponse.Data!;
-        updatedOrder.Subtotal.Should().Be(200m);
-        updatedOrder.TaxAmount.Should().Be(28m);
-        updatedOrder.Total.Should().Be(228m);
+        updatedOrder.Subtotal.Should().Be(214m);
+        updatedOrder.TaxAmount.Should().Be(29.96m);
+        updatedOrder.Total.Should().Be(243.96m);
         updatedOrder.Items.Should().HaveCount(2);
 
         var customItem = updatedOrder.Items.Single(i => i.IsCustomItem);
         customItem.CustomName.Should().Be("Custom Tax Inclusive Item");
         customItem.CustomUnitPrice.Should().Be(114m);
-        customItem.TaxInclusive.Should().BeTrue();
+        customItem.TaxInclusive.Should().BeFalse();
         customItem.OriginalPrice.Should().Be(114m);
-        customItem.UnitPrice.Should().Be(100m);
-        customItem.Subtotal.Should().Be(100m);
-        customItem.TaxAmount.Should().Be(14m);
-        customItem.Total.Should().Be(114m);
+        customItem.UnitPrice.Should().Be(114m);
+        customItem.Subtotal.Should().Be(114m);
+        customItem.TaxAmount.Should().Be(15.96m);
+        customItem.Total.Should().Be(129.96m);
 
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -668,19 +858,19 @@ public class OrderCreationFlowTests : IClassFixture<CustomWebApplicationFactory>
             .Include(o => o.Items)
             .SingleAsync(o => o.Id == createdOrder.Id);
 
-        persistedOrder.Subtotal.Should().Be(200m);
-        persistedOrder.TaxAmount.Should().Be(28m);
-        persistedOrder.Total.Should().Be(228m);
+        persistedOrder.Subtotal.Should().Be(214m);
+        persistedOrder.TaxAmount.Should().Be(29.96m);
+        persistedOrder.Total.Should().Be(243.96m);
 
         var persistedCustomItem = persistedOrder.Items.Single(i => i.IsCustomItem);
         persistedCustomItem.CustomName.Should().Be("Custom Tax Inclusive Item");
         persistedCustomItem.CustomUnitPrice.Should().Be(114m);
-        persistedCustomItem.TaxInclusive.Should().BeTrue();
+        persistedCustomItem.TaxInclusive.Should().BeFalse();
         persistedCustomItem.OriginalPrice.Should().Be(114m);
-        persistedCustomItem.UnitPrice.Should().Be(100m);
-        persistedCustomItem.Subtotal.Should().Be(100m);
-        persistedCustomItem.TaxAmount.Should().Be(14m);
-        persistedCustomItem.Total.Should().Be(114m);
+        persistedCustomItem.UnitPrice.Should().Be(114m);
+        persistedCustomItem.Subtotal.Should().Be(114m);
+        persistedCustomItem.TaxAmount.Should().Be(15.96m);
+        persistedCustomItem.Total.Should().Be(129.96m);
 
         await CleanupOrderAsync(createdOrder.Id);
     }

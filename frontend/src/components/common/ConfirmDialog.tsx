@@ -15,6 +15,7 @@ interface ConfirmDialogProps {
   isLoading?: boolean;
   icon?: ReactNode;
   variant?: "danger" | "warning" | "primary";
+  children?: ReactNode;
 }
 
 export const ConfirmDialog = ({
@@ -29,6 +30,7 @@ export const ConfirmDialog = ({
   isLoading = false,
   icon,
   variant = "danger",
+  children,
 }: ConfirmDialogProps) => {
   if (!open) return null;
 
@@ -66,6 +68,7 @@ export const ConfirmDialog = ({
               <p className="text-sm text-danger-500 mt-2">{warning}</p>
             )}
           </div>
+          {children && <div className="mb-5">{children}</div>}
           <div className="flex gap-3">
             <Button
               variant="secondary"

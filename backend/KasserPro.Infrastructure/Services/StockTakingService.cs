@@ -30,28 +30,16 @@ public class StockTakingService : IStockTakingService
             query = query.Where(st => st.Status == parsed);
 
         var total = await query.CountAsync();
-        var items = await query
+        var stockTakings = await query
+            .AsNoTracking()
+            .Include(st => st.Category)
+            .Include(st => st.CreatedByUser)
+            .Include(st => st.CompletedByUser)
+            .Include(st => st.Items)
             .OrderByDescending(st => st.StartedAt)
             .Skip((page - 1) * pageSize).Take(pageSize)
-            .Select(st => new StockTakingDto
-            {
-                Id = st.Id,
-                StockTakingNumber = st.StockTakingNumber,
-                Type = st.Type,
-                CategoryId = st.CategoryId,
-                CategoryName = st.CategoryId != null ? st.Category.Name : null,
-                Status = st.Status,
-                StartedAt = st.StartedAt,
-                CompletedAt = st.CompletedAt,
-                CreatedByUserId = st.CreatedByUserId,
-                CreatedByUserName = st.CreatedByUser.Name,
-                CompletedByUserId = st.CompletedByUserId,
-                CompletedByUserName = st.CompletedByUser != null ? st.CompletedByUser.Name : null,
-                Notes = st.Notes,
-                ItemCount = st.Items.Count,
-                TotalDifference = st.Items.Sum(i => i.ActualQuantity - i.SystemQuantity)
-            })
             .ToListAsync();
+        var items = stockTakings.Select(st => MapToDto(st)).ToList();
 
         return new PagedResult<StockTakingDto>(items, total, page, pageSize);
     }
@@ -59,44 +47,19 @@ public class StockTakingService : IStockTakingService
     public async Task<StockTakingDto?> GetByIdAsync(int id)
     {
         var st = await _context.StockTakings
+            .AsNoTracking()
+            .Include(s => s.Category)
             .Include(s => s.Items)
             .ThenInclude(i => i.Product)
+            .Include(s => s.Items)
+            .ThenInclude(i => i.Batch)
             .Include(s => s.CreatedByUser)
             .Include(s => s.CompletedByUser)
             .FirstOrDefaultAsync(s => s.Id == id && s.TenantId == _currentUser.TenantId && s.BranchId == _currentUser.BranchId);
 
         if (st == null) return null;
 
-        return new StockTakingDto
-        {
-            Id = st.Id,
-            StockTakingNumber = st.StockTakingNumber,
-            Type = st.Type,
-            CategoryId = st.CategoryId,
-            CategoryName = st.CategoryId != null ? st.Category?.Name : null,
-            Status = st.Status,
-            StartedAt = st.StartedAt,
-            CompletedAt = st.CompletedAt,
-            CreatedByUserId = st.CreatedByUserId,
-            CreatedByUserName = st.CreatedByUser?.Name,
-            CompletedByUserId = st.CompletedByUserId,
-            CompletedByUserName = st.CompletedByUser?.Name,
-            Notes = st.Notes,
-            ItemCount = st.Items.Count,
-            TotalDifference = st.Items.Sum(i => i.ActualQuantity - i.SystemQuantity),
-            Items = st.Items.Select(i => new StockTakingItemDto
-            {
-                Id = i.Id,
-                ProductId = i.ProductId,
-                ProductName = i.Product?.Name ?? "",
-                ProductSku = i.Product?.Sku,
-                SystemQuantity = i.SystemQuantity,
-                ActualQuantity = i.ActualQuantity,
-                Difference = i.ActualQuantity - i.SystemQuantity,
-                Reason = i.Reason,
-                BatchId = i.BatchId
-            }).ToList()
-        };
+        return MapToDto(st, includeItems: true);
     }
 
     public async Task<ApiResponse<StockTakingDto>> CreateAsync(CreateStockTakingRequest request)
@@ -193,6 +156,9 @@ public class StockTakingService : IStockTakingService
 
         if (stockTaking.Status != StockTakingStatus.InProgress)
             return ApiResponse<StockTakingItemDto>.Fail(ErrorCodes.STOCK_TAKING_NOT_EDITABLE, ErrorMessages.Get(ErrorCodes.STOCK_TAKING_NOT_EDITABLE));
+
+        if (request.ActualQuantity < 0)
+            return ApiResponse<StockTakingItemDto>.Fail(ErrorCodes.INVENTORY_INVALID_QUANTITY, ErrorMessages.Get(ErrorCodes.INVENTORY_INVALID_QUANTITY));
 
         var product = await _context.Products
             .FirstOrDefaultAsync(p => p.Id == request.ProductId && p.TenantId == _currentUser.TenantId);
@@ -302,10 +268,12 @@ public class StockTakingService : IStockTakingService
                     var diff = item.ActualQuantity - item.SystemQuantity;
                     if (diff == 0) continue;
 
+                    ProductBatch? batch = null;
+
                     // Batch validation before applying
                     if (item.BatchId.HasValue)
                     {
-                        var batch = await _context.ProductBatches
+                        batch = await _context.ProductBatches
                             .FirstOrDefaultAsync(b => b.Id == item.BatchId.Value && b.ProductId == item.ProductId && b.BranchId == stockTaking.BranchId && b.TenantId == _currentUser.TenantId);
 
                         if (batch == null)
@@ -336,8 +304,38 @@ public class StockTakingService : IStockTakingService
                         continue;
 
                     var balanceBefore = inventory.Quantity;
-                    inventory.Quantity = item.ActualQuantity;
+                    var balanceAfter = balanceBefore + diff;
+                    if (balanceAfter < 0)
+                    {
+                        await transaction.RollbackAsync();
+                        return ApiResponse<StockTakingDto>.Fail(ErrorCodes.INVENTORY_INVALID_QUANTITY, ErrorMessages.Get(ErrorCodes.INVENTORY_INVALID_QUANTITY));
+                    }
+
+                    inventory.Quantity = Math.Round(balanceAfter, 4);
                     inventory.LastUpdatedAt = DateTime.UtcNow;
+
+                    if (batch != null)
+                    {
+                        var batchBalanceAfter = batch.Quantity + diff;
+                        if (batchBalanceAfter < 0)
+                        {
+                            await transaction.RollbackAsync();
+                            return ApiResponse<StockTakingDto>.Fail(ErrorCodes.INVENTORY_INVALID_QUANTITY, ErrorMessages.Get(ErrorCodes.INVENTORY_INVALID_QUANTITY));
+                        }
+
+                        batch.Quantity = Math.Round(batchBalanceAfter, 4);
+                        batch.UpdatedAt = DateTime.UtcNow;
+                        if (batch.Quantity <= 0)
+                        {
+                            batch.Status = BatchStatus.Depleted;
+                            batch.StatusUpdatedAt = DateTime.UtcNow;
+                        }
+                        else if (batch.Status == BatchStatus.Depleted)
+                        {
+                            batch.Status = BatchStatus.Active;
+                            batch.StatusUpdatedAt = DateTime.UtcNow;
+                        }
+                    }
 
                     var movement = new StockMovement
                     {
@@ -398,30 +396,56 @@ public class StockTakingService : IStockTakingService
     public async Task<StockTakingDto?> GetLatestCompletedAsync()
     {
         var latest = await _context.StockTakings
+            .AsNoTracking()
+            .Include(st => st.Category)
+            .Include(st => st.CreatedByUser)
+            .Include(st => st.CompletedByUser)
+            .Include(st => st.Items)
             .Where(st => st.TenantId == _currentUser.TenantId
                       && st.BranchId == _currentUser.BranchId
                       && st.Status == StockTakingStatus.Completed)
             .OrderByDescending(st => st.CompletedAt)
-            .Select(st => new StockTakingDto
-            {
-                Id = st.Id,
-                StockTakingNumber = st.StockTakingNumber,
-                Type = st.Type,
-                CategoryId = st.CategoryId,
-                CategoryName = st.CategoryId != null ? st.Category.Name : null,
-                Status = st.Status,
-                StartedAt = st.StartedAt,
-                CompletedAt = st.CompletedAt,
-                CreatedByUserId = st.CreatedByUserId,
-                CreatedByUserName = st.CreatedByUser.Name,
-                CompletedByUserId = st.CompletedByUserId,
-                CompletedByUserName = st.CompletedByUser != null ? st.CompletedByUser.Name : null,
-                Notes = st.Notes,
-                ItemCount = st.Items.Count,
-                TotalDifference = st.Items.Sum(i => i.ActualQuantity - i.SystemQuantity)
-            })
             .FirstOrDefaultAsync();
 
-        return latest;
+        return latest == null ? null : MapToDto(latest);
+    }
+
+    private static StockTakingDto MapToDto(StockTaking stockTaking, bool includeItems = false)
+    {
+        var items = stockTaking.Items ?? new List<StockTakingItem>();
+
+        return new StockTakingDto
+        {
+            Id = stockTaking.Id,
+            StockTakingNumber = stockTaking.StockTakingNumber,
+            Type = stockTaking.Type,
+            CategoryId = stockTaking.CategoryId,
+            CategoryName = stockTaking.Category?.Name,
+            Status = stockTaking.Status,
+            StartedAt = stockTaking.StartedAt,
+            CompletedAt = stockTaking.CompletedAt,
+            CreatedByUserId = stockTaking.CreatedByUserId,
+            CreatedByUserName = stockTaking.CreatedByUser?.Name,
+            CompletedByUserId = stockTaking.CompletedByUserId,
+            CompletedByUserName = stockTaking.CompletedByUser?.Name,
+            Notes = stockTaking.Notes,
+            ItemCount = items.Count,
+            TotalDifference = items.Sum(i => i.ActualQuantity - i.SystemQuantity),
+            Items = includeItems
+                ? items.Select(i => new StockTakingItemDto
+                {
+                    Id = i.Id,
+                    ProductId = i.ProductId,
+                    ProductName = i.Product?.Name ?? string.Empty,
+                    ProductSku = i.Product?.Sku,
+                    SystemQuantity = i.SystemQuantity,
+                    ActualQuantity = i.ActualQuantity,
+                    Difference = i.ActualQuantity - i.SystemQuantity,
+                    Reason = i.Reason,
+                    BatchId = i.BatchId,
+                    BatchNumber = i.Batch?.BatchNumber
+                }).ToList()
+                : new List<StockTakingItemDto>()
+        };
     }
 }

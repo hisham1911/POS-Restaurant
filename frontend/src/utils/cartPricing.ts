@@ -13,8 +13,6 @@ export interface CartPricingItem {
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
 
-const round4 = (value: number): number => Math.round(value * 10000) / 10000;
-
 export const getProductEffectiveTaxRate = (
   product: Product,
   fallbackTaxRate: number,
@@ -32,20 +30,8 @@ export const getProductNetUnitPrice = (
   fallbackTaxRate: number,
   isTaxEnabled: boolean,
 ): number => {
-  const taxRate = getProductEffectiveTaxRate(
-    product,
-    fallbackTaxRate,
-    isTaxEnabled,
-  );
-
   // Use suggestedPrice (batch price if available, otherwise base price)
-  const effectivePrice = product.suggestedPrice;
-
-  if (product.taxInclusive && taxRate > 0) {
-    return round4(effectivePrice / (1 + taxRate / 100));
-  }
-
-  return effectivePrice;
+  return product.suggestedPrice;
 };
 
 export const getCartItemSubtotal = (

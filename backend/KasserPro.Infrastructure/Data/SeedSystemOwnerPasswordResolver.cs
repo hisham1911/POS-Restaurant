@@ -1,40 +1,33 @@
 namespace KasserPro.Infrastructure.Data;
 
-using System.Security.Cryptography;
+public enum SeedSystemOwnerPasswordSource
+{
+    Environment,
+    FixedDefault
+}
 
 public static class SeedSystemOwnerPasswordResolver
 {
     public const string EnvironmentVariableName = "KASSERPRO_SEED_SYSTEM_OWNER_PASSWORD";
-
-    private const int GeneratedPasswordLength = 24;
-    private static string? _cachedGeneratedPassword;
+    public const string FixedDefaultPassword = "Owner@123";
 
     public static string Resolve(out bool fromEnvironment)
+    {
+        var password = ResolveWithSource(out var source);
+        fromEnvironment = source == SeedSystemOwnerPasswordSource.Environment;
+        return password;
+    }
+
+    public static string ResolveWithSource(out SeedSystemOwnerPasswordSource source)
     {
         var envPassword = Environment.GetEnvironmentVariable(EnvironmentVariableName);
         if (!string.IsNullOrWhiteSpace(envPassword))
         {
-            fromEnvironment = true;
+            source = SeedSystemOwnerPasswordSource.Environment;
             return envPassword.Trim();
         }
 
-        fromEnvironment = false;
-        _cachedGeneratedPassword ??= GeneratePassword(GeneratedPasswordLength);
-        return _cachedGeneratedPassword;
-    }
-
-    private static string GeneratePassword(int length)
-    {
-        const string alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%*-_";
-        var output = new char[length];
-        var buffer = new byte[length];
-        RandomNumberGenerator.Fill(buffer);
-
-        for (var i = 0; i < length; i++)
-        {
-            output[i] = alphabet[buffer[i] % alphabet.Length];
-        }
-
-        return new string(output);
+        source = SeedSystemOwnerPasswordSource.FixedDefault;
+        return FixedDefaultPassword;
     }
 }

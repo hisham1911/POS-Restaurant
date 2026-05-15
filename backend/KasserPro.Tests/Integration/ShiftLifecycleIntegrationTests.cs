@@ -5,8 +5,10 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using FluentAssertions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using KasserPro.Application.Common;
 using KasserPro.Application.DTOs.Common;
 using KasserPro.Application.DTOs.Orders;
 using KasserPro.Application.DTOs.Shifts;
@@ -226,7 +228,7 @@ public class ShiftLifecycleIntegrationTests : IClassFixture<CustomWebApplication
         closedShift.ClosingBalance.Should().Be(614m);
         closedShift.TotalOrders.Should().Be(1, because: "One order was completed");
         closedShift.TotalCash.Should().Be(114m, because: "Total cash should be the applied sale amount after change");
-        closedShift.TotalCard.Should().Be(0m, because: "No card payments were made");
+        closedShift.TotalBankAccount.Should().Be(0m, because: "No bank account payments were made");
         
         // Expected balance = Opening + TotalCash = 500 + 114 = 614
         closedShift.ExpectedBalance.Should().Be(614m,
@@ -331,6 +333,202 @@ public class ShiftLifecycleIntegrationTests : IClassFixture<CustomWebApplication
         historyResult.Data![0].Id.Should().Be(shiftId);
         historyResult.Data[0].TotalSales.Should().Be(114m);
         historyResult.Data[0].TotalOrdersCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task CloseShift_AfterCashSaleAndFullRefund_ShouldReturnDrawerToOpeningBalance()
+    {
+        var testData = await SeedTestDataAsync(
+            taxEnabled: false,
+            tenantTaxRate: 0m,
+            productTaxRate: 0m);
+
+        var client = _factory.CreateClient();
+        var token = TestHelpers.GenerateTestToken(
+            userId: testData.UserId,
+            tenantId: testData.TenantId,
+            branchId: testData.BranchId,
+            email: "cashier@kasserpro.test",
+            name: "Refund Cashier",
+            role: "Cashier",
+            permissions: new[] { "OrdersView", "OrdersCreate", "OrdersRefund" });
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var openingBalance = 500m;
+        var openShiftResponse = await client.PostAsJsonAsync("/api/shifts/open", new OpenShiftRequest
+        {
+            OpeningBalance = openingBalance
+        });
+        var openShiftResult = await DeserializeResponse<ShiftDto>(openShiftResponse);
+        openShiftResult.Success.Should().BeTrue(because: openShiftResult.Message);
+
+        var createOrderResponse = await client.PostAsJsonAsync("/api/orders", new CreateOrderRequest
+        {
+            OrderType = OrderType.DineIn,
+            CustomerName = "Refund Flow",
+            Items = new List<CreateOrderItemRequest>
+            {
+                new() { ProductId = testData.ActiveProductId, Quantity = 1 }
+            }
+        });
+        var createOrderResult = await DeserializeResponse<OrderDto>(createOrderResponse);
+        createOrderResult.Success.Should().BeTrue(because: createOrderResult.Message);
+        createOrderResult.Data.Should().NotBeNull();
+        createOrderResult.Data!.Total.Should().Be(100m);
+
+        var orderId = createOrderResult.Data.Id;
+
+        var completeOrderResponse = await client.PostAsJsonAsync($"/api/orders/{orderId}/complete", new CompleteOrderRequest
+        {
+            Payments = new List<PaymentRequest>
+            {
+                new() { Method = "Cash", Amount = 100m }
+            }
+        });
+        var completeOrderResult = await DeserializeResponse<OrderDto>(completeOrderResponse);
+        completeOrderResult.Success.Should().BeTrue(because: completeOrderResult.Message);
+        completeOrderResult.Data.Should().NotBeNull();
+        completeOrderResult.Data!.AmountPaid.Should().Be(100m);
+        completeOrderResult.Data.ChangeAmount.Should().Be(0m);
+
+        var refundResponse = await client.PostAsJsonAsync($"/api/orders/{orderId}/refund", new
+        {
+            reason = "Full refund regression",
+            items = (object?)null
+        });
+        var refundResult = await DeserializeResponse<OrderDto>(refundResponse);
+        refundResult.Success.Should().BeTrue(because: refundResult.Message);
+        refundResult.Data.Should().NotBeNull();
+        refundResult.Data!.OrderType.Should().Be("Return");
+        refundResult.Data.Total.Should().Be(-100m);
+
+        var closeShiftResponse = await client.PostAsJsonAsync("/api/shifts/close", new CloseShiftRequest
+        {
+            ClosingBalance = openingBalance,
+            Notes = "Sale then full refund"
+        });
+        var closeShiftResult = await DeserializeResponse<ShiftDto>(closeShiftResponse);
+        closeShiftResult.Success.Should().BeTrue(because: closeShiftResult.Message);
+        closeShiftResult.Data.Should().NotBeNull();
+
+        var closedShift = closeShiftResult.Data!;
+        closedShift.ExpectedBalance.Should().Be(openingBalance);
+        closedShift.ClosingBalance.Should().Be(openingBalance);
+        closedShift.Difference.Should().Be(0m);
+        closedShift.TotalCash.Should().Be(0m);
+        closedShift.TotalRefunds.Should().Be(100m);
+        closedShift.RefundsCount.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task CreateOrder_WithNegativeDeliveryFee_ShouldReturnClearValidationMessage()
+    {
+        var testData = await SeedTestDataAsync();
+
+        var client = _factory.CreateClient();
+        var token = TestHelpers.GenerateTestToken(
+            userId: testData.UserId,
+            tenantId: testData.TenantId,
+            branchId: testData.BranchId,
+            role: "Cashier");
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await client.PostAsJsonAsync("/api/orders", new CreateOrderRequest
+        {
+            OrderType = OrderType.Delivery,
+            CustomerName = "Negative Fee Test",
+            DeliveryFee = -50m,
+            Items = new List<CreateOrderItemRequest>
+            {
+                new() { ProductId = testData.ActiveProductId, Quantity = 1 }
+            }
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+
+        var result = await DeserializeResponse<OrderDto>(response);
+        result.Success.Should().BeFalse();
+        result.ErrorCode.Should().Be(ErrorCodes.VALIDATION_ERROR);
+        result.Message.Should().Contain("رسوم التوصيل");
+        result.Message.Should().Contain("أقل من صفر");
+    }
+
+    [Fact]
+    public async Task RefundCreditSale_ShouldReduceCustomerTotalDueByOnlyTheOutstandingAmount()
+    {
+        var testData = await SeedTestDataAsync(
+            taxEnabled: false,
+            tenantTaxRate: 0m,
+            productTaxRate: 0m);
+
+        var client = _factory.CreateClient();
+        var token = TestHelpers.GenerateTestToken(
+            userId: testData.UserId,
+            tenantId: testData.TenantId,
+            branchId: testData.BranchId,
+            email: "credit@kasserpro.test",
+            name: "Credit Cashier",
+            role: "Cashier",
+            permissions: new[] { "OrdersView", "OrdersCreate", "OrdersRefund", "PosCreditSale" });
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+
+        var openShiftResponse = await client.PostAsJsonAsync("/api/shifts/open", new OpenShiftRequest
+        {
+            OpeningBalance = 200m
+        });
+        var openShiftResult = await DeserializeResponse<ShiftDto>(openShiftResponse);
+        openShiftResult.Success.Should().BeTrue(because: openShiftResult.Message);
+
+        var createOrderResponse = await client.PostAsJsonAsync("/api/orders", new CreateOrderRequest
+        {
+            OrderType = OrderType.DineIn,
+            CustomerId = testData.CustomerId,
+            CustomerName = "Credit Customer",
+            Items = new List<CreateOrderItemRequest>
+            {
+                new() { ProductId = testData.ActiveProductId, Quantity = 1 }
+            }
+        });
+        var createOrderResult = await DeserializeResponse<OrderDto>(createOrderResponse);
+        createOrderResult.Success.Should().BeTrue(because: createOrderResult.Message);
+        createOrderResult.Data.Should().NotBeNull();
+
+        var orderId = createOrderResult.Data!.Id;
+
+        var completeResponse = await client.PostAsJsonAsync($"/api/orders/{orderId}/complete", new CompleteOrderRequest
+        {
+            Payments = new List<PaymentRequest>
+            {
+                new() { Method = "Cash", Amount = 40m }
+            }
+        });
+        var completeResult = await DeserializeResponse<OrderDto>(completeResponse);
+        completeResult.Success.Should().BeTrue(because: completeResult.Message);
+        completeResult.Data.Should().NotBeNull();
+        completeResult.Data!.AmountDue.Should().Be(60m);
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var customerAfterSale = await db.Customers.SingleAsync(c => c.Id == testData.CustomerId);
+            customerAfterSale.TotalDue.Should().Be(60m);
+        }
+
+        var refundResponse = await client.PostAsJsonAsync($"/api/orders/{orderId}/refund", new
+        {
+            reason = "Refund credit sale",
+            items = (object?)null
+        });
+        var refundResult = await DeserializeResponse<OrderDto>(refundResponse);
+        refundResult.Success.Should().BeTrue(because: refundResult.Message);
+
+        using var verificationScope = _factory.Services.CreateScope();
+        var verificationDb = verificationScope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var customerAfterRefund = await verificationDb.Customers.SingleAsync(c => c.Id == testData.CustomerId);
+        var originalOrder = await verificationDb.Orders.SingleAsync(o => o.Id == orderId);
+
+        customerAfterRefund.TotalDue.Should().Be(0m);
+        originalOrder.AmountDue.Should().Be(0m);
     }
 
     /// <summary>
@@ -456,7 +654,10 @@ public class ShiftLifecycleIntegrationTests : IClassFixture<CustomWebApplication
     /// <summary>
     /// Seeds test data for the shift lifecycle test
     /// </summary>
-    private async Task<TestData> SeedTestDataAsync()
+    private async Task<TestData> SeedTestDataAsync(
+        bool taxEnabled = true,
+        decimal tenantTaxRate = 14m,
+        decimal productTaxRate = 14m)
     {
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -466,8 +667,8 @@ public class ShiftLifecycleIntegrationTests : IClassFixture<CustomWebApplication
         {
             Name = "Solid Ground Test Tenant",
             Slug = "solid-ground-" + Guid.NewGuid().ToString()[..8],
-            TaxRate = 14m,
-            IsTaxEnabled = true,
+            TaxRate = tenantTaxRate,
+            IsTaxEnabled = taxEnabled,
             IsActive = true
         };
         db.Tenants.Add(tenant);
@@ -506,8 +707,21 @@ public class ShiftLifecycleIntegrationTests : IClassFixture<CustomWebApplication
         // Seed cashier permissions required by service-layer checks
         db.UserPermissions.AddRange(
             new UserPermission { UserId = user.Id, Permission = Permission.OrdersCreate },
-            new UserPermission { UserId = user.Id, Permission = Permission.PosCreditSale }
+            new UserPermission { UserId = user.Id, Permission = Permission.PosCreditSale },
+            new UserPermission { UserId = user.Id, Permission = Permission.OrdersRefund }
         );
+        await db.SaveChangesAsync();
+
+        var customer = new Customer
+        {
+            TenantId = tenant.Id,
+            Name = "Shift Test Customer",
+            Phone = "010" + Random.Shared.Next(10000000, 99999999),
+            IsActive = true,
+            CreditLimit = 1000m,
+            TotalDue = 0m
+        };
+        db.Customers.Add(customer);
         await db.SaveChangesAsync();
 
         // Create Category
@@ -531,7 +745,7 @@ public class ShiftLifecycleIntegrationTests : IClassFixture<CustomWebApplication
             Sku = "ACTIVE-" + Guid.NewGuid().ToString()[..8],
             Price = 100m, // Net price (excluding tax)
             Cost = 70m,
-            TaxRate = 14m,
+            TaxRate = productTaxRate,
             TaxInclusive = false, // Tax Exclusive
             IsActive = true,
             TrackInventory = false
@@ -548,7 +762,7 @@ public class ShiftLifecycleIntegrationTests : IClassFixture<CustomWebApplication
             Sku = "INACTIVE-" + Guid.NewGuid().ToString()[..8],
             Price = 200m,
             Cost = 150m,
-            TaxRate = 14m,
+            TaxRate = productTaxRate,
             TaxInclusive = false,
             IsActive = false, // INACTIVE!
             TrackInventory = false
@@ -561,6 +775,7 @@ public class ShiftLifecycleIntegrationTests : IClassFixture<CustomWebApplication
             TenantId = tenant.Id,
             BranchId = branch.Id,
             UserId = user.Id,
+            CustomerId = customer.Id,
             CategoryId = category.Id,
             ActiveProductId = activeProduct.Id,
             InactiveProductId = inactiveProduct.Id
@@ -579,6 +794,7 @@ public class ShiftLifecycleIntegrationTests : IClassFixture<CustomWebApplication
         public int TenantId { get; init; }
         public int BranchId { get; init; }
         public int UserId { get; init; }
+        public int CustomerId { get; init; }
         public int CategoryId { get; init; }
         public int ActiveProductId { get; init; }
         public int InactiveProductId { get; init; }

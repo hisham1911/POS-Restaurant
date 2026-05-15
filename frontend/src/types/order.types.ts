@@ -1,12 +1,16 @@
 export type OrderStatus =
   | "Draft"
   | "Pending"
+  | "Preparing"
+  | "Prepared"
+  | "Delivered"
   | "Completed"
   | "Cancelled"
   | "Refunded"
   | "PartiallyRefunded";
 
 export type OrderType = "DineIn" | "Takeaway" | "Delivery" | "Return";
+export type OrderSource = "POS" | "Talabat" | "Marsool" | "Jahez" | "Other";
 
 export type PaymentMethod = "Cash" | "BankAccount" | "Wallet";
 
@@ -53,6 +57,9 @@ export interface OrderItem {
   unitPrice: number;
   originalPrice: number;
   quantity: number;
+  parentOrderItemId?: number | null;
+  kitchenPrintedQuantity?: number;
+  lastKitchenPrintedAt?: string | null;
   refundedQuantity: number;
   // Discount
   discountType?: string;
@@ -78,6 +85,12 @@ export interface Order {
   orderNumber: string;
   status: OrderStatus;
   orderType?: OrderType;
+  tableId?: number | null;
+  tableNumberSnapshot?: string | null;
+  orderSource?: OrderSource;
+  externalOrderNumber?: string | null;
+  kitchenPrintCount?: number;
+  lastKitchenPrintedAt?: string | null;
   // Concurrency Token (for optimistic locking)
   rowVersion?: string;
   // Branch Snapshot
@@ -147,6 +160,9 @@ export interface Payment {
 export interface CreateOrderRequest {
   branchId?: number;
   orderType?: OrderType;
+  tableId?: number;
+  orderSource?: OrderSource;
+  externalOrderNumber?: string;
   items: {
     productId: number;
     quantity: number;
@@ -179,12 +195,38 @@ export interface CompleteOrderRequest {
   }[];
 }
 
+export interface UpdateOrderStatusRequest {
+  status: OrderStatus;
+  reason?: string;
+}
+
 // طلب إضافة منتج مخصص (ليس من الكتالوج)
 export interface AddCustomItemRequest {
   name: string;
   unitPrice: number;
   quantity?: number;
+  parentOrderItemId?: number;
   taxRate?: number;
-  taxInclusive?: boolean;
   notes?: string;
+}
+
+export interface KitchenTicketItem {
+  orderItemId: number;
+  parentOrderItemId?: number | null;
+  name: string;
+  quantity: number;
+  notes?: string | null;
+  isCustomItem: boolean;
+  isAddOn: boolean;
+}
+
+export interface KitchenTicket {
+  orderId: number;
+  orderNumber: string;
+  ticketType: "Full" | "Additions";
+  header: string;
+  notes?: string | null;
+  kitchenPrintCount: number;
+  printedAt: string;
+  items: KitchenTicketItem[];
 }

@@ -1,7 +1,10 @@
 // حالات الطلب
 export const ORDER_STATUS = {
   Draft: { label: "مسودة", color: "gray" },
-  Pending: { label: "في الانتظار", color: "warning" },
+  Pending: { label: "جديد", color: "warning" },
+  Preparing: { label: "بيتحضر", color: "primary" },
+  Prepared: { label: "تم التحضير", color: "success" },
+  Delivered: { label: "تم التسليم", color: "success" },
   Completed: { label: "مكتمل", color: "success" },
   Cancelled: { label: "ملغي", color: "danger" },
   Refunded: { label: "مسترجع", color: "danger" },

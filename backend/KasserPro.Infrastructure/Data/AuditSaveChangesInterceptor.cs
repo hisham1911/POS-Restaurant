@@ -253,11 +253,17 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
             foreach (var auditEntry in _auditEntries)
             {
                 var entityId = auditEntry.EntityId ?? auditEntry.Entity?.Id ?? 0;
+                var auditTenantId = auditEntry.TenantId ?? tenantId;
+
+                if (auditTenantId <= 0)
+                {
+                    continue;
+                }
 
                 var auditLog = new AuditLog
                 {
                     // Use entity's TenantId if available, otherwise use current user's
-                    TenantId = auditEntry.TenantId ?? tenantId,
+                    TenantId = auditTenantId,
                     BranchId = auditEntry.BranchId,
                     UserId = userId > 0 ? userId : null,
                     UserName = userName,
@@ -300,10 +306,10 @@ public class AuditSaveChangesInterceptor : SaveChangesInterceptor
 
         // Get TenantId from JWT
         var tenantIdClaim = user?.FindFirst("tenantId");
-        var tenantId = int.TryParse(tenantIdClaim?.Value, out var tid) ? tid : 1;
+        var tenantId = int.TryParse(tenantIdClaim?.Value, out var tid) ? tid : 0;
 
         // Get BranchId from header first, then JWT
-        var branchId = 1;
+        var branchId = 0;
         var headerValue = httpContext?.Request.Headers["X-Branch-Id"].FirstOrDefault();
         if (!string.IsNullOrEmpty(headerValue) && int.TryParse(headerValue, out var hid))
         {

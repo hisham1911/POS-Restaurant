@@ -143,6 +143,11 @@ public class ReportService : IReportService
 
         // Wallet breakdown: use already-loaded completedOrders to guarantee
         // exact parity with totalWallet (same data source, same filter).
+        var refundedWalletById = returnPayments
+            .Where(p => p.Method == PaymentMethod.Wallet && p.WalletId.HasValue)
+            .GroupBy(p => p.WalletId!.Value)
+            .ToDictionary(g => g.Key, g => Math.Abs(g.Sum(p => p.Amount)));
+
         var walletBreakdown = completedOrders
             .Where(o => o.Status == OrderStatus.Completed
                      || o.Status == OrderStatus.PartiallyRefunded
@@ -155,7 +160,7 @@ public class ReportService : IReportService
                 WalletId = g.Key.WalletId!.Value,
                 WalletName = g.Key.Name,
                 WalletType = g.Key.Type,
-                Total = Math.Round(g.Sum(p => p.Amount), 2),
+                Total = Math.Round(Math.Max(0, g.Sum(p => p.Amount) - (refundedWalletById.GetValueOrDefault(g.Key.WalletId!.Value))), 2),
                 TransactionCount = g.Count()
             })
             .ToList();
@@ -204,7 +209,7 @@ public class ReportService : IReportService
             .OrderByDescending(p => p.QuantitySold)
             .ToList();
 
-        _logger.LogDebug("Top products (after returns): {Count}", topProducts.Count);
+        _logger.LogDebug($"Top products (after returns): {topProducts.Count}");
 
         // Hourly breakdown
         var hourlySales = completedOrders

@@ -23,7 +23,9 @@ import {
   ShoppingCart,
   Sparkles,
   ChevronDown,
+  Armchair,
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import {
   useGetCurrentTenantQuery,
   useUpdateCurrentTenantMutation,
@@ -576,6 +578,49 @@ export const SettingsPage = () => {
                 فوري ويظهر مباشرة في صفحة نقطة البيع.
               </p>
             </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-sm border p-6 space-y-4">
+          <div className="flex items-center gap-2 text-lg font-semibold">
+            <Armchair className="w-5 h-5 text-gray-500" />
+            <span>إعدادات المطعم</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <Link
+              to="/settings/tables"
+              className="rounded-xl border border-gray-200 p-4 text-start transition hover:border-primary-300 hover:bg-primary-50"
+            >
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100 text-primary-700">
+                  <Armchair className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="font-bold text-gray-900">الطاولات</p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    أضف طاولات الصالة ورتب ظهورها للكاشير.
+                  </p>
+                </div>
+              </div>
+            </Link>
+
+            <Link
+              to="/settings/saved-order-notes"
+              className="rounded-xl border border-gray-200 p-4 text-start transition hover:border-amber-300 hover:bg-amber-50"
+            >
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+                  <MessageSquare className="h-5 w-5" />
+                </span>
+                <div>
+                  <p className="font-bold text-gray-900">الملاحظات السريعة</p>
+                  <p className="mt-1 text-sm text-gray-500">
+                    جهز ملاحظات متكررة تظهر في المطبخ وفاتورة العميل.
+                  </p>
+                </div>
+              </div>
+            </Link>
           </div>
         </div>
 

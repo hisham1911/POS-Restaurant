@@ -44,17 +44,17 @@ interface CartProps {
 }
 
 const orderTypes: Array<{ value: OrderType; label: string }> = [
-  { value: "DineIn", label: "ØµØ§Ù„Ø©" },
-  { value: "Takeaway", label: "ØªÙŠÙƒ Ø£ÙˆØ§ÙŠ" },
-  { value: "Delivery", label: "Ø¯Ù„ÙŠÙØ±ÙŠ" },
+  { value: "DineIn", label: "صالة" },
+  { value: "Takeaway", label: "تيك أواي" },
+  { value: "Delivery", label: "دليفري" },
 ];
 
 const orderSources: Array<{ value: OrderSource; label: string }> = [
   { value: "POS", label: "POS" },
-  { value: "Talabat", label: "Ø·Ù„Ø¨Ø§Øª" },
-  { value: "Marsool", label: "Ù…Ø±Ø³ÙˆÙ„" },
-  { value: "Jahez", label: "Ø¬Ø§Ù‡Ø²" },
-  { value: "Other", label: "Ø£Ø®Ø±Ù‰" },
+  { value: "Talabat", label: "طلبات" },
+  { value: "Marsool", label: "مرسول" },
+  { value: "Jahez", label: "جاهز" },
+  { value: "Other", label: "أخرى" },
 ];
 
 export const Cart = ({
@@ -131,7 +131,7 @@ export const Cart = ({
             </div>
             {hasDraftOrder && (
               <span className="shrink-0 rounded-full bg-primary-100 px-2.5 py-1.5 text-xs font-bold text-primary-700">
-                Ù…ÙØªÙˆØ­
+                مفتوح
               </span>
             )}
           </div>
@@ -153,7 +153,7 @@ export const Cart = ({
                 <Armchair className="h-4 w-4" />
                 {selectedTable ? `طاولة ${selectedTable.number}` : "اختيار طاولة"}
               </span>
-              {!hasDraftOrder && <span className="text-xs">ØªØºÙŠÙŠØ±</span>}
+              {!hasDraftOrder && <span className="text-xs">تغيير</span>}
             </button>
           )}
 
@@ -181,7 +181,7 @@ export const Cart = ({
                     onExternalOrderNumberChange(event.target.value)
                   }
                   disabled={hasDraftOrder || orderSource === "POS"}
-                  placeholder="Ø±Ù‚Ù… Ø®Ø§Ø±Ø¬ÙŠ"
+                  placeholder="رقم خارجي"
                   className="min-h-[40px] rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm font-medium outline-none focus:border-primary-500 disabled:bg-gray-100"
                 />
               </div>
@@ -195,22 +195,22 @@ export const Cart = ({
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 text-sm font-bold text-primary-700">
                     <Truck className="h-4 w-4 shrink-0" />
-                    <span>Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¯Ù„ÙŠÙØ±ÙŠ</span>
+                    <span>بيانات الدليفري</span>
                   </div>
                   <p className="mt-1 truncate text-xs text-gray-600">
                     {hasDeliveryDetails
-                      ? deliveryAddress || "ØªÙ…Øª Ø¥Ø¶Ø§ÙØ© Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„Ø¯Ù„ÙŠÙØ±ÙŠ"
-                      : "Ø£Ø¶Ù Ø§Ù„Ø¹Ù†ÙˆØ§Ù† ÙˆØ§Ù„Ø±Ø³ÙˆÙ…"}
+                      ? deliveryAddress || "تمت إضافة بيانات الدليفري"
+                      : "أضف العنوان والرسوم"}
                   </p>
                   <p className="mt-1 text-xs font-semibold text-gray-900">
-                    Ø§Ù„Ø±Ø³ÙˆÙ…:{" "}
+                    الرسوم:{" "}
                     {formatCurrency(Number.parseFloat(deliveryFee || "0") || 0)}
                   </p>
                 </div>
 
                 <span className="flex shrink-0 items-center gap-1.5 rounded-md bg-white px-2.5 py-1.5 text-xs font-bold text-primary-700 shadow-sm">
                   <Pencil className="h-3.5 w-3.5" />
-                  <span>{hasDeliveryDetails ? "ØªØ¹Ø¯ÙŠÙ„" : "Ø¥Ø¶Ø§ÙØ©"}</span>
+                  <span>{hasDeliveryDetails ? "تعديل" : "إضافة"}</span>
                 </span>
               </button>
             </div>
@@ -225,15 +225,15 @@ export const Cart = ({
                 if (!orderNotes.trim()) setIsNotesExpanded(false);
               }}
               rows={isNotesExpanded || orderNotes ? 2 : 1}
-              placeholder="Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø§Ù„Ø·Ù„Ø¨: Ø¨Ø¯ÙˆÙ† Ø¨ØµÙ„ØŒ Ø­Ø§Ø±..."
+              placeholder="ملاحظات الطلب: بدون بصل، حار..."
               className="min-h-[42px] w-full resize-none rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-primary-500"
             />
             <button
               type="button"
               onClick={onSavedNotesClick}
               className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-lg border border-amber-200 bg-amber-50 text-amber-600 transition-colors hover:bg-amber-100"
-              title="Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø³Ø±ÙŠØ¹Ø©"
-              aria-label="Ù…Ù„Ø§Ø­Ø¸Ø§Øª Ø³Ø±ÙŠØ¹Ø©"
+              title="ملاحظات سريعة"
+              aria-label="ملاحظات سريعة"
             >
               <MessageSquare className="h-4 w-4" />
             </button>
@@ -243,7 +243,7 @@ export const Cart = ({
 
       <div className="flex items-center justify-between border-b border-gray-100 px-3 py-2.5">
         <div className="flex items-center gap-2">
-          <span className="text-base font-bold text-gray-900">Ø§Ù„Ø·Ù„Ø¨</span>
+          <span className="text-base font-bold text-gray-900">الطلب</span>
           <span className="flex h-6 min-w-[24px] items-center justify-center rounded-md bg-blue-600 px-2 text-xs font-bold text-white">
             {itemsCount}
           </span>
@@ -254,7 +254,7 @@ export const Cart = ({
             className="flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
           >
             <Trash2 className="h-4 w-4" />
-            <span className="hidden sm:inline">Ø¥ÙØ±Ø§Øº</span>
+            <span className="hidden sm:inline">إفراغ</span>
           </button>
         )}
       </div>
@@ -266,12 +266,12 @@ export const Cart = ({
               <ShoppingCart className="h-10 w-10 text-gray-300" strokeWidth={1.5} />
             </div>
             <p className="mb-1 text-lg font-semibold text-gray-900">
-              {hasDraftOrder ? "Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¥Ø¶Ø§ÙØ§Øª Ø¬Ø¯ÙŠØ¯Ø©" : "Ø§Ù„Ø³Ù„Ø© ÙØ§Ø±ØºØ©"}
+              {hasDraftOrder ? "لا توجد إضافات جديدة" : "السلة فارغة"}
             </p>
             <p className="text-sm text-gray-500">
               {hasDraftOrder
-                ? "ÙŠÙ…ÙƒÙ†Ùƒ Ø¥Ø±Ø³Ø§Ù„ Ø¥Ø¶Ø§ÙØ§Øª Ø¬Ø¯ÙŠØ¯Ø© Ù„Ù„Ù…Ø·Ø¨Ø® Ø£Ùˆ Ø¥ØªÙ…Ø§Ù… Ø§Ù„Ø¯ÙØ¹."
-                : "Ø§Ø¨Ø¯Ø£ Ø¨Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª"}
+                ? "يمكنك إرسال إضافات جديدة للمطبخ أو إتمام الدفع."
+                : "ابدأ بإضافة المنتجات"}
             </p>
           </div>
         ) : (
@@ -297,7 +297,7 @@ export const Cart = ({
             {hasDraftOrder && (
               <div className="mt-3 rounded-lg border border-primary-100 bg-white p-3 text-sm">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium text-gray-600">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ø·Ù„Ø¨ Ø§Ù„Ù…ÙØªÙˆØ­</span>
+                  <span className="font-medium text-gray-600">إجمالي الطلب المفتوح</span>
                   <span className="font-bold text-primary-700">
                     {formatCurrency(draftOrderTotal)}
                   </span>
@@ -325,7 +325,7 @@ export const Cart = ({
             disabled={checkoutTotal <= 0}
             className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 text-base font-bold text-white shadow-sm transition-all hover:bg-green-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <span>Ø§Ù„Ø¯ÙØ¹</span>
+            <span>الدفع</span>
             <span className="text-lg">{formatCurrency(checkoutTotal)}</span>
           </button>
         </div>

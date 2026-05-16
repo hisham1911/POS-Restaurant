@@ -52,27 +52,27 @@ export const OrderDetailsModal = ({
     switch (order.deliveryStatus) {
       case "Assigned":
         return {
-          label: "ØªÙ… Ø§Ù„ØªØ¹ÙŠÙŠÙ†",
+          label: "تم التعيين",
           className: "bg-sky-50 text-sky-700 border border-sky-200",
         };
       case "OutForDelivery":
         return {
-          label: "ÙÙŠ Ø§Ù„Ø·Ø±ÙŠÙ‚",
+          label: "في الطريق",
           className: "bg-amber-50 text-amber-700 border border-amber-200",
         };
       case "Delivered":
         return {
-          label: "ØªÙ… Ø§Ù„ØªÙˆØµÙŠÙ„",
+          label: "تم التوصيل",
           className: "bg-success-50 text-success-600 border border-success-200",
         };
       case "Cancelled":
         return {
-          label: "Ù…Ù„ØºÙŠ",
+          label: "ملغي",
           className: "bg-danger-50 text-danger-500 border border-danger-200",
         };
       default:
         return {
-          label: "â€”",
+          label: "—",
           className: "bg-gray-100 text-gray-600 border border-gray-200",
         };
     }
@@ -86,9 +86,9 @@ export const OrderDetailsModal = ({
       );
 
       if (isPrintWindowOpened) {
-        toast.success("ØªÙ… ÙØªØ­ Ø·Ø¨Ø§Ø¹Ø© Ø§Ù„Ù…ØªØµÙØ­ Ø­Ø³Ø¨ Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ù‡Ø°Ø§ Ø§Ù„Ø¬Ù‡Ø§Ø²");
+        toast.success("تم فتح طباعة المتصفح حسب إعدادات هذا الجهاز");
       } else {
-        toast.error("ØªØ¹Ø°Ø± ÙØªØ­ Ù†Ø§ÙØ°Ø© Ø§Ù„Ø·Ø¨Ø§Ø¹Ø©. ØªØ£ÙƒØ¯ Ù…Ù† Ø§Ù„Ø³Ù…Ø§Ø­ Ø¨Ø§Ù„Ù†ÙˆØ§ÙØ° Ø§Ù„Ù…Ù†Ø¨Ø«Ù‚Ø©");
+        toast.error("تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة");
       }
 
       return;
@@ -96,10 +96,10 @@ export const OrderDetailsModal = ({
 
     try {
       await printReceipt(order.id).unwrap();
-      toast.success("ØªÙ… Ø¥Ø±Ø³Ø§Ù„ Ø£Ù…Ø± Ø§Ù„Ø·Ø¨Ø§Ø¹Ø© Ø¨Ù†Ø¬Ø§Ø­");
+      toast.success("تم إرسال أمر الطباعة بنجاح");
     } catch (error) {
       if (printMode === "auto") {
-        toast.info("ØªØ¹Ø°Ø± Ø§Ù„ÙˆØµÙˆÙ„ Ù„Ø¨Ø±Ù†Ø§Ù…Ø¬ Ø§Ù„Ø·Ø§Ø¨Ø¹Ø©. Ø³ÙŠØªÙ… ÙØªØ­ Ø§Ù„Ø·Ø¨Ø§Ø¹Ø© Ù…Ù† Ø§Ù„Ù…ØªØµÙØ­");
+        toast.info("تعذر الوصول لبرنامج الطابعة. سيتم فتح الطباعة من المتصفح");
         const isPrintWindowOpened = printOrderReceiptFallback(
           order,
           tenantData?.data,
@@ -107,11 +107,11 @@ export const OrderDetailsModal = ({
 
         if (!isPrintWindowOpened) {
           toast.error(
-            "ØªØ¹Ø°Ø± ÙØªØ­ Ù†Ø§ÙØ°Ø© Ø§Ù„Ø·Ø¨Ø§Ø¹Ø©. ØªØ£ÙƒØ¯ Ù…Ù† Ø§Ù„Ø³Ù…Ø§Ø­ Ø¨Ø§Ù„Ù†ÙˆØ§ÙØ° Ø§Ù„Ù…Ù†Ø¨Ø«Ù‚Ø©",
+            "تعذر فتح نافذة الطباعة. تأكد من السماح بالنوافذ المنبثقة",
           );
         }
       } else {
-        toast.error("ØªØ¹Ø°Ø± Ø§Ù„ÙˆØµÙˆÙ„ Ù„Ø¨Ø±Ù†Ø§Ù…Ø¬ Ø§Ù„Ø·Ø§Ø¨Ø¹Ø©. Ø±Ø§Ø¬Ø¹ Ø­Ø§Ù„Ø© Ø§ØªØµØ§Ù„ Bridge");
+        toast.error("تعذر الوصول لبرنامج الطابعة. راجع حالة اتصال Bridge");
       }
 
       console.error("Print error:", error);
@@ -125,7 +125,7 @@ export const OrderDetailsModal = ({
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b shrink-0">
             <div>
-              <h2 className="text-xl font-bold">Ø·Ù„Ø¨ #{order.orderNumber}</h2>
+              <h2 className="text-xl font-bold">طلب #{order.orderNumber}</h2>
               <p className="text-sm text-gray-500">
                 {formatDateTime(order.createdAt)}
               </p>
@@ -136,7 +136,7 @@ export const OrderDetailsModal = ({
                   variant="danger"
                   size="sm"
                   onClick={() => setShowRefundModal(true)}
-                  title="Ø§Ø³ØªØ±Ø¬Ø§Ø¹ Ø§Ù„Ø·Ù„Ø¨"
+                  title="استرجاع الطلب"
                 >
                   <RotateCcw className="w-4 h-4" />
                 </Button>
@@ -146,7 +146,7 @@ export const OrderDetailsModal = ({
                 size="sm"
                 onClick={handlePrint}
                 disabled={isPrinting}
-                title="Ø·Ø¨Ø§Ø¹Ø© Ø§Ù„ÙØ§ØªÙˆØ±Ø©"
+                title="طباعة الفاتورة"
               >
                 <Printer className="w-4 h-4" />
               </Button>
@@ -163,7 +163,7 @@ export const OrderDetailsModal = ({
             <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
               <div className="mb-4 flex items-center justify-between gap-3">
                 <span className="text-sm font-bold text-gray-700">
-                  Ø­Ø§Ù„Ø© Ø§Ù„Ø·Ù„Ø¨
+                  حالة الطلب
                 </span>
                 <span className="rounded-full bg-white px-3 py-1 text-sm font-bold text-gray-700 shadow-sm">
                   {ORDER_STATUS[order.status]?.label}
@@ -179,7 +179,7 @@ export const OrderDetailsModal = ({
             {order.customerId ? (
               <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
                 <p className="text-sm font-medium text-gray-500 mb-2">
-                  Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø¹Ù…ÙŠÙ„
+                  معلومات العميل
                 </p>
                 <div className="space-y-1.5">
                   {order.customerName && (
@@ -200,14 +200,14 @@ export const OrderDetailsModal = ({
               </div>
             ) : (
               <div className="flex items-center justify-between">
-                <span className="text-gray-500">Ø§Ù„Ø¹Ù…ÙŠÙ„</span>
-                <span className="text-gray-400">Ø¹Ù…ÙŠÙ„ Ù†Ù‚Ø¯ÙŠ</span>
+                <span className="text-gray-500">العميل</span>
+                <span className="text-gray-400">عميل نقدي</span>
               </div>
             )}
 
             {/* Items */}
             <div>
-              <h3 className="font-semibold mb-3">Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª</h3>
+              <h3 className="font-semibold mb-3">المنتجات</h3>
               <div className="space-y-2">
                 {order.items.map((item) => (
                   <div key={item.id} className="p-3 bg-gray-50 rounded-lg">
@@ -215,15 +215,15 @@ export const OrderDetailsModal = ({
                       <div>
                         <p className="font-medium">{item.productName}</p>
                         <p className="text-sm text-gray-500">
-                          {item.quantity} Ã— {formatCurrency(item.unitPrice)}
+                          {item.quantity} × {formatCurrency(item.unitPrice)}
                           {item.refundedQuantity > 0 && (
                             <span className="text-orange-500 mr-2">
-                              (Ù…Ø³ØªØ±Ø¬Ø¹: {item.refundedQuantity})
+                              (مسترجع: {item.refundedQuantity})
                             </span>
                           )}
                           {item.batchNumber && (
                             <span className="text-blue-500 mr-2">
-                              (Ø¨Ø§ØªØ´: {item.batchNumber})
+                              (باتش: {item.batchNumber})
                             </span>
                           )}
                         </p>
@@ -249,7 +249,7 @@ export const OrderDetailsModal = ({
                       <div className="flex items-center gap-1.5 mt-1.5">
                         <Tag className="w-3.5 h-3.5 text-success-600" />
                         <span className="text-xs text-success-600 font-medium">
-                          Ø®ØµÙ…{" "}
+                          خصم{" "}
                           {item.discountType === "Percentage" ||
                           item.discountType === "percentage"
                             ? `${item.discountValue}%`
@@ -258,7 +258,7 @@ export const OrderDetailsModal = ({
                         </span>
                         {item.discountReason && (
                           <span className="text-xs text-gray-400">
-                            â€¢ {item.discountReason}
+                            • {item.discountReason}
                           </span>
                         )}
                       </div>
@@ -271,7 +271,7 @@ export const OrderDetailsModal = ({
             {/* Summary */}
             <div className="border-t pt-4 space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹ Ø§Ù„ÙØ±Ø¹ÙŠ</span>
+                <span className="text-gray-500">المجموع الفرعي</span>
                 <span>{formatCurrency(order.subtotal)}</span>
               </div>
               {/* Item-level discounts total */}
@@ -279,7 +279,7 @@ export const OrderDetailsModal = ({
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500 flex items-center gap-1">
                     <Tag className="w-3.5 h-3.5" />
-                    Ø®ØµÙˆÙ…Ø§Øª Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª
+                    خصومات المنتجات
                   </span>
                   <span className="text-success-600">
                     -
@@ -292,7 +292,7 @@ export const OrderDetailsModal = ({
               {order.discountAmount > 0 && (
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">
-                    Ø®ØµÙ… Ø§Ù„Ø·Ù„Ø¨
+                    خصم الطلب
                     {(order.discountType === "Percentage" ||
                       order.discountType === "percentage") &&
                     order.discountValue
@@ -306,18 +306,18 @@ export const OrderDetailsModal = ({
               )}
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">
-                  Ø§Ù„Ø¶Ø±ÙŠØ¨Ø© ({order.taxRate}%)
+                  الضريبة ({order.taxRate}%)
                 </span>
                 <span>{formatCurrency(order.taxAmount)}</span>
               </div>
               {hasDeliveryInfo && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-gray-500">Ø±Ø³ÙˆÙ… Ø§Ù„ØªÙˆØµÙŠÙ„</span>
+                  <span className="text-gray-500">رسوم التوصيل</span>
                   <span>{formatCurrency(order.deliveryFee)}</span>
                 </div>
               )}
               <div className="flex justify-between text-lg font-bold pt-2 border-t">
-                <span>Ø§Ù„Ø¥Ø¬Ù…Ø§Ù„ÙŠ</span>
+                <span>الإجمالي</span>
                 <span className="text-primary-600">
                   {formatCurrency(order.total)}
                 </span>
@@ -329,7 +329,7 @@ export const OrderDetailsModal = ({
                   <span className="text-danger-500 font-medium">
                     {isFullyRefunded
                       ? "مبلغ الاسترجاع الكامل"
-                      : "Ù…Ø¨Ù„Øº Ø§Ù„Ø§Ø³ØªØ±Ø¬Ø§Ø¹ Ø§Ù„Ø¬Ø²Ø¦ÙŠ"}
+                      : "مبلغ الاسترجاع الجزئي"}
                   </span>
                   <span className="text-danger-500 font-semibold">
                     -{formatCurrency(order.refundAmount)}
@@ -340,7 +340,7 @@ export const OrderDetailsModal = ({
               {/* Net Amount After Partial Refund */}
               {isPartiallyRefunded && order.refundAmount > 0 && (
                 <div className="flex justify-between text-sm font-medium">
-                  <span className="text-gray-600">Ø§Ù„ØµØ§ÙÙŠ Ø¨Ø¹Ø¯ Ø§Ù„Ø§Ø³ØªØ±Ø¬Ø§Ø¹</span>
+                  <span className="text-gray-600">الصافي بعد الاسترجاع</span>
                   <span className="text-success-600">
                     {formatCurrency(order.total - order.refundAmount)}
                   </span>
@@ -351,7 +351,7 @@ export const OrderDetailsModal = ({
             {/* Payments */}
             {order.payments.length > 0 && (
               <div>
-                <h3 className="font-semibold mb-3">Ø§Ù„Ù…Ø¯ÙÙˆØ¹Ø§Øª</h3>
+                <h3 className="font-semibold mb-3">المدفوعات</h3>
                 <div className="space-y-2">
                   {order.payments.map((payment) => (
                     <div
@@ -367,7 +367,7 @@ export const OrderDetailsModal = ({
                 </div>
                 {order.changeAmount > 0 && (
                   <div className="flex justify-between mt-2 text-sm">
-                    <span className="text-gray-500">Ø§Ù„Ø¨Ø§Ù‚ÙŠ</span>
+                    <span className="text-gray-500">الباقي</span>
                     <span className="text-success-500">
                       {formatCurrency(order.changeAmount)}
                     </span>
@@ -379,35 +379,35 @@ export const OrderDetailsModal = ({
             {hasDeliveryInfo && (
               <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
                 <h3 className="mb-4 text-base font-semibold text-blue-900">
-                  Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„ØªÙˆØµÙŠÙ„
+                  بيانات التوصيل
                 </h3>
                 <div className="space-y-3 text-sm">
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-gray-500">Ù†ÙˆØ¹ Ø§Ù„Ø·Ù„Ø¨</span>
+                    <span className="text-gray-500">نوع الطلب</span>
                     <span className="text-end font-medium text-gray-800">
                       {order.orderType === "Delivery" ? "توصيل" : "—"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-gray-500">Ø§Ù„Ø¹Ù†ÙˆØ§Ù†</span>
+                    <span className="text-gray-500">العنوان</span>
                     <span className="text-end font-medium text-gray-800">
-                      {order.deliveryAddress || "â€”"}
+                      {order.deliveryAddress || "—"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-gray-500">Ø§Ù„Ø±Ø³ÙˆÙ…</span>
+                    <span className="text-gray-500">الرسوم</span>
                     <span className="text-end font-medium text-gray-800">
                       {formatCurrency(order.deliveryFee)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-gray-500">Ø§Ù„Ù…Ù†Ø¯ÙˆØ¨</span>
+                    <span className="text-gray-500">المندوب</span>
                     <span className="text-end font-medium text-gray-800">
-                      {order.deliveryPersonName || "Ù„Ù… ÙŠÙØ¹ÙŠÙ† Ø¨Ø¹Ø¯"}
+                      {order.deliveryPersonName || "لم يُعين بعد"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-gray-500">Ø§Ù„Ø­Ø§Ù„Ø©</span>
+                    <span className="text-gray-500">الحالة</span>
                     <span
                       className={clsx(
                         "inline-flex rounded-full px-2.5 py-1 text-xs font-semibold",
@@ -418,25 +418,25 @@ export const OrderDetailsModal = ({
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-gray-500">Ù…Ù„Ø§Ø­Ø¸Ø§Øª</span>
+                    <span className="text-gray-500">ملاحظات</span>
                     <span className="text-end font-medium text-gray-800">
-                      {order.deliveryNotes || "â€”"}
+                      {order.deliveryNotes || "—"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-gray-500">ÙˆÙ‚Øª Ø§Ù„ØªØ¹ÙŠÙŠÙ†</span>
+                    <span className="text-gray-500">وقت التعيين</span>
                     <span className="text-end font-medium text-gray-800">
                       {order.assignedAt
                         ? formatDateTime(order.assignedAt)
-                        : "â€”"}
+                        : "—"}
                     </span>
                   </div>
                   <div className="flex items-center justify-between gap-4">
-                    <span className="text-gray-500">ÙˆÙ‚Øª Ø§Ù„ØªØ³Ù„ÙŠÙ…</span>
+                    <span className="text-gray-500">وقت التسليم</span>
                     <span className="text-end font-medium text-gray-800">
                       {order.deliveredAt
                         ? formatDateTime(order.deliveredAt)
-                        : "â€”"}
+                        : "—"}
                     </span>
                   </div>
                 </div>
@@ -446,7 +446,7 @@ export const OrderDetailsModal = ({
             {/* Notes */}
             {order.notes && (
               <div>
-                <h3 className="font-semibold mb-2">Ù…Ù„Ø§Ø­Ø¸Ø§Øª</h3>
+                <h3 className="font-semibold mb-2">ملاحظات</h3>
                 <p className="text-gray-500 bg-gray-50 p-3 rounded-lg">
                   {order.notes}
                 </p>
@@ -471,7 +471,7 @@ export const OrderDetailsModal = ({
                 >
                   {isFullyRefunded
                     ? "معلومات الاسترجاع الكامل"
-                    : "Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø§Ø³ØªØ±Ø¬Ø§Ø¹ Ø§Ù„Ø¬Ø²Ø¦ÙŠ"}
+                    : "معلومات الاسترجاع الجزئي"}
                 </h3>
                 <div
                   className={clsx(
@@ -480,24 +480,24 @@ export const OrderDetailsModal = ({
                   )}
                 >
                   <p>
-                    <span className="font-medium">Ø§Ù„Ø³Ø¨Ø¨:</span>{" "}
+                    <span className="font-medium">السبب:</span>{" "}
                     {order.refundReason}
                   </p>
                   {order.refundedAt && (
                     <p>
-                      <span className="font-medium">Ø§Ù„ØªØ§Ø±ÙŠØ®:</span>{" "}
+                      <span className="font-medium">التاريخ:</span>{" "}
                       {formatDateTime(order.refundedAt)}
                     </p>
                   )}
                   {order.refundedByUserName && (
                     <p>
-                      <span className="font-medium">Ø¨ÙˆØ§Ø³Ø·Ø©:</span>{" "}
+                      <span className="font-medium">بواسطة:</span>{" "}
                       {order.refundedByUserName}
                     </p>
                   )}
                   {order.refundAmount > 0 && (
                     <p>
-                      <span className="font-medium">Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø³ØªØ±Ø¯:</span>{" "}
+                      <span className="font-medium">المبلغ المسترد:</span>{" "}
                       {formatCurrency(order.refundAmount)}
                     </p>
                   )}

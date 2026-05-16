@@ -178,12 +178,12 @@ export const POSPage = () => {
         totalStock <= 0;
 
       if (!product.isActive) {
-        toast.error(`Ø§Ù„Ù…Ù†ØªØ¬ ØºÙŠØ± Ù…ØªØ§Ø­ Ø§Ù„Ø¢Ù†: ${product.name}`);
+        toast.error(`المنتج غير متاح الآن: ${product.name}`);
         return false;
       }
 
       if (isOutOfStock || !canAddMore) {
-        toast.error(`Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø¥Ø¶Ø§ÙØ© ${product.name} Ù„Ø¹Ø¯Ù… ØªÙˆÙØ± Ù…Ø®Ø²ÙˆÙ† ÙƒØ§ÙÙ`);
+        toast.error(`لا يمكن إضافة ${product.name} لعدم توفر مخزون كافٍ`);
         return false;
       }
 
@@ -204,7 +204,7 @@ export const POSPage = () => {
       addItem(productForCart, 1);
 
       if (options?.showToast) {
-        toast.success(`ØªÙ…Øª Ø§Ù„Ø¥Ø¶Ø§ÙØ©: ${product.name}`);
+        toast.success(`تمت الإضافة: ${product.name}`);
       }
 
       return true;
@@ -241,7 +241,7 @@ export const POSPage = () => {
           searchInputRef.current?.focus();
         }
       } else {
-        toast.error(`Ù„Ù… ÙŠØªÙ… Ø§Ù„Ø¹Ø«ÙˆØ± Ø¹Ù„Ù‰ Ù…Ù†ØªØ¬: ${trimmedValue}`);
+        toast.error(`لم يتم العثور على منتج: ${trimmedValue}`);
       }
     },
     [handleAddProductToCart, products],
@@ -349,17 +349,17 @@ export const POSPage = () => {
             <AlertCircle className="w-8 h-8 text-warning-600" />
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">
-            Ù„Ø§ ØªÙˆØ¬Ø¯ ÙˆØ±Ø¯ÙŠØ© Ù…ÙØªÙˆØ­Ø©
+            لا توجد وردية مفتوحة
           </h2>
           <p className="text-gray-600 mb-6">
-            ÙŠØ¬Ø¨ ÙØªØ­ ÙˆØ±Ø¯ÙŠØ© Ù‚Ø¨Ù„ Ø§Ù„Ø¨Ø¯Ø¡ ÙÙŠ Ø§Ù„Ø¨ÙŠØ¹. Ø§Ø°Ù‡Ø¨ Ø¥Ù„Ù‰ ØµÙØ­Ø© Ø§Ù„ÙˆØ±Ø¯ÙŠØ§Øª Ù„ÙØªØ­ ÙˆØ±Ø¯ÙŠØ©
-            Ø¬Ø¯ÙŠØ¯Ø©.
+            يجب فتح وردية قبل البدء في البيع. اذهب إلى صفحة الورديات لفتح وردية
+            جديدة.
           </p>
           <Link
             to="/shift"
             className="inline-flex items-center justify-center px-6 py-3 bg-primary-600 text-white rounded-xl hover:bg-primary-700 transition-colors font-medium"
           >
-            Ø§Ù„Ø°Ù‡Ø§Ø¨ Ø¥Ù„Ù‰ Ø§Ù„ÙˆØ±Ø¯ÙŠØ§Øª
+            الذهاب إلى الورديات
           </Link>
         </div>
       </div>
@@ -396,7 +396,7 @@ export const POSPage = () => {
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               onKeyDown={handleSearchKeyDown}
-              placeholder="Ø§Ø¨Ø­Ø« Ø¨Ø§Ù„Ø§Ø³Ù… Ø£Ùˆ Ø§Ù„Ø¨Ø§Ø±ÙƒÙˆØ¯ Ø£Ùˆ SKU"
+              placeholder="ابحث بالاسم أو الباركود أو SKU"
               className="w-full rounded-xl border-2 border-gray-200 bg-white py-3 pe-11 ps-3 text-base focus:border-primary-500 focus:ring-2 focus:ring-primary-100 focus:outline-none"
               autoComplete="off"
             />
@@ -414,11 +414,11 @@ export const POSPage = () => {
                 ? "bg-primary-600 text-white border-primary-500"
                 : "bg-white text-gray-700 border-gray-300 hover:border-primary-400 hover:bg-primary-50"
             )}
-            title="Ø§Ù„ÙƒÙ„"
+            title="الكل"
           >
-            ðŸª
+            🏪
             <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-              Ø§Ù„ÙƒÙ„
+              الكل
             </span>
           </button>
 
@@ -435,7 +435,7 @@ export const POSPage = () => {
               )}
               title={category.name}
             >
-              {category.imageUrl || "ðŸ“"}
+              {category.imageUrl || "📁"}
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                 {category.name}
               </span>
@@ -454,11 +454,11 @@ export const POSPage = () => {
                 ? "bg-green-100 text-green-700 border-green-400"
                 : "bg-white text-gray-700 border-gray-300 hover:border-green-400 hover:bg-green-50",
             )}
-            title="Ø§Ù„Ù…ØªØ§Ø­ ÙÙ‚Ø·"
+            title="المتاح فقط"
           >
             <PackageCheck className="w-5 h-5" />
             <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-              Ø§Ù„Ù…ØªØ§Ø­ ÙÙ‚Ø·
+              المتاح فقط
             </span>
           </button>
 
@@ -466,7 +466,7 @@ export const POSPage = () => {
           <button
             onClick={() => {
               if (!canQuickCreateProduct) {
-                toast.error("Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ© Ø¥Ø¶Ø§ÙØ© Ù…Ù†ØªØ¬ Ø³Ø±ÙŠØ¹");
+                toast.error("ليس لديك صلاحية إضافة منتج سريع");
                 return;
               }
               setShowQuickCreate(true);
@@ -478,12 +478,12 @@ export const POSPage = () => {
                 ? "bg-primary-600 text-white border-primary-500 hover:bg-primary-700"
                 : "bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed",
             )}
-            title="Ù…Ù†ØªØ¬ Ø¬Ø¯ÙŠØ¯"
+            title="منتج جديد"
           >
             <PlusCircle className="w-5 h-5" />
             {canQuickCreateProduct && (
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                Ù…Ù†ØªØ¬ Ø¬Ø¯ÙŠØ¯
+                منتج جديد
               </span>
             )}
           </button>
@@ -492,11 +492,11 @@ export const POSPage = () => {
           <button
             onClick={() => setShowCustomItem(true)}
             className="relative group p-2.5 rounded-lg border-2 bg-secondary-600 text-white border-secondary-500 hover:bg-secondary-700 transition-all"
-            title="Ù…Ù†ØªØ¬ Ù…Ø®ØµØµ"
+            title="منتج مخصص"
           >
             <FileText className="w-5 h-5" />
             <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-              Ù…Ù†ØªØ¬ Ù…Ø®ØµØµ
+              منتج مخصص
             </span>
           </button>
         </div>
@@ -511,10 +511,10 @@ export const POSPage = () => {
               onChange={(e) => setSelectedCategory(e.target.value ? Number(e.target.value) : null)}
               className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm font-medium text-gray-700 focus:border-primary-500 focus:outline-none"
             >
-              <option value="">ðŸª Ø§Ù„ÙƒÙ„</option>
+              <option value="">🏪 الكل</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
-                  {category.imageUrl || "ðŸ“"} {category.name}
+                  {category.imageUrl || "📁"} {category.name}
                 </option>
               ))}
             </select>
@@ -528,7 +528,7 @@ export const POSPage = () => {
                   ? "bg-green-100 text-green-700 border-green-400"
                   : "bg-white text-gray-700 border-gray-300",
               )}
-              title="Ø§Ù„Ù…ØªØ§Ø­ ÙÙ‚Ø·"
+              title="المتاح فقط"
             >
               <PackageCheck className="w-5 h-5" />
             </button>
@@ -553,7 +553,7 @@ export const POSPage = () => {
             <button
               onClick={() => {
                 if (!canQuickCreateProduct) {
-                  toast.error("Ù„ÙŠØ³ Ù„Ø¯ÙŠÙƒ ØµÙ„Ø§Ø­ÙŠØ© Ø¥Ø¶Ø§ÙØ© Ù…Ù†ØªØ¬ Ø³Ø±ÙŠØ¹");
+                  toast.error("ليس لديك صلاحية إضافة منتج سريع");
                   return;
                 }
                 setShowQuickCreate(true);
@@ -567,7 +567,7 @@ export const POSPage = () => {
               )}
             >
               <PlusCircle className="w-4 h-4" />
-              <span>Ù…Ù†ØªØ¬ Ø¬Ø¯ÙŠØ¯</span>
+              <span>منتج جديد</span>
             </button>
 
             {/* Custom Item */}
@@ -576,7 +576,7 @@ export const POSPage = () => {
               className="flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border-2 bg-secondary-600 text-white border-secondary-500"
             >
               <FileText className="w-4 h-4" />
-              <span>Ù…Ù†ØªØ¬ Ù…Ø®ØµØµ</span>
+              <span>منتج مخصص</span>
             </button>
           </div>
         </div>
@@ -701,7 +701,7 @@ export const POSPage = () => {
         <ProductQuickCreateModal
           onClose={() => setShowQuickCreate(false)}
           onSuccess={(productId) => {
-            toast.success("ØªÙ… Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ù…Ù†ØªØ¬ Ø¨Ù†Ø¬Ø§Ø­");
+            toast.success("تم إضافة المنتج بنجاح");
           }}
         />
       )}
@@ -728,7 +728,7 @@ export const POSPage = () => {
             };
 
             addItem(customProduct, item.quantity ?? 1);
-            toast.success(`ØªÙ…Øª Ø¥Ø¶Ø§ÙØ©: ${item.name}`);
+            toast.success(`تمت إضافة: ${item.name}`);
           }}
         />
       )}
@@ -758,7 +758,7 @@ export const POSPage = () => {
               batchQuantity: batch.quantity,
             });
 
-            toast.success(`ØªÙ…Øª Ø§Ù„Ø¥Ø¶Ø§ÙØ©: ${selectedProductForBatch.name} Ù…Ù† ${batch.batchNumber || "Ø¨Ø¯ÙˆÙ† Ø±Ù‚Ù… Ø¯ÙØ¹Ø©"}`);
+            toast.success(`تمت الإضافة: ${selectedProductForBatch.name} من ${batch.batchNumber || "بدون رقم دفعة"}`);
             setShowBatchModal(false);
             setSelectedProductForBatch(null);
           }}
@@ -802,7 +802,7 @@ const BatchSelectionModalWithData = ({
 
   useEffect(() => {
     if (isLoading || !isSuccess || batches.length > 0) return;
-    toast.error(`Ù„Ø§ ØªÙˆØ¬Ø¯ Ø¯ÙØ¹Ø§Øª Ù…ØªØ§Ø­Ø© Ù„Ù„Ø¨ÙŠØ¹ Ù„Ù„Ù…Ù†ØªØ¬: ${product.name}`);
+    toast.error(`لا توجد دفعات متاحة للبيع للمنتج: ${product.name}`);
     onClose();
   }, [batches.length, isLoading, isSuccess, onClose, product.name]);
 

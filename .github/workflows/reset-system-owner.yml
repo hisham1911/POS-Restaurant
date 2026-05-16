@@ -1,0 +1,348 @@
+name: Reset System Owner Password
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: system-owner-password-reset
+  cancel-in-progress: false
+
+jobs:
+  reset:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      DOTNET_VERSION: 8.0.x
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+      VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+      VPS_SERVICE_NAME: ${{ secrets.VPS_SERVICE_NAME }}
+      VPS_HEALTH_PORT: ${{ secrets.VPS_HEALTH_PORT }}
+      VPS_DOMAIN: ${{ secrets.VPS_DOMAIN }}
+      SYSTEM_OWNER_RESET_PASSWORD: ${{ secrets.SYSTEM_OWNER_RESET_PASSWORD }}
+
+    steps:
+      - name: Validate Secrets
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          if [ -z "$VPS_HOST" ]; then
+            echo "Missing required secret: VPS_HOST" >&2
+            exit 1
+          fi
+
+          if [ -z "$VPS_SSH_KEY" ]; then
+            echo "Missing required secret: VPS_SSH_KEY" >&2
+            exit 1
+          fi
+
+          if [ -z "$SYSTEM_OWNER_RESET_PASSWORD" ]; then
+            echo "Missing required secret: SYSTEM_OWNER_RESET_PASSWORD" >&2
+            exit 1
+          fi
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          PORT="${VPS_SSH_PORT:-22}"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p "$PORT" -H "$VPS_HOST" >> ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+
+      - name: Build Reset Tool
+        run: |
+          RESET_TOOL_DIR="$RUNNER_TEMP/reset-owner"
+          mkdir -p "$RESET_TOOL_DIR"
+
+          cat > "$RESET_TOOL_DIR/ResetOwner.csproj" <<'EOF'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <OutputType>Exe</OutputType>
+              <TargetFramework>net8.0</TargetFramework>
+              <ImplicitUsings>enable</ImplicitUsings>
+              <Nullable>enable</Nullable>
+            </PropertyGroup>
+
+            <ItemGroup>
+              <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
+              <PackageReference Include="Microsoft.Data.Sqlite.Core" Version="8.0.11" />
+              <PackageReference Include="SQLitePCLRaw.provider.e_sqlcipher" Version="2.1.6" />
+              <PackageReference Include="SQLitePCLRaw.lib.e_sqlcipher" Version="2.1.6" />
+            </ItemGroup>
+          </Project>
+          EOF
+
+          cat > "$RESET_TOOL_DIR/Program.cs" <<'EOF'
+          using BCrypt.Net;
+          using Microsoft.Data.Sqlite;
+          using SQLitePCL;
+
+          raw.SetProvider(new SQLite3Provider_e_sqlcipher());
+
+          if (args.Length != 1)
+          {
+              Console.Error.WriteLine("Usage: ResetOwner <database-path>");
+              return 64;
+          }
+
+          var dbPath = args[0];
+          var resetPassword = Environment.GetEnvironmentVariable("SYSTEM_OWNER_RESET_PASSWORD");
+          var dbPassword = Environment.GetEnvironmentVariable("KASSERPRO_DB_PASSWORD");
+
+          if (string.IsNullOrWhiteSpace(resetPassword) || resetPassword.Length < 12)
+          {
+              Console.Error.WriteLine("SYSTEM_OWNER_RESET_PASSWORD is missing or too short.");
+              return 65;
+          }
+
+          if (!File.Exists(dbPath))
+          {
+              Console.Error.WriteLine($"Database not found: {dbPath}");
+              return 66;
+          }
+
+          var builder = new SqliteConnectionStringBuilder
+          {
+              DataSource = dbPath,
+              Cache = SqliteCacheMode.Default,
+              Pooling = false
+          };
+
+          if (!string.IsNullOrWhiteSpace(dbPassword))
+          {
+              builder.Password = dbPassword;
+          }
+
+          await using var connection = new SqliteConnection(builder.ConnectionString);
+          await connection.OpenAsync();
+
+          using var transaction = connection.BeginTransaction();
+          var passwordHash = BCrypt.Net.BCrypt.HashPassword(resetPassword);
+          var securityStamp = Guid.NewGuid().ToString();
+          var now = DateTime.UtcNow.ToString("O");
+
+          int? ownerId = null;
+          string ownerEmail = "owner@kasserpro.com";
+          bool ownerWasActive = false;
+
+          await using (var select = connection.CreateCommand())
+          {
+              select.Transaction = transaction;
+              select.CommandText = """
+                  SELECT Id, Email, IsActive
+                  FROM Users
+                  WHERE Role = 2
+                  ORDER BY IsDeleted ASC, Id ASC
+                  LIMIT 1;
+                  """;
+
+              await using var reader = await select.ExecuteReaderAsync();
+              if (await reader.ReadAsync())
+              {
+                  ownerId = reader.GetInt32(0);
+                  ownerEmail = reader.GetString(1);
+                  ownerWasActive = reader.GetBoolean(2);
+              }
+          }
+
+          if (ownerId.HasValue)
+          {
+              await using var update = connection.CreateCommand();
+              update.Transaction = transaction;
+              update.CommandText = """
+                  UPDATE Users
+                  SET PasswordHash = $passwordHash,
+                      IsActive = 1,
+                      SecurityStamp = $securityStamp,
+                      UpdatedAt = $updatedAt,
+                      IsDeleted = 0
+                  WHERE Id = $id;
+                  """;
+              update.Parameters.AddWithValue("$passwordHash", passwordHash);
+              update.Parameters.AddWithValue("$securityStamp", securityStamp);
+              update.Parameters.AddWithValue("$updatedAt", now);
+              update.Parameters.AddWithValue("$id", ownerId.Value);
+              await update.ExecuteNonQueryAsync();
+
+              transaction.Commit();
+              Console.WriteLine($"SystemOwner updated: id={ownerId.Value}, email={ownerEmail}, wasActive={ownerWasActive}");
+              return 0;
+          }
+
+          await using (var insert = connection.CreateCommand())
+          {
+              insert.Transaction = transaction;
+              insert.CommandText = """
+                  INSERT INTO Users
+                      (TenantId, BranchId, Name, Email, PasswordHash, Phone, Role, IsActive, PinCode, SecurityStamp, CreatedAt, UpdatedAt, IsDeleted)
+                  VALUES
+                      (NULL, NULL, 'System Owner', $email, $passwordHash, NULL, 2, 1, NULL, $securityStamp, $createdAt, NULL, 0);
+                  """;
+              insert.Parameters.AddWithValue("$email", ownerEmail);
+              insert.Parameters.AddWithValue("$passwordHash", passwordHash);
+              insert.Parameters.AddWithValue("$securityStamp", securityStamp);
+              insert.Parameters.AddWithValue("$createdAt", now);
+              await insert.ExecuteNonQueryAsync();
+          }
+
+          transaction.Commit();
+          Console.WriteLine($"SystemOwner created: email={ownerEmail}");
+          return 0;
+          EOF
+
+          dotnet publish "$RESET_TOOL_DIR/ResetOwner.csproj" \
+            -c Release \
+            -r linux-x64 \
+            --self-contained false \
+            -o "$RESET_TOOL_DIR/publish"
+
+          (cd "$RESET_TOOL_DIR/publish" && tar -czf "$RUNNER_TEMP/reset-owner.tar.gz" .)
+
+      - name: Upload Reset Tool
+        run: |
+          PORT="${VPS_SSH_PORT:-22}"
+          USER_NAME="${VPS_USER:-root}"
+
+          scp -P "$PORT" "$RUNNER_TEMP/reset-owner.tar.gz" "${USER_NAME}@${VPS_HOST}:/tmp/reset-owner.tar.gz"
+
+      - name: Reset Password On VPS
+        run: |
+          PORT="${VPS_SSH_PORT:-22}"
+          USER_NAME="${VPS_USER:-root}"
+          APP_DIR="${VPS_APP_DIR:-/var/www/kasserpro-restaurant}"
+          SERVICE_NAME="${VPS_SERVICE_NAME:-kasserpro-restaurant}"
+          HEALTH_PORT="${VPS_HEALTH_PORT:-5244}"
+          RESET_PASSWORD_B64="$(printf '%s' "$SYSTEM_OWNER_RESET_PASSWORD" | base64 -w0)"
+
+          ssh -p "$PORT" "${USER_NAME}@${VPS_HOST}" "bash -s -- '$APP_DIR' '$SERVICE_NAME' '$HEALTH_PORT' '$RESET_PASSWORD_B64'" <<'EOF'
+          set -euo pipefail
+
+          APP_DIR="$1"
+          SERVICE_NAME="$2"
+          HEALTH_PORT="$3"
+          RESET_PASSWORD_B64="$4"
+
+          if [ "$(id -u)" -eq 0 ]; then
+            SUDO=""
+          else
+            SUDO="sudo"
+          fi
+
+          DB_PATH="${APP_DIR}/kasserpro.db"
+          TS="$(date +%Y%m%d-%H%M%S)"
+          BACKUP_PATH="${APP_DIR}/backups/kasserpro.db.pre-owner-reset-${TS}.bak"
+          TOOL_DIR="/tmp/kasserpro-reset-owner"
+
+          if [ ! -f "$DB_PATH" ]; then
+            echo "Database not found: $DB_PATH" >&2
+            exit 1
+          fi
+
+          $SUDO mkdir -p "${APP_DIR}/backups"
+          $SUDO cp -a "$DB_PATH" "$BACKUP_PATH"
+
+          WAS_ACTIVE=0
+          if $SUDO systemctl is-active --quiet "$SERVICE_NAME"; then
+            WAS_ACTIVE=1
+            $SUDO systemctl stop "$SERVICE_NAME"
+          fi
+
+          cleanup() {
+            $SUDO rm -rf "$TOOL_DIR"
+            $SUDO rm -f /tmp/reset-owner.tar.gz
+            if [ "$WAS_ACTIVE" = "1" ]; then
+              $SUDO systemctl start "$SERVICE_NAME" || true
+            fi
+          }
+          trap cleanup EXIT
+
+          rm -rf "$TOOL_DIR"
+          mkdir -p "$TOOL_DIR"
+          tar -xzf /tmp/reset-owner.tar.gz -C "$TOOL_DIR"
+
+          DB_PASSWORD=""
+          SERVICE_ENVIRONMENT="$($SUDO systemctl show "$SERVICE_NAME" -p Environment --value || true)"
+          for item in $SERVICE_ENVIRONMENT; do
+            case "$item" in
+              KASSERPRO_DB_PASSWORD=*) DB_PASSWORD="${item#KASSERPRO_DB_PASSWORD=}" ;;
+            esac
+          done
+
+          if [ -z "$DB_PASSWORD" ]; then
+            SERVICE_ENV_FILES="$($SUDO systemctl show "$SERVICE_NAME" -p EnvironmentFiles --value || true)"
+            for entry in $SERVICE_ENV_FILES; do
+              ENV_FILE="${entry%% *}"
+              if [ -f "$ENV_FILE" ]; then
+                CANDIDATE="$($SUDO awk -F= '$1=="KASSERPRO_DB_PASSWORD" { sub(/^KASSERPRO_DB_PASSWORD=/, ""); print; exit }' "$ENV_FILE" || true)"
+                if [ -n "$CANDIDATE" ]; then
+                  DB_PASSWORD="$CANDIDATE"
+                  break
+                fi
+              fi
+            done
+          fi
+
+          RESET_PASSWORD="$(printf '%s' "$RESET_PASSWORD_B64" | base64 -d)"
+          if [ -n "$DB_PASSWORD" ]; then
+            $SUDO env SYSTEM_OWNER_RESET_PASSWORD="$RESET_PASSWORD" KASSERPRO_DB_PASSWORD="$DB_PASSWORD" dotnet "$TOOL_DIR/ResetOwner.dll" "$DB_PATH"
+          else
+            $SUDO env SYSTEM_OWNER_RESET_PASSWORD="$RESET_PASSWORD" dotnet "$TOOL_DIR/ResetOwner.dll" "$DB_PATH"
+          fi
+
+          $SUDO systemctl start "$SERVICE_NAME"
+          WAS_ACTIVE=0
+          $SUDO systemctl is-active --quiet "$SERVICE_NAME"
+
+          if command -v curl >/dev/null 2>&1; then
+            curl -fsS "http://127.0.0.1:${HEALTH_PORT}/api/health" || true
+          fi
+
+          echo "Backup path: $BACKUP_PATH"
+          EOF
+
+      - name: Verify Login
+        run: |
+          DOMAIN="${VPS_DOMAIN:-restaurant.azinternational-eg.com}"
+          LOGIN_BODY_PATH="$RUNNER_TEMP/login-body.json"
+          LOGIN_RESPONSE_PATH="$RUNNER_TEMP/login-response.json"
+
+          python3 - <<'PY' > "$LOGIN_BODY_PATH"
+          import json
+          import os
+
+          print(json.dumps({
+              "email": "owner@kasserpro.com",
+              "password": os.environ["SYSTEM_OWNER_RESET_PASSWORD"],
+          }))
+          PY
+
+          curl -fsS \
+            -X POST "https://${DOMAIN}/api/auth/login" \
+            -H "Content-Type: application/json" \
+            --data-binary "@${LOGIN_BODY_PATH}" \
+            -o "$LOGIN_RESPONSE_PATH"
+
+          python3 - <<'PY'
+          import json
+          import os
+
+          response_path = os.path.join(os.environ["RUNNER_TEMP"], "login-response.json")
+          with open(response_path, "r", encoding="utf-8") as handle:
+              response = json.load(handle)
+
+          if not response.get("success") or not response.get("data", {}).get("token"):
+              raise SystemExit("Login verification failed")
+
+          print("Login verification succeeded for owner@kasserpro.com")
+          PY

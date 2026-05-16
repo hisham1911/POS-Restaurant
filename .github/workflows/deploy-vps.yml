@@ -17,13 +17,16 @@ jobs:
     permissions:
       contents: read
     env:
-      DOTNET_VERSION: 9.0.x
+      DOTNET_VERSION: 8.0.x
       NODE_VERSION: 20
       VPS_HOST: ${{ secrets.VPS_HOST }}
       VPS_USER: ${{ secrets.VPS_USER }}
       VPS_SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
       VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
       VPS_SERVICE_NAME: ${{ secrets.VPS_SERVICE_NAME }}
+      VPS_HEALTH_PORT: ${{ secrets.VPS_HEALTH_PORT }}
+      VPS_DOMAIN: ${{ secrets.VPS_DOMAIN }}
+      CERTBOT_EMAIL: ${{ secrets.CERTBOT_EMAIL }}
 
     steps:
       - name: Checkout
@@ -59,7 +62,8 @@ jobs:
           dotnet publish backend/KasserPro.API/KasserPro.API.csproj \
             -c Release \
             -o artifacts/backend-publish/ci \
-            --self-contained false
+            --self-contained false \
+            /p:UseAppHost=false
 
       - name: Create Deploy Package
         run: |
@@ -106,15 +110,17 @@ jobs:
         run: |
           PORT="${VPS_SSH_PORT:-22}"
           USER_NAME="${VPS_USER:-root}"
-          APP_DIR="${VPS_APP_DIR:-/var/www/kasserpro}"
-          SERVICE_NAME="${VPS_SERVICE_NAME:-kasserpro}"
+          APP_DIR="${VPS_APP_DIR:-/var/www/kasserpro-restaurant}"
+          SERVICE_NAME="${VPS_SERVICE_NAME:-kasserpro-restaurant}"
+          HEALTH_PORT="${VPS_HEALTH_PORT:-5244}"
 
-          ssh -p "$PORT" "${USER_NAME}@${VPS_HOST}" "bash -s -- '$PKG_REMOTE_PATH' '$APP_DIR' '$SERVICE_NAME'" <<'EOF'
+          ssh -p "$PORT" "${USER_NAME}@${VPS_HOST}" "bash -s -- '$PKG_REMOTE_PATH' '$APP_DIR' '$SERVICE_NAME' '$HEALTH_PORT'" <<'EOF'
           set -euo pipefail
 
           PKG_PATH="$1"
           APP_DIR="$2"
           SERVICE_NAME="$3"
+          HEALTH_PORT="$4"
 
           if [ "$(id -u)" -eq 0 ]; then
             SUDO=""
@@ -174,7 +180,7 @@ jobs:
           $SUDO systemctl is-active --quiet "$SERVICE_NAME"
 
           if command -v curl >/dev/null 2>&1; then
-            curl -fsS "http://127.0.0.1:5243/api/health" || true
+            curl -fsS "http://127.0.0.1:${HEALTH_PORT}/api/health" || true
           fi
 
           $SUDO journalctl -u "$SERVICE_NAME" -n 25 --no-pager || true
@@ -182,4 +188,39 @@ jobs:
           $SUDO rm -f "$PKG_PATH"
 
           echo "Backup directory: $BACKUP_DIR"
+          EOF
+
+      - name: Ensure Restaurant SSL
+        run: |
+          PORT="${VPS_SSH_PORT:-22}"
+          USER_NAME="${VPS_USER:-root}"
+          DOMAIN="${VPS_DOMAIN:-restaurant.azinternational-eg.com}"
+          EMAIL="${CERTBOT_EMAIL:-admin@azinternational-eg.com}"
+
+          ssh -p "$PORT" "${USER_NAME}@${VPS_HOST}" "bash -s -- '$DOMAIN' '$EMAIL'" <<'EOF'
+          set -euo pipefail
+
+          DOMAIN="$1"
+          EMAIL="$2"
+
+          if [ "$(id -u)" -eq 0 ]; then
+            SUDO=""
+          else
+            SUDO="sudo"
+          fi
+
+          if ! command -v certbot >/dev/null 2>&1; then
+            $SUDO apt-get update
+            $SUDO apt-get install -y certbot python3-certbot-nginx
+          fi
+
+          $SUDO nginx -t
+          $SUDO certbot --nginx \
+            --non-interactive \
+            --agree-tos \
+            --email "$EMAIL" \
+            --redirect \
+            -d "$DOMAIN"
+          $SUDO nginx -t
+          $SUDO systemctl reload nginx
           EOF

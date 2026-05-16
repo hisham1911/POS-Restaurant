@@ -118,6 +118,8 @@ backups/
 output/
 artifacts/
 packages/
+Deployment/Installers/
+*.exe.old
 backend/KasserPro.API/publish/
 build-result.txt
 *.zip

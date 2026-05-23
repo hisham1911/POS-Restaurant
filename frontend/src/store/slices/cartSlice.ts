@@ -216,6 +216,19 @@ const cartSlice = createSlice({
       state.discountValue = undefined;
     },
 
+    replaceCart: (
+      state,
+      action: PayloadAction<{
+        items: CartItem[];
+        discountType?: DiscountType;
+        discountValue?: number;
+      }>,
+    ) => {
+      state.items = action.payload.items;
+      state.discountType = action.payload.discountType;
+      state.discountValue = action.payload.discountValue;
+    },
+
     // تحديث إعدادات الضريبة والمخزون من بيانات الشركة
     setTaxSettings: (
       state,
@@ -338,6 +351,7 @@ export const {
   updateQuantity,
   updateNotes,
   clearCart,
+  replaceCart,
   setTaxSettings,
   setServiceChargeRate,
   setDiscount,

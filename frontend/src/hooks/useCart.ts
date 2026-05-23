@@ -7,6 +7,7 @@ import {
   updateQuantity,
   updateNotes,
   clearCart,
+  replaceCart,
   updateItemBatch,
   selectCartItems,
   selectItemsCount,
@@ -102,6 +103,16 @@ export const useCart = () => {
     dispatch(clearCart());
   };
 
+  const replace = (
+    nextCart: {
+      items: ReturnType<typeof selectCartItems>;
+      discountType?: DiscountType;
+      discountValue?: number;
+    },
+  ) => {
+    dispatch(replaceCart(nextCart));
+  };
+
   const applyDiscount = (type: DiscountType, value: number) => {
     if (!canManageDiscounts) {
       notifyDiscountPermissionDenied();
@@ -159,6 +170,7 @@ export const useCart = () => {
     updateNotes: setNotes,
     updateItemBatch: changeBatch,
     clearCart: clear,
+    replaceCart: replace,
     applyDiscount,
     removeDiscount,
     applyItemDiscount,

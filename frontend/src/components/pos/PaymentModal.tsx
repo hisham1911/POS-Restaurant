@@ -36,7 +36,9 @@ interface PaymentModalProps {
   orderNotes?: string;
   draftOrderId?: number | null;
   draftOrderTotal?: number;
-  onDraftOrderChange?: (draft: { id: number; total: number } | null) => void;
+  onDraftOrderChange?: (
+    draft: { id: number; total: number; orderNumber?: string } | null,
+  ) => void;
   onOrderComplete?: () => void;
 }
 
@@ -254,7 +256,11 @@ export const PaymentModal = ({
         }
 
         orderId = order.id;
-        onDraftOrderChange?.({ id: order.id, total: order.total });
+        onDraftOrderChange?.({
+          id: order.id,
+          total: order.total,
+          orderNumber: order.orderNumber,
+        });
       } else if (items.length > 0) {
         const order = await addCartItemsToOrder(orderId);
 
@@ -262,7 +268,11 @@ export const PaymentModal = ({
           return;
         }
 
-        onDraftOrderChange?.({ id: order.id, total: order.total });
+        onDraftOrderChange?.({
+          id: order.id,
+          total: order.total,
+          orderNumber: order.orderNumber,
+        });
       }
 
       if (!orderId) {

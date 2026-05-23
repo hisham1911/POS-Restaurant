@@ -31,11 +31,13 @@ const TablesGridPage = () => {
         return;
       }
 
-      navigate("/orders", { state: { openOrderId: table.openOrderId } });
+      navigate(`/pos?openOrderId=${table.openOrderId}&tableId=${table.id}`, {
+        state: { openOrderId: table.openOrderId, openTable: table },
+      });
       return;
     }
 
-    navigate("/pos-workspace", { state: { selectedTable: table } });
+    navigate(`/pos?tableId=${table.id}`, { state: { selectedTable: table } });
   };
 
   if (!currentBranch?.id) {

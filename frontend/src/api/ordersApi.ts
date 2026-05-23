@@ -105,7 +105,7 @@ export const ordersApi = baseApi.injectEndpoints({
         method: "POST",
         body: order,
       }),
-      invalidatesTags: [{ type: "Orders", id: "LIST" }, "Shifts"],
+      invalidatesTags: [{ type: "Orders", id: "LIST" }, "Shifts", "RestaurantTables"],
     }),
 
     // إضافة عنصر للطلب
@@ -203,6 +203,7 @@ export const ordersApi = baseApi.injectEndpoints({
         "Shifts",
         "Customers", // Invalidate customers in case order affects customer debt
         "Inventory", // Invalidate inventory as stock is updated
+        "RestaurantTables",
       ],
     }),
 
@@ -219,6 +220,7 @@ export const ordersApi = baseApi.injectEndpoints({
       invalidatesTags: (_result, _error, { orderId }) => [
         { type: "Orders", id: orderId },
         { type: "Orders", id: "LIST" },
+        "RestaurantTables",
       ],
     }),
 

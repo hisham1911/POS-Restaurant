@@ -841,7 +841,13 @@ export const POSWorkspacePage = () => {
     : filteredProducts.slice(0, 12);
 
   if (shouldRedirectToCashier) {
-    return <Navigate to="/pos" replace />;
+    return (
+      <Navigate
+        to={{ pathname: "/pos", search: location.search }}
+        replace
+        state={location.state}
+      />
+    );
   }
 
   if (isLoading || isLoadingShift) {

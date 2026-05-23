@@ -16,7 +16,7 @@ import { CustomerSearch } from "./CustomerSearch";
 import { Customer } from "@/types/customer.types";
 import { DiscountModal } from "./DiscountModal";
 import { DeliveryDetailsModal } from "./DeliveryDetailsModal";
-import type { OrderSource, OrderType } from "@/types/order.types";
+import type { Order, OrderSource, OrderType } from "@/types/order.types";
 import type { RestaurantTable } from "@/types/restaurant.types";
 import clsx from "clsx";
 
@@ -41,6 +41,10 @@ interface CartProps {
   orderNotes: string;
   onOrderNotesChange: (value: string) => void;
   onSavedNotesClick: () => void;
+  draftOrder?: Order | null;
+  draftOrderId?: number | null;
+  draftOrderNumber?: string | null;
+  draftOrderTotal?: number;
 }
 
 const orderTypes: Array<{ value: OrderType; label: string }> = [
@@ -78,6 +82,10 @@ export const Cart = ({
   orderNotes,
   onOrderNotesChange,
   onSavedNotesClick,
+  draftOrder,
+  draftOrderId,
+  draftOrderNumber,
+  draftOrderTotal = 0,
 }: CartProps) => {
   const {
     items,
@@ -90,13 +98,12 @@ export const Cart = ({
   const [showDiscountModal, setShowDiscountModal] = useState(false);
   const [showDeliveryModal, setShowDeliveryModal] = useState(false);
   const [isNotesExpanded, setIsNotesExpanded] = useState(false);
-  const hasDraftOrder = false;
-  const draftOrderTotal = 0;
+  const hasDraftOrder = typeof draftOrderId === "number";
   const parsedDeliveryFee =
     orderType === "Delivery"
       ? Number.parseFloat(deliveryFee || "0") || 0
       : 0;
-  const checkoutTotal = total + parsedDeliveryFee;
+  const checkoutTotal = total + parsedDeliveryFee + draftOrderTotal;
   const hasDeliveryDetails =
     deliveryAddress.trim().length > 0 ||
     deliveryFee.trim().length > 0 ||
@@ -131,7 +138,7 @@ export const Cart = ({
             </div>
             {hasDraftOrder && (
               <span className="shrink-0 rounded-full bg-primary-100 px-2.5 py-1.5 text-xs font-bold text-primary-700">
-                مفتوح
+                مفتوح {draftOrderNumber ? `#${draftOrderNumber}` : ""}
               </span>
             )}
           </div>
@@ -260,6 +267,48 @@ export const Cart = ({
       </div>
 
       <div className="min-h-0 space-y-2.5 overflow-y-auto px-3 py-3">
+        {hasDraftOrder && draftOrder && draftOrder.items.length > 0 && (
+          <div className="rounded-xl border border-primary-100 bg-primary-50/80 p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="text-sm font-bold text-primary-800">
+                الطلب المفتوح
+              </span>
+              <span className="text-xs font-semibold text-primary-700">
+                #{draftOrder.orderNumber}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {draftOrder.items.map((item) => (
+                <div
+                  key={item.id}
+                  className="rounded-lg bg-white px-3 py-2 text-sm shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-gray-900">
+                        {item.productName}
+                      </p>
+                      {item.notes && (
+                        <p className="mt-1 break-words text-xs text-gray-500">
+                          {item.notes}
+                        </p>
+                      )}
+                    </div>
+                    <div className="shrink-0 text-end">
+                      <p className="font-bold text-gray-900">
+                        {formatCurrency(item.total)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {item.quantity} × {formatCurrency(item.unitPrice)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {items.length === 0 ? (
           <div className="flex h-full min-h-[180px] flex-col items-center justify-center px-4 text-center">
             <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gray-50">

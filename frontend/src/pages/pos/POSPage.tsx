@@ -19,6 +19,9 @@ import {
   AlertCircle,
   PlusCircle,
   FileText,
+  X,
+  Plus,
+  Armchair,
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
 import { useShift } from "@/hooks/useShift";
@@ -30,13 +33,18 @@ import { useGetRestaurantTablesQuery } from "@/api/restaurantTablesApi";
 import { useGetSavedOrderNotesQuery } from "@/api/savedOrderNotesApi";
 import { usePOSMode } from "@/hooks/usePOSMode";
 import { Customer } from "@/types/customer.types";
-import type { OrderSource, OrderType } from "@/types/order.types";
+import type { Order, OrderSource, OrderType } from "@/types/order.types";
 import type { RestaurantTable } from "@/types/restaurant.types";
 import { Product, ProductType, UnitOfMeasure } from "@/types/product.types";
 import { ProductBatch } from "@/types/productBatch.types";
 import { toast } from "sonner";
 import clsx from "clsx";
-import { Link, Navigate } from "react-router-dom";
+import {
+  Link,
+  Navigate,
+  useLocation,
+  useSearchParams,
+} from "react-router-dom";
 import { ShiftWarningBanner } from "@/components/shifts";
 import {
   buildBranchInventoryStockMap,
@@ -46,11 +54,112 @@ import {
 import { usePermission } from "@/hooks/usePermission";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentBranch } from "@/store/slices/branchSlice";
-import { selectAllowNegativeStock } from "@/store/slices/cartSlice";
+import {
+  selectAllowNegativeStock,
+  type CartItem,
+  type DiscountType,
+} from "@/store/slices/cartSlice";
+import { useGetOrderQuery } from "@/api/ordersApi";
+
+interface POSLocationState {
+  selectedTable?: RestaurantTable;
+  openTable?: RestaurantTable;
+  openOrderId?: number;
+}
+
+interface POSOrderTab {
+  id: string;
+  label: string;
+  selectedCustomer: Customer | null;
+  orderType: OrderType;
+  selectedTable: RestaurantTable | null;
+  deliveryAddress: string;
+  deliveryFee: string;
+  deliveryNotes: string;
+  orderSource: OrderSource;
+  externalOrderNumber: string;
+  orderNotes: string;
+  draftOrderId: number | null;
+  draftOrderNumber: string | null;
+  draftOrderTotal: number;
+  cartItems: CartItem[];
+  discountType?: DiscountType;
+  discountValue?: number;
+}
+
+const createOrderTabId = () => {
+  if (typeof crypto !== "undefined" && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+
+  return `pos-tab-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+};
+
+const cloneCartItems = (items: CartItem[]): CartItem[] =>
+  items.map((item) => ({
+    ...item,
+    product: { ...item.product },
+    discount: item.discount ? { ...item.discount } : undefined,
+  }));
+
+const createEmptyOrderTab = (
+  id = createOrderTabId(),
+  overrides: Partial<POSOrderTab> = {},
+): POSOrderTab => ({
+  id,
+  label: "طلب جديد",
+  selectedCustomer: null,
+  orderType: "DineIn",
+  selectedTable: null,
+  deliveryAddress: "",
+  deliveryFee: "",
+  deliveryNotes: "",
+  orderSource: "POS",
+  externalOrderNumber: "",
+  orderNotes: "",
+  draftOrderId: null,
+  draftOrderNumber: null,
+  draftOrderTotal: 0,
+  cartItems: [],
+  ...overrides,
+});
+
+const getOrderPayableTotal = (order: Order | null | undefined, fallback = 0) => {
+  if (!order) {
+    return fallback;
+  }
+
+  return order.amountDue > 0 ? order.amountDue : order.total;
+};
+
+const createTableFromOrder = (order: Order): RestaurantTable | null => {
+  if (!order.tableId) {
+    return null;
+  }
+
+  return {
+    id: order.tableId,
+    tenantId: 0,
+    branchId: order.branchId,
+    number: order.tableNumberSnapshot ?? String(order.tableId),
+    sortOrder: 0,
+    status: "Occupied",
+    isActive: true,
+    openOrderId: order.id,
+    openOrderNumber: order.orderNumber,
+    createdAt: order.createdAt,
+  };
+};
 
 export const POSPage = () => {
   const { mode } = usePOSMode();
-  const shouldRedirectToWorkspace = mode === "standard";
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const initialOrderTabRef = useRef<POSOrderTab | null>(null);
+
+  if (!initialOrderTabRef.current) {
+    initialOrderTabRef.current = createEmptyOrderTab();
+  }
 
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [showPayment, setShowPayment] = useState(false);
@@ -65,6 +174,15 @@ export const POSPage = () => {
   const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(
     null,
   );
+  const [draftOrderId, setDraftOrderId] = useState<number | null>(null);
+  const [draftOrderNumber, setDraftOrderNumber] = useState<string | null>(null);
+  const [draftOrderTotal, setDraftOrderTotal] = useState(0);
+  const [orderTabs, setOrderTabs] = useState<POSOrderTab[]>(() => [
+    initialOrderTabRef.current as POSOrderTab,
+  ]);
+  const [activeOrderTabId, setActiveOrderTabId] = useState(
+    () => (initialOrderTabRef.current as POSOrderTab).id,
+  );
   const [showTableModal, setShowTableModal] = useState(false);
   const [showSavedNotesModal, setShowSavedNotesModal] = useState(false);
   const [orderSource, setOrderSource] = useState<OrderSource>("POS");
@@ -75,17 +193,45 @@ export const POSPage = () => {
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const handledRouteKeyRef = useRef<string | null>(null);
   const [dismissedWarning, setDismissedWarning] = useState(false);
 
   // Batch selection state
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [selectedProductForBatch, setSelectedProductForBatch] = useState<Product | null>(null);
   const [pendingBatchQuantity, setPendingBatchQuantity] = useState(1);
+  const locationState = location.state as POSLocationState | null;
+  const openOrderIdParam = searchParams.get("openOrderId");
+  const parsedOpenOrderId = openOrderIdParam
+    ? Number.parseInt(openOrderIdParam, 10)
+    : locationState?.openOrderId;
+  const requestedOpenOrderId =
+    typeof parsedOpenOrderId === "number" && Number.isFinite(parsedOpenOrderId)
+      ? parsedOpenOrderId
+      : undefined;
+  const tableIdParam = searchParams.get("tableId");
+  const requestedTableId = tableIdParam
+    ? Number.parseInt(tableIdParam, 10)
+    : undefined;
+  const hasPOSOpenRequest =
+    requestedOpenOrderId !== undefined ||
+    requestedTableId !== undefined ||
+    Boolean(locationState?.selectedTable) ||
+    Boolean(locationState?.openTable);
+  const shouldRedirectToWorkspace = mode === "standard" && !hasPOSOpenRequest;
 
   // Hooks must be called at the top level before any callbacks that use their data
   const { products, isLoading } = useProducts();
   const { categories } = useCategories();
-  const { addItem, items, itemsCount, taxRate } = useCart();
+  const {
+    addItem,
+    items,
+    itemsCount,
+    taxRate,
+    discountType,
+    discountValue,
+    replaceCart,
+  } = useCart();
   const { hasActiveShift, isLoading: isLoadingShift } = useShift();
   const currentBranch = useAppSelector(selectCurrentBranch);
   const allowNegativeStock = useAppSelector(selectAllowNegativeStock);
@@ -108,8 +254,25 @@ export const POSPage = () => {
       skip: !currentBranch?.id,
     },
   );
+  const { data: requestedOpenOrderResponse } = useGetOrderQuery(
+    requestedOpenOrderId ?? 0,
+    {
+      skip: requestedOpenOrderId === undefined,
+    },
+  );
+  const { data: activeDraftOrderResponse } = useGetOrderQuery(
+    draftOrderId ?? 0,
+    {
+      skip: draftOrderId === null,
+    },
+  );
   const restaurantTables = restaurantTablesResponse?.data ?? [];
   const savedNotes = savedNotesResponse?.data ?? [];
+  const activeDraftOrder = activeDraftOrderResponse?.data ?? null;
+  const activeDraftOrderTotal = getOrderPayableTotal(
+    activeDraftOrder,
+    draftOrderTotal,
+  );
   const stockByProductId = useMemo(
     () => buildBranchInventoryStockMap(branchInventory),
     [branchInventory],
@@ -128,6 +291,263 @@ export const POSPage = () => {
   useEffect(() => {
     setDismissedWarning(false);
   }, [shiftWarning?.message]);
+
+  const getCurrentTabLabel = () => {
+    if (selectedTable) {
+      return `طاولة ${selectedTable.number}`;
+    }
+
+    if (draftOrderNumber) {
+      return `طلب #${draftOrderNumber}`;
+    }
+
+    return "طلب جديد";
+  };
+
+  const captureCurrentOrderTab = (tab: POSOrderTab): POSOrderTab => ({
+    ...tab,
+    label: getCurrentTabLabel(),
+    selectedCustomer,
+    orderType,
+    selectedTable,
+    deliveryAddress,
+    deliveryFee,
+    deliveryNotes,
+    orderSource,
+    externalOrderNumber,
+    orderNotes,
+    draftOrderId,
+    draftOrderNumber,
+    draftOrderTotal: activeDraftOrderTotal,
+    cartItems: cloneCartItems(items),
+    discountType,
+    discountValue,
+  });
+
+  const restoreOrderTab = (tab: POSOrderTab) => {
+    setSelectedCustomer(tab.selectedCustomer);
+    setOrderType(tab.orderType);
+    setSelectedTable(tab.selectedTable);
+    setDeliveryAddress(tab.deliveryAddress);
+    setDeliveryFee(tab.deliveryFee);
+    setDeliveryNotes(tab.deliveryNotes);
+    setOrderSource(tab.orderSource);
+    setExternalOrderNumber(tab.externalOrderNumber);
+    setOrderNotes(tab.orderNotes);
+    setDraftOrderId(tab.draftOrderId);
+    setDraftOrderNumber(tab.draftOrderNumber);
+    setDraftOrderTotal(tab.draftOrderTotal);
+    replaceCart({
+      items: cloneCartItems(tab.cartItems),
+      discountType: tab.discountType,
+      discountValue: tab.discountValue,
+    });
+    setShowPayment(false);
+    setShowMobileCart(false);
+    setShowTableModal(false);
+  };
+
+  const isCurrentOrderPristine = () =>
+    items.length === 0 &&
+    !draftOrderId &&
+    !selectedCustomer &&
+    !selectedTable &&
+    !deliveryAddress.trim() &&
+    !deliveryFee.trim() &&
+    !deliveryNotes.trim() &&
+    !externalOrderNumber.trim() &&
+    !orderNotes.trim();
+
+  const switchOrderTab = (tabId: string) => {
+    if (tabId === activeOrderTabId) {
+      return;
+    }
+
+    const nextTab = orderTabs.find((tab) => tab.id === tabId);
+    if (!nextTab) {
+      return;
+    }
+
+    setOrderTabs((currentTabs) =>
+      currentTabs.map((tab) =>
+        tab.id === activeOrderTabId ? captureCurrentOrderTab(tab) : tab,
+      ),
+    );
+    setActiveOrderTabId(tabId);
+    restoreOrderTab(nextTab);
+  };
+
+  const addOrderTab = () => {
+    const nextTab = createEmptyOrderTab();
+    setOrderTabs((currentTabs) => [
+      ...currentTabs.map((tab) =>
+        tab.id === activeOrderTabId ? captureCurrentOrderTab(tab) : tab,
+      ),
+      nextTab,
+    ]);
+    setActiveOrderTabId(nextTab.id);
+    restoreOrderTab(nextTab);
+  };
+
+  const closeOrderTab = (tabId: string) => {
+    const closingTab = orderTabs.find((tab) => tab.id === tabId);
+    if (!closingTab) {
+      return;
+    }
+
+    const isActive = tabId === activeOrderTabId;
+    const hasUnsavedCart = isActive ? items.length > 0 : closingTab.cartItems.length > 0;
+
+    if (
+      hasUnsavedCart &&
+      !window.confirm("إغلاق التاب سيحذف الإضافات غير المحفوظة. هل تريد المتابعة؟")
+    ) {
+      return;
+    }
+
+    if (orderTabs.length === 1) {
+      const emptyTab = createEmptyOrderTab();
+      setOrderTabs([emptyTab]);
+      setActiveOrderTabId(emptyTab.id);
+      restoreOrderTab(emptyTab);
+      return;
+    }
+
+    const closingIndex = orderTabs.findIndex((tab) => tab.id === tabId);
+    const nextTabs = orderTabs.filter((tab) => tab.id !== tabId);
+    setOrderTabs(nextTabs);
+
+    if (!isActive) {
+      return;
+    }
+
+    const nextTab = nextTabs[Math.max(0, closingIndex - 1)];
+    setActiveOrderTabId(nextTab.id);
+    restoreOrderTab(nextTab);
+  };
+
+  const replaceActiveOrderTab = (nextTab: POSOrderTab) => {
+    setOrderTabs((currentTabs) =>
+      currentTabs.map((tab) => (tab.id === activeOrderTabId ? nextTab : tab)),
+    );
+    setActiveOrderTabId(nextTab.id);
+    restoreOrderTab(nextTab);
+  };
+
+  const openTableInOrderTab = (table: RestaurantTable) => {
+    if (selectedTable?.id === table.id && !draftOrderId) {
+      return;
+    }
+
+    const existingTab = orderTabs.find(
+      (tab) => tab.selectedTable?.id === table.id && !tab.draftOrderId,
+    );
+
+    if (existingTab) {
+      switchOrderTab(existingTab.id);
+      return;
+    }
+
+    const nextTab = createEmptyOrderTab(
+      isCurrentOrderPristine() ? activeOrderTabId : undefined,
+      {
+        label: `طاولة ${table.number}`,
+        selectedTable: table,
+      },
+    );
+
+    if (isCurrentOrderPristine()) {
+      replaceActiveOrderTab(nextTab);
+      return;
+    }
+
+    setOrderTabs((currentTabs) => [
+      ...currentTabs.map((tab) =>
+        tab.id === activeOrderTabId ? captureCurrentOrderTab(tab) : tab,
+      ),
+      nextTab,
+    ]);
+    setActiveOrderTabId(nextTab.id);
+    restoreOrderTab(nextTab);
+  };
+
+  const openOrderInTab = (order: Order, table?: RestaurantTable) => {
+    if (draftOrderId === order.id) {
+      return;
+    }
+
+    const existingTab = orderTabs.find((tab) => tab.draftOrderId === order.id);
+
+    if (existingTab) {
+      switchOrderTab(existingTab.id);
+      return;
+    }
+
+    const orderTable =
+      table ??
+      restaurantTables.find((restaurantTable) => restaurantTable.id === order.tableId) ??
+      createTableFromOrder(order);
+    const nextTab = createEmptyOrderTab(
+      isCurrentOrderPristine() ? activeOrderTabId : undefined,
+      {
+        label: orderTable ? `طاولة ${orderTable.number}` : `طلب #${order.orderNumber}`,
+        orderType: order.orderType ?? "DineIn",
+        selectedTable: orderTable,
+        deliveryAddress: order.deliveryAddress ?? "",
+        deliveryFee: order.deliveryFee ? String(order.deliveryFee) : "",
+        deliveryNotes: order.deliveryNotes ?? "",
+        orderSource: order.orderSource ?? "POS",
+        externalOrderNumber: order.externalOrderNumber ?? "",
+        orderNotes: order.notes ?? "",
+        draftOrderId: order.id,
+        draftOrderNumber: order.orderNumber,
+        draftOrderTotal: getOrderPayableTotal(order),
+      },
+    );
+
+    if (isCurrentOrderPristine()) {
+      replaceActiveOrderTab(nextTab);
+      return;
+    }
+
+    setOrderTabs((currentTabs) => [
+      ...currentTabs.map((tab) =>
+        tab.id === activeOrderTabId ? captureCurrentOrderTab(tab) : tab,
+      ),
+      nextTab,
+    ]);
+    setActiveOrderTabId(nextTab.id);
+    restoreOrderTab(nextTab);
+  };
+
+  useEffect(() => {
+    if (handledRouteKeyRef.current === location.key) {
+      return;
+    }
+
+    const requestedTable =
+      locationState?.selectedTable ??
+      locationState?.openTable ??
+      restaurantTables.find((table) => table.id === requestedTableId);
+
+    if (requestedOpenOrderResponse?.data) {
+      handledRouteKeyRef.current = location.key;
+      openOrderInTab(requestedOpenOrderResponse.data, requestedTable);
+      return;
+    }
+
+    if (!requestedOpenOrderId && requestedTable) {
+      handledRouteKeyRef.current = location.key;
+      openTableInOrderTab(requestedTable);
+    }
+  }, [
+    location.key,
+    locationState,
+    requestedOpenOrderId,
+    requestedOpenOrderResponse?.data,
+    requestedTableId,
+    restaurantTables,
+  ]);
 
   useEffect(() => {
     if (
@@ -255,6 +675,10 @@ export const POSPage = () => {
   };
 
   const handleOrderTypeChange = (nextOrderType: OrderType) => {
+    if (draftOrderId) {
+      return;
+    }
+
     setOrderType(nextOrderType);
 
     if (nextOrderType !== "DineIn") {
@@ -283,12 +707,29 @@ export const POSPage = () => {
     setSelectedCustomer(null);
     setOrderType("DineIn");
     setSelectedTable(null);
+    setDraftOrderId(null);
+    setDraftOrderNumber(null);
+    setDraftOrderTotal(0);
     setDeliveryAddress("");
     setDeliveryFee("");
     setDeliveryNotes("");
     setOrderSource("POS");
     setExternalOrderNumber("");
     setOrderNotes("");
+  };
+
+  const handleDraftOrderChange = (
+    draft: { id: number; total: number; orderNumber?: string } | null,
+  ) => {
+    setDraftOrderId(draft?.id ?? null);
+    setDraftOrderNumber(draft?.orderNumber ?? null);
+    setDraftOrderTotal(draft?.total ?? 0);
+  };
+
+  const handleOrderComplete = () => {
+    const emptyTab = createEmptyOrderTab(activeOrderTabId);
+    resetRestaurantOrderState();
+    replaceActiveOrderTab(emptyTab);
   };
 
   // Filter products by search, category and availability
@@ -329,7 +770,13 @@ export const POSPage = () => {
   }
 
   if (shouldRedirectToWorkspace) {
-    return <Navigate to="/pos-workspace" replace />;
+    return (
+      <Navigate
+        to={{ pathname: "/pos-workspace", search: location.search }}
+        replace
+        state={location.state}
+      />
+    );
   }
 
   if (isLoading || isLoadingShift) {
@@ -367,9 +814,69 @@ export const POSPage = () => {
   }
 
   return (
-    <div className="h-full flex overflow-hidden bg-gray-50">
-      {/* Products Section */}
-      <div className="flex-1 flex flex-col p-4 min-w-0">
+    <div className="flex h-full flex-col overflow-hidden bg-gray-50">
+      <div className="flex shrink-0 items-center gap-2 overflow-x-auto border-b border-gray-200 bg-white px-3 py-2">
+        {orderTabs.map((tab) => {
+          const isActive = tab.id === activeOrderTabId;
+          const title = isActive ? getCurrentTabLabel() : tab.label;
+          const tabHasOrder = isActive ? Boolean(draftOrderId) : Boolean(tab.draftOrderId);
+          const tabItemsCount = isActive
+            ? itemsCount
+            : tab.cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+          return (
+            <div
+              key={tab.id}
+              className={clsx(
+                "flex min-h-[38px] max-w-[220px] shrink-0 items-center gap-1 rounded-t-xl border px-2 py-1.5 text-sm font-bold transition",
+                isActive
+                  ? "border-primary-200 border-b-white bg-white text-primary-700 shadow-sm"
+                  : "border-gray-200 bg-gray-50 text-gray-600 hover:bg-white",
+              )}
+            >
+              <button
+                type="button"
+                onClick={() => switchOrderTab(tab.id)}
+                className="flex min-w-0 flex-1 items-center gap-2 text-start"
+              >
+                <Armchair
+                  className={clsx(
+                    "h-4 w-4 shrink-0",
+                    tabHasOrder ? "text-emerald-600" : "text-gray-400",
+                  )}
+                />
+                <span className="truncate">{title}</span>
+                {tabItemsCount > 0 && (
+                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary-100 px-1.5 text-[11px] text-primary-700">
+                    {tabItemsCount}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => closeOrderTab(tab.id)}
+                className="rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-danger-600"
+                aria-label="إغلاق التاب"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={addOrderTab}
+          className="flex min-h-[38px] shrink-0 items-center gap-2 rounded-xl border border-dashed border-gray-300 bg-white px-3 py-2 text-sm font-bold text-gray-600 transition hover:border-primary-300 hover:text-primary-700"
+        >
+          <Plus className="h-4 w-4" />
+          طلب جديد
+        </button>
+      </div>
+
+      <div className="flex min-h-0 flex-1 overflow-hidden">
+        {/* Products Section */}
+        <div className="flex-1 flex flex-col p-4 min-w-0">
         {/* Shift Warning Banner */}
         {shiftWarning && shiftWarning.shouldWarn && !dismissedWarning && (
           <div className="mb-4">
@@ -617,7 +1124,12 @@ export const POSPage = () => {
           orderNotes={orderNotes}
           onOrderNotesChange={setOrderNotes}
           onSavedNotesClick={() => setShowSavedNotesModal(true)}
+          draftOrder={activeDraftOrder}
+          draftOrderId={draftOrderId}
+          draftOrderNumber={draftOrderNumber}
+          draftOrderTotal={activeDraftOrderTotal}
         />
+      </div>
       </div>
 
       {/* Cart Section - Mobile */}
@@ -652,6 +1164,10 @@ export const POSPage = () => {
               orderNotes={orderNotes}
               onOrderNotesChange={setOrderNotes}
               onSavedNotesClick={() => setShowSavedNotesModal(true)}
+              draftOrder={activeDraftOrder}
+              draftOrderId={draftOrderId}
+              draftOrderNumber={draftOrderNumber}
+              draftOrderTotal={activeDraftOrderTotal}
             />
           </div>
         </div>
@@ -672,7 +1188,10 @@ export const POSPage = () => {
             orderType === "Delivery" ? externalOrderNumber : undefined
           }
           orderNotes={orderNotes}
-          onOrderComplete={resetRestaurantOrderState}
+          draftOrderId={draftOrderId}
+          draftOrderTotal={activeDraftOrderTotal}
+          onDraftOrderChange={handleDraftOrderChange}
+          onOrderComplete={handleOrderComplete}
         />
       )}
 

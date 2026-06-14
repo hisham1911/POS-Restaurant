@@ -24,6 +24,7 @@ import {
   Armchair,
 } from "lucide-react";
 import { useCart } from "@/hooks/useCart";
+import { useOrders } from "@/hooks/useOrders";
 import { useShift } from "@/hooks/useShift";
 import { usePOSShortcuts } from "@/hooks/usePOSShortcuts";
 import { useGetShiftWarningsQuery } from "@/api/shiftsApi";
@@ -132,6 +133,69 @@ const getOrderPayableTotal = (order: Order | null | undefined, fallback = 0) => 
   return order.amountDue > 0 ? order.amountDue : order.total;
 };
 
+
+const POS_ORDER_TABS_STORAGE_KEY = "kasserpro.pos.orderTabs.v1";
+
+interface StoredPOSOrderTabs {
+  activeOrderTabId: string;
+  orderTabs: POSOrderTab[];
+}
+
+const isBrowserStorageAvailable = () =>
+  typeof window !== "undefined" && typeof window.sessionStorage !== "undefined";
+
+const loadStoredOrderTabs = (): StoredPOSOrderTabs | null => {
+  if (!isBrowserStorageAvailable()) {
+    return null;
+  }
+
+  try {
+    const rawValue = window.sessionStorage.getItem(POS_ORDER_TABS_STORAGE_KEY);
+    if (!rawValue) {
+      return null;
+    }
+
+    const parsed = JSON.parse(rawValue) as Partial<StoredPOSOrderTabs>;
+    if (!Array.isArray(parsed.orderTabs) || parsed.orderTabs.length === 0) {
+      return null;
+    }
+
+    const activeOrderTabId =
+      typeof parsed.activeOrderTabId === "string" &&
+      parsed.orderTabs.some((tab) => tab.id === parsed.activeOrderTabId)
+        ? parsed.activeOrderTabId
+        : parsed.orderTabs[0]?.id;
+
+    if (!activeOrderTabId) {
+      return null;
+    }
+
+    return {
+      activeOrderTabId,
+      orderTabs: parsed.orderTabs.map((tab) =>
+        createEmptyOrderTab(tab.id, {
+          ...tab,
+          cartItems: cloneCartItems(tab.cartItems ?? []),
+        }),
+      ),
+    };
+  } catch {
+    window.sessionStorage.removeItem(POS_ORDER_TABS_STORAGE_KEY);
+    return null;
+  }
+};
+
+const saveStoredOrderTabs = (payload: StoredPOSOrderTabs) => {
+  if (!isBrowserStorageAvailable()) {
+    return;
+  }
+
+  window.sessionStorage.setItem(
+    POS_ORDER_TABS_STORAGE_KEY,
+    JSON.stringify(payload),
+  );
+};
+
 const createTableFromOrder = (order: Order): RestaurantTable | null => {
   if (!order.tableId) {
     return null;
@@ -155,11 +219,22 @@ export const POSPage = () => {
   const { mode } = usePOSMode();
   const location = useLocation();
   const [searchParams] = useSearchParams();
-  const initialOrderTabRef = useRef<POSOrderTab | null>(null);
+  const initialOrderTabsRef = useRef<StoredPOSOrderTabs | null>(null);
 
-  if (!initialOrderTabRef.current) {
-    initialOrderTabRef.current = createEmptyOrderTab();
+  if (!initialOrderTabsRef.current) {
+    const storedTabs = loadStoredOrderTabs();
+    const fallbackTab = createEmptyOrderTab();
+    initialOrderTabsRef.current = storedTabs ?? {
+      activeOrderTabId: fallbackTab.id,
+      orderTabs: [fallbackTab],
+    };
   }
+
+  const initialOrderTabs = initialOrderTabsRef.current;
+  const initialActiveOrderTab =
+    initialOrderTabs.orderTabs.find(
+      (tab) => tab.id === initialOrderTabs.activeOrderTabId,
+    ) ?? initialOrderTabs.orderTabs[0];
 
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [showPayment, setShowPayment] = useState(false);
@@ -168,32 +243,53 @@ export const POSPage = () => {
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [showCustomItem, setShowCustomItem] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(
-    null,
+    initialActiveOrderTab.selectedCustomer,
   );
-  const [orderType, setOrderType] = useState<OrderType>("DineIn");
+  const [orderType, setOrderType] = useState<OrderType>(
+    initialActiveOrderTab.orderType,
+  );
   const [selectedTable, setSelectedTable] = useState<RestaurantTable | null>(
-    null,
+    initialActiveOrderTab.selectedTable,
   );
-  const [draftOrderId, setDraftOrderId] = useState<number | null>(null);
-  const [draftOrderNumber, setDraftOrderNumber] = useState<string | null>(null);
-  const [draftOrderTotal, setDraftOrderTotal] = useState(0);
-  const [orderTabs, setOrderTabs] = useState<POSOrderTab[]>(() => [
-    initialOrderTabRef.current as POSOrderTab,
-  ]);
+  const [draftOrderId, setDraftOrderId] = useState<number | null>(
+    initialActiveOrderTab.draftOrderId,
+  );
+  const [draftOrderNumber, setDraftOrderNumber] = useState<string | null>(
+    initialActiveOrderTab.draftOrderNumber,
+  );
+  const [draftOrderTotal, setDraftOrderTotal] = useState(
+    initialActiveOrderTab.draftOrderTotal,
+  );
+  const [orderTabs, setOrderTabs] = useState<POSOrderTab[]>(() =>
+    initialOrderTabs.orderTabs,
+  );
   const [activeOrderTabId, setActiveOrderTabId] = useState(
-    () => (initialOrderTabRef.current as POSOrderTab).id,
+    () => initialOrderTabs.activeOrderTabId,
   );
   const [showTableModal, setShowTableModal] = useState(false);
   const [showSavedNotesModal, setShowSavedNotesModal] = useState(false);
-  const [orderSource, setOrderSource] = useState<OrderSource>("POS");
-  const [externalOrderNumber, setExternalOrderNumber] = useState("");
-  const [orderNotes, setOrderNotes] = useState("");
-  const [deliveryAddress, setDeliveryAddress] = useState("");
-  const [deliveryFee, setDeliveryFee] = useState("");
-  const [deliveryNotes, setDeliveryNotes] = useState("");
+  const [orderSource, setOrderSource] = useState<OrderSource>(
+    initialActiveOrderTab.orderSource,
+  );
+  const [externalOrderNumber, setExternalOrderNumber] = useState(
+    initialActiveOrderTab.externalOrderNumber,
+  );
+  const [orderNotes, setOrderNotes] = useState(
+    initialActiveOrderTab.orderNotes,
+  );
+  const [deliveryAddress, setDeliveryAddress] = useState(
+    initialActiveOrderTab.deliveryAddress,
+  );
+  const [deliveryFee, setDeliveryFee] = useState(
+    initialActiveOrderTab.deliveryFee,
+  );
+  const [deliveryNotes, setDeliveryNotes] = useState(
+    initialActiveOrderTab.deliveryNotes,
+  );
   const [searchInput, setSearchInput] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const handledRouteKeyRef = useRef<string | null>(null);
+  const restoredInitialCartRef = useRef(false);
   const [dismissedWarning, setDismissedWarning] = useState(false);
 
   // Batch selection state
@@ -232,6 +328,11 @@ export const POSPage = () => {
     discountValue,
     replaceCart,
   } = useCart();
+  const {
+    createOrder,
+    addCartItemsToOrder,
+    isCreating: isCreatingOpenOrder,
+  } = useOrders();
   const { hasActiveShift, isLoading: isLoadingShift } = useShift();
   const currentBranch = useAppSelector(selectCurrentBranch);
   const allowNegativeStock = useAppSelector(selectAllowNegativeStock);
@@ -357,6 +458,46 @@ export const POSPage = () => {
     !deliveryNotes.trim() &&
     !externalOrderNumber.trim() &&
     !orderNotes.trim();
+
+  useEffect(() => {
+    if (restoredInitialCartRef.current) {
+      return;
+    }
+
+    restoredInitialCartRef.current = true;
+    replaceCart({
+      items: cloneCartItems(initialActiveOrderTab.cartItems),
+      discountType: initialActiveOrderTab.discountType,
+      discountValue: initialActiveOrderTab.discountValue,
+    });
+  });
+
+  useEffect(() => {
+    saveStoredOrderTabs({
+      activeOrderTabId,
+      orderTabs: orderTabs.map((tab) =>
+        tab.id === activeOrderTabId ? captureCurrentOrderTab(tab) : tab,
+      ),
+    });
+  }, [
+    activeOrderTabId,
+    deliveryAddress,
+    deliveryFee,
+    deliveryNotes,
+    discountType,
+    discountValue,
+    draftOrderId,
+    draftOrderNumber,
+    activeDraftOrderTotal,
+    externalOrderNumber,
+    items,
+    orderNotes,
+    orderSource,
+    orderTabs,
+    orderType,
+    selectedCustomer,
+    selectedTable,
+  ]);
 
   const switchOrderTab = (tabId: string) => {
     if (tabId === activeOrderTabId) {
@@ -724,6 +865,47 @@ export const POSPage = () => {
     setDraftOrderId(draft?.id ?? null);
     setDraftOrderNumber(draft?.orderNumber ?? null);
     setDraftOrderTotal(draft?.total ?? 0);
+  };
+
+  const handleSaveOpenOrder = async () => {
+    if (orderType !== "DineIn") {
+      toast.error("حفظ الطلب مفتوح متاح لطلبات الصالة فقط");
+      return;
+    }
+
+    if (!selectedTable?.id) {
+      toast.error("اختر طاولة قبل حفظ طلب الصالة");
+      return;
+    }
+
+    if (items.length === 0) {
+      toast.error("أضف منتجات قبل حفظ الطلب المفتوح");
+      return;
+    }
+
+    const order = draftOrderId
+      ? await addCartItemsToOrder(draftOrderId)
+      : await createOrder(selectedCustomer?.id, orderType, undefined, 0, undefined, {
+          tableId: selectedTable.id,
+          orderSource: "POS",
+          notes: orderNotes.trim() || undefined,
+        });
+
+    if (!order) {
+      return;
+    }
+
+    handleDraftOrderChange({
+      id: order.id,
+      total: getOrderPayableTotal(order),
+      orderNumber: order.orderNumber,
+    });
+    replaceCart({
+      items: [],
+      discountType: undefined,
+      discountValue: undefined,
+    });
+    toast.success("تم حفظ الطلب وسيظل مفتوحًا للطاولة");
   };
 
   const handleOrderComplete = () => {
@@ -1105,6 +1287,8 @@ export const POSPage = () => {
       <div className="hidden min-h-0 w-[440px] shrink-0 flex-col border-s-2 border-gray-100 bg-white lg:flex xl:w-[470px] 2xl:w-[500px]">
         <Cart
           onCheckout={() => setShowPayment(true)}
+          onSaveOpenOrder={handleSaveOpenOrder}
+          isSavingOpenOrder={isCreatingOpenOrder}
           selectedCustomer={selectedCustomer}
           onCustomerSelect={setSelectedCustomer}
           orderType={orderType}
@@ -1145,6 +1329,11 @@ export const POSPage = () => {
                 setShowMobileCart(false);
                 setShowPayment(true);
               }}
+              onSaveOpenOrder={async () => {
+                await handleSaveOpenOrder();
+                setShowMobileCart(false);
+              }}
+              isSavingOpenOrder={isCreatingOpenOrder}
               selectedCustomer={selectedCustomer}
               onCustomerSelect={setSelectedCustomer}
               orderType={orderType}

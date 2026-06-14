@@ -60,6 +60,17 @@ public class AuthService : IAuthService
                     ErrorMessages.Get(ErrorCodes.TENANT_INACTIVE));
         }
 
+        if (string.IsNullOrWhiteSpace(user.SecurityStamp))
+        {
+            user.UpdateSecurityStamp();
+            _unitOfWork.Users.Update(user);
+            await _unitOfWork.SaveChangesAsync();
+
+            _logger.LogWarning(
+                "Repaired missing security stamp during login for user {UserId}",
+                user.Id);
+        }
+
         var expiryHours = GetJwtExpiryHours();
         var expiresAt = DateTime.UtcNow.AddHours(expiryHours);
         var token = await GenerateTokenAsync(user, expiresAt);

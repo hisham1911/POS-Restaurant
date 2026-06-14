@@ -70,7 +70,64 @@ public class AuthIntegrationTests
         meResponse.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 
+    [Fact]
+    public async Task Login_WithSystemOwner_ReturnsToken()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        var email = await SeedSystemOwnerAsync(factory);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Email = email,
+            Password = "Owner@123"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        var content = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<ApiResponse<LoginResponse>>(content, _jsonOptions);
+
+        result.Should().NotBeNull();
+        result!.Success.Should().BeTrue();
+        result.Data.Should().NotBeNull();
+        result.Data!.AccessToken.Should().NotBeNullOrWhiteSpace();
+        result.Data.User.Role.Should().Be(UserRole.SystemOwner.ToString());
+        result.Data.User.BranchId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Login_WhenSecurityStampIsMissing_RepairsStampBeforeIssuingToken()
+    {
+        using var factory = new CustomWebApplicationFactory();
+        var (email, userId) = await SeedLoginUserWithSecurityStampAsync(factory, string.Empty);
+        using var client = factory.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginRequest
+        {
+            Email = email,
+            Password = "Test123!"
+        });
+
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var user = await db.Users.FindAsync(userId);
+
+        user.Should().NotBeNull();
+        user!.SecurityStamp.Should().NotBeNullOrWhiteSpace();
+    }
+
     private static async Task<string> SeedLoginUserAsync(CustomWebApplicationFactory factory)
+    {
+        var (email, _) = await SeedLoginUserWithSecurityStampAsync(factory);
+        return email;
+    }
+
+    private static async Task<(string Email, int UserId)> SeedLoginUserWithSecurityStampAsync(
+        CustomWebApplicationFactory factory,
+        string? securityStamp = null)
     {
         using var scope = factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -97,7 +154,7 @@ public class AuthIntegrationTests
         await db.SaveChangesAsync();
 
         var email = "auth-" + Guid.NewGuid().ToString()[..8] + "@test.com";
-        db.Users.Add(new User
+        var user = new User
         {
             TenantId = tenant.Id,
             BranchId = branch.Id,
@@ -105,6 +162,29 @@ public class AuthIntegrationTests
             Email = email,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword("Test123!"),
             Role = UserRole.Admin,
+            IsActive = true,
+            SecurityStamp = securityStamp ?? Guid.NewGuid().ToString()
+        };
+        db.Users.Add(user);
+        await db.SaveChangesAsync();
+
+        return (email, user.Id);
+    }
+
+    private static async Task<string> SeedSystemOwnerAsync(CustomWebApplicationFactory factory)
+    {
+        using var scope = factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var email = "owner-" + Guid.NewGuid().ToString()[..8] + "@test.com";
+        db.Users.Add(new User
+        {
+            TenantId = null,
+            BranchId = null,
+            Name = "System Owner",
+            Email = email,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword("Owner@123"),
+            Role = UserRole.SystemOwner,
             IsActive = true
         });
         await db.SaveChangesAsync();

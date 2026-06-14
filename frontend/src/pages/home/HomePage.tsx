@@ -42,7 +42,7 @@ export default function HomePage() {
   const visibleReportGroups = canViewReports ? reportGroups : [];
 
   const firstName = user?.name?.trim().split(/\s+/)[0] ?? "المستخدم";
-  const storeName = tenantResponse?.data?.name ?? "TajerPro";
+  const storeName = tenantResponse?.data?.name ?? "مطعم برو";
   const currentTime = new Date().toLocaleTimeString("ar-EG", {
     hour: "2-digit",
     minute: "2-digit",

@@ -181,6 +181,24 @@ public class SystemController : ControllerBase
     }
 
     /// <summary>
+    /// Seed the Am Salama restaurant demo tenant manually (SystemOwner only)
+    /// </summary>
+    [HttpPost("seed/restaurant-demo")]
+    [Authorize(Roles = "SystemOwner")]
+    public async Task<IActionResult> SeedRestaurantDemo()
+    {
+        var result = await _systemSeedService.SeedRestaurantDemoAsync(HttpContext.RequestAborted);
+
+        if (result.Success)
+            return Ok(result);
+
+        if (result.ErrorCode == ErrorCodes.CONFLICT)
+            return Conflict(result);
+
+        return BadRequest(result);
+    }
+
+    /// <summary>
     /// Helper: Get best LAN IPv4 address, preferring physical NICs over virtual/VPN adapters.
     /// </summary>
     private static string GetLanIpAddress()

@@ -161,19 +161,19 @@ export const MainLayout = () => {
                 className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#2563eb_0%,#f97316_100%)] text-white shadow-[0_18px_30px_-24px_rgba(37,99,235,0.7)] transition-transform hover:scale-[1.03]"
                 title="فتح السايد بار"
               >
-                <span className="text-base font-black">T</span>
+                <span className="text-base font-black">م</span>
               </button>
             </div>
           ) : (
             <div className="rounded-[1.6rem] border border-primary-100 bg-white/95 p-3 shadow-[0_18px_40px_-34px_rgba(37,99,235,0.45)]">
               <div className="flex items-center gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#2563eb_0%,#f97316_100%)] text-white shadow-[0_18px_30px_-24px_rgba(37,99,235,0.7)]">
-                  <span className="text-base font-black">T</span>
+                  <span className="text-base font-black">م</span>
                 </div>
 
                 <div className="min-w-0 flex-1">
                   <h1 className="truncate text-base font-bold text-slate-900">
-                    TajerPro
+                    مطعم برو
                   </h1>
                   <p className="text-xs text-slate-500">
                     تنقل أسرع بين صفحات النظام
@@ -318,10 +318,10 @@ export const MainLayout = () => {
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#2563eb_0%,#f97316_100%)] text-white">
-                      <span className="text-base font-black">T</span>
+                      <span className="text-base font-black">م</span>
                     </div>
                     <div>
-                      <p className="font-bold text-slate-900">TajerPro</p>
+                      <p className="font-bold text-slate-900">مطعم برو</p>
                       <p className="text-xs text-slate-500">تنقل منظم وسريع</p>
                     </div>
                   </div>
@@ -443,9 +443,9 @@ export const MainLayout = () => {
 
             <div className="flex items-center gap-2 lg:hidden">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[linear-gradient(135deg,#2563eb_0%,#f97316_100%)] text-white">
-                <span className="text-sm font-black">T</span>
+                <span className="text-sm font-black">م</span>
               </div>
-              <span className="font-bold text-primary-700">TajerPro</span>
+              <span className="font-bold text-primary-700">مطعم برو</span>
             </div>
           </div>
 

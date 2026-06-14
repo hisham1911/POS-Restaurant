@@ -280,7 +280,7 @@ const generateDailyReportReceiptHtml = (
 
   <div class="footer">
     <p>تم الطباعة: ${new Date().toLocaleString("ar-EG")}</p>
-    <p>نظام نقاط البيع TajerPro</p>
+    <p>نظام إدارة المطاعم مطعم برو</p>
   </div>
 
   <script>window.onload = function() { window.print(); }</script>

@@ -13,8 +13,8 @@ import {
 } from "lucide-react";
 
 const DEMO_ACCOUNT = {
-  email: "karim@supermarket.com",
-  password: "Admin@123",
+  email: "demo@amsalama.com",
+  password: "Demo@12345",
 };
 
 export const LoginPage = () => {
@@ -43,19 +43,19 @@ export const LoginPage = () => {
           <div className="relative">
             <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold tracking-wide text-blue-100">
               <Sparkles className="h-4 w-4" />
-              تاجر برو | نظام نقاط البيع
+              مطعم برو | نظام إدارة المطاعم
             </div>
 
             <h1 className="text-4xl font-black leading-tight">
-              تاجر برو
+              مطعم برو
               <span className="mt-1 block text-xl font-medium text-blue-100">
-                نظام بسيط لإدارة المبيعات والفواتير والمخزون
+                نظام بسيط لإدارة الطلبات والفواتير والطاولات
               </span>
             </h1>
 
             <p className="mt-6 max-w-md text-sm leading-7 text-blue-100/90">
-              كل ما تحتاجه لإدارة الشغل اليومي في مكان واحد: بيع أسرع، متابعة
-              واضحة، وتقارير مفهومة.
+              كل ما تحتاجه لإدارة شغل المطعم اليومي في مكان واحد: طلبات أسرع،
+              متابعة أوضح، وتقارير مفهومة.
             </p>
           </div>
 
@@ -66,11 +66,11 @@ export const LoginPage = () => {
             </div>
             <div className="flex items-center gap-3 text-sm">
               <BadgeCheck className="h-5 w-5 text-amber-300" />
-              بيع وفواتير ومخزون من نفس النظام
+              طلبات وفواتير وطاولات من نفس النظام
             </div>
             <div className="flex items-center gap-3 text-sm">
               <LogIn className="h-5 w-5 text-cyan-300" />
-              تقارير يومية تساعدك تتابع الأداء
+              تقارير يومية تساعدك تتابع أداء المطعم
             </div>
           </div>
         </section>
@@ -79,7 +79,7 @@ export const LoginPage = () => {
           <div className="w-full max-w-md animate-fade-in">
             <div className="mb-7 text-center">
               <div className="mx-auto mb-4 inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-[linear-gradient(140deg,#1d4ed8_0%,#f97316_100%)] text-white shadow-[0_22px_35px_-24px_rgba(37,99,235,0.8)]">
-                <span className="text-4xl font-black">T</span>
+                <span className="text-4xl font-black">م</span>
               </div>
 
               <h2 className="text-3xl font-black text-slate-800">
@@ -96,7 +96,7 @@ export const LoginPage = () => {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="مثال: karim@supermarket.com"
+                placeholder="مثال: demo@amsalama.com"
                 required
               />
 

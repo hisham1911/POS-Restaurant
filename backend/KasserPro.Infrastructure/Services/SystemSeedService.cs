@@ -182,6 +182,53 @@ public class SystemSeedService : ISystemSeedService
         }
     }
 
+    public async Task<ApiResponse<SystemSeedRunResultDto>> SeedRestaurantDemoAsync(CancellationToken cancellationToken = default)
+    {
+        if (!await SeedExecutionLock.WaitAsync(0, cancellationToken))
+        {
+            return ApiResponse<SystemSeedRunResultDto>.Fail(
+                ErrorCodes.CONFLICT,
+                ErrorMessages.Get(ErrorCodes.CONFLICT),
+                new List<string> { "عملية تحميل بيانات العرض قيد التنفيذ حالياً" });
+        }
+
+        var startedAtUtc = DateTime.UtcNow;
+        var stopwatch = Stopwatch.StartNew();
+
+        try
+        {
+            await RestaurantDemoSeeder.SeedAmSalamaAsync(_context, cancellationToken);
+            _context.ChangeTracker.Clear();
+
+            stopwatch.Stop();
+
+            var result = new SystemSeedRunResultDto
+            {
+                StartedAtUtc = startedAtUtc,
+                CompletedAtUtc = DateTime.UtcNow,
+                DurationMs = stopwatch.ElapsedMilliseconds,
+                InventorySynchronizationTriggered = false,
+                PreservedExistingData = true,
+                SeededTenantSlugs = new List<string> { RestaurantDemoSeeder.TenantSlug }
+            };
+
+            return ApiResponse<SystemSeedRunResultDto>.Ok(result, "تم تجهيز حساب مطعم عم سلامة التجريبي بنجاح");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Restaurant demo seed failed");
+
+            return ApiResponse<SystemSeedRunResultDto>.Fail(
+                ErrorCodes.INTERNAL_ERROR,
+                ErrorMessages.Get(ErrorCodes.INTERNAL_ERROR),
+                new List<string> { ex.Message });
+        }
+        finally
+        {
+            SeedExecutionLock.Release();
+        }
+    }
+
     private async Task<bool> ShouldSynchronizeSeedInventoryAsync(CancellationToken cancellationToken)
     {
         var seedTenantIds = await _context.Tenants

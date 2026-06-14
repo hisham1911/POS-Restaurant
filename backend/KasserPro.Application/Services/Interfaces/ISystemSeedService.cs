@@ -6,6 +6,7 @@ public interface ISystemSeedService
 {
     Task EnsureSystemOwnerAsync(CancellationToken cancellationToken = default);
     Task<ApiResponse<SystemSeedRunResultDto>> RunFullSeedPipelineAsync(CancellationToken cancellationToken = default);
+    Task<ApiResponse<SystemSeedRunResultDto>> SeedRestaurantDemoAsync(CancellationToken cancellationToken = default);
 }
 
 public class SystemSeedRunResultDto

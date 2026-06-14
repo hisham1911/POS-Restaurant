@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="TajerPro T Logo">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="MatamPro M Logo">
   <defs>
     <linearGradient id="brand" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#2563eb" />
@@ -6,8 +6,5 @@
     </linearGradient>
   </defs>
   <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#brand)" />
-  <path
-    d="M18 19h28v8H36v22h-8V27H18z"
-    fill="#ffffff"
-  />
+  <path d="M14 45V19h8l10 14 10-14h8v26h-8V31L34 43h-4l-8-12v14z" fill="#ffffff" />
 </svg>

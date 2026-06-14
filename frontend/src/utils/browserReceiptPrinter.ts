@@ -23,7 +23,7 @@ type ReceiptTenantSettings = Pick<
 >;
 
 const DEFAULT_RECEIPT_SETTINGS: ReceiptTenantSettings = {
-  name: "KasserPro Store",
+  name: "مطعم برو",
   timezone: "Africa/Cairo",
   logoUrl: undefined,
   isTaxEnabled: true,
@@ -278,7 +278,7 @@ export const printOrderReceiptFallback = (
     }
     ${
       settings.receiptShowBranchName
-        ? `<h2 class="title">${escapeHtml(order.branchName || settings.name || "KasserPro Store")}</h2>`
+        ? `<h2 class="title">${escapeHtml(order.branchName || settings.name || "مطعم برو")}</h2>`
         : ""
     }
     <div class="line-item"><span>${isRefund ? "فاتورة إرجاع" : "فاتورة رقم"}</span><span>${escapeHtml(order.orderNumber)}</span></div>
@@ -464,7 +464,7 @@ export const printKitchenTicketFallback = (
         ? `<img class="logo" src="${escapeHtml(safeLogoUrl)}" alt="Logo" onerror="this.style.display='none'" />`
         : ""
     }
-    <h2 class="title">${escapeHtml(order.branchName || settings.name || "KasserPro Store")}</h2>
+    <h2 class="title">${escapeHtml(order.branchName || settings.name || "مطعم برو")}</h2>
     <div class="kitchen-title">${escapeHtml(title)}</div>
     <div class="line-item"><span>أمر مطبخ</span><span>${escapeHtml(order.orderNumber)}</span></div>
     <p class="center">${formattedReceiptDate}</p>
@@ -516,7 +516,7 @@ export const printDebtPaymentReceiptFallback = (
     }
     ${
       settings.receiptShowBranchName
-        ? `<h2 class="title">${escapeHtml(options.branchName || settings.name || "KasserPro Store")}</h2>`
+        ? `<h2 class="title">${escapeHtml(options.branchName || settings.name || "مطعم برو")}</h2>`
         : ""
     }
     <div class="line-item"><span>إيصال سداد دين</span><span>PAY-${payment.id}</span></div>

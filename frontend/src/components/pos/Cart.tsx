@@ -2,6 +2,7 @@ import {
   Armchair,
   MessageSquare,
   Pencil,
+  Send,
   ShoppingCart,
   Tag,
   Trash2,
@@ -22,6 +23,8 @@ import clsx from "clsx";
 
 interface CartProps {
   onCheckout: () => void;
+  onSaveOpenOrder?: () => void;
+  isSavingOpenOrder?: boolean;
   selectedCustomer: Customer | null;
   onCustomerSelect: (customer: Customer | null) => void;
   orderType: OrderType;
@@ -63,6 +66,8 @@ const orderSources: Array<{ value: OrderSource; label: string }> = [
 
 export const Cart = ({
   onCheckout,
+  onSaveOpenOrder,
+  isSavingOpenOrder = false,
   selectedCustomer,
   onCustomerSelect,
   orderType,
@@ -108,6 +113,11 @@ export const Cart = ({
     deliveryAddress.trim().length > 0 ||
     deliveryFee.trim().length > 0 ||
     deliveryNotes.trim().length > 0;
+  const canKeepDineInOrderOpen =
+    orderType === "DineIn" && Boolean(selectedTable) && Boolean(onSaveOpenOrder);
+  const openOrderActionLabel = hasDraftOrder
+    ? "إرسال الإضافات وإبقاء الطلب مفتوح"
+    : "حفظ الطلب مفتوح";
 
   return (
     <div className="grid h-full min-h-0 grid-rows-[auto_auto_minmax(0,1fr)_auto] bg-white">
@@ -369,12 +379,29 @@ export const Cart = ({
             </div>
           ) : null}
 
+          {canKeepDineInOrderOpen && items.length > 0 && (
+            <button
+              onClick={onSaveOpenOrder}
+              disabled={isSavingOpenOrder}
+              className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-lg bg-primary-600 px-4 py-3 text-base font-bold text-white shadow-sm transition-all hover:bg-primary-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Send className="h-5 w-5" />
+              <span>{isSavingOpenOrder ? "جاري الحفظ..." : openOrderActionLabel}</span>
+              <span className="text-lg">{formatCurrency(total)}</span>
+            </button>
+          )}
+
           <button
             onClick={onCheckout}
             disabled={checkoutTotal <= 0}
-            className="flex min-h-[50px] w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-3 text-base font-bold text-white shadow-sm transition-all hover:bg-green-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+            className={clsx(
+              "flex min-h-[50px] w-full items-center justify-center gap-2 rounded-lg px-4 py-3 text-base font-bold shadow-sm transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60",
+              canKeepDineInOrderOpen && items.length > 0
+                ? "border border-green-200 bg-white text-green-700 hover:bg-green-50"
+                : "bg-green-600 text-white hover:bg-green-700",
+            )}
           >
-            <span>الدفع</span>
+            <span>الدفع وإغلاق الطلب</span>
             <span className="text-lg">{formatCurrency(checkoutTotal)}</span>
           </button>
         </div>

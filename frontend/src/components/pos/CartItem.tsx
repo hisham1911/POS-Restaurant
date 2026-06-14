@@ -14,6 +14,7 @@ import { useGetAvailableBatchesQuery } from "@/api/productBatchApi";
 import { usePermission } from "@/hooks/usePermission";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentBranch } from "@/store/slices/branchSlice";
+import { resolveProductIcon } from "@/utils/menuIcons";
 
 interface CartItemProps {
   item: CartItem;
@@ -85,6 +86,7 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
       ? getCartItemTotal({ ...item, discount: undefined }, taxRate, isTaxEnabled)
       : total;
   const productIcon = product.imageUrl?.trim() || "";
+  const fallbackIcon = resolveProductIcon(product.name);
   const hasProductImage = isImageSource(productIcon) && !imageError;
 
   return (
@@ -100,7 +102,7 @@ export const CartItemComponent = ({ item }: CartItemProps) => {
                 onError={() => setImageError(true)}
               />
             ) : (
-              <span className="text-2xl">{productIcon || "📦"}</span>
+              <span className="text-2xl">{productIcon || fallbackIcon}</span>
             )}
           </div>
 

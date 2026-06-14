@@ -52,6 +52,7 @@ import {
   getProductAvailableStock,
   getProductCurrentStock,
 } from "@/utils/productStock";
+import { resolveCategoryIcon } from "@/utils/menuIcons";
 import { usePermission } from "@/hooks/usePermission";
 import { useAppSelector } from "@/store/hooks";
 import { selectCurrentBranch } from "@/store/slices/branchSlice";
@@ -1105,7 +1106,7 @@ export const POSPage = () => {
             )}
             title="الكل"
           >
-            🏪
+            🧾
             <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
               الكل
             </span>
@@ -1124,7 +1125,7 @@ export const POSPage = () => {
               )}
               title={category.name}
             >
-              {category.imageUrl || "📁"}
+              {resolveCategoryIcon(category.name, category.imageUrl)}
               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                 {category.name}
               </span>
@@ -1200,10 +1201,10 @@ export const POSPage = () => {
               onChange={(e) => setSelectedCategory(e.target.value ? Number(e.target.value) : null)}
               className="flex-1 px-3 py-2 border-2 border-gray-200 rounded-lg bg-white text-sm font-medium text-gray-700 focus:border-primary-500 focus:outline-none"
             >
-              <option value="">🏪 الكل</option>
+              <option value="">🧾 الكل</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
-                  {category.imageUrl || "📁"} {category.name}
+                  {resolveCategoryIcon(category.name, category.imageUrl)} {category.name}
                 </option>
               ))}
             </select>

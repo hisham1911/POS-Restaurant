@@ -1,5 +1,6 @@
 import { Category } from "@/types/category.types";
 import clsx from "clsx";
+import { resolveCategoryIcon } from "@/utils/menuIcons";
 
 interface CategoryChipsProps {
   categories: Category[];
@@ -24,7 +25,7 @@ export const CategoryChips = ({
             : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50",
         )}
       >
-        الكل
+        🧾 الكل
       </button>
 
       {categories.map((category) => (
@@ -39,7 +40,7 @@ export const CategoryChips = ({
               : "border-gray-200 bg-white text-gray-700 hover:bg-gray-50",
           )}
         >
-          {category.name}
+          {resolveCategoryIcon(category.name, category.imageUrl)} {category.name}
         </button>
       ))}
     </div>

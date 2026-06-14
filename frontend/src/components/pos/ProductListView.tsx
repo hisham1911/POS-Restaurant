@@ -17,6 +17,7 @@ import {
   getProductCurrentStock,
   type BranchInventoryStockMap,
 } from "@/utils/productStock";
+import { resolveProductIcon } from "@/utils/menuIcons";
 
 interface ProductListViewProps {
   products: Product[];
@@ -148,6 +149,12 @@ export const ProductListView = ({
                   hasInventorySnapshot &&
                   totalStock > 0 &&
                   totalStock <= (product.lowStockThreshold ?? 10);
+                const rawProductIcon = product.imageUrl?.trim() || "";
+                const productIcon =
+                  rawProductIcon &&
+                  !/^(https?:\/\/|\/|data:image\/|blob:)/i.test(rawProductIcon)
+                    ? rawProductIcon
+                    : resolveProductIcon(product.name, category?.name);
 
                 return (
                   <button
@@ -169,18 +176,22 @@ export const ProductListView = ({
                         "active:scale-[0.99]",
                     )}
                   >
-                    {/* Left: Name & Stock */}
-                    <div className="flex-1 min-w-0 pe-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="text-sm font-semibold text-gray-900 truncate">
-                          {product.name}
-                        </h4>
-                        {quantityInCart > 0 && (
-                          <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-md bg-primary-600 px-1.5 text-xs font-bold text-white">
-                            {quantityInCart}
-                          </span>
-                        )}
-                      </div>
+                    {/* Left: Icon, name & stock */}
+                    <div className="flex min-w-0 flex-1 items-center gap-3 pe-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-xl">
+                        {productIcon}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="text-sm font-semibold text-gray-900 truncate">
+                            {product.name}
+                          </h4>
+                          {quantityInCart > 0 && (
+                            <span className="flex h-5 min-w-[20px] shrink-0 items-center justify-center rounded-md bg-primary-600 px-1.5 text-xs font-bold text-white">
+                              {quantityInCart}
+                            </span>
+                          )}
+                        </div>
 
                       {/* Stock Status */}
                       {requiresDirectStock && (
@@ -224,6 +235,7 @@ export const ProductListView = ({
                           <span className="text-gray-500 font-medium">غير متوفر</span>
                         </div>
                       )}
+                      </div>
                     </div>
 
                     {/* Right: Price */}

@@ -1,5 +1,6 @@
 import { Category } from "@/types/category.types";
 import clsx from "clsx";
+import { resolveCategoryIcon } from "@/utils/menuIcons";
 
 interface CategoryTabsProps {
   categories: Category[];
@@ -37,7 +38,7 @@ export const CategoryTabs = ({ categories, selectedId, onSelect }: CategoryTabsP
           )}
           aria-pressed={selectedId === category.id}
         >
-          {category.imageUrl || "📁"} {category.name}
+          {resolveCategoryIcon(category.name, category.imageUrl)} {category.name}
         </button>
       ))}
     </div>

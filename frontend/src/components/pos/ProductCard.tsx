@@ -11,6 +11,7 @@ import {
   getProductCurrentStock,
   type BranchInventoryStockMap,
 } from "@/utils/productStock";
+import { resolveProductIcon } from "@/utils/menuIcons";
 import { Loader2 } from "lucide-react";
 
 // Default low stock threshold if not provided
@@ -53,6 +54,7 @@ export const ProductCard = ({
   const categoryIcon = category?.imageUrl?.trim() || "";
   const hasProductImage = isImageSource(productIcon) && !imageError;
   const hasCategoryImage = isImageSource(categoryIcon) && !categoryImageError;
+  const fallbackIcon = resolveProductIcon(product.name, category?.name);
 
   // Get quantity in cart for this product
   const cartItems = items.filter((item) => item.product.id === product.id);
@@ -202,7 +204,7 @@ export const ProductCard = ({
         ) : categoryIcon ? (
           <span className="text-4xl">{categoryIcon}</span>
         ) : (
-          <span className="text-4xl">{"📦"}</span>
+          <span className="text-4xl">{fallbackIcon}</span>
         )}
 
         {/* Stock Badge */}
